@@ -30,3 +30,10 @@
 
 - **メモリ**: 512MB 以上 (Native Image 時) / 1GB 以上 (JVM 時)
 - **ディスク**: 100MB 以上 (バイナリ単体)
+
+## 5. 互換性目標 (Compatibility Goal)
+
+- **ターゲットバージョン**: **Ansible 13** で動作するコレクションの実行を目標としています。
+- **互換性の範囲**: 
+    - Ansible 13 相当の `ansible-core` 仕様への準拠。
+    - Ansible 13 エコシステムで提供される一般的な Collection の動作。
