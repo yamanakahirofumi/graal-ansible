@@ -44,5 +44,10 @@
 
 ## 完了済みの項目 (Completed)
 
+### [x] CLI エントリポイントの実装
+- **完了日**: 2026-02-28
+- **概要**: `ansible-playbook` 互換の引数を受け付ける CLI の実装。
+- **解決策**: [CLI仕様](features/CLI-Specification.md) に基づき、`picocli` を用いて `Main.java` および `PlaybookCli.java` を実装。
+
 ---
-*更新日: 2024-02-26*
+*更新日: 2026-02-28*
