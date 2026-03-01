@@ -38,7 +38,7 @@
 ### [ ] 実際の Ansible コレクションを使ったテスト方法の設計
 - **概要**: Java/GraalPy 環境で、既存の Python 製 Ansible コレクション（モジュール）が正しく動作するかを確認するテスト戦略。
 - **検討内容**:
-    - [テストケース作成ルール](tech/Test-Rule.md) に基づく、統合テストの定義。
+    - [テストケース作成ルール](tech/Test-Rule.md) および [実際のコレクションを用いた自動テストの要件](tech/Automated-Testing-Requirements.md) に基づく、統合テストの定義。
     - **指定したコレクション（`ansible.builtin.copy`, `ansible.builtin.command` 等）については、本物の Ansible モジュールを用いた動作確認を自動テストの中で実施する。**
     - 実際のコレクションを用いた実行環境（GraalPy）での挙動検証。
     - テスト実行時の Python 依存ライブラリ（コレクション）の解決方法。
