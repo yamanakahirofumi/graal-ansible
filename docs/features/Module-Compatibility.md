@@ -1,11 +1,13 @@
 # モジュール互換性 (Module Compatibility)
 
-Ansible モジュールを `graal-ansible` 上でどのように実行し、互換性を維持するかを定義します。
+Ansible モジュールの `graal-ansible` 上での実行における互換性の定義です。基本方針については [モジュールの開発方針](Module-Development-Policy.md) を参照してください。
 
-## 1. 実行方式の分類
+## 1. 実行方式
 
-1.  **Java Native Module**: 頻用されるモジュール（`command`, `file` 等）を Java で再実装したもの。高速で Python 環境不要。
-2.  **GraalPy Module**: 本家 Ansible の Python モジュールを GraalPy 上で実行。高い互換性を持つが、実行コストは Java Native より高い。
+本プロジェクトでは、本家 Ansible の Python モジュールを GraalPy 上で実行します。
+
+- **GraalPy Module**: 本家 Ansible の Python モジュールを GraalPy 上で実行。高い互換性を持ちますが、実行コストは Java Native よりも高くなる可能性があります。
+- **Java Native Module**: (非推奨) パフォーマンス上の制約等により、どうしても Java で実装されたモジュール。原則として新規開発は行いません。
 
 ## 2. 実装時にブレる恐れがある仕様 (実装上の留意点)
 

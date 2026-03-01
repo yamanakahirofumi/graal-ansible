@@ -21,7 +21,8 @@
 | `CLI-Specification.md`   | `ansible-playbook` 互換のコマンドライン引数、オプション、終了コードの仕様。                          |
 | `Playbook-Execution.md`  | Playbook の解析フロー、タスク実行順序、変数解決の優先順位、ループや条件分岐のサポート範囲。          |
 | `Inventory-System.md`    | 静的・動的インベントリのサポート形式（INI, YAML等）、グループ変数、ホスト変数の管理方法。            |
-| `Module-Compatibility.md`| サポート対象のモジュール一覧、Java Native実装とGraalPy実装の使い分け方針。                           |
+| `Module-Development-Policy.md`| Ansible モジュール自体の利用と、再実装禁止に関する基本方針。                                  |
+| `Module-Compatibility.md`| サポート対象のモジュール一覧、GraalPy 実装における互換性の維持方針。                            |
 | `System-Requirements.md` | 動作環境（Java/GraalVMバージョン、OS互換性）、必要な外部ライブラリ等の技術的制約。                   |
 
 ### 記述時の注意

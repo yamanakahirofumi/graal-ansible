@@ -18,6 +18,7 @@
 - [インベントリ管理](features/Inventory-System.md)：静的・動的インベントリのサポート範囲
 - [Playbook実行仕様](features/Playbook-Execution.md)：タスク実行、ループ、条件分岐のサポート範囲
 - [モジュール互換性](features/Module-Compatibility.md)：実装済みのコアモジュール一覧
+- [モジュールの開発方針](features/Module-Development-Policy.md)：Ansibleモジュールの実行および再実装禁止の方針
 
 ## 3. 技術・開発設定 (`docs/tech/`)
 - [アーキテクチャ設計](tech/Architecture.md)：システムのパッケージ構造と主要クラスの責務
