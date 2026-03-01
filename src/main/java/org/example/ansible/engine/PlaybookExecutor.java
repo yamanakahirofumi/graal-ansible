@@ -31,16 +31,28 @@ public class PlaybookExecutor {
      * @return A map of host names to their execution results for each task.
      */
     public Map<String, List<TaskResult>> execute(Playbook playbook, Inventory inventory) {
+        return execute(playbook, inventory, Map.of());
+    }
+
+    /**
+     * Executes the entire playbook with extra variables.
+     *
+     * @param playbook  The playbook to execute.
+     * @param inventory The inventory to use.
+     * @param extraVars Extra variables provided from outside.
+     * @return A map of host names to their execution results for each task.
+     */
+    public Map<String, List<TaskResult>> execute(Playbook playbook, Inventory inventory, Map<String, Object> extraVars) {
         Map<String, List<TaskResult>> results = new HashMap<>();
 
         for (Play play : playbook.plays()) {
-            executePlay(play, inventory, results);
+            executePlay(play, inventory, extraVars, results);
         }
 
         return results;
     }
 
-    private void executePlay(Play play, Inventory inventory, Map<String, List<TaskResult>> results) {
+    private void executePlay(Play play, Inventory inventory, Map<String, Object> extraVars, Map<String, List<TaskResult>> results) {
         List<Host> targetHosts = getTargetHosts(play.hosts(), inventory);
         java.util.Set<String> failedHosts = new java.util.HashSet<>();
 
@@ -50,11 +62,16 @@ public class PlaybookExecutor {
                     continue;
                 }
 
-                Map<String, Object> hostVars = inventory.getVariablesForHost(host.name());
+                Map<String, Object> allVars = new HashMap<>();
+                // Priority: Inventory < Play < Task < Extra
+                allVars.putAll(inventory.getVariablesForHost(host.name()));
+                allVars.putAll(play.vars());
+                allVars.putAll(task.vars());
+                allVars.putAll(extraVars);
 
                 // Variable resolution for task arguments
-                Map<String, Object> resolvedArgs = variableResolver.resolve(task.args(), hostVars);
-                Task resolvedTask = new Task(task.name(), task.action(), resolvedArgs);
+                Map<String, Object> resolvedArgs = variableResolver.resolve(task.args(), allVars);
+                Task resolvedTask = new Task(task.name(), task.action(), resolvedArgs, task.vars());
 
                 TaskResult result = taskExecutor.execute(resolvedTask);
                 results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(result);

@@ -16,9 +16,15 @@
     <jackson.version>2.17.0</jackson.version>
     <junit.version>5.10.2</junit.version>
     <sshd.version>2.12.1</sshd.version>
+    <jinjava.version>2.7.6</jinjava.version>
   </properties>
 
   <dependencies>
+    <dependency>
+      <groupId>com.hubspot.jinjava</groupId>
+      <artifactId>jinjava</artifactId>
+      <version>${jinjava.version}</version>
+    </dependency>
     <dependency>
       <groupId>org.yaml</groupId>
       <artifactId>snakeyaml</artifactId>

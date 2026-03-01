@@ -65,7 +65,9 @@ public class YamlParser {
             }
         }
 
-        return new Play(name, hosts, tasks);
+        Map<String, Object> vars = (Map<String, Object>) map.getOrDefault("vars", Map.of());
+
+        return new Play(name, hosts, tasks, vars);
     }
 
     @SuppressWarnings("unchecked")
@@ -95,6 +97,8 @@ public class YamlParser {
             throw new IllegalArgumentException("Task '" + name + "' is missing a module/action.");
         }
 
-        return new Task(name, action, args);
+        Map<String, Object> vars = (Map<String, Object>) map.getOrDefault("vars", Map.of());
+
+        return new Task(name, action, args, vars);
     }
 }

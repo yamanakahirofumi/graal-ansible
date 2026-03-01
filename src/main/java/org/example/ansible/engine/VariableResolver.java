@@ -1,17 +1,20 @@
 package org.example.ansible.engine;
 
+import com.hubspot.jinjava.Jinjava;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
- * Simple variable resolver for Ansible-like {{ var }} placeholders.
+ * Variable resolver using Jinjava for Jinja2 compatibility.
  */
 public class VariableResolver {
-    private static final Pattern VAR_PATTERN = Pattern.compile("\\{\\{\\s*([\\w.]+)\\s*}}");
+    private final Jinjava jinjava;
+
+    public VariableResolver() {
+        this.jinjava = new Jinjava();
+    }
 
     /**
      * Resolves variables in a map of arguments.
@@ -50,21 +53,11 @@ public class VariableResolver {
         return value;
     }
 
-    private String resolveString(String input, Map<String, Object> variables) {
-        Matcher matcher = VAR_PATTERN.matcher(input);
-        StringBuilder sb = new StringBuilder();
-        while (matcher.find()) {
-            String varName = matcher.group(1);
-            Object varValue = variables.get(varName);
-            if (varValue != null) {
-                matcher.appendReplacement(sb, Matcher.quoteReplacement(varValue.toString()));
-            } else {
-                // If variable not found, leave it as is or handle accordingly.
-                // For now, we leave the placeholder.
-                matcher.appendReplacement(sb, Matcher.quoteReplacement(matcher.group(0)));
-            }
+    private Object resolveString(String input, Map<String, Object> variables) {
+        if (input == null) return null;
+        if (!input.contains("{{")) {
+            return input;
         }
-        matcher.appendTail(sb);
-        return sb.toString();
+        return jinjava.render(input, variables);
     }
 }

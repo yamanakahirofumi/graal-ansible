@@ -17,6 +17,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -88,9 +89,12 @@ public class PlaybookCli implements Callable<Integer> {
             TaskExecutor taskExecutor = new TaskExecutor();
             registerStandardModules(taskExecutor);
 
+            // Parse extra-vars
+            Map<String, Object> parsedExtraVars = parseExtraVars(extraVars);
+
             // Execute Playbook
             PlaybookExecutor executor = new PlaybookExecutor(taskExecutor);
-            Map<String, List<TaskResult>> results = executor.execute(playbook, inventory);
+            Map<String, List<TaskResult>> results = executor.execute(playbook, inventory, parsedExtraVars);
 
             // Print Results
             printSummary(results);
@@ -105,9 +109,23 @@ public class PlaybookCli implements Callable<Integer> {
         }
     }
 
+    private Map<String, Object> parseExtraVars(List<String> extraVars) {
+        Map<String, Object> result = new HashMap<>();
+        for (String var : extraVars) {
+            if (var.contains("=")) {
+                String[] parts = var.split("=", 2);
+                result.put(parts[0].trim(), parts[1].trim());
+            } else {
+                // Support for JSON/YAML extra-vars can be added here
+                // For now, only key=value is supported as per the simple implementation
+            }
+        }
+        return result;
+    }
+
     private void registerStandardModules(TaskExecutor executor) {
         executor.registerModule("debug", args -> {
-            String msg = (String) args.getOrDefault("msg", "Hello world");
+            Object msg = args.getOrDefault("msg", "Hello world");
             System.out.println("DEBUG: " + msg);
             return TaskResult.success(false, Map.of("msg", msg));
         });
