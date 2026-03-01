@@ -41,7 +41,7 @@
     - [テストケース作成ルール](tech/Test-Rule.md) および [実際のコレクションを用いた自動テストの要件](tech/Automated-Testing-Requirements.md) に基づく、統合テストの定義。
     - **指定したコレクション（`ansible.builtin.copy`, `ansible.builtin.command` 等）については、本物の Ansible モジュールを用いた動作確認を自動テストの中で実施する。**
     - 実際のコレクションを用いた実行環境（GraalPy）での挙動検証。
-    - テスト実行時の Python 依存ライブラリ（コレクション）の解決方法。
+    - テスト実行時の Python 依存ライブラリやコレクションの自動取得・解決方法（`ansible-galaxy` 等の利用）。
     - モジュール実行結果（JSON）のパースと Java 側での検証フロー。
 
 ## 5. 人間が主導すべき設計・調整面
