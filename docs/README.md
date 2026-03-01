@@ -27,6 +27,7 @@
 - [技術スタック](tech/Tech-Stack.md)：使用している言語、ライブラリ、ツールなどの情報
 - [CI 設定](tech/CI-Setting.md)：GitHub Actions を利用した自動ビルドとテストの設定について
 - [実際のコレクションを用いたテスト](tech/Actual-Collection-Testing.md)：実際の Ansible コレクションを用いた自動テストの実施方法
+- [実際のコレクションを用いた自動テストの要件](tech/Automated-Testing-Requirements.md)：テスト実行に必要な環境設定や手順の詳細
 - [テストルール](tech/Test-Rule.md)：テストケース作成の一般的なガイドライン
 - [品質方針](tech/Quality-Policy.md)：フェーズ（仕様未確定/確定）に応じた品質の考え方と到達目標
 - [配布方法](tech/Distribution-Method.md)：カスタム JRE による配布パッケージの作成について
