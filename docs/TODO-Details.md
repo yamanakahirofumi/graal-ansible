@@ -31,7 +31,16 @@
 ### [ ] Native Image 時のリフレクション設定
 - **概要**: YAML 解析や動的クラスロードに伴うリフレクション定義の生成。
 - **検討内容**:
-    - `reflect-config.json` の自動生成ツールの検討。
+    - [Native Image 最適化](implementation/Native-Image-Optimization.md) に基づく設定ファイルの作成。
+    - `native-image-configure-plugin` を用いた自動生成プロセスの構築。
+    - GraalPy 実行時のリソース（Python スクリプト等）のバンドル設定。
+
+### [ ] Jinjava による変数テンプレートの実装
+- **概要**: Playbook や変数ファイル内の Jinja2 テンプレートを展開する仕組み。
+- **検討内容**:
+    - [変数とテンプレート](implementation/Variables-Templating.md) に基づく VariableManager の実装。
+    - 主要な Ansible フィルター（default, ipaddr 等）の Java による実装と登録。
+    - 遅延評価ロジックの組み込み。
 
 ## 4. テスト面 (Testing)
 
