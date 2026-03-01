@@ -32,4 +32,15 @@ public record TaskResult(boolean success, boolean changed, String message, Map<S
     public static TaskResult failure(String message) {
         return new TaskResult(false, false, message, Map.of());
     }
+
+    /**
+     * Creates a successful task result from a data map, extracting the "changed" flag.
+     *
+     * @param data The result data map.
+     * @return A successful TaskResult.
+     */
+    public static TaskResult success(final Map<String, Object> data) {
+        final boolean changed = Boolean.TRUE.equals(data.get("changed"));
+        return new TaskResult(true, changed, "OK", data);
+    }
 }

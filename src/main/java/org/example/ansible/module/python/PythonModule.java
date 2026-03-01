@@ -31,25 +31,27 @@ public class PythonModule implements Module {
      * @return The result of the execution.
      */
     @Override
-    public TaskResult execute(Map<String, Object> args) {
+    public TaskResult execute(final Map<String, Object> args) {
         try (Context context = Context.newBuilder("python")
                 .allowAllAccess(true)
                 .build()) {
-            
-            // モジュール引数をJSON文字列に変換
-            String argsJson = objectMapper.writeValueAsString(args);
-            
+
+            // Bind values to the Python context to avoid script injection
+            context.getBindings("python").putMember("complex_args", args);
+            context.getBindings("python").putMember("module_code", scriptContent);
+
             // Python側で引数を読み込み、モジュールを実行するラッパースクリプト
             // Ansibleモジュールは通常標準入力から引数を受け取り、標準出力にJSONを出す
-            String wrapperScript = 
+            final String wrapperScript =
                 "import json\n" +
                 "import sys\n" +
+                "import polyglot\n" +
                 "from io import StringIO\n" +
                 "\n" +
                 "def run_module():\n" +
-                "    args = json.loads(r'''" + argsJson + "''')\n" +
-                "    # モジュールのメイン処理を呼び出すための擬似的な環境構築\n" +
-                "    # 本来は ansible.module_utils が必要だが、動作確認用として最小限に留める\n" +
+                "    # Bindings from Java are directly accessible\n" +
+                "    # polyglot.as_type can convert host objects to Python objects\n" +
+                "    args = complex_args\n" +
                 "    \n" +
                 "    # 出力をキャプチャ\n" +
                 "    old_stdout = sys.stdout\n" +
@@ -58,7 +60,6 @@ public class PythonModule implements Module {
                 "    try:\n" +
                 "        # ここで本来のモジュールコードを実行\n" +
                 "        # 今回は簡略化のため、モジュールコード自体が args を処理するように期待する\n" +
-                "        module_code = r'''" + scriptContent + "'''\n" +
                 "        module_globals = {'complex_args': args, 'ansible_module_results': {}}\n" +
                 "        exec(module_code, module_globals)\n" +
                 "        # モジュールが結果を標準出力に出すと仮定\n" +
@@ -78,16 +79,16 @@ public class PythonModule implements Module {
             if (pythonResult == null || !pythonResult.isString()) {
                 return TaskResult.failure("Module produced no valid output (result is not a string)");
             }
-            String output = pythonResult.asString();
-            
+            final String output = pythonResult.asString();
+
             if (output == null || output.isBlank()) {
                 return TaskResult.failure("Module produced no output");
             }
 
             @SuppressWarnings("unchecked")
-            Map<String, Object> resultMap = objectMapper.readValue(output, Map.class);
-            
-            boolean failed = resultMap.containsKey("failed") && (boolean) resultMap.get("failed");
+            final Map<String, Object> resultMap = objectMapper.readValue(output, Map.class);
+
+            final boolean failed = Boolean.TRUE.equals(resultMap.get("failed"));
             if (failed) {
                 return TaskResult.failure(resultMap.getOrDefault("msg", "Module failed").toString());
             }
