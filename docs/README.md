@@ -35,6 +35,7 @@
 
 ## 4. 実装詳細 (`docs/implementation/`)
 - [YAML解析エンジン](implementation/YAML-Parser.md)：SnakeYAML等を用いたPlaybook解析の実装
+- [インベントリシステム実装](implementation/Inventory-System.md)：静的インベントリの解析と管理
 - [タスク実行エンジン](implementation/Task-Executor.md)：マルチスレッド実行と順序制御
 - [接続プラグイン実装](implementation/Connection-Plugins.md)：Local, SSH(JSch/Apache MINA SSHD)の実装
 - [変数とテンプレート](implementation/Variables-Templating.md)：Jinja2互換エンジンの統合
