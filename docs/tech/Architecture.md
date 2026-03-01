@@ -17,7 +17,7 @@
 │   │   │       ├── parser/           # YAML/Playbook 解析 (SnakeYAML等)
 │   │   │       ├── engine/           # Playbook 実行エンジン (タスク制御)
 │   │   │       ├── inventory/        # インベントリ管理 (静的/動的)
-│   │   │       ├── module/           # コアモジュール実装 (Javaによる再実装)
+│   │   │       ├── module/           # モジュール実行ブリッジ (GraalPy経由)
 │   │   │       ├── connection/       # 接続プラグイン (Local, SSH)
 │   │   │       └── util/             # OS抽象化レイヤー、共通ユーティリティ
 │   │   └── resources
@@ -40,7 +40,7 @@
 
 ### 2.3 Provider / Plugin 層
 - **InventoryManager**：ホスト情報およびグループ変数を管理します。
-- **ModuleExecutor**：Javaで実装された各モジュール（file, command, shell等）を、OS非依存性を考慮して実行します。
+- **ModuleExecutor**：本家 Ansible の Python モジュールを GraalPy を介して実行します。実際のコレクションやモジュールを直接利用することで、高い互換性を確保します。
 - **Python Runtime (GraalPy)**：既存の Python 製 Ansible モジュールを実行するためのランタイム環境を提供します。
 - **ConnectionPlugin**：対象ホストへの接続（Local, SSH等）を抽象化します。
 
