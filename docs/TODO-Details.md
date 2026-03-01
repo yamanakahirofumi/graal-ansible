@@ -8,6 +8,7 @@
 ### [ ] GraalPy と Java のシームレスな統合
 - **概要**: Java コードから既存の Ansible Python モジュールを効率的に呼び出すためのブリッジ設計。
 - **検討内容**:
+    - [モジュールの開発方針](features/Module-Development-Policy.md) に基づく、既存 Python モジュールのロード。
     - Polyglot API を用いたデータ型変換の最適化。
     - Python 側の標準ライブラリ（`ansible.module_utils` 等）の読み込み。
 
