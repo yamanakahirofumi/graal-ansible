@@ -11,6 +11,7 @@
 ### 1.2 Ansible コレクションの配置と自動取得
 - テストに使用するコレクション（例：`ansible.posix`, `community.general` 等）が、テスト実行環境の特定のパス（`ANSIBLE_COLLECTIONS_PATH`）に配置されていること。
 - **自動取得の検討**: テスト実行前に `ansible-galaxy collection install` 相当の処理（現時点でも標準的なコマンド）を自動で行い、必要なコレクションを指定した一時ディレクトリ等に配備する仕組みを検討すること。
+    - 詳細は [実際のコレクションを用いた自動テストの実施方法](Actual-Collection-Testing.md) を参照。
 - `ansible.builtin` モジュールについては、Ansible 本体（あるいは互換レイヤー）からロード可能であること。
 - **ツール選定**: 現行の Ansible 環境では `ansible-galaxy` が依然としてコレクション管理のデファクトスタンダードであり、自動テスト時もこのコマンド、または `requirements.yml` を用いたインストール手法を採用することが適切である。
 
