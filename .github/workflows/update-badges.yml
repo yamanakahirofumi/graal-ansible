@@ -1,0 +1,116 @@
+name: Update README badges (docs md lines & Java LOC)
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'docs/**/*.md'
+      - '**/*.java'
+      - '.github/workflows/update-badges.yml'
+      - 'README.md'
+  workflow_dispatch: {}
+  schedule:
+    - cron: '0 3 * * 1'  # Weekly on Monday 03:00 UTC
+
+permissions:
+  contents: write
+
+jobs:
+  update-badges:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Calculate docs md total lines
+        id: doclines
+        shell: bash
+        run: |
+          set -euo pipefail
+          DOCS_DIR="docs"
+          if [ -d "$DOCS_DIR" ]; then
+            # Find .md files under docs and sum total lines (including empty lines)
+            total=$(find "$DOCS_DIR" -type f -name '*.md' -print0 | xargs -0 -I{} sh -c 'wc -l < "$1"' _ {} | awk '{s+=$1} END{print s+0}')
+          else
+            total=0
+          fi
+          echo "docs_lines=$total" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Calculate Java LOC (non-empty lines)
+        id: javaloc
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Sum non-empty lines across all *.java files in the repo
+          if git ls-files '*.java' | grep -q ".java$"; then
+            total=$(git ls-files '*.java' | xargs -I{} sh -c "grep -v '^[[:space:]]*$' \"{}\" | wc -l" | awk '{s+=$1} END{print s+0}')
+          else
+            total=0
+          fi
+          echo "java_loc=$total" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Build shields.io badge markdown
+        id: badges
+        shell: bash
+        run: |
+          set -euo pipefail
+          docs_lines="${{ steps.doclines.outputs.docs_lines }}"
+          java_loc="${{ steps.javaloc.outputs.java_loc }}"
+
+          # Build badge image URLs (URL-encoded spaces)
+          docs_badge_url="https://img.shields.io/badge/docs%20md%20lines-${docs_lines}-blue"
+          java_badge_url="https://img.shields.io/badge/Java%20LOC-${java_loc}-green"
+
+          # Markdown badges block
+          printf '%s\n' "<!-- badges: start -->" > badges.md
+          printf '%s\n' "[![Docs MD Lines](${docs_badge_url})](./docs) [![Java LOC](${java_badge_url})](.)" >> badges.md
+          printf '%s\n' "<!-- badges: end -->" >> badges.md
+
+          echo "Generated badges.md:" && cat badges.md
+
+      - name: Update README badges section
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Ensure README exists
+          if [ ! -f README.md ]; then
+            echo "# Project" > README.md
+          fi
+
+          # If badges section exists, replace between markers. Otherwise, insert after first header.
+          if grep -q "<!-- badges: start -->" README.md; then
+            # Replace the whole badges block
+            awk 'BEGIN{p=1} /<!-- badges: start -->/{print; system("sed -n 1,9999p badges.md | sed -n 2p"); p=0} /<!-- badges: end -->/{print; p=1; next} p{print}' README.md > README.tmp
+          else
+            # Insert badges after the first markdown title line if present, else at top
+            if grep -nE '^[#]{1,6} ' README.md | head -n1 | grep -o '^[0-9]\+' > /dev/null; then
+              line=$(grep -nE '^[#]{1,6} ' README.md | head -n1 | cut -d: -f1)
+              awk -v l="$line" 'NR==l{print; print ""; print "<!-- badges: start -->"; system("sed -n 2p badges.md"); print "<!-- badges: end -->"; next} {print}' README.md > README.tmp
+            else
+              # Prepend badges at top
+              { cat badges.md; echo; cat README.md; } > README.tmp
+            fi
+          fi
+
+          mv README.tmp README.md
+          rm -f badges.md
+
+      - name: Commit and push changes if any
+        shell: bash
+        env:
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git add README.md
+          git commit -m "chore: update README badges (docs md lines: ${{ steps.doclines.outputs.docs_lines }}, Java LOC: ${{ steps.javaloc.outputs.java_loc }})"
+          git push
