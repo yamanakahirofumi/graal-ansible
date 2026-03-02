@@ -11,6 +11,8 @@ import org.example.ansible.engine.TaskExecutor;
 import org.example.ansible.engine.TaskResult;
 import org.example.ansible.inventory.IniInventoryParser;
 import org.example.ansible.inventory.Inventory;
+import org.example.ansible.inventory.InventoryParser;
+import org.example.ansible.inventory.YamlInventoryParser;
 import org.example.ansible.parser.YamlParser;
 
 import java.io.File;
@@ -75,7 +77,13 @@ public class PlaybookCli implements Callable<Integer> {
             // Load Inventory
             Inventory inventory;
             if (inventoryPath != null) {
-                IniInventoryParser inventoryParser = new IniInventoryParser();
+                InventoryParser inventoryParser;
+                if (inventoryPath.endsWith(".yml") || inventoryPath.endsWith(".yaml")) {
+                    inventoryParser = new YamlInventoryParser();
+                } else {
+                    inventoryParser = new IniInventoryParser();
+                }
+
                 try (InputStream is = new FileInputStream(inventoryPath)) {
                     inventory = inventoryParser.parse(is);
                 }
