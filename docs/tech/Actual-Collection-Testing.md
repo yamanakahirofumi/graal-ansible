@@ -2,32 +2,65 @@
 
 本ドキュメントでは、GraalPy 環境で実際の Ansible コレクション（`ansible.builtin` や外部コレクション）を使用して動作確認を行うための具体的なテスト実施方法について述べます。
 
-## 1. テストの全体像
+## 1. テストの目的と分類
 
-実際のコレクションを用いたテストは、モックを使用せずに GraalPy 上で本物の Python モジュールを実行する「結合テスト」の性質を持ちます。テストの信頼性を高めるため、以下の3つのフェーズで構成されます。
+実際のコレクションを用いたテストは、検証の目的に応じて以下の2つのカテゴリに分類して実施します。
 
-1.  **依存関係の準備 (Setup)**: `ansible-galaxy` を使用して必要なコレクションを一時ディレクトリにインストールする。
-2.  **テスト実行 (Execute)**: JUnit 5 から GraalPy コンテキストを起動し、対象モジュールを実行する。
-3.  **状態検証 (Verify)**: モジュールの戻り値（JSON）と、実際のファイルシステムへの副作用を検証する。
+### 1.1 ランタイム互換性テスト (Runtime Compatibility Test)
+`graal-ansible` の実行エンジン（Playbook 解析等）を介さず、**「対象の Python モジュールが GraalPy 上で単独で動作するか」**のみを検証します。
+*   **目的**: Ansible モジュールの Python コードが、GraalPy の制限（C拡張の互換性、特定ライブラリの非互換など）に抵触しないかを早期に発見する。
+*   **方法**: `PythonModule` ラッパーを直接呼び出し、最小限の引数で実行結果（JSON）が返ってくるかを確認する。
 
-## 2. 依存関係の管理と動的取得
+### 1.2 機能充足テスト (Functional Sufficiency Test)
+`graal-ansible` の全機能を組み合わせて、**「Playbook が期待通りに実行され、ターゲットの状態が変更されるか」**を検証します。
+*   **目的**: YAML 解析、変数展開、タスク実行エンジンの整合性を含めたエンドツーエンドの品質を確認する。
+*   **方法**: 実際の Playbook ファイルを読み込み、`PlaybookExecutor` を通じて実行し、ファイルシステム等の副作用を検証する。
 
-テストに必要なコレクションは、プロジェクト内の `src/test/resources/ansible/requirements.yml` に定義します。
+## 2. テストの全体像 (フェーズ構成)
+上記テストを支えるため、以下の3つのフェーズで構成されます。
 
-### 2.1 requirements.yml の例
-```yaml
-collections:
-  - name: ansible.posix
-    version: 1.5.4
-  - name: community.general
-    version: 8.0.2
+1.  **依存関係の準備 (Setup)**:
+    *   **環境の分離 (Virtualenv)**: ホスト環境の汚染を防ぐため、GraalPy 上で仮想環境 (venv) を構築します。
+    *   **ansible-core のインストール**: `pip install ansible-core` を実行し、`ansible.builtin` モジュールや `ansible.module_utils` を取得します。
+    *   **コレクションのインストール**: `ansible-galaxy collection install` を使用して必要な外部コレクションを `target/ansible_collections` にインストールします。
+    *   Maven の `exec-maven-plugin` または JUnit 5 の `@BeforeAll` を活用して、これらの構築を自動化します。
+2.  **テスト実行 (Execute)**:
+    *   構築した仮想環境内の Python インタプリタ、またはライブラリパスを GraalPy コンテキストに紐づけます。
+    *   `ANSIBLE_COLLECTIONS_PATH` を環境変数として設定します。
+    *   モジュールが必要とする引数を JSON 形式で作成し、Ansible 互換の一時ファイル経由で渡します。
+3.  **状態検証 (Verify)**:
+    *   モジュールが標準出力（JSON）に返した実行結果を検証します。
+    *   ファイル操作（`copy` など）を伴う場合は、実際に副作用が発生したかを Java 側で検証します。
+    *   冪等性のテスト（2回実行して `changed=false`）も実施します。
+
+## 2. 実行環境の動的構築フロー
+
+ホストマシンに Ansible がインストールされていない環境を前提とし、以下の手順でテスト環境を自動構築します。
+
+### 2.1 仮想環境の構築例 (Java/JUnit 側)
+```java
+@BeforeAll
+static void setupAnsibleEnvironment() throws Exception {
+    Path venvPath = Paths.get("target/test-venv");
+    if (!Files.exists(venvPath)) {
+        // 1. venv の作成
+        new ProcessBuilder("graalpy", "-m", "venv", venvPath.toString()).start().waitFor();
+        
+        // 2. ansible-core と依存ライブラリのインストール
+        String pipPath = venvPath.resolve("bin/pip").toString();
+        new ProcessBuilder(pipPath, "install", "ansible-core==2.18.0").start().waitFor();
+    }
+}
 ```
 
-### 2.2 ansible-galaxy によるインストール
-JUnit の `@BeforeAll` またはビルドスクリプト（Maven）の `process-test-resources` フェーズで、以下のコマンドを実行し、テスト用の一時ディレクトリにコレクションを配置します。
+### 2.2 GraalPy コンテキストの設定
+インストールしたライブラリを Java から利用するため、GraalPy コンテキストの `python.executable` や `python.path` を設定します。
 
-```bash
-ansible-galaxy collection install -r requirements.yml -p ./target/ansible_collections
+```java
+Context context = Context.newBuilder("python")
+    .option("python.executable", venvPath.resolve("bin/graalpy").toString())
+    .allowAllAccess(true)
+    .build();
 ```
 
 ## 3. テストクラスの構造案
