@@ -1,6 +1,9 @@
 package org.example.ansible.engine;
 
 import com.hubspot.jinjava.Jinjava;
+import org.example.ansible.engine.filter.DefaultFilter;
+import org.example.ansible.engine.filter.IpAddrFilter;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -14,6 +17,12 @@ public class VariableResolver {
 
     public VariableResolver() {
         this.jinjava = new Jinjava();
+        registerFilters();
+    }
+
+    private void registerFilters() {
+        jinjava.getGlobalContext().registerFilter(new DefaultFilter());
+        jinjava.getGlobalContext().registerFilter(new IpAddrFilter());
     }
 
     /**
@@ -29,7 +38,7 @@ public class VariableResolver {
         for (Map.Entry<String, Object> entry : args.entrySet()) {
             resolved.put(entry.getKey(), resolveValue(entry.getValue(), variables));
         }
-        return Map.copyOf(resolved);
+        return java.util.Collections.unmodifiableMap(resolved);
     }
 
     /**
