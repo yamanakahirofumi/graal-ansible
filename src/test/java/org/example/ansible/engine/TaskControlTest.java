@@ -25,6 +25,75 @@ class TaskControlTest {
     }
 
     @Test
+    void testWhenConditionList() {
+        // Arrange
+        String inventoryIni = "host1 run_a=true run_b=true\nhost2 run_a=true run_b=false";
+        Inventory inventory = new IniInventoryParser().parse(new ByteArrayInputStream(inventoryIni.getBytes(StandardCharsets.UTF_8)));
+
+        String playbookYaml = """
+                - name: test when list
+                  hosts: all
+                  tasks:
+                    - name: conditional task
+                      debug:
+                        msg: "hello"
+                      when:
+                        - run_a
+                        - run_b
+                """;
+        Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
+
+        taskExecutor.registerModule("debug", args -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+
+        // Act
+        Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
+
+        // Assert
+        assertTrue(results.get("host1").get(0).success());
+        assertNull(results.get("host1").get(0).data().get("skipped"));
+
+        assertTrue(Boolean.TRUE.equals(results.get("host2").get(0).data().get("skipped")));
+    }
+
+    @Test
+    void testEmptyStringTruthiness() {
+        // Arrange
+        String inventoryIni = "host1";
+        Inventory inventory = new IniInventoryParser().parse(new ByteArrayInputStream(inventoryIni.getBytes(StandardCharsets.UTF_8)));
+
+        String playbookYaml = """
+                - name: test truthiness
+                  hosts: all
+                  vars:
+                    empty_var: ""
+                    non_empty_var: "hi"
+                  tasks:
+                    - name: skip me
+                      debug:
+                        msg: "skip"
+                      when: empty_var
+                    - name: run me
+                      debug:
+                        msg: "run"
+                      when: non_empty_var
+                """;
+        Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
+
+        taskExecutor.registerModule("debug", args -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+
+        // Act
+        Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
+
+        // Assert
+        assertTrue(isSkipped(results.get("host1").get(0)));
+        assertFalse(isSkipped(results.get("host1").get(1)));
+    }
+
+    private boolean isSkipped(TaskResult result) {
+        return Boolean.TRUE.equals(result.data().get("skipped"));
+    }
+
+    @Test
     void testWhenCondition() {
         // Arrange
         String inventoryIni = "host1 run_task=true\nhost2 run_task=false";

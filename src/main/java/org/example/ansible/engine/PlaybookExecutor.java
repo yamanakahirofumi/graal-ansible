@@ -109,15 +109,26 @@ public class PlaybookExecutor {
     private TaskResult executeSingleTask(Play play, Host host, Task task, Map<String, Object> variables) {
         // Evaluate 'when' condition
         if (task.when() != null) {
-            Object conditionResult = variableResolver.resolveValue("{{ " + task.when() + " }}", variables);
-            if (!isTrue(conditionResult)) {
-                return new TaskResult(true, false, "Skipped due to when condition", Map.of("skipped", true));
+            List<String> conditions;
+            if (task.when() instanceof List<?> list) {
+                conditions = list.stream().filter(String.class::isInstance).map(String.class::cast).collect(Collectors.toList());
+            } else if (task.when() instanceof String s) {
+                conditions = List.of(s);
+            } else {
+                conditions = List.of(task.when().toString());
+            }
+
+            for (String condition : conditions) {
+                Object conditionResult = variableResolver.resolveValue("{{ " + condition + " }}", variables);
+                if (!isTrue(conditionResult)) {
+                    return new TaskResult(true, false, "Skipped due to when condition", Map.of("skipped", true));
+                }
             }
         }
 
         // Variable resolution for task arguments
         Map<String, Object> resolvedArgs = variableResolver.resolve(task.args(), variables);
-        Task resolvedTask = new Task(task.name(), task.action(), resolvedArgs, task.vars(), task.when(), task.register(), task.loop());
+        Task resolvedTask = new Task(task.name(), task.action(), resolvedArgs, task.vars(), task.when(), task.register(), task.loop(), task.notifications());
 
         return taskExecutor.execute(resolvedTask);
     }
@@ -218,11 +229,17 @@ public class PlaybookExecutor {
     }
 
     private boolean isTrue(Object value) {
+        if (value == null) return false;
         if (value instanceof Boolean b) return b;
         if (value instanceof String s) {
-            return "true".equalsIgnoreCase(s) || "yes".equalsIgnoreCase(s) || "on".equalsIgnoreCase(s);
+            if (s.isEmpty() || s.isBlank() || "false".equalsIgnoreCase(s) || "no".equalsIgnoreCase(s) || "off".equalsIgnoreCase(s)) {
+                return false;
+            }
+            return true;
         }
         if (value instanceof Number n) return n.doubleValue() != 0;
-        return value != null;
+        if (value instanceof List<?> l) return !l.isEmpty();
+        if (value instanceof Map<?, ?> m) return !m.isEmpty();
+        return true;
     }
 }
