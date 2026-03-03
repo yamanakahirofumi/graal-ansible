@@ -2,7 +2,12 @@ package org.example.ansible.engine;
 
 import org.example.ansible.inventory.Host;
 import org.example.ansible.inventory.Inventory;
+import org.yaml.snakeyaml.Yaml;
 
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -13,10 +18,17 @@ import java.util.Map;
 public class VariableManager {
     private final Inventory inventory;
     private final Map<String, Object> extraVars;
+    private final Path baseDir;
+    private final Yaml yaml = new Yaml();
 
     public VariableManager(Inventory inventory, Map<String, Object> extraVars) {
+        this(inventory, extraVars, null);
+    }
+
+    public VariableManager(Inventory inventory, Map<String, Object> extraVars, Path baseDir) {
         this.inventory = inventory;
         this.extraVars = extraVars != null ? new HashMap<>(extraVars) : new HashMap<>();
+        this.baseDir = baseDir;
     }
 
     /**
@@ -43,7 +55,12 @@ public class VariableManager {
             variables.putAll(play.vars());
         }
 
-        // 7. Play Vars Files (Not implemented yet)
+        // 7. Play Vars Files
+        if (play != null && !play.varsFiles().isEmpty()) {
+            for (String varsFile : play.varsFiles()) {
+                variables.putAll(loadVarsFile(varsFile));
+            }
+        }
 
         // 8. Role Vars (Not implemented yet)
 
@@ -56,5 +73,21 @@ public class VariableManager {
         variables.putAll(extraVars);
 
         return Collections.unmodifiableMap(variables);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> loadVarsFile(String varsFile) {
+        Path filePath = baseDir != null ? baseDir.resolve(varsFile) : Path.of(varsFile);
+        try (InputStream is = new FileInputStream(filePath.toFile())) {
+            Object raw = yaml.load(is);
+            if (raw instanceof Map<?, ?> map) {
+                return (Map<String, Object>) map;
+            }
+        } catch (IOException e) {
+            // In Ansible, if vars_file is not found, it's generally an error unless ignored.
+            // For now, we'll just throw a runtime exception or log it.
+            throw new RuntimeException("Failed to load vars_file: " + varsFile, e);
+        }
+        return Map.of();
     }
 }

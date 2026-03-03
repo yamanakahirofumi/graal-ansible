@@ -4,6 +4,7 @@ import org.example.ansible.inventory.Group;
 import org.example.ansible.inventory.Host;
 import org.example.ansible.inventory.Inventory;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -31,7 +32,7 @@ public class PlaybookExecutor {
      * @return A map of host names to their execution results for each task.
      */
     public Map<String, List<TaskResult>> execute(Playbook playbook, Inventory inventory) {
-        return execute(playbook, inventory, Map.of());
+        return execute(playbook, inventory, Map.of(), null);
     }
 
     /**
@@ -43,8 +44,21 @@ public class PlaybookExecutor {
      * @return A map of host names to their execution results for each task.
      */
     public Map<String, List<TaskResult>> execute(Playbook playbook, Inventory inventory, Map<String, Object> extraVars) {
+        return execute(playbook, inventory, extraVars, null);
+    }
+
+    /**
+     * Executes the entire playbook with extra variables and a base directory for file resolution.
+     *
+     * @param playbook  The playbook to execute.
+     * @param inventory The inventory to use.
+     * @param extraVars Extra variables provided from outside.
+     * @param baseDir   The base directory for resolving relative paths (e.g., vars_files).
+     * @return A map of host names to their execution results for each task.
+     */
+    public Map<String, List<TaskResult>> execute(Playbook playbook, Inventory inventory, Map<String, Object> extraVars, Path baseDir) {
         Map<String, List<TaskResult>> results = new HashMap<>();
-        VariableManager variableManager = new VariableManager(inventory, extraVars);
+        VariableManager variableManager = new VariableManager(inventory, extraVars, baseDir);
 
         for (Play play : playbook.plays()) {
             executePlay(play, inventory, variableManager, results);
