@@ -110,7 +110,20 @@ public class YamlParser {
         }
 
         Map<String, Object> vars = (Map<String, Object>) map.getOrDefault("vars", Map.of());
+        Object when = map.get("when");
+        String register = (String) map.get("register");
+        Object loop = map.get("loop");
 
-        return new Task(name, action, args, vars);
+        List<String> notify = new ArrayList<>();
+        Object notifyObj = map.get("notify");
+        if (notifyObj instanceof List<?> list) {
+            for (Object item : list) {
+                if (item instanceof String s) notify.add(s);
+            }
+        } else if (notifyObj instanceof String s) {
+            notify.add(s);
+        }
+
+        return new Task(name, action, args, vars, when, register, loop, notify);
     }
 }

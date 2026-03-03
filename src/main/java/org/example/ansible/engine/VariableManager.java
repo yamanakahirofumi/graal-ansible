@@ -18,6 +18,7 @@ import java.util.Map;
 public class VariableManager {
     private final Inventory inventory;
     private final Map<String, Object> extraVars;
+    private final Map<String, Map<String, Object>> hostVars = new HashMap<>();
     private final Path baseDir;
     private final Yaml yaml = new Yaml();
 
@@ -29,6 +30,17 @@ public class VariableManager {
         this.inventory = inventory;
         this.extraVars = extraVars != null ? new HashMap<>(extraVars) : new HashMap<>();
         this.baseDir = baseDir;
+    }
+
+    /**
+     * Registers a variable for a specific host.
+     *
+     * @param hostName The host name.
+     * @param name     The variable name.
+     * @param value    The variable value.
+     */
+    public void registerVariable(String hostName, String name, Object value) {
+        hostVars.computeIfAbsent(hostName, k -> new HashMap<>()).put(name, value);
     }
 
     /**
@@ -48,6 +60,11 @@ public class VariableManager {
         // 2-5. Inventory Variables (all, parent group, child group, host vars)
         if (inventory != null && host != null) {
             variables.putAll(inventory.getVariablesForHost(host.name()));
+        }
+
+        // Host vars registered during execution (e.g., via register)
+        if (host != null && hostVars.containsKey(host.name())) {
+            variables.putAll(hostVars.get(host.name()));
         }
 
         // 6. Play Vars
