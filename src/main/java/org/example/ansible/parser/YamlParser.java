@@ -110,7 +110,10 @@ public class YamlParser {
         }
 
         Map<String, Object> vars = (Map<String, Object>) map.getOrDefault("vars", Map.of());
+        String when = (String) map.get("when");
+        String register = (String) map.get("register");
+        Object loop = map.get("loop");
 
-        return new Task(name, action, args, vars);
+        return new Task(name, action, args, vars, when, register, loop);
     }
 }

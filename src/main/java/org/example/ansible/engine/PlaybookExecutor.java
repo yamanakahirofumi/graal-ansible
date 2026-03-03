@@ -8,8 +8,10 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -69,28 +71,111 @@ public class PlaybookExecutor {
 
     private void executePlay(Play play, Inventory inventory, VariableManager variableManager, Map<String, List<TaskResult>> results) {
         List<Host> targetHosts = getTargetHosts(play.hosts(), inventory);
-        java.util.Set<String> failedHosts = new java.util.HashSet<>();
+        Set<String> failedHosts = new HashSet<>();
 
         for (Task task : play.tasks()) {
             for (Host host : targetHosts) {
                 if (failedHosts.contains(host.name())) {
                     continue;
                 }
-
-                Map<String, Object> allVars = variableManager.getAllVariables(play, host, task);
-
-                // Variable resolution for task arguments
-                Map<String, Object> resolvedArgs = variableResolver.resolve(task.args(), allVars);
-                Task resolvedTask = new Task(task.name(), task.action(), resolvedArgs, task.vars());
-
-                TaskResult result = taskExecutor.execute(resolvedTask);
-                results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(result);
-
-                if (!result.success()) {
-                    failedHosts.add(host.name());
-                }
+                executeTaskOnHost(play, host, task, variableManager, results, failedHosts);
             }
         }
+    }
+
+    private void executeTaskOnHost(Play play, Host host, Task task, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts) {
+        Map<String, Object> allVars = variableManager.getAllVariables(play, host, task);
+        TaskResult result;
+
+        if (task.loop() != null) {
+            result = executeLoopTask(play, host, task, variableManager, allVars);
+        } else {
+            result = executeSingleTask(play, host, task, allVars);
+        }
+
+        if (result != null) {
+            results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(result);
+
+            if (task.register() != null) {
+                variableManager.registerVariable(host.name(), task.register(), result.data());
+            }
+
+            if (!result.success() && !isSkipped(result)) {
+                failedHosts.add(host.name());
+            }
+        }
+    }
+
+    private TaskResult executeSingleTask(Play play, Host host, Task task, Map<String, Object> variables) {
+        // Evaluate 'when' condition
+        if (task.when() != null) {
+            Object conditionResult = variableResolver.resolveValue("{{ " + task.when() + " }}", variables);
+            if (!isTrue(conditionResult)) {
+                return new TaskResult(true, false, "Skipped due to when condition", Map.of("skipped", true));
+            }
+        }
+
+        // Variable resolution for task arguments
+        Map<String, Object> resolvedArgs = variableResolver.resolve(task.args(), variables);
+        Task resolvedTask = new Task(task.name(), task.action(), resolvedArgs, task.vars(), task.when(), task.register(), task.loop());
+
+        return taskExecutor.execute(resolvedTask);
+    }
+
+    private TaskResult executeLoopTask(Play play, Host host, Task task, VariableManager variableManager, Map<String, Object> allVars) {
+        Object loopValue = task.loop();
+        if (loopValue instanceof String str && str.contains("{{")) {
+            loopValue = variableResolver.resolveValue(str, allVars);
+        } else if (loopValue instanceof String str) {
+            // Handle cases where it's a variable name without {{ }}
+            loopValue = variableResolver.resolveValue("{{ " + str + " }}", allVars);
+        }
+
+        if (!(loopValue instanceof List<?> items)) {
+            // If it's not a list, treat it as a single-item list or skip?
+            // Ansible usually expects a list.
+            return TaskResult.failure("loop must be a list");
+        }
+
+        List<Map<String, Object>> loopResults = new ArrayList<>();
+        boolean anyFailed = false;
+        boolean anyChanged = false;
+        boolean allSkipped = true;
+
+        for (Object item : items) {
+            Map<String, Object> iterationVars = new HashMap<>(allVars);
+            iterationVars.put("item", item);
+
+            TaskResult result = executeSingleTask(play, host, task, iterationVars);
+
+            Map<String, Object> resultData = new HashMap<>(result.data());
+            resultData.put("item", item);
+            resultData.put("changed", result.changed());
+            resultData.put("failed", !result.success());
+            if (isSkipped(result)) {
+                resultData.put("skipped", true);
+            } else {
+                allSkipped = false;
+            }
+
+            loopResults.add(resultData);
+
+            if (!result.success() && !isSkipped(result)) anyFailed = true;
+            if (result.changed()) anyChanged = true;
+        }
+
+        Map<String, Object> finalData = new HashMap<>();
+        finalData.put("results", loopResults);
+        finalData.put("changed", anyChanged);
+        if (allSkipped) {
+            finalData.put("skipped", true);
+        }
+
+        return new TaskResult(!anyFailed, anyChanged, anyFailed ? "One or more loop items failed" : "OK", finalData);
+    }
+
+    private boolean isSkipped(TaskResult result) {
+        return Boolean.TRUE.equals(result.data().get("skipped"));
     }
 
     private List<Host> getTargetHosts(String pattern, Inventory inventory) {
@@ -130,5 +215,14 @@ public class PlaybookExecutor {
             if (found != null) return found;
         }
         return null;
+    }
+
+    private boolean isTrue(Object value) {
+        if (value instanceof Boolean b) return b;
+        if (value instanceof String s) {
+            return "true".equalsIgnoreCase(s) || "yes".equalsIgnoreCase(s) || "on".equalsIgnoreCase(s);
+        }
+        if (value instanceof Number n) return n.doubleValue() != 0;
+        return value != null;
     }
 }
