@@ -1,0 +1,90 @@
+package org.example.ansible.connection;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+
+/**
+ * Implementation of Connection for local execution.
+ */
+public class LocalConnection implements Connection {
+
+    @Override
+    public void connect() {
+        // No-op for local connection
+    }
+
+    @Override
+    public ConnectionResult execCommand(String command, boolean sudo) {
+        List<String> commandList = new ArrayList<>();
+        if (sudo) {
+            commandList.add("sudo");
+            commandList.add("-n"); // non-interactive
+        }
+        commandList.add("/bin/sh");
+        commandList.add("-c");
+        commandList.add(command);
+
+        ProcessBuilder pb = new ProcessBuilder(commandList);
+        try {
+            Process process = pb.start();
+
+            // Read stdout and stderr concurrently to avoid deadlock
+            CompletableFuture<String> stdoutFuture = readStreamAsync(process.getInputStream());
+            CompletableFuture<String> stderrFuture = readStreamAsync(process.getErrorStream());
+
+            int exitCode = process.waitFor();
+            String stdout = stdoutFuture.get();
+            String stderr = stderrFuture.get();
+
+            return new ConnectionResult(stdout, stderr, exitCode);
+        } catch (IOException e) {
+            return new ConnectionResult("", e.getMessage(), 1);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return new ConnectionResult("", "Interrupted: " + e.getMessage(), 1);
+        } catch (ExecutionException e) {
+            return new ConnectionResult("", "Execution failed: " + e.getMessage(), 1);
+        }
+    }
+
+    private CompletableFuture<String> readStreamAsync(InputStream is) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                return new String(is.readAllBytes(), StandardCharsets.UTF_8);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
+
+    @Override
+    public void putFile(Path localPath, Path remotePath) {
+        try {
+            Files.copy(localPath, remotePath, StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to copy file locally (putFile): " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public void fetchFile(Path remotePath, Path localPath) {
+        try {
+            Files.copy(remotePath, localPath, StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to copy file locally (fetchFile): " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public void close() {
+        // No-op for local connection
+    }
+}
