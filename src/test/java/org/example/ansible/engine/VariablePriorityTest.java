@@ -5,9 +5,13 @@ import org.example.ansible.inventory.Inventory;
 import org.example.ansible.parser.YamlParser;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
@@ -17,6 +21,9 @@ class VariablePriorityTest {
 
     private TaskExecutor taskExecutor;
     private PlaybookExecutor playbookExecutor;
+
+    @TempDir
+    Path tempDir;
 
     @BeforeEach
     void setUp() {
@@ -90,5 +97,36 @@ class VariablePriorityTest {
         playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYamlNoPlayVar.getBytes(StandardCharsets.UTF_8)));
         results = playbookExecutor.execute(playbook, inventory, Map.of());
         assertEquals("inventory", results.get("host1").get(0).data().get("msg"));
+    }
+
+    @Test
+    void testVarsFilesPriority() throws IOException {
+        // Prepare vars_file
+        Path varsFile = tempDir.resolve("external_vars.yml");
+        Files.writeString(varsFile, "external_var: value_from_file\nmy_var: from_file");
+
+        String inventoryIni = "host1";
+        Inventory inventory = new IniInventoryParser().parse(new ByteArrayInputStream(inventoryIni.getBytes(StandardCharsets.UTF_8)));
+
+        String playbookYaml = """
+                - name: play
+                  hosts: all
+                  vars_files:
+                    - external_vars.yml
+                  vars:
+                    my_var: play
+                  tasks:
+                    - name: task
+                      debug:
+                        msg: "{{ my_var }} and {{ external_var }}"
+                """;
+        Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
+
+        // Act
+        Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory, Map.of(), tempDir);
+
+        // Assert
+        // Priority 7 (vars_files) > Priority 6 (vars)
+        assertEquals("from_file and value_from_file", results.get("host1").get(0).data().get("msg"));
     }
 }

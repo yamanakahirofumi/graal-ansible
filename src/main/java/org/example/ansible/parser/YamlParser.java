@@ -67,7 +67,19 @@ public class YamlParser {
 
         Map<String, Object> vars = (Map<String, Object>) map.getOrDefault("vars", Map.of());
 
-        return new Play(name, hosts, tasks, vars);
+        List<String> varsFiles = new ArrayList<>();
+        Object varsFilesObj = map.get("vars_files");
+        if (varsFilesObj instanceof List<?> list) {
+            for (Object item : list) {
+                if (item instanceof String s) {
+                    varsFiles.add(s);
+                }
+            }
+        } else if (varsFilesObj instanceof String s) {
+            varsFiles.add(s);
+        }
+
+        return new Play(name, hosts, tasks, vars, varsFiles);
     }
 
     @SuppressWarnings("unchecked")

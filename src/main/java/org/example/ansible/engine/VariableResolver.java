@@ -2,6 +2,7 @@ package org.example.ansible.engine;
 
 import com.hubspot.jinjava.Jinjava;
 import org.example.ansible.engine.filter.DefaultFilter;
+import org.example.ansible.engine.filter.Dict2ItemsFilter;
 import org.example.ansible.engine.filter.IpAddrFilter;
 
 import java.util.HashMap;
@@ -23,6 +24,7 @@ public class VariableResolver {
     private void registerFilters() {
         jinjava.getGlobalContext().registerFilter(new DefaultFilter());
         jinjava.getGlobalContext().registerFilter(new IpAddrFilter());
+        jinjava.getGlobalContext().registerFilter(new Dict2ItemsFilter());
     }
 
     /**
