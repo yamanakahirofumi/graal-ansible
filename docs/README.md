@@ -44,6 +44,7 @@
 - [接続プラグイン実装](implementation/Connection-Plugins.md)：Local, SSH(JSch/Apache MINA SSHD)の実装
 - [変数とテンプレート](implementation/Variables-Templating.md)：Jinja2互換エンジンの統合
 - [OS非依存レイヤー](implementation/OS-Abstraction.md)：ファイル操作やプロセス実行のOS差分吸収
+- [タスク制御機能](implementation/Task-Control.md)：when, register, loop, handlers の実装
 - [Native Image最適化](implementation/Native-Image-Optimization.md)：GraalVMでのリフレクション設定と最適化
 
 ## 5. 検討事項（TODOリスト）
