@@ -1,6 +1,7 @@
 package org.example.ansible.engine;
 
 import org.junit.jupiter.api.Test;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
@@ -48,5 +49,41 @@ class VariableResolverTest {
         // Usually Jinja2 leaves it if not found, but Jinjava might be different.
         // Actually, Ansible would fail if it's mandatory, but here we just check the output.
         System.out.println("Result for missing var: " + result);
+    }
+
+    @Test
+    void testDefaultFilter() {
+        Map<String, Object> variables = Map.of();
+        String template = "{{ undefined_var | default('fallback') }}";
+        assertEquals("fallback", resolver.resolveValue(template, variables));
+
+        variables = Map.of("defined_var", "actual");
+        template = "{{ defined_var | default('fallback') }}";
+        assertEquals("actual", resolver.resolveValue(template, variables));
+    }
+
+    @Test
+    void testIpAddrFilter() {
+        Map<String, Object> variables = Map.of("my_ip", "192.168.1.1");
+        String template = "{{ my_ip | ipaddr }}";
+        assertEquals("192.168.1.1", resolver.resolveValue(template, variables));
+
+        variables = Map.of("my_ip", "not-an-ip");
+        template = "{{ my_ip | ipaddr }}";
+        assertEquals("false", resolver.resolveValue(template, variables));
+    }
+
+    @Test
+    void testNullVariable() {
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("null_var", null);
+        Map<String, Object> args = new HashMap<>();
+        args.put("key", "{{ null_var }}");
+
+        Map<String, Object> resolved = resolver.resolve(args, variables);
+        // Jinjava might render null as empty string or "null" string depending on config
+        // Default is often empty or null
+        assertNotNull(resolved);
+        assertTrue(resolved.containsKey("key"));
     }
 }

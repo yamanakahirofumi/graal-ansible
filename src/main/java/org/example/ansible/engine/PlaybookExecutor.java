@@ -44,15 +44,16 @@ public class PlaybookExecutor {
      */
     public Map<String, List<TaskResult>> execute(Playbook playbook, Inventory inventory, Map<String, Object> extraVars) {
         Map<String, List<TaskResult>> results = new HashMap<>();
+        VariableManager variableManager = new VariableManager(inventory, extraVars);
 
         for (Play play : playbook.plays()) {
-            executePlay(play, inventory, extraVars, results);
+            executePlay(play, inventory, variableManager, results);
         }
 
         return results;
     }
 
-    private void executePlay(Play play, Inventory inventory, Map<String, Object> extraVars, Map<String, List<TaskResult>> results) {
+    private void executePlay(Play play, Inventory inventory, VariableManager variableManager, Map<String, List<TaskResult>> results) {
         List<Host> targetHosts = getTargetHosts(play.hosts(), inventory);
         java.util.Set<String> failedHosts = new java.util.HashSet<>();
 
@@ -62,12 +63,7 @@ public class PlaybookExecutor {
                     continue;
                 }
 
-                Map<String, Object> allVars = new HashMap<>();
-                // Priority: Inventory < Play < Task < Extra
-                allVars.putAll(inventory.getVariablesForHost(host.name()));
-                allVars.putAll(play.vars());
-                allVars.putAll(task.vars());
-                allVars.putAll(extraVars);
+                Map<String, Object> allVars = variableManager.getAllVariables(play, host, task);
 
                 // Variable resolution for task arguments
                 Map<String, Object> resolvedArgs = variableResolver.resolve(task.args(), allVars);
