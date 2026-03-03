@@ -18,7 +18,13 @@
 - **成功判定**: `failed` フラグが `false`（または未定義）の場合に成功とみなします。
 - **変更の検知**: 戻り値の `changed` フィールドが `true` の場合、システムの変更があったと判断します。`TaskResult.success(Map<String, Object> data)` メソッドにより、安全に `changed` ステータスを抽出します。
 
-## 4. Pythonモジュールの実行 (GraalPy)
+## 4. コアJavaモジュール (Core Java Modules)
+パフォーマンスの向上や、低レイヤーのシステム操作を効率的に行うため、一部の基本モジュールは Java で直接実装されています。
+
+- **実装モジュール**: `command`, `shell`
+- **特徴**: `Connection` 抽象化レイヤー（`LocalConnection` 等）を直接利用し、OS 固有のプロセス実行を安全に制御します。
+
+## 5. Pythonモジュールの実行 (GraalPy)
 既存のAnsible Pythonモジュールとの互換性を維持するため、GraalVM上のPythonランタイムである **GraalPy** を利用します。
 
 - **統合方法**: Javaコード内から GraalVM SDK の Polyglot API を介して Python スクリプトを直接呼び出します。
