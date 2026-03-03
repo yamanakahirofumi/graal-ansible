@@ -9,8 +9,6 @@ import org.example.ansible.engine.Playbook;
 import org.example.ansible.engine.PlaybookExecutor;
 import org.example.ansible.engine.TaskExecutor;
 import org.example.ansible.engine.TaskResult;
-import org.example.ansible.module.CommandModule;
-import org.example.ansible.module.ShellModule;
 import org.example.ansible.inventory.IniInventoryParser;
 import org.example.ansible.inventory.Inventory;
 import org.example.ansible.inventory.InventoryParser;
@@ -140,8 +138,7 @@ public class PlaybookCli implements Callable<Integer> {
             System.out.println("DEBUG: " + msg);
             return TaskResult.success(false, Map.of("msg", msg));
         });
-        executor.registerModule("command", new CommandModule());
-        executor.registerModule("shell", new ShellModule());
+        // You can register more modules here (e.g., shell, command if implemented)
     }
 
     private void printSummary(Map<String, List<TaskResult>> results) {
