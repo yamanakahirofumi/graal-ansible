@@ -53,6 +53,14 @@
     - 主要な Ansible フィルター（default, ipaddr 等）の Java による実装と登録。
     - 遅延評価ロジックの組み込み。
 
+### [ ] タスク制御機能（when, register, loop, handlers）の実装
+- **概要**: 実行の動的制御や変数の再利用、繰り返し処理のサポート。
+- **検討内容**:
+    - [タスク制御機能](implementation/Task-Control.md) に基づく `PlaybookExecutor` および `TaskExecutor` への組み込み。
+    - `when` における Jinja2 式の評価ロジック（Jinja2タグなしの式への対応）。
+    - `loop` 展開時の `item` 変数のスコープ管理。
+    - プレイ終了時のハンドラー実行制御。
+
 ## 4. テスト面 (Testing)
 
 ### [ ] 実際の Ansible コレクションを使ったテスト方法の設計
