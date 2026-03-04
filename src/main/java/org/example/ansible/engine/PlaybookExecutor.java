@@ -72,18 +72,34 @@ public class PlaybookExecutor {
     private void executePlay(Play play, Inventory inventory, VariableManager variableManager, Map<String, List<TaskResult>> results) {
         List<Host> targetHosts = getTargetHosts(play.hosts(), inventory);
         Set<String> failedHosts = new HashSet<>();
+        Map<String, Set<String>> hostNotifications = new HashMap<>();
 
         for (Task task : play.tasks()) {
             for (Host host : targetHosts) {
                 if (failedHosts.contains(host.name())) {
                     continue;
                 }
-                executeTaskOnHost(play, host, task, variableManager, results, failedHosts);
+                executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications);
+            }
+        }
+
+        // Execute handlers
+        for (Host host : targetHosts) {
+            Set<String> notifiedHandlers = hostNotifications.getOrDefault(host.name(), Collections.emptySet());
+            if (notifiedHandlers.isEmpty()) continue;
+
+            for (Task handler : play.handlers()) {
+                if (notifiedHandlers.contains(handler.name())) {
+                    // Handlers ignore failedHosts check usually, or they only run for hosts that didn't fail earlier?
+                    // Ansible runs handlers even if some earlier tasks failed, as long as the host is still in the play.
+                    if (failedHosts.contains(host.name())) continue;
+                    executeTaskOnHost(play, host, handler, variableManager, results, failedHosts, hostNotifications);
+                }
             }
         }
     }
 
-    private void executeTaskOnHost(Play play, Host host, Task task, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts) {
+    private void executeTaskOnHost(Play play, Host host, Task task, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications) {
         Map<String, Object> allVars = variableManager.getAllVariables(play, host, task);
         TaskResult result;
 
@@ -94,16 +110,87 @@ public class PlaybookExecutor {
         }
 
         if (result != null) {
+            // Re-evaluate success and changed based on failed_when and changed_when
+            result = evaluateResultCustomization(task, result, allVars);
+
             results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(result);
 
             if (task.register() != null) {
                 variableManager.registerVariable(host.name(), task.register(), result.data());
             }
 
+            if (result.changed() && !task.notifications().isEmpty()) {
+                hostNotifications.computeIfAbsent(host.name(), k -> new HashSet<>()).addAll(task.notifications());
+            }
+
             if (!result.success() && !isSkipped(result)) {
-                failedHosts.add(host.name());
+                if (!task.ignoreErrors()) {
+                    failedHosts.add(host.name());
+                }
             }
         }
+    }
+
+    private TaskResult evaluateResultCustomization(Task task, TaskResult result, Map<String, Object> variables) {
+        if (isSkipped(result)) return result;
+
+        boolean success = result.success();
+        boolean changed = result.changed();
+
+        Map<String, Object> evalVars = new HashMap<>(variables);
+        evalVars.putAll(result.data());
+
+        if (task.failedWhen() != null) {
+            List<Object> conditions;
+            if (task.failedWhen() instanceof List<?> list) {
+                conditions = (List<Object>) list;
+            } else {
+                conditions = List.of(task.failedWhen());
+            }
+
+            for (Object condition : conditions) {
+                Object conditionResult = variableResolver.resolveValue(wrapInJinja(condition), evalVars);
+                if (isTrue(conditionResult)) {
+                    success = false;
+                    break;
+                }
+            }
+        }
+
+        if (task.changedWhen() != null) {
+            List<Object> conditions;
+            if (task.changedWhen() instanceof List<?> list) {
+                conditions = (List<Object>) list;
+            } else {
+                conditions = List.of(task.changedWhen());
+            }
+
+            boolean allChanged = true;
+            for (Object condition : conditions) {
+                Object conditionResult = variableResolver.resolveValue(wrapInJinja(condition), evalVars);
+                if (!isTrue(conditionResult)) {
+                    allChanged = false;
+                    break;
+                }
+            }
+            changed = allChanged;
+        }
+
+        if (success == result.success() && changed == result.changed()) {
+            return result;
+        }
+
+        Map<String, Object> newData = new HashMap<>(result.data());
+        newData.put("changed", changed);
+        return new TaskResult(success, changed, result.message(), newData);
+    }
+
+    private String wrapInJinja(Object expression) {
+        if (expression instanceof String s) {
+            if (s.contains("{{")) return s;
+            return "{{ " + s + " }}";
+        }
+        return expression.toString();
     }
 
     private TaskResult executeSingleTask(Play play, Host host, Task task, Map<String, Object> variables) {
@@ -119,7 +206,7 @@ public class PlaybookExecutor {
             }
 
             for (String condition : conditions) {
-                Object conditionResult = variableResolver.resolveValue("{{ " + condition + " }}", variables);
+                Object conditionResult = variableResolver.resolveValue(wrapInJinja(condition), variables);
                 if (!isTrue(conditionResult)) {
                     return new TaskResult(true, false, "Skipped due to when condition", Map.of("skipped", true));
                 }
@@ -128,7 +215,7 @@ public class PlaybookExecutor {
 
         // Variable resolution for task arguments
         Map<String, Object> resolvedArgs = variableResolver.resolve(task.args(), variables);
-        Task resolvedTask = new Task(task.name(), task.action(), resolvedArgs, task.vars(), task.when(), task.register(), task.loop(), task.notifications());
+        Task resolvedTask = new Task(task.name(), task.action(), resolvedArgs, task.vars(), task.when(), task.register(), task.loop(), task.notifications(), task.failedWhen(), task.changedWhen(), task.ignoreErrors());
 
         return taskExecutor.execute(resolvedTask);
     }

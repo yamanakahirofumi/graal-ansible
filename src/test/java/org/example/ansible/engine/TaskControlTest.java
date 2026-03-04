@@ -192,4 +192,186 @@ class TaskControlTest {
         assertEquals(2, host1Results.size());
         assertEquals("previous was captured", host1Results.get(1).data().get("msg"));
     }
+
+    @Test
+    void testFailedWhen() {
+        String inventoryIni = "host1";
+        Inventory inventory = new IniInventoryParser().parse(new ByteArrayInputStream(inventoryIni.getBytes(StandardCharsets.UTF_8)));
+
+        String playbookYaml = """
+                - name: test failed_when
+                  hosts: all
+                  tasks:
+                    - name: fail me
+                      debug:
+                        msg: "not really failed"
+                      failed_when: true
+                """;
+        Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
+        taskExecutor.registerModule("debug", args -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+
+        Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
+
+        assertFalse(results.get("host1").get(0).success());
+    }
+
+    @Test
+    void testChangedWhen() {
+        String inventoryIni = "host1";
+        Inventory inventory = new IniInventoryParser().parse(new ByteArrayInputStream(inventoryIni.getBytes(StandardCharsets.UTF_8)));
+
+        String playbookYaml = """
+                - name: test changed_when
+                  hosts: all
+                  tasks:
+                    - name: change me
+                      debug:
+                        msg: "forced change"
+                      changed_when: true
+                """;
+        Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
+        taskExecutor.registerModule("debug", args -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+
+        Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
+
+        assertTrue(results.get("host1").get(0).changed());
+    }
+
+    @Test
+    void testIgnoreErrors() {
+        String inventoryIni = "host1";
+        Inventory inventory = new IniInventoryParser().parse(new ByteArrayInputStream(inventoryIni.getBytes(StandardCharsets.UTF_8)));
+
+        String playbookYaml = """
+                - name: test ignore_errors
+                  hosts: all
+                  tasks:
+                    - name: fail and ignore
+                      debug:
+                        msg: "fail"
+                      failed_when: true
+                      ignore_errors: true
+                    - name: should run
+                      debug:
+                        msg: "ran"
+                """;
+        Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
+        taskExecutor.registerModule("debug", args -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+
+        Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
+
+        assertEquals(2, results.get("host1").size());
+        assertFalse(results.get("host1").get(0).success());
+        assertTrue(results.get("host1").get(1).success());
+    }
+
+    @Test
+    void testHandlers() {
+        String inventoryIni = "host1";
+        Inventory inventory = new IniInventoryParser().parse(new ByteArrayInputStream(inventoryIni.getBytes(StandardCharsets.UTF_8)));
+
+        String playbookYaml = """
+                - name: test handlers
+                  hosts: all
+                  tasks:
+                    - name: trigger handler
+                      debug:
+                        msg: "trigger"
+                      changed_when: true
+                      notify: my handler
+                  handlers:
+                    - name: my handler
+                      debug:
+                        msg: "handled"
+                """;
+        Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
+        taskExecutor.registerModule("debug", args -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+
+        Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
+
+        assertEquals(2, results.get("host1").size());
+        assertEquals("handled", results.get("host1").get(1).data().get("msg"));
+    }
+
+    @Test
+    void testWithItems() {
+        String inventoryIni = "host1";
+        Inventory inventory = new IniInventoryParser().parse(new ByteArrayInputStream(inventoryIni.getBytes(StandardCharsets.UTF_8)));
+
+        String playbookYaml = """
+                - name: test with_items
+                  hosts: all
+                  tasks:
+                    - name: loop task
+                      debug:
+                        msg: "item is {{ item }}"
+                      with_items:
+                        - one
+                        - two
+                """;
+        Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
+        taskExecutor.registerModule("debug", args -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+
+        Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
+
+        List<TaskResult> host1Results = results.get("host1");
+        TaskResult loopResult = host1Results.get(0);
+        List<Map<String, Object>> iterationResults = (List<Map<String, Object>>) loopResult.data().get("results");
+        assertEquals(2, iterationResults.size());
+    }
+
+    @Test
+    void testFailedWhenList() {
+        String inventoryIni = "host1";
+        Inventory inventory = new IniInventoryParser().parse(new ByteArrayInputStream(inventoryIni.getBytes(StandardCharsets.UTF_8)));
+
+        String playbookYaml = """
+                - name: test failed_when list
+                  hosts: all
+                  tasks:
+                    - name: fail me if any is true
+                      debug:
+                        msg: "fail"
+                      failed_when:
+                        - false
+                        - true
+                """;
+        Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
+        taskExecutor.registerModule("debug", args -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+
+        Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
+
+        assertFalse(results.get("host1").get(0).success());
+    }
+
+    @Test
+    void testChangedWhenList() {
+        String inventoryIni = "host1";
+        Inventory inventory = new IniInventoryParser().parse(new ByteArrayInputStream(inventoryIni.getBytes(StandardCharsets.UTF_8)));
+
+        String playbookYaml = """
+                - name: test changed_when list
+                  hosts: all
+                  tasks:
+                    - name: change me if all are true
+                      debug:
+                        msg: "change"
+                      changed_when:
+                        - true
+                        - true
+                    - name: don't change if any is false
+                      debug:
+                        msg: "no change"
+                      changed_when:
+                        - true
+                        - false
+                """;
+        Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
+        taskExecutor.registerModule("debug", args -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+
+        Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
+
+        assertTrue(results.get("host1").get(0).changed());
+        assertFalse(results.get("host1").get(1).changed());
+    }
 }
