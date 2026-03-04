@@ -19,7 +19,8 @@ public class YamlParser {
     private static final Set<String> RESERVED_TASK_KEYS = Set.of(
             "name", "register", "when", "loop", "until", "retries", "delay",
             "ignore_errors", "tags", "become", "become_user", "become_method",
-            "vars", "notify", "with_items", "with_list", "with_dict"
+            "vars", "notify", "with_items", "with_list", "with_dict",
+            "failed_when", "changed_when"
     );
 
     private final Yaml yaml;
@@ -65,6 +66,16 @@ public class YamlParser {
             }
         }
 
+        List<Task> handlers = new ArrayList<>();
+        Object handlersObj = map.get("handlers");
+        if (handlersObj instanceof List<?> handlersList) {
+            for (Object handlerItem : handlersList) {
+                if (handlerItem instanceof Map<?, ?> handlerMap) {
+                    handlers.add(parseTask((Map<String, Object>) handlerMap));
+                }
+            }
+        }
+
         Map<String, Object> vars = (Map<String, Object>) map.getOrDefault("vars", Map.of());
 
         List<String> varsFiles = new ArrayList<>();
@@ -79,7 +90,7 @@ public class YamlParser {
             varsFiles.add(s);
         }
 
-        return new Play(name, hosts, tasks, vars, varsFiles);
+        return new Play(name, hosts, tasks, vars, varsFiles, handlers);
     }
 
     @SuppressWarnings("unchecked")
@@ -113,6 +124,13 @@ public class YamlParser {
         Object when = map.get("when");
         String register = (String) map.get("register");
         Object loop = map.get("loop");
+        if (loop == null) {
+            loop = map.get("with_items");
+        }
+
+        Object failedWhen = map.get("failed_when");
+        Object changedWhen = map.get("changed_when");
+        boolean ignoreErrors = Boolean.TRUE.equals(map.get("ignore_errors"));
 
         List<String> notify = new ArrayList<>();
         Object notifyObj = map.get("notify");
@@ -124,6 +142,6 @@ public class YamlParser {
             notify.add(s);
         }
 
-        return new Task(name, action, args, vars, when, register, loop, notify);
+        return new Task(name, action, args, vars, when, register, loop, notify, failedWhen, changedWhen, ignoreErrors);
     }
 }

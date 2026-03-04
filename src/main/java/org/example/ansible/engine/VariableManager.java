@@ -62,11 +62,6 @@ public class VariableManager {
             variables.putAll(inventory.getVariablesForHost(host.name()));
         }
 
-        // Host vars registered during execution (e.g., via register)
-        if (host != null && hostVars.containsKey(host.name())) {
-            variables.putAll(hostVars.get(host.name()));
-        }
-
         // 6. Play Vars
         if (play != null) {
             variables.putAll(play.vars());
@@ -84,6 +79,11 @@ public class VariableManager {
         // 9. Task Vars
         if (task != null) {
             variables.putAll(task.vars());
+        }
+
+        // Registered Variables (Higher priority than Task Vars in Ansible)
+        if (host != null && hostVars.containsKey(host.name())) {
+            variables.putAll(hostVars.get(host.name()));
         }
 
         // 10. Extra Vars
