@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.example.ansible.util.Truthiness;
 
 /**
  * Executes a Playbook against an Inventory.
@@ -158,7 +159,7 @@ public class PlaybookExecutor {
 
             for (String condition : conditions) {
                 Object conditionResult = variableResolver.resolveValue(wrapInJinja(condition), blockVars);
-                if (!isTrue(conditionResult)) {
+                if (!Truthiness.isTrue(conditionResult)) {
                     // Block skipped
                     results.computeIfAbsent(host.name(), k -> new ArrayList<>())
                            .add(new TaskResult(true, false, "Skipped due to block when condition", Map.of("skipped", true)));
@@ -217,7 +218,7 @@ public class PlaybookExecutor {
 
             for (Object condition : conditions) {
                 Object conditionResult = variableResolver.resolveValue(wrapInJinja(condition), evalVars);
-                if (isTrue(conditionResult)) {
+                if (Truthiness.isTrue(conditionResult)) {
                     success = false;
                     break;
                 }
@@ -235,7 +236,7 @@ public class PlaybookExecutor {
             boolean allChanged = true;
             for (Object condition : conditions) {
                 Object conditionResult = variableResolver.resolveValue(wrapInJinja(condition), evalVars);
-                if (!isTrue(conditionResult)) {
+                if (!Truthiness.isTrue(conditionResult)) {
                     allChanged = false;
                     break;
                 }
@@ -274,7 +275,7 @@ public class PlaybookExecutor {
 
             for (String condition : conditions) {
                 Object conditionResult = variableResolver.resolveValue(wrapInJinja(condition), variables);
-                if (!isTrue(conditionResult)) {
+                if (!Truthiness.isTrue(conditionResult)) {
                     return new TaskResult(true, false, "Skipped due to when condition", Map.of("skipped", true));
                 }
             }
@@ -309,7 +310,7 @@ public class PlaybookExecutor {
             evalVars.putAll(lastResult.data());
             Object untilResult = variableResolver.resolveValue(wrapInJinja(task.until()), evalVars);
 
-            if (isTrue(untilResult)) {
+            if (Truthiness.isTrue(untilResult)) {
                 return lastResult;
             }
 
@@ -425,20 +426,5 @@ public class PlaybookExecutor {
             if (found != null) return found;
         }
         return null;
-    }
-
-    private boolean isTrue(Object value) {
-        if (value == null) return false;
-        if (value instanceof Boolean b) return b;
-        if (value instanceof String s) {
-            if (s.isEmpty() || s.isBlank() || "false".equalsIgnoreCase(s) || "no".equalsIgnoreCase(s) || "off".equalsIgnoreCase(s)) {
-                return false;
-            }
-            return true;
-        }
-        if (value instanceof Number n) return n.doubleValue() != 0;
-        if (value instanceof List<?> l) return !l.isEmpty();
-        if (value instanceof Map<?, ?> m) return !m.isEmpty();
-        return true;
     }
 }

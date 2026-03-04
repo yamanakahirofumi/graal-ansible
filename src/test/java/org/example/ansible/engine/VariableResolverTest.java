@@ -35,7 +35,8 @@ class VariableResolverTest {
 
         Map<String, Object> resolved = resolver.resolve(args, variables);
         assertEquals("listening on 8080", resolved.get("msg"));
-        assertEquals("8080", ((Map<String, Object>) resolved.get("nested")).get("key"));
+        // VariableResolver now returns the raw object if it's just {{ var }}
+        assertEquals(8080, resolved.get("nested") instanceof Map ? ((Map)resolved.get("nested")).get("key") : null);
         assertEquals("port 8080", ((List<Object>) resolved.get("list")).get(0));
     }
 
@@ -43,11 +44,7 @@ class VariableResolverTest {
     void testMissingVariable() {
         Map<String, Object> variables = Map.of();
         String template = "hello {{ name }}";
-        // Jinjava by default might leave it or replace with empty, depends on config.
-        // Let's see what the default behavior is.
         Object result = resolver.resolveValue(template, variables);
-        // Usually Jinja2 leaves it if not found, but Jinjava might be different.
-        // Actually, Ansible would fail if it's mandatory, but here we just check the output.
         System.out.println("Result for missing var: " + result);
     }
 
@@ -70,7 +67,7 @@ class VariableResolverTest {
 
         variables = Map.of("my_ip", "not-an-ip");
         template = "{{ my_ip | ipaddr }}";
-        assertEquals("false", resolver.resolveValue(template, variables));
+        assertEquals(false, resolver.resolveValue(template, variables));
     }
 
     @Test
@@ -81,8 +78,6 @@ class VariableResolverTest {
         args.put("key", "{{ null_var }}");
 
         Map<String, Object> resolved = resolver.resolve(args, variables);
-        // Jinjava might render null as empty string or "null" string depending on config
-        // Default is often empty or null
         assertNotNull(resolved);
         assertTrue(resolved.containsKey("key"));
     }
