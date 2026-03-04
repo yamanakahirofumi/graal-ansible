@@ -1,9 +1,8 @@
 package org.example.ansible.engine;
 
 import com.hubspot.jinjava.Jinjava;
-import org.example.ansible.engine.filter.DefaultFilter;
-import org.example.ansible.engine.filter.Dict2ItemsFilter;
-import org.example.ansible.engine.filter.IpAddrFilter;
+import com.hubspot.jinjava.interpret.JinjavaInterpreter;
+import org.example.ansible.engine.filter.*;
 
 import java.util.HashMap;
 import java.util.List;
@@ -25,6 +24,10 @@ public class VariableResolver {
         jinjava.getGlobalContext().registerFilter(new DefaultFilter());
         jinjava.getGlobalContext().registerFilter(new IpAddrFilter());
         jinjava.getGlobalContext().registerFilter(new Dict2ItemsFilter());
+        jinjava.getGlobalContext().registerFilter(new BoolFilter());
+        jinjava.getGlobalContext().registerFilter(new ToJsonFilter());
+        jinjava.getGlobalContext().registerFilter(new ToYamlFilter());
+        jinjava.getGlobalContext().registerFilter(new CombineFilter());
     }
 
     /**
@@ -69,6 +72,37 @@ public class VariableResolver {
         if (!input.contains("{{")) {
             return input;
         }
-        return jinjava.render(input, variables);
+
+        JinjavaInterpreter interpreter = jinjava.newInterpreter();
+        interpreter.getContext().putAll(variables);
+
+        // If the entire string is just a single {{ expr }}, we try to return the raw object
+        String trimmed = input.trim();
+        if (trimmed.startsWith("{{") && trimmed.endsWith("}}")) {
+            String expr = trimmed.substring(2, trimmed.length() - 2).trim();
+            if (!expr.contains("{{")) { // Not nested
+                try {
+                    // Use a temporary variable to capture the result of the expression evaluation
+                    // This handles filters and complex expressions correctly
+                    String tempVarName = "__ansible_temp_var_" + System.nanoTime();
+                    String renderScript = "{% set " + tempVarName + " = " + expr + " %}";
+                    interpreter.render(renderScript);
+                    Object resolved = interpreter.getContext().get(tempVarName);
+                    // Check if it's explicitly set to something (even null)
+                    if (interpreter.getContext().containsKey(tempVarName)) {
+                        return resolved;
+                    }
+                } catch (Exception e) {
+                    // Fallback to standard rendering if resolution fails
+                }
+            }
+        }
+
+        Object rendered = jinjava.render(input, variables);
+        if (rendered instanceof String s) {
+            if ("true".equals(s)) return true;
+            if ("false".equals(s)) return false;
+        }
+        return rendered;
     }
 }
