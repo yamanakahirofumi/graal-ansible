@@ -20,7 +20,8 @@ public class YamlParser {
             "name", "register", "when", "loop", "until", "retries", "delay",
             "ignore_errors", "tags", "become", "become_user", "become_method",
             "vars", "notify", "with_items", "with_list", "with_dict",
-            "failed_when", "changed_when"
+            "failed_when", "changed_when", "delegate_to", "run_once",
+            "block", "rescue", "always"
     );
 
     private final Yaml yaml;
@@ -99,6 +100,10 @@ public class YamlParser {
         String action = null;
         Map<String, Object> args = Map.of();
 
+        List<Task> block = parseTaskList(map.get("block"));
+        List<Task> rescue = parseTaskList(map.get("rescue"));
+        List<Task> always = parseTaskList(map.get("always"));
+
         for (Map.Entry<String, Object> entry : map.entrySet()) {
             String key = entry.getKey();
             if (RESERVED_TASK_KEYS.contains(key)) {
@@ -116,7 +121,7 @@ public class YamlParser {
             break;
         }
 
-        if (action == null) {
+        if (action == null && block.isEmpty()) {
             throw new IllegalArgumentException("Task '" + name + "' is missing a module/action.");
         }
 
@@ -132,6 +137,12 @@ public class YamlParser {
         Object changedWhen = map.get("changed_when");
         boolean ignoreErrors = Boolean.TRUE.equals(map.get("ignore_errors"));
 
+        Object until = map.get("until");
+        Integer retries = (Integer) map.getOrDefault("retries", 3);
+        Integer delay = (Integer) map.getOrDefault("delay", 5);
+        String delegateTo = (String) map.get("delegate_to");
+        boolean runOnce = Boolean.TRUE.equals(map.get("run_once"));
+
         List<String> notify = new ArrayList<>();
         Object notifyObj = map.get("notify");
         if (notifyObj instanceof List<?> list) {
@@ -142,6 +153,20 @@ public class YamlParser {
             notify.add(s);
         }
 
-        return new Task(name, action, args, vars, when, register, loop, notify, failedWhen, changedWhen, ignoreErrors);
+        return new Task(name, action, args, vars, when, register, loop, notify, failedWhen, changedWhen, ignoreErrors,
+                until, retries, delay, delegateTo, runOnce, block, rescue, always);
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Task> parseTaskList(Object obj) {
+        List<Task> tasks = new ArrayList<>();
+        if (obj instanceof List<?> list) {
+            for (Object item : list) {
+                if (item instanceof Map<?, ?> map) {
+                    tasks.add(parseTask((Map<String, Object>) map));
+                }
+            }
+        }
+        return tasks;
     }
 }

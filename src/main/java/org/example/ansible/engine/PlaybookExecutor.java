@@ -75,11 +75,16 @@ public class PlaybookExecutor {
         Map<String, Set<String>> hostNotifications = new HashMap<>();
 
         for (Task task : play.tasks()) {
+            boolean executedOnce = false;
             for (Host host : targetHosts) {
                 if (failedHosts.contains(host.name())) {
                     continue;
                 }
+                if (task.runOnce() && executedOnce) {
+                    continue;
+                }
                 executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications);
+                executedOnce = true;
             }
         }
 
@@ -100,13 +105,18 @@ public class PlaybookExecutor {
     }
 
     private void executeTaskOnHost(Play play, Host host, Task task, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications) {
+        if (!task.block().isEmpty()) {
+            executeBlock(play, host, task, variableManager, results, failedHosts, hostNotifications);
+            return;
+        }
+
         Map<String, Object> allVars = variableManager.getAllVariables(play, host, task);
         TaskResult result;
 
         if (task.loop() != null) {
             result = executeLoopTask(play, host, task, variableManager, allVars);
         } else {
-            result = executeSingleTask(play, host, task, allVars);
+            result = executeSingleTask(play, host, task, allVars, variableManager);
         }
 
         if (result != null) {
@@ -117,6 +127,8 @@ public class PlaybookExecutor {
 
             if (task.register() != null) {
                 variableManager.registerVariable(host.name(), task.register(), result.data());
+                // Refresh allVars for subsequent steps (though currently not used in this method)
+                allVars = variableManager.getAllVariables(play, host, task);
             }
 
             if (result.changed() && !task.notifications().isEmpty()) {
@@ -128,6 +140,61 @@ public class PlaybookExecutor {
                     failedHosts.add(host.name());
                 }
             }
+        }
+    }
+
+    private void executeBlock(Play play, Host host, Task blockTask, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications) {
+        // Evaluate 'when' for the block itself
+        Map<String, Object> blockVars = variableManager.getAllVariables(play, host, blockTask);
+        if (blockTask.when() != null) {
+            List<String> conditions;
+            if (blockTask.when() instanceof List<?> list) {
+                conditions = list.stream().filter(String.class::isInstance).map(String.class::cast).collect(Collectors.toList());
+            } else if (blockTask.when() instanceof String s) {
+                conditions = List.of(s);
+            } else {
+                conditions = List.of(blockTask.when().toString());
+            }
+
+            for (String condition : conditions) {
+                Object conditionResult = variableResolver.resolveValue(wrapInJinja(condition), blockVars);
+                if (!isTrue(conditionResult)) {
+                    // Block skipped
+                    results.computeIfAbsent(host.name(), k -> new ArrayList<>())
+                           .add(new TaskResult(true, false, "Skipped due to block when condition", Map.of("skipped", true)));
+                    return;
+                }
+            }
+        }
+
+        boolean blockFailed = false;
+        Set<String> blockFailedHosts = new HashSet<>();
+
+        for (Task task : blockTask.block()) {
+            if (blockFailedHosts.contains(host.name())) {
+                blockFailed = true;
+                break;
+            }
+            executeTaskOnHost(play, host, task, variableManager, results, blockFailedHosts, hostNotifications);
+        }
+
+        if (blockFailedHosts.contains(host.name())) {
+            blockFailed = true;
+        }
+
+        if (blockFailed) {
+            for (Task task : blockTask.rescue()) {
+                // rescue tasks run even if block failed
+                executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications);
+            }
+        }
+
+        for (Task task : blockTask.always()) {
+            executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications);
+        }
+
+        if (blockFailed && blockTask.rescue().isEmpty()) {
+            failedHosts.add(host.name());
         }
     }
 
@@ -193,7 +260,7 @@ public class PlaybookExecutor {
         return expression.toString();
     }
 
-    private TaskResult executeSingleTask(Play play, Host host, Task task, Map<String, Object> variables) {
+    private TaskResult executeSingleTask(Play play, Host host, Task task, Map<String, Object> variables, VariableManager variableManager) {
         // Evaluate 'when' condition
         if (task.when() != null) {
             List<String> conditions;
@@ -215,9 +282,54 @@ public class PlaybookExecutor {
 
         // Variable resolution for task arguments
         Map<String, Object> resolvedArgs = variableResolver.resolve(task.args(), variables);
-        Task resolvedTask = new Task(task.name(), task.action(), resolvedArgs, task.vars(), task.when(), task.register(), task.loop(), task.notifications(), task.failedWhen(), task.changedWhen(), task.ignoreErrors());
+        String resolvedDelegateTo = null;
+        if (task.delegateTo() != null) {
+            Object resolved = variableResolver.resolveValue(wrapInJinja(task.delegateTo()), variables);
+            resolvedDelegateTo = resolved != null ? resolved.toString() : null;
+        }
 
-        return taskExecutor.execute(resolvedTask);
+        Task resolvedTask = new Task(task.name(), task.action(), resolvedArgs, task.vars(), task.when(), task.register(), task.loop(), task.notifications(), task.failedWhen(), task.changedWhen(), task.ignoreErrors(),
+                task.until(), task.retries(), task.delay(), resolvedDelegateTo, task.runOnce(), task.block(), task.rescue(), task.always());
+
+        if (task.until() == null) {
+            return taskExecutor.execute(resolvedTask);
+        }
+
+        // Retry logic
+        TaskResult lastResult = null;
+        for (int i = 0; i < task.retries(); i++) {
+            lastResult = taskExecutor.execute(resolvedTask);
+
+            if (task.register() != null && variableManager != null) {
+                variableManager.registerVariable(host.name(), task.register(), lastResult.data());
+                variables = variableManager.getAllVariables(play, host, task);
+            }
+
+            Map<String, Object> evalVars = new HashMap<>(variables);
+            evalVars.putAll(lastResult.data());
+            Object untilResult = variableResolver.resolveValue(wrapInJinja(task.until()), evalVars);
+
+            if (isTrue(untilResult)) {
+                return lastResult;
+            }
+
+            if (i < task.retries() - 1) {
+                try {
+                    Thread.sleep(task.delay() * 1000L);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }
+
+        // If we reached here, retries were exhausted and condition never met
+        if (lastResult != null && lastResult.success()) {
+            // Mark as failed because until condition was not met
+            return new TaskResult(false, lastResult.changed(), "Until condition not met after " + task.retries() + " retries", lastResult.data());
+        }
+
+        return lastResult;
     }
 
     private TaskResult executeLoopTask(Play play, Host host, Task task, VariableManager variableManager, Map<String, Object> allVars) {
@@ -244,7 +356,7 @@ public class PlaybookExecutor {
             Map<String, Object> iterationVars = new HashMap<>(allVars);
             iterationVars.put("item", item);
 
-            TaskResult result = executeSingleTask(play, host, task, iterationVars);
+            TaskResult result = executeSingleTask(play, host, task, iterationVars, variableManager);
 
             Map<String, Object> resultData = new HashMap<>(result.data());
             resultData.put("item", item);
