@@ -1,5 +1,8 @@
 package org.example.ansible.connection;
 
+import org.example.ansible.util.OSHandler;
+import org.example.ansible.util.OSHandlerFactory;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -16,6 +19,16 @@ import java.util.concurrent.ExecutionException;
  */
 public class LocalConnection implements Connection {
 
+    private final OSHandler osHandler;
+
+    public LocalConnection() {
+        this(OSHandlerFactory.getHandler());
+    }
+
+    public LocalConnection(OSHandler osHandler) {
+        this.osHandler = osHandler;
+    }
+
     @Override
     public void connect() {
         // No-op for local connection
@@ -24,12 +37,12 @@ public class LocalConnection implements Connection {
     @Override
     public ConnectionResult execCommand(String command, boolean sudo) {
         List<String> commandList = new ArrayList<>();
-        if (sudo) {
+        if (sudo && osHandler.supportsSudo()) {
             commandList.add("sudo");
             commandList.add("-n"); // non-interactive
         }
-        commandList.add("/bin/sh");
-        commandList.add("-c");
+
+        commandList.addAll(osHandler.getShellExecutable());
         commandList.add(command);
 
         ProcessBuilder pb = new ProcessBuilder(commandList);
