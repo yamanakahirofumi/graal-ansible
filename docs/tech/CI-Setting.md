@@ -34,10 +34,11 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Set up GraalVM
-      uses: graalvm/setup-java@v2
+      uses: graalvm/setup-graalvm@v1
       with:
         java-version: '21'
         distribution: 'graalvm'
+        version: '23.1.2'
         github-token: ${{ secrets.GITHUB_TOKEN }}
         native-image-job-reports: 'true'
     - name: Build and Test

@@ -65,3 +65,15 @@
 
 ### [✓] Ansible 互換性の維持レベル
 - **決定事項**: **Ansible 13** で動くコレクションが動作することを目標とする。
+
+## 3. 整理・調整済み (Refactored/Adjusted)
+
+### [x] GitHub Actions CI ワークフローの構築
+- **完了日**: 2026-03-05
+- **概要**: docs/tech/CI-Setting.md に記載されていたが未実装だった CI 環境を構築。
+- **解決策**: `.github/workflows/build.yml` を作成し、マルチプラットフォームでのビルドとテストを自動化。
+
+### [x] Task Record および YamlParser の同期
+- **完了日**: 2026-03-05
+- **概要**: docs/implementation/Task-Control.md で予約されていたが未実装だったキーワードの追加。
+- **解決策**: `Task` レコードに `ignore_unreachable`, `delegate_facts` を追加し、`YamlParser` での解析をサポート。

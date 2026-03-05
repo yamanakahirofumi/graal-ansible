@@ -49,6 +49,34 @@ class YamlParserTest {
     }
 
     @Test
+    void testReservedKeywordsParsing() {
+        String yaml = """
+                - name: reserved keywords play
+                  hosts: localhost
+                  tasks:
+                    - name: full task
+                      shell: echo hi
+                      ignore_errors: true
+                      ignore_unreachable: true
+                      delegate_to: otherhost
+                      delegate_facts: true
+                      run_once: true
+                """;
+        InputStream inputStream = new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8));
+        YamlParser parser = new YamlParser();
+        Playbook playbook = parser.parse(inputStream);
+
+        Task task = playbook.plays().get(0).tasks().get(0);
+        assertEquals("full task", task.name());
+        assertEquals("shell", task.action());
+        assertTrue(task.ignoreErrors());
+        assertTrue(task.ignoreUnreachable());
+        assertEquals("otherhost", task.delegateTo());
+        assertTrue(task.delegateFacts());
+        assertTrue(task.runOnce());
+    }
+
+    @Test
     void testInvalidTaskParsing() {
         String yaml = """
                 - name: invalid play
