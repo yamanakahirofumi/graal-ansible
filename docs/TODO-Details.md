@@ -12,22 +12,38 @@
     - `native-image-configure-plugin` を用いた自動生成プロセスの構築。
     - GraalPy 実行時のリソース（Python スクリプト等）のバンドル設定。
 
-### [ ] 権限昇格 (become) の実装
-- **概要**: [権限昇格 (become)](implementation/Privilege-Escalation.md) に基づく sudo/su 等の実行サポート。
-- **検討内容**:
-    - `BecomeContext` クラスの定義と `exec_command` への統合。
-    - `sudo -p` 等のプロンプト検知とパスワード自動入力ロジックの実装。
-    - `OSHandler` 経由での OS 固有の昇格コマンド生成。
-
 ## 2. 実装時の詳細事項
 
-### [ ] 実際の Ansible コレクションを使ったテストの実施
-- **概要**: [実際のコレクションを使ったテスト方法の設計](tech/Actual-Collection-Testing.md) に基づき、主要なモジュールのテストを実装する。
+### [ ] 実際の Ansible コレクションを使ったテストの拡充
+- **概要**: 主要なモジュールのテストを継続的に追加し、互換性を検証する。
 - **検討内容**:
-    - `ansible.builtin.copy`, `ansible.builtin.command` 等のテスト実装。
-    - CI 環境での GraalPy および ansible-core のセットアップ自動化。
+    - `ansible.builtin.template`, `ansible.builtin.file`, `ansible.builtin.stat` 等のテスト実装。
+    - 各 OS（Linux, Windows, macOS）固有のモジュール挙動の検証。
 
 ## 完了済みの項目 (Completed)
+
+### [x] 権限昇格 (become) の実装
+- **完了日**: 2026-03-05
+- **概要**: [権限昇格 (become)](implementation/Privilege-Escalation.md) に基づく sudo/su 等の実行サポート。
+- **解決策**:
+    - `BecomeContext` レコードを定義し、`Connection` インターフェースの `execCommand` メソッドへ統合。
+    - `LocalConnection` において、`sudo` および `su` によるコマンドのラップ処理を実装。
+    - `PlaybookExecutor` にて Play レベルおよび Task レベルの `become` 設定の解決ロジックを実装済み。
+
+### [x] OS 抽象化レイヤー (OSHandler) の実装
+- **完了日**: 2026-03-05
+- **概要**: [OS 抽象化レイヤー](implementation/OS-Abstraction.md) に基づき、ターゲット OS ごとの差異を吸収。
+- **解決策**:
+    - `OSHandler` インターフェースおよび `LinuxHandler`, `WindowsHandler` を実装。
+    - シェル実行コマンド (`/bin/sh -c` vs `cmd.exe /c`) や一時ディレクトリ、パス区切り文字の共通化を実現。
+    - `OSHandlerFactory` による実行環境に応じた動的なハンドラ切り替えを実装済み。
+
+### [x] 実際の Ansible コレクションを使ったテストの実施
+- **完了日**: 2026-03-05
+- **概要**: [実際のコレクションを使ったテスト方法の設計](tech/Actual-Collection-Testing.md) に基づき、主要なモジュールのテストを統合。
+- **解決策**:
+    - `ansible.builtin.copy`, `ansible.builtin.command` 等のテストを CI 環境へ統合。
+    - GraalPy および `ansible-core` のセットアップを GitHub Actions 上で自動化済み。
 
 ### [x] GraalPy と Java のシームレスな統合
 - **完了日**: 2026-03-04
@@ -64,11 +80,6 @@
 - **解決策**:
     - [タスク制御の実装詳細](implementation/Task-Control.md) に基づき、`PlaybookExecutor` および `TaskExecutor` へ全機能を組み込み済み。
     - `when`, `loop` (`with_items`), `register`, `handlers` (`notify`), `block/rescue/always`, `until/retries/delay`, `failed_when/changed_when`, `delegate_to`, `run_once`, `ignore_errors` をサポート。
-
-### [x] 実際の Ansible コレクションを使ったテスト方法の設計
-- **完了日**: 2026-03-04
-- **概要**: Java/GraalPy 環境で、既存の Python 製 Ansible コレクションが正しく動作するかを確認するテスト戦略の策定。
-- **解決策**: [実際のコレクションを用いた自動テストの実施方法](tech/Actual-Collection-Testing.md) にて、venv 構築、`ANSIBLE_COLLECTIONS_PATH` の設定、モジュール実行ラッパーの設計を完了。
 
 ### [✓] Ansible 互換性の維持レベル
 - **決定事項**: **Ansible 13** で動くコレクションが動作することを目標とする。
