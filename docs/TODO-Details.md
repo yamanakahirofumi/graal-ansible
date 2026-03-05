@@ -12,6 +12,13 @@
     - `native-image-configure-plugin` を用いた自動生成プロセスの構築。
     - GraalPy 実行時のリソース（Python スクリプト等）のバンドル設定。
 
+### [ ] 権限昇格 (become) の実装
+- **概要**: [権限昇格 (become)](implementation/Privilege-Escalation.md) に基づく sudo/su 等の実行サポート。
+- **検討内容**:
+    - `BecomeContext` クラスの定義と `exec_command` への統合。
+    - `sudo -p` 等のプロンプト検知とパスワード自動入力ロジックの実装。
+    - `OSHandler` 経由での OS 固有の昇格コマンド生成。
+
 ## 2. 実装時の詳細事項
 
 ### [ ] 実際の Ansible コレクションを使ったテストの実施
