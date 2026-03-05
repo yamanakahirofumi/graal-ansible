@@ -1,0 +1,10 @@
+{
+  "resources": {
+    "includes": [
+      {"pattern": ".*\\.yml"},
+      {"pattern": ".*\\.yaml"},
+      {"pattern": ".*\\.py"}
+    ]
+  },
+  "bundles": []
+}
