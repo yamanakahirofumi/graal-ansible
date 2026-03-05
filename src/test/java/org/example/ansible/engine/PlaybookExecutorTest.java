@@ -44,7 +44,7 @@ class PlaybookExecutorTest {
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
 
-        taskExecutor.registerModule("debug", args -> {
+        taskExecutor.registerModule("debug", (args, become) -> {
             String msg = (String) args.get("msg");
             return TaskResult.success(false, Map.of("msg", msg));
         });
@@ -82,28 +82,23 @@ class PlaybookExecutorTest {
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
 
-        taskExecutor.registerModule("fail_on_host1", args -> {
-            // This is a hacky way to simulate failure for a specific host in our current TaskExecutor
-            // since TaskExecutor doesn't know about the host.
-            // But wait, PlaybookExecutor DOES know about the host and passes resolved task.
-            // Let's use a variable to signal failure.
+        taskExecutor.registerModule("fail_on_host1", (args, become) -> {
             return TaskResult.failure("failed");
         });
 
-        // Better way: use a variable in the inventory and a module that fails based on that variable
         String inventoryIniWithVar = """
                 host1 fail_me=true
                 host2 fail_me=false
                 """;
         inventory = new IniInventoryParser().parse(new ByteArrayInputStream(inventoryIniWithVar.getBytes(StandardCharsets.UTF_8)));
 
-        taskExecutor.registerModule("fail_if_var_true", args -> {
+        taskExecutor.registerModule("fail_if_var_true", (args, become) -> {
             if ("true".equals(args.get("should_fail"))) {
                 return TaskResult.failure("Intentional failure");
             }
             return TaskResult.success(false, Map.of());
         });
-        taskExecutor.registerModule("debug", args -> TaskResult.success(false, Map.of()));
+        taskExecutor.registerModule("debug", (args, become) -> TaskResult.success(false, Map.of()));
 
         String playbookYaml2 = """
                 - name: test failure
@@ -122,11 +117,9 @@ class PlaybookExecutorTest {
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
 
         // Assert
-        // host1 should have 1 result (failed)
         assertEquals(1, results.get("host1").size());
         assertFalse(results.get("host1").get(0).success());
 
-        // host2 should have 2 results (success)
         assertEquals(2, results.get("host2").size());
         assertTrue(results.get("host2").get(0).success());
         assertTrue(results.get("host2").get(1).success());
@@ -153,7 +146,7 @@ class PlaybookExecutorTest {
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
 
-        taskExecutor.registerModule("debug", args -> TaskResult.success(false, Map.of()));
+        taskExecutor.registerModule("debug", (args, become) -> TaskResult.success(false, Map.of()));
 
         // Act
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);

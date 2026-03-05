@@ -1,5 +1,6 @@
 package org.example.ansible.engine;
 
+import org.example.ansible.connection.BecomeContext;
 import org.example.ansible.module.Module;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,14 +21,14 @@ class TaskExecutorTest {
     @Test
     void testExecuteDebugTask() {
         // Arrange (準備)
-        executor.registerModule("debug", args -> {
+        executor.registerModule("debug", (args, becomeContext) -> {
             String msg = (String) args.getOrDefault("msg", "");
             return TaskResult.success(false, Map.of("msg", msg));
         });
         Task task = new Task("test debug", "debug", Map.of("msg", "hello world"));
 
         // Act (実行)
-        TaskResult result = executor.execute(task);
+        TaskResult result = executor.execute(task, BecomeContext.empty());
 
         // Assert (検証)
         assertTrue(result.success());
@@ -41,7 +42,7 @@ class TaskExecutorTest {
         Task task = new Task("test unknown", "unknown", Map.of());
 
         // Act (実行)
-        TaskResult result = executor.execute(task);
+        TaskResult result = executor.execute(task, BecomeContext.empty());
 
         // Assert (検証)
         assertFalse(result.success());

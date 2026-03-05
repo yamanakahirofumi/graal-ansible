@@ -29,7 +29,7 @@ class VariablePriorityTest {
     void setUp() {
         taskExecutor = new TaskExecutor();
         playbookExecutor = new PlaybookExecutor(taskExecutor);
-        taskExecutor.registerModule("debug", args -> {
+        taskExecutor.registerModule("debug", (args, become) -> {
             Object msg = args.get("msg");
             return TaskResult.success(false, Map.of("msg", msg));
         });

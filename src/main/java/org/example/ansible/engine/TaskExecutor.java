@@ -1,5 +1,6 @@
 package org.example.ansible.engine;
 
+import org.example.ansible.connection.BecomeContext;
 import org.example.ansible.module.Module;
 import org.example.ansible.util.OSHandler;
 import org.example.ansible.util.OSHandlerFactory;
@@ -43,10 +44,11 @@ public class TaskExecutor {
     /**
      * Executes the given task.
      *
-     * @param task The task to execute.
+     * @param task          The task to execute.
+     * @param becomeContext The privilege escalation context.
      * @return The execution result.
      */
-    public TaskResult execute(Task task) {
+    public TaskResult execute(Task task, BecomeContext becomeContext) {
         Module module = modules.get(task.action());
         if (module == null) {
             return TaskResult.failure("Module not found: " + task.action());
@@ -54,7 +56,7 @@ public class TaskExecutor {
         try {
             // Future improvement: modules could use osHandler to adapt behavior.
             // For now, it is registered in TaskExecutor as a step toward full OS abstraction.
-            return module.execute(task.args());
+            return module.execute(task.args(), becomeContext);
         } catch (Exception e) {
             return TaskResult.failure("Execution failed: " + e.getMessage());
         }

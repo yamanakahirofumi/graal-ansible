@@ -1,5 +1,6 @@
 package org.example.ansible.module.python;
 
+import org.example.ansible.connection.BecomeContext;
 import org.example.ansible.engine.TaskResult;
 import org.example.ansible.module.Module;
 import org.graalvm.polyglot.Context;
@@ -27,11 +28,12 @@ public class PythonModule implements Module {
      * Executes the module with the given arguments.
      * This implementation uses GraalPy to run Python module code.
      *
-     * @param args The module arguments (e.g., src, dest, content).
+     * @param args          The module arguments (e.g., src, dest, content).
+     * @param becomeContext The privilege escalation context.
      * @return The result of the execution.
      */
     @Override
-    public TaskResult execute(final Map<String, Object> args) {
+    public TaskResult execute(final Map<String, Object> args, BecomeContext becomeContext) {
         try (Context context = Context.newBuilder("python")
                 .allowAllAccess(true)
                 .build()) {
