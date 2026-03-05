@@ -5,12 +5,11 @@
 
 ## 1. 技術面 (Technical)
 
-### [ ] Native Image 時のリフレクション設定
-- **概要**: YAML 解析や動的クラスロードに伴うリフレクション定義の生成。
+### [ ] CI における Native Image ビルドの安定化
+- **概要**: GitHub Actions 上での Native Image コンパイル時間の短縮とリソース最適化。
 - **検討内容**:
-    - [Native Image 最適化](implementation/Native-Image-Optimization.md) に基づく設定ファイルの作成。
-    - `native-image-configure-plugin` を用いた自動生成プロセスの構築。
-    - GraalPy 実行時のリソース（Python スクリプト等）のバンドル設定。
+    - Build Cache の有効活用。
+    - Windows/macOS 環境でのビルドエラーの監視と修正。
 
 ## 2. 実装時の詳細事項
 
@@ -21,6 +20,13 @@
     - 各 OS（Linux, Windows, macOS）固有のモジュール挙動の検証。
 
 ## 完了済みの項目 (Completed)
+
+### [x] Native Image 時のリフレクション設定
+- **完了日**: 2026-03-05
+- **概要**: YAML 解析や動的クラスロードに伴うリフレクション定義の生成。
+- **解決策**:
+    - `src/main/resources/META-INF/native-image/` 配下に `reflect-config.json`, `resource-config.json`, `native-image.properties` を作成済み。
+    - SnakeYAML, Jackson, Picocli, および主要な Record クラスのリフレクション設定を包含。
 
 ### [x] 権限昇格 (become) の実装
 - **完了日**: 2026-03-05
