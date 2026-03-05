@@ -18,9 +18,9 @@ public class YamlParser {
 
     private static final Set<String> RESERVED_TASK_KEYS = Set.of(
             "name", "register", "when", "loop", "until", "retries", "delay",
-            "ignore_errors", "tags", "become", "become_user", "become_method",
+            "ignore_errors", "ignore_unreachable", "tags", "become", "become_user", "become_method",
             "vars", "notify", "with_items", "with_list", "with_dict",
-            "failed_when", "changed_when", "delegate_to", "run_once",
+            "failed_when", "changed_when", "delegate_to", "delegate_facts", "run_once",
             "block", "rescue", "always"
     );
 
@@ -141,7 +141,9 @@ public class YamlParser {
         Integer retries = (Integer) map.getOrDefault("retries", 3);
         Integer delay = (Integer) map.getOrDefault("delay", 5);
         String delegateTo = (String) map.get("delegate_to");
+        boolean delegateFacts = Boolean.TRUE.equals(map.get("delegate_facts"));
         boolean runOnce = Boolean.TRUE.equals(map.get("run_once"));
+        boolean ignoreUnreachable = Boolean.TRUE.equals(map.get("ignore_unreachable"));
 
         List<String> notify = new ArrayList<>();
         Object notifyObj = map.get("notify");
@@ -154,7 +156,7 @@ public class YamlParser {
         }
 
         return new Task(name, action, args, vars, when, register, loop, notify, failedWhen, changedWhen, ignoreErrors,
-                until, retries, delay, delegateTo, runOnce, block, rescue, always);
+                until, retries, delay, delegateTo, delegateFacts, runOnce, ignoreUnreachable, block, rescue, always);
     }
 
     @SuppressWarnings("unchecked")

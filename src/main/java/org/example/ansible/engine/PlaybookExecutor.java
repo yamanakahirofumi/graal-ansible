@@ -290,7 +290,7 @@ public class PlaybookExecutor {
         }
 
         Task resolvedTask = new Task(task.name(), task.action(), resolvedArgs, task.vars(), task.when(), task.register(), task.loop(), task.notifications(), task.failedWhen(), task.changedWhen(), task.ignoreErrors(),
-                task.until(), task.retries(), task.delay(), resolvedDelegateTo, task.runOnce(), task.block(), task.rescue(), task.always());
+                task.until(), task.retries(), task.delay(), resolvedDelegateTo, task.delegateFacts(), task.runOnce(), task.ignoreUnreachable(), task.block(), task.rescue(), task.always());
 
         if (task.until() == null) {
             return taskExecutor.execute(resolvedTask);
