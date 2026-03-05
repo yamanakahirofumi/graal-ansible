@@ -12,7 +12,64 @@ Java の動的な機能（リフレクション、動的プロキシ、リソー
 - **Jinjava**: テンプレート展開時の動的なプロパティアクセスに必要です。
 - **Picocli**: コマンドライン引数のマッピングに必要です（`picocli-codegen` による自動生成を推奨）。
 
-### 1.2 設定の自動生成
+### 1.2 設定の具体例 (JSON)
+
+#### SnakeYAML (Record クラス)
+Playbook を構成する Java Record は、すべてのコンストラクタとプロパティへのアクセスを許可する必要があります。
+
+```json
+[
+  {
+    "name": "org.example.ansible.engine.Play",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true,
+    "allDeclaredFields": true,
+    "allPublicMethods": true
+  },
+  {
+    "name": "org.example.ansible.engine.Task",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true,
+    "allDeclaredFields": true,
+    "allPublicMethods": true
+  }
+]
+```
+
+#### Picocli (CLI オプション)
+アノテーションを付与したフィールドがリフレクションでアクセスされるため、以下のような設定が必要です。
+
+```json
+[
+  {
+    "name": "org.example.ansible.cli.PlaybookCli",
+    "allDeclaredFields": true,
+    "allDeclaredConstructors": true,
+    "methods": [
+      { "name": "run", "parameterTypes": [] }
+    ]
+  }
+]
+```
+
+#### Jackson (JSON マッピング)
+モジュールの戻り値を Map に変換する際、Jackson が使用する内部クラスや、特定の型変換ロジックを登録します。
+
+```json
+[
+  {
+    "name": "com.fasterxml.jackson.databind.ObjectMapper",
+    "allDeclaredConstructors": true,
+    "methods": [ { "name": "<init>", "parameterTypes": [] } ]
+  },
+  {
+    "name": "java.util.LinkedHashMap",
+    "allDeclaredConstructors": true
+  }
+]
+```
+
+### 1.3 設定の自動生成
 - `native-image-configure-plugin` を活用し、JUnit テスト実行時にトレースエージェントを走らせて設定ファイルを自動生成するプロセスを導入します。
 
 ## 2. リソース管理 (Resource Management)
