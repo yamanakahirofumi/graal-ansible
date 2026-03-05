@@ -22,7 +22,7 @@ Ansible と同様に、ターゲットホストに対する実行環境（ロー
 ### 主要メソッド
 
 - `connect()`: ターゲットホストへの接続を確立。
-- `exec_command(command, sudo=False)`: 指定されたコマンドを実行し、標準出力・標準エラー・終了コードを返す。
+- `exec_command(command, become_context=null)`: 指定されたコマンドを実行し、標準出力・標準エラー・終了コードを返す。詳細は [権限昇格 (become)](Privilege-Escalation.md) を参照。
 - `put_file(local_path, remote_path)`: ファイルをターゲットホストへ転送。
 - `fetch_file(remote_path, local_path)`: ファイルをターゲットホストから取得。
 - `close()`: 接続を終了。
