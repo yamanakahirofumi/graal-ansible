@@ -17,35 +17,55 @@ class LocalConnectionTest {
     void testExecCommandSuccess() {
         ConnectionResult result = connection.execCommand("echo hello", false);
         assertEquals(0, result.exitCode());
-        assertEquals("hello\n", result.stdout());
+        assertEquals("hello", result.stdout().trim());
         assertTrue(result.stderr().isEmpty());
     }
 
     @Test
     void testExecCommandFailure() {
         // Exit with non-zero code
+        // Use a portable way to exit with a code.
+        // /bin/sh -c "exit 42" works on Unix.
+        // cmd.exe /c "exit 42" works on Windows.
         ConnectionResult result = connection.execCommand("exit 42", false);
         assertEquals(42, result.exitCode());
     }
 
     @Test
     void testExecCommandStderr() {
-        ConnectionResult result = connection.execCommand("echo error >&2", false);
+        // Use a portable way to write to stderr if possible, or just accept that echo >&2 might be slightly different
+        // On Windows cmd.exe: echo error 1>&2
+        // On Unix sh: echo error >&2
+        // Actually "echo error 1>&2" works on both.
+        ConnectionResult result = connection.execCommand("echo error 1>&2", false);
         assertEquals(0, result.exitCode());
-        assertTrue(result.stdout().isEmpty());
-        assertEquals("error\n", result.stderr());
+        assertTrue(result.stdout().trim().isEmpty());
+        assertEquals("error", result.stderr().trim());
     }
 
     @Test
-    void testLargeOutput() {
+    void testLargeOutput(@TempDir Path tempDir) throws IOException {
         // Generate large output to test potential deadlocks (standard buffer is ~64KB)
-        // Using seq and tr to generate a predictable large stream that works in /bin/sh
-        String command = "seq 1 20000 | tr -d '\\n'";
+        // Creating a large file and reading it back is more portable than seq | tr
+        Path largeFile = tempDir.resolve("large.txt");
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 20000; i++) {
+            sb.append(i).append(" ");
+        }
+        String content = sb.toString();
+        Files.writeString(largeFile, content);
+
+        String command;
+        if (System.getProperty("os.name").toLowerCase().contains("win")) {
+            command = "type " + largeFile.toAbsolutePath();
+        } else {
+            command = "cat " + largeFile.toAbsolutePath();
+        }
+
         ConnectionResult result = connection.execCommand(command, false);
         assertEquals(0, result.exitCode());
-        // seq 1 20000 produces numbers. 1-9 (9 chars), 10-99 (90*2=180), 100-999 (900*3=2700), 1000-9999 (9000*4=36000), 10000-20000 (10001*5=50005)
-        // Total: 9 + 180 + 2700 + 36000 + 50005 = 88894
         assertTrue(result.stdout().length() > 65536, "Output should be larger than 64KB, but was " + result.stdout().length());
+        assertEquals(content.trim(), result.stdout().trim());
     }
 
     @Test
