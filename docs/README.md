@@ -29,6 +29,7 @@
 - [CLI仕様](features/CLI-Specification.md)：ansible-playbook互換のコマンドライン引数
 - [動作環境](features/System-Requirements.md)：Java/GraalVMの実行環境とOS互換性
 - [インベントリ管理](features/Inventory-System.md)：静的・動的インベントリのサポート範囲
+- [コレクションの管理と取得方法](features/Collection-Management.md)：実際のコレクションを取得・利用する手順
 - [Playbook実行仕様](features/Playbook-Execution.md)：タスク実行、ループ、条件分岐のサポート範囲
 - [Ansible用語集](features/Ansible-Terminology.md)：コレクション、モジュール、ロール等の用語定義
 - [モジュール互換性](features/Module-Compatibility.md)：実装済みのコアモジュール一覧

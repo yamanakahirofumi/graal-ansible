@@ -25,6 +25,7 @@ graal-ansible [options] playbook.yml
 | `--become-user` | - | 昇格後のユーザーを指定 (デフォルト: root) | 中 |
 | `--ask-become-pass` | `-K` | 権限昇格パスワードをプロンプトで問い合せる | 高 |
 | `--version` | - | バージョン情報を表示 | 高 |
+| `--collections-path` | - | コレクションの探索パスを指定 | 中 |
 | `--help` | `-h` | ヘルプメッセージを表示 | 高 |
 
 ## 3. 実装方針
