@@ -7,6 +7,11 @@ import java.util.List;
  */
 public class LinuxHandler implements OSHandler {
     @Override
+    public String getTempDir() {
+        return "/tmp";
+    }
+
+    @Override
     public String getSeparator() {
         return "/";
     }

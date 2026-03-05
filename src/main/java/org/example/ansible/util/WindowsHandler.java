@@ -7,6 +7,11 @@ import java.util.List;
  */
 public class WindowsHandler implements OSHandler {
     @Override
+    public String getTempDir() {
+        return "C:\\Temp";
+    }
+
+    @Override
     public String getSeparator() {
         return "\\";
     }
