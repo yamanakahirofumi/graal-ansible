@@ -1,5 +1,6 @@
 package org.example.ansible.engine;
 
+import org.example.ansible.connection.BecomeContext;
 import org.example.ansible.inventory.Group;
 import org.example.ansible.inventory.Host;
 import org.example.ansible.inventory.Inventory;
@@ -290,16 +291,19 @@ public class PlaybookExecutor {
         }
 
         Task resolvedTask = new Task(task.name(), task.action(), resolvedArgs, task.vars(), task.when(), task.register(), task.loop(), task.notifications(), task.failedWhen(), task.changedWhen(), task.ignoreErrors(),
-                task.until(), task.retries(), task.delay(), resolvedDelegateTo, task.delegateFacts(), task.runOnce(), task.ignoreUnreachable(), task.block(), task.rescue(), task.always());
+                task.until(), task.retries(), task.delay(), resolvedDelegateTo, task.delegateFacts(), task.runOnce(), task.ignoreUnreachable(), task.block(), task.rescue(), task.always(),
+                task.become(), task.becomeMethod(), task.becomeUser(), task.becomeFlags());
+
+        BecomeContext becomeContext = resolveBecomeContext(play, resolvedTask, variables);
 
         if (task.until() == null) {
-            return taskExecutor.execute(resolvedTask);
+            return taskExecutor.execute(resolvedTask, becomeContext);
         }
 
         // Retry logic
         TaskResult lastResult = null;
         for (int i = 0; i < task.retries(); i++) {
-            lastResult = taskExecutor.execute(resolvedTask);
+            lastResult = taskExecutor.execute(resolvedTask, becomeContext);
 
             if (task.register() != null && variableManager != null) {
                 variableManager.registerVariable(host.name(), task.register(), lastResult.data());
@@ -387,6 +391,48 @@ public class PlaybookExecutor {
 
     private boolean isSkipped(TaskResult result) {
         return Boolean.TRUE.equals(result.data().get("skipped"));
+    }
+
+    private BecomeContext resolveBecomeContext(Play play, Task task, Map<String, Object> variables) {
+        // Task level takes precedence, then Play level
+        Object becomeObj = task.become();
+        if (becomeObj == null) becomeObj = play.become();
+
+        boolean become = false;
+        if (becomeObj != null) {
+            if (becomeObj instanceof String s && s.contains("{{")) {
+                becomeObj = variableResolver.resolveValue(s, variables);
+            }
+            become = Truthiness.isTrue(becomeObj);
+        }
+
+        String method = task.becomeMethod();
+        if (method == null) method = play.becomeMethod();
+        if (method == null) method = "sudo";
+
+        String user = task.becomeUser();
+        if (user == null) user = play.becomeUser();
+        if (user == null) user = "root";
+
+        String flags = task.becomeFlags();
+        if (flags == null) flags = play.becomeFlags();
+        if (flags == null) flags = "";
+
+        // Resolve variables in strings
+        if (method != null && method.contains("{{")) {
+            Object resolved = variableResolver.resolveValue(method, variables);
+            method = resolved != null ? resolved.toString() : null;
+        }
+        if (user != null && user.contains("{{")) {
+            Object resolved = variableResolver.resolveValue(user, variables);
+            user = resolved != null ? resolved.toString() : null;
+        }
+        if (flags != null && flags.contains("{{")) {
+            Object resolved = variableResolver.resolveValue(flags, variables);
+            flags = resolved != null ? resolved.toString() : null;
+        }
+
+        return new BecomeContext(become, method, user, flags);
     }
 
     private List<Host> getTargetHosts(String pattern, Inventory inventory) {

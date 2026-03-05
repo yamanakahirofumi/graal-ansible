@@ -35,11 +35,31 @@ public class LocalConnection implements Connection {
     }
 
     @Override
-    public ConnectionResult execCommand(String command, boolean sudo) {
+    public ConnectionResult execCommand(String command, BecomeContext becomeContext) {
         List<String> commandList = new ArrayList<>();
-        if (sudo && osHandler.supportsSudo()) {
-            commandList.add("sudo");
-            commandList.add("-n"); // non-interactive
+
+        if (becomeContext != null && becomeContext.become() && osHandler.supportsSudo()) {
+            String method = becomeContext.becomeMethod();
+            if (method == null || "sudo".equals(method)) {
+                commandList.add("sudo");
+                commandList.add("-p");
+                commandList.add("BECOME-PROMPT");
+                if (becomeContext.becomeUser() != null) {
+                    commandList.add("-u");
+                    commandList.add(becomeContext.becomeUser());
+                }
+                if (becomeContext.becomeFlags() != null && !becomeContext.becomeFlags().isEmpty()) {
+                    for (String flag : becomeContext.becomeFlags().split("\\s+")) {
+                        if (!flag.isEmpty()) commandList.add(flag);
+                    }
+                }
+            } else if ("su".equals(method)) {
+                commandList.add("su");
+                if (becomeContext.becomeUser() != null) {
+                    commandList.add(becomeContext.becomeUser());
+                }
+                commandList.add("-c");
+            }
         }
 
         commandList.addAll(osHandler.getShellExecutable());

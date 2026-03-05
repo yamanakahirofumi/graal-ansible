@@ -6,6 +6,9 @@ import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 
 import org.example.ansible.engine.Playbook;
+import org.example.ansible.connection.Connection;
+import org.example.ansible.connection.ConnectionResult;
+import org.example.ansible.connection.LocalConnection;
 import org.example.ansible.engine.PlaybookExecutor;
 import org.example.ansible.engine.TaskExecutor;
 import org.example.ansible.engine.TaskResult;
@@ -133,12 +136,49 @@ public class PlaybookCli implements Callable<Integer> {
     }
 
     private void registerStandardModules(TaskExecutor executor) {
-        executor.registerModule("debug", args -> {
+        Connection localConnection = new LocalConnection(executor.getOsHandler());
+
+        executor.registerModule("debug", (args, becomeContext) -> {
             Object msg = args.getOrDefault("msg", "Hello world");
             System.out.println("DEBUG: " + msg);
             return TaskResult.success(false, Map.of("msg", msg));
         });
-        // You can register more modules here (e.g., shell, command if implemented)
+
+        executor.registerModule("command", (args, becomeContext) -> {
+            String command = (String) args.get("_raw_params");
+            if (command == null) command = (String) args.get("cmd");
+            if (command == null) return TaskResult.failure("no command given");
+
+            ConnectionResult result = localConnection.execCommand(command, becomeContext);
+            Map<String, Object> data = new HashMap<>();
+            data.put("stdout", result.stdout());
+            data.put("stderr", result.stderr());
+            data.put("rc", result.exitCode());
+            data.put("changed", result.exitCode() == 0);
+
+            if (result.exitCode() != 0) {
+                return new TaskResult(false, false, "Command failed with rc " + result.exitCode(), data);
+            }
+            return TaskResult.success(data);
+        });
+
+        executor.registerModule("shell", (args, becomeContext) -> {
+            String command = (String) args.get("_raw_params");
+            if (command == null) command = (String) args.get("cmd");
+            if (command == null) return TaskResult.failure("no command given");
+
+            ConnectionResult result = localConnection.execCommand(command, becomeContext);
+            Map<String, Object> data = new HashMap<>();
+            data.put("stdout", result.stdout());
+            data.put("stderr", result.stderr());
+            data.put("rc", result.exitCode());
+            data.put("changed", result.exitCode() == 0);
+
+            if (result.exitCode() != 0) {
+                return new TaskResult(false, false, "Shell command failed with rc " + result.exitCode(), data);
+            }
+            return TaskResult.success(data);
+        });
     }
 
     private void printSummary(Map<String, List<TaskResult>> results) {

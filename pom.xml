@@ -17,6 +17,7 @@
     <junit.version>5.10.2</junit.version>
     <sshd.version>2.12.1</sshd.version>
     <jinjava.version>2.7.6</jinjava.version>
+    <mockito.version>5.11.0</mockito.version>
   </properties>
 
   <dependencies>
@@ -71,6 +72,18 @@
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter-engine</artifactId>
       <version>${junit.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-core</artifactId>
+      <version>${mockito.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-junit-jupiter</artifactId>
+      <version>${mockito.version}</version>
       <scope>test</scope>
     </dependency>
   </dependencies>

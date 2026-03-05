@@ -1,5 +1,6 @@
 package org.example.ansible.module.python;
 
+import org.example.ansible.connection.BecomeContext;
 import org.example.ansible.engine.TaskResult;
 import org.junit.jupiter.api.Test;
 
@@ -32,7 +33,7 @@ class PythonModuleTest {
         PythonModule module = new PythonModule("test_module", script);
         Map<String, Object> args = Map.of("foo", "bar");
 
-        TaskResult result = module.execute(args);
+        TaskResult result = module.execute(args, BecomeContext.empty());
 
         assertTrue(result.success(), "Execution failed: " + result.message());
         assertTrue(result.changed());
@@ -56,7 +57,7 @@ class PythonModuleTest {
             """;
 
         PythonModule module = new PythonModule("fail_module", script);
-        TaskResult result = module.execute(Map.of());
+        TaskResult result = module.execute(Map.of(), BecomeContext.empty());
 
         assertFalse(result.success());
         assertFalse(result.changed());

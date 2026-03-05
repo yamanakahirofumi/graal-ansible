@@ -14,11 +14,11 @@ public interface Connection extends AutoCloseable {
     /**
      * Executes a command on the target host.
      *
-     * @param command The command to execute.
-     * @param sudo    Whether to use sudo for execution.
+     * @param command       The command to execute.
+     * @param becomeContext The privilege escalation context.
      * @return The result of the command execution.
      */
-    ConnectionResult execCommand(String command, boolean sudo);
+    ConnectionResult execCommand(String command, BecomeContext becomeContext);
 
     /**
      * Transfers a file to the target host.

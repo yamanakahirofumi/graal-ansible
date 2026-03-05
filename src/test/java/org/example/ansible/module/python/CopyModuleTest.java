@@ -1,5 +1,6 @@
 package org.example.ansible.module.python;
 
+import org.example.ansible.connection.BecomeContext;
 import org.example.ansible.engine.TaskResult;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -43,7 +44,7 @@ public class CopyModuleTest {
             "dest", destFile.toString()
         );
 
-        TaskResult result = module.execute(args);
+        TaskResult result = module.execute(args, BecomeContext.empty());
 
         assertTrue(result.success(), "Module execution should be successful: " + result.message());
         assertTrue(result.changed(), "Module should have changed the state");
@@ -77,7 +78,7 @@ public class CopyModuleTest {
             "dest", destFile.toString()
         );
 
-        TaskResult result = module.execute(args);
+        TaskResult result = module.execute(args, BecomeContext.empty());
 
         assertTrue(result.success(), "Module execution should be successful: " + result.message());
         assertTrue(result.changed(), "Module should have changed the state");
