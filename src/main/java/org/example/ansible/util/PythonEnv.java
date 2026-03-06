@@ -28,8 +28,21 @@ public class PythonEnv {
             executable = findCommand("graalpy");
         }
         if (executable == null) {
-            // Last resort default for the sandbox
-            executable = "/home/jules/.pyenv/versions/3.12.12/bin/python3";
+            executable = findCommand("python");
+        }
+
+        if (executable == null) {
+            // Last resort defaults
+            String[] possiblePaths = {
+                "/usr/bin/python3",
+                "/usr/local/bin/python3"
+            };
+            for (String p : possiblePaths) {
+                if (Files.exists(Paths.get(p))) {
+                    executable = p;
+                    break;
+                }
+            }
         }
         return executable;
     }
@@ -44,10 +57,6 @@ public class PythonEnv {
             sitePackages = queryPython("import site; print(site.getsitepackages()[0] if site.getsitepackages() else '')");
         }
 
-        if (sitePackages == null || sitePackages.isEmpty()) {
-            // Fallback for current environment
-            sitePackages = "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages";
-        }
         return sitePackages;
     }
 
@@ -77,6 +86,7 @@ public class PythonEnv {
     private static String queryPython(String script) {
         try {
             String exe = getExecutable();
+            if (exe == null) return null;
             Process p = new ProcessBuilder(exe, "-c", script).start();
             try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
                 String line = r.readLine();

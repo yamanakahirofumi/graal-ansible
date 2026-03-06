@@ -6,12 +6,7 @@ import org.example.ansible.connection.LocalConnection;
 import org.example.ansible.engine.TaskExecutor;
 import org.example.ansible.engine.TaskResult;
 import org.example.ansible.module.python.PythonModule;
-import org.example.ansible.util.PythonEnv;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -68,22 +63,18 @@ public class StandardModules {
             return TaskResult.success(data);
         });
 
-        // 4. copy, 5. file, 6. template, 7. stat (using actual Python scripts)
-        Path modulesPath = PythonEnv.getModulesPath();
-
-        registerPythonModule(registry, "copy", modulesPath.resolve("copy.py"));
-        registerPythonModule(registry, "file", modulesPath.resolve("file.py"));
-        registerPythonModule(registry, "template", modulesPath.resolve("template.py"));
-        registerPythonModule(registry, "stat", modulesPath.resolve("stat.py"));
+        // 4-7. copy, file, template, stat (delegated to PythonModule for name-based loading)
+        registerPythonModule(registry, "copy");
+        registerPythonModule(registry, "file");
+        registerPythonModule(registry, "template");
+        registerPythonModule(registry, "stat");
 
         registry.registerTo(executor);
     }
 
-    private static void registerPythonModule(ModuleRegistry registry, String name, Path scriptPath) {
-        if (Files.exists(scriptPath)) {
-            PythonModule module = new PythonModule(name, scriptPath);
-            registry.register(name, module);
-            registry.register("ansible.builtin." + name, module);
-        }
+    private static void registerPythonModule(ModuleRegistry registry, String name) {
+        PythonModule module = new PythonModule(name);
+        registry.register(name, module);
+        registry.register("ansible.builtin." + name, module);
     }
 }

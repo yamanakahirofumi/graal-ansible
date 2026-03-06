@@ -37,6 +37,13 @@ class ActualModuleIntegrationTest {
         playbookExecutor = new PlaybookExecutor(taskExecutor);
     }
 
+    @org.junit.jupiter.api.AfterEach
+    void tearDown() {
+        if (taskExecutor != null) {
+            taskExecutor.close();
+        }
+    }
+
     @Test
     void testCopyAndFileModules() throws IOException {
         Path srcFile = tempDir.resolve("src.txt");

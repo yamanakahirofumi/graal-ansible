@@ -22,6 +22,12 @@ public class PythonModule implements Module {
     private final Path scriptPath;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    public PythonModule(String moduleName) {
+        this.moduleName = moduleName;
+        this.scriptContent = null;
+        this.scriptPath = null;
+    }
+
     public PythonModule(String moduleName, String scriptContent) {
         this.moduleName = moduleName;
         this.scriptContent = scriptContent;
@@ -66,6 +72,7 @@ public class PythonModule implements Module {
                 "import json\n" +
                 "import sys\n" +
                 "import os\n" +
+                "import importlib.util\n" +
                 "from io import StringIO\n" +
                 "\n" +
                 "def run_module():\n" +
@@ -76,6 +83,18 @@ public class PythonModule implements Module {
                 "    sys.stdout = mystdout = StringIO()\n" +
                 "    \n" +
                 "    try:\n" +
+                "        code = module_code\n" +
+                "        if code is None:\n" +
+                "            # Try to find module by name\n" +
+                "            name = module_name\n" +
+                "            if name.startswith('ansible.builtin.'): name = name[len('ansible.builtin.'):]\n" +
+                "            from ansible.plugins.loader import module_loader\n" +
+                "            path = module_loader.find_plugin(name)\n" +
+                "            if path:\n" +
+                "                with open(path, 'r') as f: code = f.read()\n" +
+                "            else:\n" +
+                "                return json.dumps({'failed': True, 'msg': f'Module not found: {module_name}'})\n" +
+                "        \n" +
                 "        # Setup globals for the module\n" +
                 "        module_globals = {\n" +
                 "            '__name__': '__main__',\n" +
@@ -83,7 +102,7 @@ public class PythonModule implements Module {
                 "        }\n" +
                 "        \n" +
                 "        # Execute the module code\n" +
-                "        exec(module_code, module_globals)\n" +
+                "        exec(code, module_globals)\n" +
                 "        \n" +
                 "        return mystdout.getvalue()\n" +
                 "    except SystemExit as e:\n" +
