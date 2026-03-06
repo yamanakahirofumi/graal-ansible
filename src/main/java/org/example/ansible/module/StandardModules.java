@@ -6,6 +6,7 @@ import org.example.ansible.connection.LocalConnection;
 import org.example.ansible.engine.TaskExecutor;
 import org.example.ansible.engine.TaskResult;
 import org.example.ansible.module.python.PythonModule;
+import org.example.ansible.util.PythonEnv;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -68,11 +69,7 @@ public class StandardModules {
         });
 
         // 4. copy, 5. file, 6. template, 7. stat (using actual Python scripts)
-        String sitePackages = System.getenv("ANSIBLE_SITE_PACKAGES");
-        if (sitePackages == null) {
-            sitePackages = System.getProperty("ansible.site.packages", "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages");
-        }
-        Path modulesPath = Paths.get(sitePackages, "ansible", "modules");
+        Path modulesPath = PythonEnv.getModulesPath();
 
         registerPythonModule(registry, "copy", modulesPath.resolve("copy.py"));
         registerPythonModule(registry, "file", modulesPath.resolve("file.py"));

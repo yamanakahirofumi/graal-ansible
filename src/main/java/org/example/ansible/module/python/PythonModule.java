@@ -3,6 +3,7 @@ package org.example.ansible.module.python;
 import org.example.ansible.connection.BecomeContext;
 import org.example.ansible.engine.TaskResult;
 import org.example.ansible.module.Module;
+import org.example.ansible.util.PythonEnv;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.Value;
@@ -37,14 +38,8 @@ public class PythonModule implements Module {
     public TaskResult execute(final Map<String, Object> args, BecomeContext becomeContext, Context context) {
         boolean ownContext = (context == null);
         if (ownContext) {
-            String pythonExecutable = System.getenv("GRAALPY_EXECUTABLE");
-            if (pythonExecutable == null) {
-                pythonExecutable = System.getProperty("graalpy.executable", "/home/jules/.pyenv/versions/3.12.12/bin/python3");
-            }
-            String sitePackages = System.getenv("ANSIBLE_SITE_PACKAGES");
-            if (sitePackages == null) {
-                sitePackages = System.getProperty("ansible.site.packages", "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages");
-            }
+            String pythonExecutable = PythonEnv.getExecutable();
+            String sitePackages = PythonEnv.getSitePackages();
 
             context = Context.newBuilder("python")
                     .allowAllAccess(true)
