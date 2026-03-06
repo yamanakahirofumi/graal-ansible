@@ -2,6 +2,7 @@ package org.example.ansible.engine;
 
 import org.example.ansible.connection.BecomeContext;
 import org.example.ansible.module.Module;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -18,10 +19,17 @@ class TaskExecutorTest {
         executor = new TaskExecutor();
     }
 
+    @AfterEach
+    void tearDown() {
+        if (executor != null) {
+            executor.close();
+        }
+    }
+
     @Test
     void testExecuteDebugTask() {
         // Arrange (準備)
-        executor.registerModule("debug", (args, becomeContext) -> {
+        executor.registerModule("debug", (args, becomeContext, context) -> {
             String msg = (String) args.getOrDefault("msg", "");
             return TaskResult.success(false, Map.of("msg", msg));
         });

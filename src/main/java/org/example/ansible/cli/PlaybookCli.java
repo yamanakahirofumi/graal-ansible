@@ -9,6 +9,8 @@ import org.example.ansible.engine.Playbook;
 import org.example.ansible.connection.Connection;
 import org.example.ansible.connection.ConnectionResult;
 import org.example.ansible.connection.LocalConnection;
+import org.example.ansible.module.Module;
+import org.example.ansible.module.python.PythonModule;
 import org.example.ansible.engine.PlaybookExecutor;
 import org.example.ansible.engine.TaskExecutor;
 import org.example.ansible.engine.TaskResult;
@@ -17,6 +19,7 @@ import org.example.ansible.inventory.Inventory;
 import org.example.ansible.inventory.InventoryParser;
 import org.example.ansible.inventory.YamlInventoryParser;
 import org.example.ansible.parser.YamlParser;
+import org.graalvm.polyglot.Context;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -97,21 +100,22 @@ public class PlaybookCli implements Callable<Integer> {
             }
 
             // Setup TaskExecutor with standard modules
-            TaskExecutor taskExecutor = new TaskExecutor();
-            registerStandardModules(taskExecutor);
+            try (TaskExecutor taskExecutor = new TaskExecutor()) {
+                registerStandardModules(taskExecutor);
 
-            // Parse extra-vars
-            Map<String, Object> parsedExtraVars = parseExtraVars(extraVars);
+                // Parse extra-vars
+                Map<String, Object> parsedExtraVars = parseExtraVars(extraVars);
 
-            // Execute Playbook
-            PlaybookExecutor executor = new PlaybookExecutor(taskExecutor);
-            java.nio.file.Path baseDir = playbookFile.getAbsoluteFile().getParentFile().toPath();
-            Map<String, List<TaskResult>> results = executor.execute(playbook, inventory, parsedExtraVars, baseDir);
+                // Execute Playbook
+                PlaybookExecutor executor = new PlaybookExecutor(taskExecutor);
+                java.nio.file.Path baseDir = playbookFile.getAbsoluteFile().getParentFile().toPath();
+                Map<String, List<TaskResult>> results = executor.execute(playbook, inventory, parsedExtraVars, baseDir);
 
-            // Print Results
-            printSummary(results);
+                // Print Results
+                printSummary(results);
 
-            return 0;
+                return 0;
+            }
         } catch (Exception e) {
             System.err.println("Error: " + e.getMessage());
             if (verbosity > 1) {
@@ -138,47 +142,59 @@ public class PlaybookCli implements Callable<Integer> {
     private void registerStandardModules(TaskExecutor executor) {
         Connection localConnection = new LocalConnection(executor.getOsHandler());
 
-        executor.registerModule("debug", (args, becomeContext) -> {
-            Object msg = args.getOrDefault("msg", "Hello world");
-            System.out.println("DEBUG: " + msg);
-            return TaskResult.success(false, Map.of("msg", msg));
-        });
-
-        executor.registerModule("command", (args, becomeContext) -> {
-            String command = (String) args.get("_raw_params");
-            if (command == null) command = (String) args.get("cmd");
-            if (command == null) return TaskResult.failure("no command given");
-
-            ConnectionResult result = localConnection.execCommand(command, becomeContext);
-            Map<String, Object> data = new HashMap<>();
-            data.put("stdout", result.stdout());
-            data.put("stderr", result.stderr());
-            data.put("rc", result.exitCode());
-            data.put("changed", result.exitCode() == 0);
-
-            if (result.exitCode() != 0) {
-                return new TaskResult(false, false, "Command failed with rc " + result.exitCode(), data);
+        executor.registerModule("debug", new Module() {
+            @Override
+            public TaskResult execute(Map<String, Object> args, org.example.ansible.connection.BecomeContext becomeContext, Context context) {
+                Object msg = args.getOrDefault("msg", "Hello world");
+                System.out.println("DEBUG: " + msg);
+                return TaskResult.success(false, Map.of("msg", msg));
             }
-            return TaskResult.success(data);
         });
 
-        executor.registerModule("shell", (args, becomeContext) -> {
-            String command = (String) args.get("_raw_params");
-            if (command == null) command = (String) args.get("cmd");
-            if (command == null) return TaskResult.failure("no command given");
+        executor.registerModule("command", new Module() {
+            @Override
+            public TaskResult execute(Map<String, Object> args, org.example.ansible.connection.BecomeContext becomeContext, Context context) {
+                String command = (String) args.get("_raw_params");
+                if (command == null) command = (String) args.get("cmd");
+                if (command == null) return TaskResult.failure("no command given");
 
-            ConnectionResult result = localConnection.execCommand(command, becomeContext);
-            Map<String, Object> data = new HashMap<>();
-            data.put("stdout", result.stdout());
-            data.put("stderr", result.stderr());
-            data.put("rc", result.exitCode());
-            data.put("changed", result.exitCode() == 0);
+                ConnectionResult result = localConnection.execCommand(command, becomeContext);
+                Map<String, Object> data = new HashMap<>();
+                data.put("stdout", result.stdout());
+                data.put("stderr", result.stderr());
+                data.put("rc", result.exitCode());
+                data.put("changed", result.exitCode() == 0);
 
-            if (result.exitCode() != 0) {
-                return new TaskResult(false, false, "Shell command failed with rc " + result.exitCode(), data);
+                if (result.exitCode() != 0) {
+                    return new TaskResult(false, false, "Command failed with rc " + result.exitCode(), data);
+                }
+                return TaskResult.success(data);
             }
-            return TaskResult.success(data);
         });
+
+        executor.registerModule("shell", new Module() {
+            @Override
+            public TaskResult execute(Map<String, Object> args, org.example.ansible.connection.BecomeContext becomeContext, Context context) {
+                String command = (String) args.get("_raw_params");
+                if (command == null) command = (String) args.get("cmd");
+                if (command == null) return TaskResult.failure("no command given");
+
+                ConnectionResult result = localConnection.execCommand(command, becomeContext);
+                Map<String, Object> data = new HashMap<>();
+                data.put("stdout", result.stdout());
+                data.put("stderr", result.stderr());
+                data.put("rc", result.exitCode());
+                data.put("changed", result.exitCode() == 0);
+
+                if (result.exitCode() != 0) {
+                    return new TaskResult(false, false, "Shell command failed with rc " + result.exitCode(), data);
+                }
+                return TaskResult.success(data);
+            }
+        });
+
+        executor.registerModule("file", new PythonModule("ansible.builtin.file"));
+        executor.registerModule("copy", new PythonModule("ansible.builtin.copy"));
     }
 
     private void printSummary(Map<String, List<TaskResult>> results) {

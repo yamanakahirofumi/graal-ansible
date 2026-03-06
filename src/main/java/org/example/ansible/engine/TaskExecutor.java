@@ -4,16 +4,19 @@ import org.example.ansible.connection.BecomeContext;
 import org.example.ansible.module.Module;
 import org.example.ansible.util.OSHandler;
 import org.example.ansible.util.OSHandlerFactory;
+import org.graalvm.polyglot.Context;
+
 import java.util.Map;
 import java.util.HashMap;
 
 /**
  * Executes individual tasks by delegating to modules.
  */
-public class TaskExecutor {
+public class TaskExecutor implements AutoCloseable {
 
     private final Map<String, Module> modules = new HashMap<>();
     private final OSHandler osHandler;
+    private final Context context;
 
     public TaskExecutor() {
         this(OSHandlerFactory.getHandler());
@@ -21,6 +24,10 @@ public class TaskExecutor {
 
     public TaskExecutor(OSHandler osHandler) {
         this.osHandler = osHandler;
+        this.context = Context.newBuilder("python")
+                .allowAllAccess(true)
+                .option("python.IsolateNativeModules", "true")
+                .build();
     }
 
     /**
@@ -54,11 +61,16 @@ public class TaskExecutor {
             return TaskResult.failure("Module not found: " + task.action());
         }
         try {
-            // Future improvement: modules could use osHandler to adapt behavior.
-            // For now, it is registered in TaskExecutor as a step toward full OS abstraction.
-            return module.execute(task.args(), becomeContext);
+            return module.execute(task.args(), becomeContext, context);
         } catch (Exception e) {
             return TaskResult.failure("Execution failed: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public void close() {
+        if (context != null) {
+            context.close();
         }
     }
 }

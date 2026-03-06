@@ -1,7 +1,11 @@
 package org.example.ansible.module.python;
 
 import org.example.ansible.connection.BecomeContext;
+import org.example.ansible.engine.Task;
+import org.example.ansible.engine.TaskExecutor;
 import org.example.ansible.engine.TaskResult;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -10,16 +14,26 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class PythonModuleTest {
 
+    private TaskExecutor taskExecutor;
+
+    @BeforeEach
+    void setUp() {
+        taskExecutor = new TaskExecutor();
+    }
+
+    @AfterEach
+    void tearDown() {
+        if (taskExecutor != null) {
+            taskExecutor.close();
+        }
+    }
+
     @Test
     void testSimplePythonModule() {
         // Simple Python module that echoes back arguments and sets changed=True
         String script = """
             import json
             import sys
-
-            # complex_args is provided by PythonModule wrapper
-            # Use polyglot.as_type if necessary, but for Map it should work.
-            # GraalPy might return a polyglot object that needs to be treated carefully.
             import polyglot
 
             result = {
@@ -30,10 +44,10 @@ class PythonModuleTest {
             sys.stdout.write(json.dumps(result))
             """;
 
-        PythonModule module = new PythonModule("test_module", script);
-        Map<String, Object> args = Map.of("foo", "bar");
+        taskExecutor.registerModule("test_module", new PythonModule("test_module", script));
+        Task task = new Task("test", "test_module", Map.of("foo", "bar"));
 
-        TaskResult result = module.execute(args, BecomeContext.empty());
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty());
 
         assertTrue(result.success(), "Execution failed: " + result.message());
         assertTrue(result.changed());
@@ -56,8 +70,9 @@ class PythonModuleTest {
             print(json.dumps(result))
             """;
 
-        PythonModule module = new PythonModule("fail_module", script);
-        TaskResult result = module.execute(Map.of(), BecomeContext.empty());
+        taskExecutor.registerModule("fail_module", new PythonModule("fail_module", script));
+        Task task = new Task("test", "fail_module", Map.of());
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty());
 
         assertFalse(result.success());
         assertFalse(result.changed());

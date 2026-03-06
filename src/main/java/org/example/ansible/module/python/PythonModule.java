@@ -3,83 +3,115 @@ package org.example.ansible.module.python;
 import org.example.ansible.connection.BecomeContext;
 import org.example.ansible.engine.TaskResult;
 import org.example.ansible.module.Module;
+import org.example.ansible.util.PythonEnv;
 import org.graalvm.polyglot.Context;
-import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.Value;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Map;
-import java.util.HashMap;
+import java.util.List;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class PythonModule implements Module {
     private final String moduleName;
-    private final String scriptContent;
+    private final String scriptContent; // Added back for mocking/legacy support
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    public PythonModule(String moduleName) {
+        this(moduleName, null);
+    }
 
     public PythonModule(String moduleName, String scriptContent) {
         this.moduleName = moduleName;
         this.scriptContent = scriptContent;
     }
 
-    /**
-     * Executes the module with the given arguments.
-     * This implementation uses GraalPy to run Python module code.
-     *
-     * @param args          The module arguments (e.g., src, dest, content).
-     * @param becomeContext The privilege escalation context.
-     * @return The result of the execution.
-     */
     @Override
-    public TaskResult execute(final Map<String, Object> args, BecomeContext becomeContext) {
-        try (Context context = Context.newBuilder("python")
-                .allowAllAccess(true)
-                .build()) {
-
-            // Bind values to the Python context to avoid script injection
-            context.getBindings("python").putMember("complex_args", args);
-            context.getBindings("python").putMember("module_code", scriptContent);
-
-            // Python側で引数を読み込み、モジュールを実行するラッパースクリプト
-            // Ansibleモジュールは通常標準入力から引数を受け取り、標準出力にJSONを出す
-            final String wrapperScript =
-                "import json\n" +
-                "import sys\n" +
-                "import polyglot\n" +
-                "from io import StringIO\n" +
-                "\n" +
-                "def run_module():\n" +
-                "    # Bindings from Java are directly accessible\n" +
-                "    # polyglot.as_type can convert host objects to Python objects\n" +
-                "    args = complex_args\n" +
-                "    \n" +
-                "    # 出力をキャプチャ\n" +
-                "    old_stdout = sys.stdout\n" +
-                "    sys.stdout = mystdout = StringIO()\n" +
-                "    \n" +
-                "    try:\n" +
-                "        # ここで本来のモジュールコードを実行\n" +
-                "        # 今回は簡略化のため、モジュールコード自体が args を処理するように期待する\n" +
-                "        module_globals = {'complex_args': args, 'ansible_module_results': {}}\n" +
-                "        exec(module_code, module_globals)\n" +
-                "        # モジュールが結果を標準出力に出すと仮定\n" +
-                "        return mystdout.getvalue()\n" +
-                "    finally:\n" +
-                "        sys.stdout = old_stdout\n" +
-                "\n" +
-                "result = run_module()";
-
-            context.eval("python", wrapperScript);
-            Value pythonResult = context.getPolyglotBindings().getMember("result");
-            if (pythonResult == null) {
-                // bindings にない場合はグローバルスコープから探す
-                pythonResult = context.getBindings("python").getMember("result");
+    public TaskResult execute(final Map<String, Object> args, BecomeContext becomeContext, Context context) {
+        try {
+            // Setup sys.path with site-packages
+            List<String> sitePackages = PythonEnv.getSitePackagesFromEnv();
+            Value sys = context.getBindings("python").getMember("sys");
+            if (sys == null) {
+                context.eval("python", "import sys");
+                sys = context.getBindings("python").getMember("sys");
+            }
+            Value path = sys.getMember("path");
+            for (String p : sitePackages) {
+                boolean exists = false;
+                for (long i = 0; i < path.getArraySize(); i++) {
+                    if (p.equals(path.getArrayElement(i).asString())) {
+                        exists = true;
+                        break;
+                    }
+                }
+                if (!exists) {
+                    path.invokeMember("append", p);
+                }
             }
 
+            // Bind values to the Python context
+            context.getBindings("python").putMember("complex_args", args);
+            context.getBindings("python").putMember("module_name", moduleName);
+
+            String wrapperScript;
+            if (scriptContent != null) {
+                // Legacy/Mock mode
+                context.getBindings("python").putMember("module_code", scriptContent);
+                wrapperScript =
+                    "import json\n" +
+                    "import sys\n" +
+                    "from io import StringIO\n" +
+                    "\n" +
+                    "def run_module():\n" +
+                    "    old_stdout = sys.stdout\n" +
+                    "    sys.stdout = mystdout = StringIO()\n" +
+                    "    try:\n" +
+                    "        module_globals = {'complex_args': complex_args, 'ansible_module_results': {}}\n" +
+                    "        exec(module_code, module_globals)\n" +
+                    "        return mystdout.getvalue()\n" +
+                    "    finally:\n" +
+                    "        sys.stdout = old_stdout\n" +
+                    "\n" +
+                    "result = run_module()";
+            } else {
+                // Actual module mode
+                wrapperScript =
+                    "import json\n" +
+                    "import sys\n" +
+                    "import os\n" +
+                    "try:\n" +
+                    "    from ansible.plugins.loader import module_loader\n" +
+                    "    def run_module():\n" +
+                    "        path = module_loader.find_plugin(module_name)\n" +
+                    "        if not path:\n" +
+                    "            return json.dumps({'failed': True, 'msg': f'Module {module_name} not found'})\n" +
+                    "        import ansible.module_utils.basic\n" +
+                    "        original_load_params = ansible.module_utils.basic.AnsibleModule._load_params\n" +
+                    "        ansible.module_utils.basic.AnsibleModule._load_params = lambda self: complex_args\n" +
+                    "        from io import StringIO\n" +
+                    "        old_stdout = sys.stdout\n" +
+                    "        sys.stdout = mystdout = StringIO()\n" +
+                    "        try:\n" +
+                    "            with open(path, 'rb') as f:\n" +
+                    "                code = compile(f.read(), path, 'exec')\n" +
+                    "            try:\n" +
+                    "                exec(code, {'__name__': '__main__', '__file__': path})\n" +
+                    "            except SystemExit:\n" +
+                    "                pass\n" +
+                    "            return mystdout.getvalue()\n" +
+                    "        finally:\n" +
+                    "            sys.stdout = old_stdout\n" +
+                    "            ansible.module_utils.basic.AnsibleModule._load_params = original_load_params\n" +
+                    "    result = run_module()\n" +
+                    "except ImportError:\n" +
+                    "    result = json.dumps({'failed': True, 'msg': 'Ansible core not found in Python path'})\n";
+            }
+
+            context.eval("python", wrapperScript);
+            Value pythonResult = context.getBindings("python").getMember("result");
+
             if (pythonResult == null || !pythonResult.isString()) {
-                return TaskResult.failure("Module produced no valid output (result is not a string)");
+                return TaskResult.failure("Module produced no valid output");
             }
             final String output = pythonResult.asString();
 
@@ -87,12 +119,17 @@ public class PythonModule implements Module {
                 return TaskResult.failure("Module produced no output");
             }
 
+            String jsonOutput = output;
+            if (output.contains("{")) {
+                jsonOutput = output.substring(output.indexOf("{"));
+            }
+
             @SuppressWarnings("unchecked")
-            final Map<String, Object> resultMap = objectMapper.readValue(output, Map.class);
+            final Map<String, Object> resultMap = objectMapper.readValue(jsonOutput, Map.class);
 
             final boolean failed = Boolean.TRUE.equals(resultMap.get("failed"));
             if (failed) {
-                return TaskResult.failure(resultMap.getOrDefault("msg", "Module failed").toString());
+                return new TaskResult(false, false, resultMap.getOrDefault("msg", "Module failed").toString(), resultMap);
             }
 
             return TaskResult.success(resultMap);

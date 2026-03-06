@@ -1,7 +1,11 @@
 package org.example.ansible.module.python;
 
 import org.example.ansible.connection.BecomeContext;
+import org.example.ansible.engine.Task;
+import org.example.ansible.engine.TaskExecutor;
 import org.example.ansible.engine.TaskResult;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -17,13 +21,26 @@ public class CopyModuleTest {
     @TempDir
     Path tempDir;
 
+    private TaskExecutor taskExecutor;
+
+    @BeforeEach
+    void setUp() {
+        taskExecutor = new TaskExecutor();
+    }
+
+    @AfterEach
+    void tearDown() {
+        if (taskExecutor != null) {
+            taskExecutor.close();
+        }
+    }
+
     @Test
     void testCopyModuleWithContent() throws IOException {
         Path destFile = tempDir.resolve("hello.txt");
         String content = "Hello from GraalPy Ansible!";
 
-        // 本来の ansible.builtin.copy モジュールの動作を模倣する Python スクリプト
-        // 実際には本家の copy.py をロードするが、ここでは簡易版で動作確認
+        // Mock implementation for testing without actual ansible-core
         String copyModuleMock = 
             "import os\n" +
             "import json\n" +
@@ -37,14 +54,15 @@ public class CopyModuleTest {
             "    changed = True\n" +
             "print(json.dumps({'changed': changed, 'dest': dest, 'success': True}))\n";
 
-        PythonModule module = new PythonModule("copy", copyModuleMock);
+        taskExecutor.registerModule("copy", new PythonModule("copy", copyModuleMock));
         
         Map<String, Object> args = Map.of(
             "content", content,
             "dest", destFile.toString()
         );
 
-        TaskResult result = module.execute(args, BecomeContext.empty());
+        Task task = new Task("test", "copy", args);
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty());
 
         assertTrue(result.success(), "Module execution should be successful: " + result.message());
         assertTrue(result.changed(), "Module should have changed the state");
@@ -71,14 +89,15 @@ public class CopyModuleTest {
             "    changed = True\n" +
             "print(json.dumps({'changed': changed, 'src': src, 'dest': dest}))\n";
 
-        PythonModule module = new PythonModule("copy", copyModuleMock);
+        taskExecutor.registerModule("copy", new PythonModule("copy", copyModuleMock));
         
         Map<String, Object> args = Map.of(
             "src", srcFile.toString(),
             "dest", destFile.toString()
         );
 
-        TaskResult result = module.execute(args, BecomeContext.empty());
+        Task task = new Task("test", "copy", args);
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty());
 
         assertTrue(result.success(), "Module execution should be successful: " + result.message());
         assertTrue(result.changed(), "Module should have changed the state");

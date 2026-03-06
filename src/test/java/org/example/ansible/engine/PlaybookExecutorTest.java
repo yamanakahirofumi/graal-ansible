@@ -3,6 +3,7 @@ package org.example.ansible.engine;
 import org.example.ansible.inventory.IniInventoryParser;
 import org.example.ansible.inventory.Inventory;
 import org.example.ansible.parser.YamlParser;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -22,6 +23,13 @@ class PlaybookExecutorTest {
     void setUp() {
         taskExecutor = new TaskExecutor();
         playbookExecutor = new PlaybookExecutor(taskExecutor);
+    }
+
+    @AfterEach
+    void tearDown() {
+        if (taskExecutor != null) {
+            taskExecutor.close();
+        }
     }
 
     @Test
@@ -44,7 +52,7 @@ class PlaybookExecutorTest {
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
 
-        taskExecutor.registerModule("debug", (args, become) -> {
+        taskExecutor.registerModule("debug", (args, become, context) -> {
             String msg = (String) args.get("msg");
             return TaskResult.success(false, Map.of("msg", msg));
         });
@@ -82,7 +90,7 @@ class PlaybookExecutorTest {
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
 
-        taskExecutor.registerModule("fail_on_host1", (args, become) -> {
+        taskExecutor.registerModule("fail_on_host1", (args, become, context) -> {
             return TaskResult.failure("failed");
         });
 
@@ -92,13 +100,13 @@ class PlaybookExecutorTest {
                 """;
         inventory = new IniInventoryParser().parse(new ByteArrayInputStream(inventoryIniWithVar.getBytes(StandardCharsets.UTF_8)));
 
-        taskExecutor.registerModule("fail_if_var_true", (args, become) -> {
+        taskExecutor.registerModule("fail_if_var_true", (args, become, context) -> {
             if ("true".equals(args.get("should_fail"))) {
                 return TaskResult.failure("Intentional failure");
             }
             return TaskResult.success(false, Map.of());
         });
-        taskExecutor.registerModule("debug", (args, become) -> TaskResult.success(false, Map.of()));
+        taskExecutor.registerModule("debug", (args, become, context) -> TaskResult.success(false, Map.of()));
 
         String playbookYaml2 = """
                 - name: test failure
@@ -146,7 +154,7 @@ class PlaybookExecutorTest {
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
 
-        taskExecutor.registerModule("debug", (args, become) -> TaskResult.success(false, Map.of()));
+        taskExecutor.registerModule("debug", (args, become, context) -> TaskResult.success(false, Map.of()));
 
         // Act
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
