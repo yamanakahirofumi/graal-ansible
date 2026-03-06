@@ -25,7 +25,8 @@ Ansible の複雑な変数の優先順位を簡略化しつつ、主要なレベ
 7.  **Play Vars Files**: Play 定義内の `vars_files`
 8.  **Role Vars**: ロールの `vars/main.yml`（将来対応）
 9.  **Task Vars**: Task 定義内の `vars`
-10. **Extra Vars**: コマンドライン引数 `-e` / `--extra-vars`
+10. **Registered Variables (hostVars)**: `register` によって実行時に保存された変数
+11. **Extra Vars**: コマンドライン引数 `-e` / `--extra-vars`
 
 ### 2.1 インベントリ変数の解決
 ホストが複数のグループに属している場合、それぞれのグループパスを辿って変数を収集します。この際、**子グループは親グループの変数を上書き**します。最終的にホスト固有の変数がすべてのグループ変数を上書きします。
