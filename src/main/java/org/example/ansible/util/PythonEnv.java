@@ -6,6 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -13,7 +14,7 @@ import java.util.List;
  */
 public class PythonEnv {
     private static String executable;
-    private static String sitePackages;
+    private static List<String> sitePackages;
 
     public static synchronized String getExecutable() {
         if (executable != null) return executable;
@@ -22,10 +23,10 @@ public class PythonEnv {
         if (executable == null) executable = System.getProperty("graalpy.executable");
 
         if (executable == null) {
-            executable = findCommand("python3");
+            executable = findCommand("graalpy");
         }
         if (executable == null) {
-            executable = findCommand("graalpy");
+            executable = findCommand("python3");
         }
         if (executable == null) {
             executable = findCommand("python");
@@ -47,14 +48,23 @@ public class PythonEnv {
         return executable;
     }
 
-    public static synchronized String getSitePackages() {
+    public static synchronized List<String> getSitePackages() {
         if (sitePackages != null) return sitePackages;
 
-        sitePackages = System.getenv("ANSIBLE_SITE_PACKAGES");
-        if (sitePackages == null) sitePackages = System.getProperty("ansible.site.packages");
+        String env = System.getenv("ANSIBLE_SITE_PACKAGES");
+        if (env == null) env = System.getProperty("ansible.site.packages");
 
-        if (sitePackages == null) {
-            sitePackages = queryPython("import site; print(site.getsitepackages()[0] if site.getsitepackages() else '')");
+        if (env != null) {
+            sitePackages = Arrays.asList(env.split(","));
+        } else {
+            String output = queryPython("import site; paths = site.getsitepackages(); user_site = site.getusersitepackages(); " +
+                                       "if user_site not in paths: paths.append(user_site); " +
+                                       "print(','.join(paths))");
+            if (output != null && !output.isEmpty()) {
+                sitePackages = Arrays.asList(output.split(","));
+            } else {
+                sitePackages = new ArrayList<>();
+            }
         }
 
         return sitePackages;
@@ -65,7 +75,9 @@ public class PythonEnv {
         if (path != null && !path.isEmpty()) {
             return Paths.get(path);
         }
-        return Paths.get(getSitePackages(), "ansible", "modules");
+        List<String> packages = getSitePackages();
+        String base = packages.isEmpty() ? "/usr/lib/python3/dist-packages" : packages.get(0);
+        return Paths.get(base, "ansible", "modules");
     }
 
     private static String findCommand(String command) {
