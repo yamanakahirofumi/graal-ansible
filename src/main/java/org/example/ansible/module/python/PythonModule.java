@@ -45,14 +45,20 @@ public class PythonModule implements Module {
         boolean ownContext = (context == null);
         if (ownContext) {
             String pythonExecutable = PythonEnv.getExecutable();
-            String sitePackages = PythonEnv.getSitePackages();
+            java.util.List<String> sitePackagesList = PythonEnv.getSitePackages();
 
             context = Context.newBuilder("python")
                     .allowAllAccess(true)
                     .option("python.Executable", pythonExecutable)
                     .option("python.PosixModuleBackend", "native")
                     .build();
-            context.eval("python", "import sys; sys.path.append('" + sitePackages + "')");
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("import sys\n");
+            for (String p : sitePackagesList) {
+                sb.append("sys.path.append('").append(p).append("')\n");
+            }
+            context.eval("python", sb.toString());
         }
 
         try {

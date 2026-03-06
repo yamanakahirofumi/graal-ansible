@@ -31,7 +31,7 @@ public class TaskExecutor implements AutoCloseable {
     private synchronized Context getPythonContext() {
         if (pythonContext == null) {
             String pythonExecutable = PythonEnv.getExecutable();
-            String sitePackages = PythonEnv.getSitePackages();
+            java.util.List<String> sitePackagesList = PythonEnv.getSitePackages();
 
             pythonContext = Context.newBuilder("python")
                     .allowAllAccess(true)
@@ -40,9 +40,12 @@ public class TaskExecutor implements AutoCloseable {
                     .build();
 
             // Initial setup
-            final String initScript =
-                "import sys\n" +
-                "sys.path.append('" + sitePackages + "')\n" +
+            StringBuilder sb = new StringBuilder();
+            sb.append("import sys\n");
+            for (String p : sitePackagesList) {
+                sb.append("sys.path.append('").append(p).append("')\n");
+            }
+            final String initScript = sb.toString() +
                 "import polyglot\n" +
                 "def mock_module(name, attrs):\n" +
                 "    import types\n" +
