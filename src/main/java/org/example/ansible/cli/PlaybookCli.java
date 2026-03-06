@@ -9,6 +9,7 @@ import org.example.ansible.engine.Playbook;
 import org.example.ansible.connection.Connection;
 import org.example.ansible.connection.ConnectionResult;
 import org.example.ansible.connection.LocalConnection;
+import org.example.ansible.module.StandardModules;
 import org.example.ansible.engine.PlaybookExecutor;
 import org.example.ansible.engine.TaskExecutor;
 import org.example.ansible.engine.TaskResult;
@@ -97,19 +98,20 @@ public class PlaybookCli implements Callable<Integer> {
             }
 
             // Setup TaskExecutor with standard modules
-            TaskExecutor taskExecutor = new TaskExecutor();
-            registerStandardModules(taskExecutor);
+            try (TaskExecutor taskExecutor = new TaskExecutor()) {
+                StandardModules.registerAll(taskExecutor);
 
-            // Parse extra-vars
-            Map<String, Object> parsedExtraVars = parseExtraVars(extraVars);
+                // Parse extra-vars
+                Map<String, Object> parsedExtraVars = parseExtraVars(extraVars);
 
-            // Execute Playbook
-            PlaybookExecutor executor = new PlaybookExecutor(taskExecutor);
-            java.nio.file.Path baseDir = playbookFile.getAbsoluteFile().getParentFile().toPath();
-            Map<String, List<TaskResult>> results = executor.execute(playbook, inventory, parsedExtraVars, baseDir);
+                // Execute Playbook
+                PlaybookExecutor executor = new PlaybookExecutor(taskExecutor);
+                java.nio.file.Path baseDir = playbookFile.getAbsoluteFile().getParentFile().toPath();
+                Map<String, List<TaskResult>> results = executor.execute(playbook, inventory, parsedExtraVars, baseDir);
 
-            // Print Results
-            printSummary(results);
+                // Print Results
+                printSummary(results);
+            }
 
             return 0;
         } catch (Exception e) {
@@ -133,52 +135,6 @@ public class PlaybookCli implements Callable<Integer> {
             }
         }
         return result;
-    }
-
-    private void registerStandardModules(TaskExecutor executor) {
-        Connection localConnection = new LocalConnection(executor.getOsHandler());
-
-        executor.registerModule("debug", (args, becomeContext) -> {
-            Object msg = args.getOrDefault("msg", "Hello world");
-            System.out.println("DEBUG: " + msg);
-            return TaskResult.success(false, Map.of("msg", msg));
-        });
-
-        executor.registerModule("command", (args, becomeContext) -> {
-            String command = (String) args.get("_raw_params");
-            if (command == null) command = (String) args.get("cmd");
-            if (command == null) return TaskResult.failure("no command given");
-
-            ConnectionResult result = localConnection.execCommand(command, becomeContext);
-            Map<String, Object> data = new HashMap<>();
-            data.put("stdout", result.stdout());
-            data.put("stderr", result.stderr());
-            data.put("rc", result.exitCode());
-            data.put("changed", result.exitCode() == 0);
-
-            if (result.exitCode() != 0) {
-                return new TaskResult(false, false, "Command failed with rc " + result.exitCode(), data);
-            }
-            return TaskResult.success(data);
-        });
-
-        executor.registerModule("shell", (args, becomeContext) -> {
-            String command = (String) args.get("_raw_params");
-            if (command == null) command = (String) args.get("cmd");
-            if (command == null) return TaskResult.failure("no command given");
-
-            ConnectionResult result = localConnection.execCommand(command, becomeContext);
-            Map<String, Object> data = new HashMap<>();
-            data.put("stdout", result.stdout());
-            data.put("stderr", result.stderr());
-            data.put("rc", result.exitCode());
-            data.put("changed", result.exitCode() == 0);
-
-            if (result.exitCode() != 0) {
-                return new TaskResult(false, false, "Shell command failed with rc " + result.exitCode(), data);
-            }
-            return TaskResult.success(data);
-        });
     }
 
     private void printSummary(Map<String, List<TaskResult>> results) {

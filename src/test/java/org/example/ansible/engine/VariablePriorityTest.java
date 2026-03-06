@@ -3,6 +3,7 @@ package org.example.ansible.engine;
 import org.example.ansible.inventory.IniInventoryParser;
 import org.example.ansible.inventory.Inventory;
 import org.example.ansible.parser.YamlParser;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -29,10 +30,15 @@ class VariablePriorityTest {
     void setUp() {
         taskExecutor = new TaskExecutor();
         playbookExecutor = new PlaybookExecutor(taskExecutor);
-        taskExecutor.registerModule("debug", (args, become) -> {
+        taskExecutor.registerModule("debug", (args, become, pythonContext) -> {
             Object msg = args.get("msg");
             return TaskResult.success(false, Map.of("msg", msg));
         });
+    }
+
+    @AfterEach
+    void tearDown() {
+        taskExecutor.close();
     }
 
     @Test

@@ -10,6 +10,7 @@ import org.graalvm.polyglot.Value;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Map;
 import java.util.HashMap;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -17,69 +18,94 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class PythonModule implements Module {
     private final String moduleName;
     private final String scriptContent;
+    private final Path scriptPath;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public PythonModule(String moduleName, String scriptContent) {
         this.moduleName = moduleName;
         this.scriptContent = scriptContent;
+        this.scriptPath = null;
     }
 
-    /**
-     * Executes the module with the given arguments.
-     * This implementation uses GraalPy to run Python module code.
-     *
-     * @param args          The module arguments (e.g., src, dest, content).
-     * @param becomeContext The privilege escalation context.
-     * @return The result of the execution.
-     */
+    public PythonModule(String moduleName, Path scriptPath) {
+        this.moduleName = moduleName;
+        this.scriptPath = scriptPath;
+        this.scriptContent = null;
+    }
+
     @Override
-    public TaskResult execute(final Map<String, Object> args, BecomeContext becomeContext) {
-        try (Context context = Context.newBuilder("python")
-                .allowAllAccess(true)
-                .build()) {
+    public TaskResult execute(final Map<String, Object> args, BecomeContext becomeContext, Context context) {
+        boolean ownContext = (context == null);
+        if (ownContext) {
+            String pythonExecutable = System.getenv("GRAALPY_EXECUTABLE");
+            if (pythonExecutable == null) {
+                pythonExecutable = System.getProperty("graalpy.executable", "/home/jules/.pyenv/versions/3.12.12/bin/python3");
+            }
+            String sitePackages = System.getenv("ANSIBLE_SITE_PACKAGES");
+            if (sitePackages == null) {
+                sitePackages = System.getProperty("ansible.site.packages", "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/site-packages");
+            }
 
-            // Bind values to the Python context to avoid script injection
-            context.getBindings("python").putMember("complex_args", args);
-            context.getBindings("python").putMember("module_code", scriptContent);
+            context = Context.newBuilder("python")
+                    .allowAllAccess(true)
+                    .option("python.Executable", pythonExecutable)
+                    .option("python.PosixModuleBackend", "native")
+                    .build();
+            context.eval("python", "import sys; sys.path.append('" + sitePackages + "')");
+        }
 
-            // Python側で引数を読み込み、モジュールを実行するラッパースクリプト
-            // Ansibleモジュールは通常標準入力から引数を受け取り、標準出力にJSONを出す
+        try {
+            String effectiveScript = scriptContent;
+            if (scriptPath != null) {
+                effectiveScript = Files.readString(scriptPath);
+            }
+
+            // Bind values to the Python context
+            Value pythonBindings = context.getBindings("python");
+            pythonBindings.putMember("complex_args", args);
+            pythonBindings.putMember("module_code", effectiveScript);
+            pythonBindings.putMember("module_name", moduleName);
+
+            // Python wrapper to simulate Ansible's module execution environment
             final String wrapperScript =
                 "import json\n" +
                 "import sys\n" +
-                "import polyglot\n" +
+                "import os\n" +
                 "from io import StringIO\n" +
                 "\n" +
                 "def run_module():\n" +
-                "    # Bindings from Java are directly accessible\n" +
-                "    # polyglot.as_type can convert host objects to Python objects\n" +
                 "    args = complex_args\n" +
                 "    \n" +
-                "    # 出力をキャプチャ\n" +
+                "    # Capture stdout\n" +
                 "    old_stdout = sys.stdout\n" +
                 "    sys.stdout = mystdout = StringIO()\n" +
                 "    \n" +
                 "    try:\n" +
-                "        # ここで本来のモジュールコードを実行\n" +
-                "        # 今回は簡略化のため、モジュールコード自体が args を処理するように期待する\n" +
-                "        module_globals = {'complex_args': args, 'ansible_module_results': {}}\n" +
+                "        # Setup globals for the module\n" +
+                "        module_globals = {\n" +
+                "            '__name__': '__main__',\n" +
+                "            'complex_args': args\n" +
+                "        }\n" +
+                "        \n" +
+                "        # Execute the module code\n" +
                 "        exec(module_code, module_globals)\n" +
-                "        # モジュールが結果を標準出力に出すと仮定\n" +
+                "        \n" +
                 "        return mystdout.getvalue()\n" +
+                "    except SystemExit as e:\n" +
+                "        return mystdout.getvalue()\n" +
+                "    except Exception as e:\n" +
+                "        import traceback\n" +
+                "        return json.dumps({'failed': True, 'msg': str(e), 'traceback': traceback.format_exc()})\n" +
                 "    finally:\n" +
                 "        sys.stdout = old_stdout\n" +
                 "\n" +
                 "result = run_module()";
 
             context.eval("python", wrapperScript);
-            Value pythonResult = context.getPolyglotBindings().getMember("result");
-            if (pythonResult == null) {
-                // bindings にない場合はグローバルスコープから探す
-                pythonResult = context.getBindings("python").getMember("result");
-            }
+            Value pythonResult = context.getBindings("python").getMember("result");
 
             if (pythonResult == null || !pythonResult.isString()) {
-                return TaskResult.failure("Module produced no valid output (result is not a string)");
+                return TaskResult.failure("Module produced no valid output");
             }
             final String output = pythonResult.asString();
 
@@ -87,18 +113,36 @@ public class PythonModule implements Module {
                 return TaskResult.failure("Module produced no output");
             }
 
+            String jsonOutput = findJson(output);
+            if (jsonOutput == null) {
+                return TaskResult.failure("Could not find JSON in module output: " + output);
+            }
+
             @SuppressWarnings("unchecked")
-            final Map<String, Object> resultMap = objectMapper.readValue(output, Map.class);
+            final Map<String, Object> resultMap = objectMapper.readValue(jsonOutput, Map.class);
 
             final boolean failed = Boolean.TRUE.equals(resultMap.get("failed"));
             if (failed) {
-                return TaskResult.failure(resultMap.getOrDefault("msg", "Module failed").toString());
+                return TaskResult.failure(resultMap.getOrDefault("msg", "Module failed").toString(), resultMap);
             }
 
             return TaskResult.success(resultMap);
             
         } catch (Exception e) {
             return TaskResult.failure("GraalPy execution failed: " + e.getMessage());
+        } finally {
+            if (ownContext) {
+                context.close();
+            }
         }
+    }
+
+    private String findJson(String output) {
+        int start = output.indexOf('{');
+        int end = output.lastIndexOf('}');
+        if (start != -1 && end != -1 && start < end) {
+            return output.substring(start, end + 1);
+        }
+        return null;
     }
 }

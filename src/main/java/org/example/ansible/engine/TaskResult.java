@@ -34,6 +34,17 @@ public record TaskResult(boolean success, boolean changed, String message, Map<S
     }
 
     /**
+     * Creates a failed task result with data.
+     *
+     * @param message The error message.
+     * @param data    The result data.
+     * @return A failed TaskResult.
+     */
+    public static TaskResult failure(String message, Map<String, Object> data) {
+        return new TaskResult(false, false, message, data);
+    }
+
+    /**
      * Creates a successful task result from a data map, extracting the "changed" flag.
      *
      * @param data The result data map.

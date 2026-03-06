@@ -3,6 +3,7 @@ package org.example.ansible.engine;
 import org.example.ansible.inventory.IniInventoryParser;
 import org.example.ansible.inventory.Inventory;
 import org.example.ansible.parser.YamlParser;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -25,6 +26,11 @@ class TaskControlTest {
         playbookExecutor = new PlaybookExecutor(taskExecutor);
     }
 
+    @AfterEach
+    void tearDown() {
+        taskExecutor.close();
+    }
+
     @Test
     void testWhenConditionList() {
         // Arrange
@@ -44,7 +50,7 @@ class TaskControlTest {
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
 
-        taskExecutor.registerModule("debug", (args, become) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+        taskExecutor.registerModule("debug", (args, become, pythonContext) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
 
         // Act
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
@@ -80,7 +86,7 @@ class TaskControlTest {
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
 
-        taskExecutor.registerModule("debug", (args, become) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+        taskExecutor.registerModule("debug", (args, become, pythonContext) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
 
         // Act
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
@@ -111,7 +117,7 @@ class TaskControlTest {
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
 
-        taskExecutor.registerModule("debug", (args, become) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+        taskExecutor.registerModule("debug", (args, become, pythonContext) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
 
         // Act
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
@@ -146,7 +152,7 @@ class TaskControlTest {
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
 
-        taskExecutor.registerModule("debug", (args, become) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+        taskExecutor.registerModule("debug", (args, become, pythonContext) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
 
         // Act
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
@@ -183,7 +189,7 @@ class TaskControlTest {
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
 
-        taskExecutor.registerModule("debug", (args, become) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+        taskExecutor.registerModule("debug", (args, become, pythonContext) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
 
         // Act
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
@@ -209,7 +215,7 @@ class TaskControlTest {
                       failed_when: true
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
-        taskExecutor.registerModule("debug", (args, become) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+        taskExecutor.registerModule("debug", (args, become, pythonContext) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
 
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
 
@@ -231,7 +237,7 @@ class TaskControlTest {
                       changed_when: true
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
-        taskExecutor.registerModule("debug", (args, become) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+        taskExecutor.registerModule("debug", (args, become, pythonContext) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
 
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
 
@@ -257,7 +263,7 @@ class TaskControlTest {
                         msg: "ran"
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
-        taskExecutor.registerModule("debug", (args, become) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+        taskExecutor.registerModule("debug", (args, become, pythonContext) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
 
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
 
@@ -286,7 +292,7 @@ class TaskControlTest {
                         msg: "handled"
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
-        taskExecutor.registerModule("debug", (args, become) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+        taskExecutor.registerModule("debug", (args, become, pythonContext) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
 
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
 
@@ -311,7 +317,7 @@ class TaskControlTest {
                         - two
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
-        taskExecutor.registerModule("debug", (args, become) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+        taskExecutor.registerModule("debug", (args, become, pythonContext) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
 
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
 
@@ -338,7 +344,7 @@ class TaskControlTest {
                         - true
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
-        taskExecutor.registerModule("debug", (args, become) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+        taskExecutor.registerModule("debug", (args, become, pythonContext) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
 
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
 
@@ -368,7 +374,7 @@ class TaskControlTest {
                         - false
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
-        taskExecutor.registerModule("debug", (args, become) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+        taskExecutor.registerModule("debug", (args, become, pythonContext) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
 
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
 
@@ -391,7 +397,7 @@ class TaskControlTest {
                       run_once: true
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
-        taskExecutor.registerModule("debug", (args, become) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+        taskExecutor.registerModule("debug", (args, become, pythonContext) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
 
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
 
@@ -418,7 +424,7 @@ class TaskControlTest {
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
 
         AtomicInteger counter = new AtomicInteger(0);
-        taskExecutor.registerModule("test_retry", (args, become) -> {
+        taskExecutor.registerModule("test_retry", (args, become, pythonContext) -> {
             int val = counter.incrementAndGet();
             return TaskResult.success(false, Map.of("count", val));
         });
@@ -448,7 +454,7 @@ class TaskControlTest {
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
 
         AtomicInteger counter = new AtomicInteger(0);
-        taskExecutor.registerModule("test_retry_fail", (args, become) -> {
+        taskExecutor.registerModule("test_retry_fail", (args, become, pythonContext) -> {
             counter.incrementAndGet();
             return TaskResult.success(false, Map.of("status", "ok"));
         });
@@ -488,7 +494,7 @@ class TaskControlTest {
                             msg: "always"
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
-        taskExecutor.registerModule("debug", (args, become) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+        taskExecutor.registerModule("debug", (args, become, pythonContext) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
 
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
 
@@ -518,7 +524,7 @@ class TaskControlTest {
                       when: false
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
-        taskExecutor.registerModule("debug", (args, become) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+        taskExecutor.registerModule("debug", (args, become, pythonContext) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
 
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
 
@@ -548,7 +554,7 @@ class TaskControlTest {
                           failed_when: true
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
-        taskExecutor.registerModule("debug", (args, become) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+        taskExecutor.registerModule("debug", (args, become, pythonContext) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
 
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
 
