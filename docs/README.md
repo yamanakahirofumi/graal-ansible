@@ -60,6 +60,7 @@
 - [変数とテンプレート](implementation/Variables-Templating.md)：Jinja2互換エンジンの統合
 - [OS非依存レイヤー](implementation/OS-Abstraction.md)：ファイル操作やプロセス実行のOS差分吸収
 - [Native Image最適化](implementation/Native-Image-Optimization.md)：GraalVMでのリフレクション設定と最適化
+- [コレクション実装ロードマップ](implementation/Collection-Implementation-Roadmap.md)：本物のコレクション実行に向けた段階的実装計画
 
 ## 5. 検討事項（TODOリスト）
 開発を進めるにあたって検討・具体化が必要な事項のリストです。
