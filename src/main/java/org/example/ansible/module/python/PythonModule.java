@@ -81,6 +81,21 @@ public class PythonModule implements Module {
                     "import os\n" +
                 "import types\n" +
                     "try:\n" +
+                "    # Mock subprocess module to prevent fork calls in sandbox\n" +
+                "    if 'subprocess' not in sys.modules:\n" +
+                "        sub = types.ModuleType('subprocess')\n" +
+                "        sub.PIPE = -1\n" +
+                "        sub.STDOUT = -2\n" +
+                "        sub.DEVNULL = -3\n" +
+                "        class Popen:\n" +
+                "            def __init__(self, *args, **kwargs): pass\n" +
+                "            def communicate(self, *args, **kwargs): return (b'', b'')\n" +
+                "            def wait(self): return 0\n" +
+                "            returncode = 0\n" +
+                "        sub.Popen = Popen\n" +
+                "        sub.check_output = lambda *args, **kwargs: b''\n" +
+                "        sub.call = lambda *args, **kwargs: 0\n" +
+                "        sys.modules['subprocess'] = sub\n" +
                 "    # Mock missing system modules before any ansible imports\n" +
                 "    if 'grp' not in sys.modules:\n" +
                 "        m = types.ModuleType('grp')\n" +
@@ -92,6 +107,10 @@ public class PythonModule implements Module {
                 "        sys.modules['pwd'] = m\n" +
                     "    from ansible.plugins.loader import module_loader\n" +
                 "    import ansible.module_utils.basic\n" +
+                "    import ansible.module_utils.distro\n" +
+                "    # Monkeypatch distro to avoid subprocess calls\n" +
+                "    ansible.module_utils.distro.id = lambda: 'debian'\n" +
+                "    ansible.module_utils.distro.version = lambda: '12'\n" +
                 "    # Monkeypatch globally before instantiation\n" +
                 "    ansible.module_utils.basic._load_params = lambda: (complex_args, 'main')\n" +
                 "    ansible.module_utils.basic.AnsibleModule._load_params = lambda self: setattr(self, 'params', complex_args)\n" +
