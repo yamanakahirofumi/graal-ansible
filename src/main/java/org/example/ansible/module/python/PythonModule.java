@@ -101,6 +101,12 @@ public class PythonModule implements Module {
                     "        m = types.ModuleType('pwd')\n" +
                     "        m.getpwnam = m.getpwuid = lambda x: passwd('root', 'x', 0, 0, 'root', '/root', '/bin/bash')\n" +
                     "        sys.modules['pwd'] = m\n" +
+                    "    if 'termios' not in sys.modules:\n" +
+                    "        m = types.ModuleType('termios')\n" +
+                    "        m.TCSAFLUSH = 1\n" +
+                    "        m.tcgetattr = lambda fd: [0,0,0,0, ' ', ' ', []]\n" +
+                    "        m.tcsetattr = lambda fd, opt, mode: None\n" +
+                    "        sys.modules['termios'] = m\n" +
                     "\n" +
                     "    from ansible.plugins.loader import module_loader\n" +
                     "    import ansible.module_utils.basic\n" +

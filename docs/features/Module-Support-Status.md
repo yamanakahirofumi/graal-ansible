@@ -12,15 +12,15 @@
 
 | コレクション / モジュール | Linux | macOS | Windows | 備考 |
 | :--- | :---: | :---: | :---: | :--- |
-| **ansible.builtin** (Collection) | ○ | ○ | ？ | コアコレクション。Linux/macOS は Phase 1 で対応済。 |
-| - `debug` | ○ | ○ | ○ | Java による内部実装。 |
-| - `command` | ○ | ○ | - | 本家は Windows 非対応。本プロジェクトでは OS 抽象化レイヤーで限定的に動作可。 |
-| - `shell` | ○ | ○ | - | 本家は Windows 非対応。本プロジェクトでは OS 抽象化レイヤーで限定的に動作可。 |
-| - `ping` | ○ | ○ | - | 本家は Windows 非対応 (`ansible.windows.win_ping` を推奨)。 |
-| - `copy` | ○ | ○ | - | 本家は Windows 非対応 (`ansible.windows.win_copy` を推奨)。 |
-| - `file` | ○ | ○ | - | 本家は Windows 非対応 (`ansible.windows.win_file` を推奨)。 |
-| - `template` | ○ | ○ | - | 本家は Windows 非対応 (`ansible.windows.win_template` を推奨)。 |
-| - `stat` | ○ | ○ | - | 本家は Windows 非対応 (`ansible.windows.win_stat` を推奨)。 |
+| **ansible.builtin** (Collection) | ○ | ○ | ？ | コアコレクション。全 72 モジュールのうち約半数のロードおよび基本動作を確認済（Phase 1）。 |
+| - `debug` | ○ | ○ | ○ | Java による内部実装および Python 実装の両方に対応。 |
+| - `command` | ○ | ○ | - | ロード確認済。本家は Windows 非対応。本プロジェクトでは OS 抽象化レイヤーで限定的に動作可。 |
+| - `shell` | ○ | ○ | - | ロード確認済。本家は Windows 非対応。本プロジェクトでは OS 抽象化レイヤーで限定的に動作可。 |
+| - `ping` | ○ | ○ | - | 動作確認済。本家は Windows 非対応 (`ansible.windows.win_ping` を推奨)。 |
+| - `copy` | ○ | ○ | - | 動作確認済。本家は Windows 非対応 (`ansible.windows.win_copy` を推奨)。 |
+| - `file` | ○ | ○ | - | 動作確認済。本家は Windows 非対応 (`ansible.windows.win_file` を推奨)。 |
+| - `template` | ○ | ○ | - | 動作確認済。本家は Windows 非対応 (`ansible.windows.win_template` を推奨)。 |
+| - `stat` | ○ | ○ | - | 動作確認済。本家は Windows 非対応 (`ansible.windows.win_stat` を推奨)。 |
 | **ansible.posix** | ？ | ？ | - | POSIX 固有の機能を提供するコレクション。 |
 | **ansible.utils** | ？ | ？ | ？ | ユーティリティ機能を提供するコレクション。 |
 | **community.general** | ？ | ？ | × | 多くのサードパーティ製モジュールを含む汎用コレクション。 |
