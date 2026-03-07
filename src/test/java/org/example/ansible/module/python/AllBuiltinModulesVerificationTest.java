@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class AllBuiltinModulesVerificationTest {
 
     private TaskExecutor taskExecutor;
-    private static final String MODULES_PATH = "target/python-packages/ansible/modules";
+    private static final Path MODULES_PATH = Paths.get("target", "python-packages", "ansible", "modules");
 
     @BeforeEach
     void setUp() {
@@ -47,13 +47,12 @@ class AllBuiltinModulesVerificationTest {
     @Test
     @EnabledOnOs({OS.LINUX, OS.MAC})
     void verifyAllBuiltinModules() throws IOException {
-        Path modulesDir = Paths.get(MODULES_PATH);
-        if (!Files.exists(modulesDir)) {
+        if (!Files.exists(MODULES_PATH)) {
             fail("Modules directory not found at " + MODULES_PATH + ". Run 'mvn generate-resources' first.");
         }
 
         List<String> modules;
-        try (Stream<Path> stream = Files.list(modulesDir)) {
+        try (Stream<Path> stream = Files.list(MODULES_PATH)) {
             modules = stream
                     .filter(file -> !Files.isDirectory(file))
                     .map(Path::getFileName)

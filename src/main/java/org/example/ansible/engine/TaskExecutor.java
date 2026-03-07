@@ -24,11 +24,16 @@ public class TaskExecutor implements AutoCloseable {
 
     public TaskExecutor(OSHandler osHandler) {
         this.osHandler = osHandler;
-        this.context = Context.newBuilder("python")
+        Context.Builder builder = Context.newBuilder("python")
                 .allowAllAccess(true)
-                .option("python.IsolateNativeModules", "true")
-                .option("python.PosixModuleBackend", "native")
-                .build();
+                .option("python.IsolateNativeModules", "true");
+
+        // Enable native POSIX backend only on non-Windows systems for better file handling compatibility
+        if (!"Windows".equals(osHandler.getOSFamily())) {
+            builder.option("python.PosixModuleBackend", "native");
+        }
+
+        this.context = builder.build();
     }
 
     /**
