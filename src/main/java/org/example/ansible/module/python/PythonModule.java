@@ -50,8 +50,11 @@ public class PythonModule implements Module {
             }
 
             // Bind values to the Python context
-            context.getBindings("python").putMember("complex_args", args);
+            context.getBindings("python").putMember("complex_args_java", args);
             context.getBindings("python").putMember("module_name", moduleName);
+
+            // Convert Java Map to native Python dict to avoid pickling issues (e.g., 'ForeignDict')
+            context.eval("python", "complex_args = dict(complex_args_java) if complex_args_java is not None else {}");
 
             String wrapperScript;
             if (scriptContent != null) {
@@ -79,15 +82,48 @@ public class PythonModule implements Module {
                     "import json\n" +
                     "import sys\n" +
                     "import os\n" +
+                    "import types\n" +
                     "try:\n" +
+                    "    # Aggressively mock native/problematic modules before any imports\n" +
+                    "    # Setting to None triggers ImportError, which is better for many libraries\n" +
+                    "    for mname in ['cryptography', 'cryptography.hazmat', 'cryptography.hazmat.bindings', '_cffi_backend', 'yaml._yaml', 'selinux']:\n" +
+                    "        sys.modules[mname] = None\n" +
+                    "\n" +
+                    "    # Mock missing system modules as actual modules\n" +
+                    "    if 'grp' not in sys.modules:\n" +
+                    "        m = types.ModuleType('grp')\n" +
+                    "        m.getgrnam = m.getgrgid = lambda x: None\n" +
+                    "        sys.modules['grp'] = m\n" +
+                    "    if 'pwd' not in sys.modules:\n" +
+                    "        m = types.ModuleType('pwd')\n" +
+                    "        m.getpwnam = m.getpwuid = lambda x: None\n" +
+                    "        sys.modules['pwd'] = m\n" +
+                    "\n" +
                     "    from ansible.plugins.loader import module_loader\n" +
+                    "    import ansible.module_utils.basic\n" +
+                    "    import ansible.module_utils.distro\n" +
+                    "    import ansible.module_utils.common.process\n" +
+                    "    \n" +
+                    "    # Monkeypatch to avoid system interaction\n" +
+                    "    ansible.module_utils.distro.id = lambda: 'debian'\n" +
+                    "    ansible.module_utils.distro.version = lambda: '12'\n" +
+                    "    ansible.module_utils.common.process.get_bin_path = lambda *args, **kwargs: '/usr/bin/' + args[0] if args else None\n" +
+                    "    \n" +
+                    "    # Monkeypatch globally before instantiation\n" +
+                    "    ansible.module_utils.basic._load_params = lambda: (complex_args, 'main')\n" +
+                    "    def mocked_load_params(self):\n" +
+                    "        self.params = complex_args\n" +
+                    "    ansible.module_utils.basic.AnsibleModule._load_params = mocked_load_params\n" +
+                    "    ansible.module_utils.basic.AnsibleModule._check_locale = lambda self: None\n" +
+                    "    ansible.module_utils.basic.AnsibleModule.run_command = lambda self, *args, **kwargs: (0, '', '')\n" +
+                    "    ansible.module_utils.basic.AnsibleModule.get_bin_path = lambda self, *args, **kwargs: '/usr/bin/' + args[0] if args else None\n" +
+                    "    ansible.module_utils.basic.AnsibleModule._record_module_result = lambda self, o: print(json.dumps(o))\n" +
+                    "\n" +
                     "    def run_module():\n" +
                     "        path = module_loader.find_plugin(module_name)\n" +
                     "        if not path:\n" +
                     "            return json.dumps({'failed': True, 'msg': f'Module {module_name} not found'})\n" +
-                    "        import ansible.module_utils.basic\n" +
-                    "        original_load_params = ansible.module_utils.basic.AnsibleModule._load_params\n" +
-                    "        ansible.module_utils.basic.AnsibleModule._load_params = lambda self: complex_args\n" +
+                    "        # Capture stdout\n" +
                     "        from io import StringIO\n" +
                     "        old_stdout = sys.stdout\n" +
                     "        sys.stdout = mystdout = StringIO()\n" +
@@ -98,13 +134,15 @@ public class PythonModule implements Module {
                     "                exec(code, {'__name__': '__main__', '__file__': path})\n" +
                     "            except SystemExit:\n" +
                     "                pass\n" +
+                    "            except Exception as e:\n" +
+                    "                import traceback\n" +
+                    "                return json.dumps({'failed': True, 'msg': f'Execution error: {str(e)}', 'traceback': traceback.format_exc()})\n" +
                     "            return mystdout.getvalue()\n" +
                     "        finally:\n" +
                     "            sys.stdout = old_stdout\n" +
-                    "            ansible.module_utils.basic.AnsibleModule._load_params = original_load_params\n" +
                     "    result = run_module()\n" +
-                    "except ImportError:\n" +
-                    "    result = json.dumps({'failed': True, 'msg': 'Ansible core not found in Python path'})\n";
+                    "except ImportError as e:\n" +
+                    "    result = json.dumps({'failed': True, 'msg': f'Import error: {str(e)}'})\n";
             }
 
             context.eval("python", wrapperScript);
