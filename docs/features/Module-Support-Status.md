@@ -19,8 +19,8 @@
 | - `ping` | ○ | ○ | - | 本家は Windows 非対応 (`ansible.windows.win_ping` を推奨)。 |
 | - `copy` | ○ | ○ | - | 本家は Windows 非対応 (`ansible.windows.win_copy` を推奨)。 |
 | - `file` | ○ | ○ | - | 本家は Windows 非対応 (`ansible.windows.win_file` を推奨)。 |
-| - `template` | ？ | ？ | - | 本家は Windows 非対応 (`ansible.windows.win_template` を推奨)。 |
-| - `stat` | ？ | ？ | - | 本家は Windows 非対応 (`ansible.windows.win_stat` を推奨)。 |
+| - `template` | ○ | ○ | - | 本家は Windows 非対応 (`ansible.windows.win_template` を推奨)。 |
+| - `stat` | ○ | ○ | - | 本家は Windows 非対応 (`ansible.windows.win_stat` を推奨)。 |
 | **community.general** | ？ | ？ | × | 今後の拡張対象。 |
 
 ## 2. 自動テストのスコープ (Automated Testing Scope)
