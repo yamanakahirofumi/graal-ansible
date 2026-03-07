@@ -2,7 +2,7 @@
 
 `graal-ansible` における各 OS ごとのコレクションおよびモジュールのサポート状況のサマリーです。
 
-## 1. サポート状況一覧
+## 1. サポート状況一覧 (Support Status Matrix)
 
 下表の記号は以下の意味を表します。
 - **○**: サポート済み (Supported / Verified)
@@ -10,20 +10,26 @@
 - **×**: 未サポート (Not Supported)
 - **-**: 対象 OS 自体が本家 Ansible のサポート対象外 (Not Supported by original Ansible)
 
-| コレクション / モジュール | Linux | macOS | Windows | 備考 |
+また、各セル内での表記は **[実行環境 (Control Node)] : [サポート状況]** を表します。
+- **L**: Linux
+- **M**: macOS
+- **W**: Windows
+(例: `L:○, W:？` は Linux 実行環境ではサポート済み、Windows 実行環境では動作未確認を意味します)
+
+| コレクション / モジュール | Target: Linux | Target: macOS | Target: Windows | 備考 |
 | :--- | :---: | :---: | :---: | :--- |
-| **ansible.builtin** (Collection) | ○ | ？ | ？ | コアコレクション。Linux では全 72 モジュールのロードを確認済。macOS は一部環境で制限あり (動作未確認)。 |
-| - `debug` | ○ | ○ | ○ | Java による内部実装および Python 実装の両方に対応。 |
-| - `command` | ○ | ○ | - | ロード確認済。本家は Windows 非対応。本プロジェクトでは OS 抽象化レイヤーで限定的に動作可。 |
-| - `shell` | ○ | ○ | - | ロード確認済。本家は Windows 非対応。本プロジェクトでは OS 抽象化レイヤーで限定的に動作可。 |
-| - `ping` | ○ | ○ | - | 動作確認済。本家は Windows 非対応 (`ansible.windows.win_ping` を推奨)。 |
-| - `copy` | ○ | ○ | - | 動作確認済。本家は Windows 非対応 (`ansible.windows.win_copy` を推奨)。 |
-| - `file` | ○ | ○ | - | 動作確認済。本家は Windows 非対応 (`ansible.windows.win_file` を推奨)。 |
-| - `template` | ○ | ○ | - | 動作確認済。本家は Windows 非対応 (`ansible.windows.win_template` を推奨)。 |
-| - `stat` | ○ | ○ | - | 動作確認済。本家は Windows 非対応 (`ansible.windows.win_stat` を推奨)。 |
-| **ansible.posix** | ？ | ？ | - | POSIX 固有の機能を提供するコレクション。 |
-| **ansible.utils** | ？ | ？ | ？ | ユーティリティ機能を提供するコレクション。 |
-| **community.general** | ？ | ？ | × | 多くのサードパーティ製モジュールを含む汎用コレクション。 |
+| **ansible.builtin** (Collection) | L:○, M:？, W:？ | L:？, M:？, W:？ | L:？, M:？, W:？ | コアコレクション。Linux 実行環境では全 72 モジュールのロードを確認済。 |
+| - `debug` | L:○, M:？, W:？ | L:？, M:○, W:？ | L:？, M:？, W:○ | Java による内部実装および Python 実装の両方に対応。 |
+| - `command` | L:○, M:？, W:？ | L:？, M:○, W:？ | - | ロード確認済。本家は Windows 非対応。本プロジェクトでは OS 抽象化レイヤーで限定的に動作可。 |
+| - `shell` | L:○, M:？, W:？ | L:？, M:○, W:？ | - | ロード確認済。本家は Windows 非対応。本プロジェクトでは OS 抽象化レイヤーで限定的に動作可。 |
+| - `ping` | L:○, M:？, W:？ | L:？, M:○, W:？ | - | 動作確認済。本家は Windows 非対応 (`ansible.windows.win_ping` を推奨)。 |
+| - `copy` | L:○, M:？, W:？ | L:？, M:○, W:？ | - | 動作確認済。本家は Windows 非対応 (`ansible.windows.win_copy` を推奨)。 |
+| - `file` | L:○, M:？, W:？ | L:？, M:○, W:？ | - | 動作確認済。本家は Windows 非対応 (`ansible.windows.win_file` を推奨)。 |
+| - `template` | L:○, M:？, W:？ | L:？, M:○, W:？ | - | 動作確認済。本家は Windows 非対応 (`ansible.windows.win_template` を推奨)。 |
+| - `stat` | L:○, M:？, W:？ | L:？, M:○, W:？ | - | 動作確認済。本家は Windows 非対応 (`ansible.windows.win_stat` を推奨)。 |
+| **ansible.posix** | L:？, M:？, W:？ | L:？, M:？, W:？ | - | POSIX 固有の機能を提供するコレクション。 |
+| **ansible.utils** | L:？, M:？, W:？ | L:？, M:？, W:？ | L:？, M:？, W:？ | ユーティリティ機能を提供するコレクション。 |
+| **community.general** | L:？, M:？, W:？ | L:？, M:？, W:？ | × | 多くのサードパーティ製モジュールを含む汎用コレクション。 |
 
 ## 2. 自動テストのスコープ (Automated Testing Scope)
 
