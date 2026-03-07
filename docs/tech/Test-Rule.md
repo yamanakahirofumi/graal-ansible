@@ -44,3 +44,24 @@ assertTrue(result.isSuccess());
 - **モジュール・コレクション**:
   - `ansible.builtin` などの実際のモジュールを用いたテストは、そのモジュールが本家 Ansible でサポートしている OS 環境でのみ実施します。
   - JUnit の `@EnabledOnOs` を使用して、非対応 OS でのテスト実行を適切にスキップしてください。
+
+## 5. SSH 接続のテスト (Testing SSH Connections)
+SSH を介した接続（`SshConnection` 等）をテストする場合は、**Testcontainers** の SSH モジュールを使用して、一時的な SSH サーバーコンテナを起動して検証を行います。
+
+- **使用ライブラリ**: `org.testcontainers:ssh`
+- **目的**: 実際のネットワーク経由での認証、コマンド実行、ファイル転送が正しく行われるかを検証する。
+- **実装例**:
+  ```java
+  @Testcontainers
+  class SshConnectionTest {
+      @Container
+      private static final SshContainer sshd = new SshContainer()
+          .withPassword("ansible")
+          .withCommand("sleep infinity");
+
+      @Test
+      void testExecCommand() {
+          // sshd コンテナの情報を利用して SshConnection を構築しテスト
+      }
+  }
+  ```

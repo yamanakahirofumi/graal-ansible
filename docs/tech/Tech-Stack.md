@@ -13,4 +13,5 @@
 | 接続 | Apache MINA SSHD | 2.12+ | SSH接続実装 |
 | テンプレート | Jinjava (HubSpot) | 2.7.6 | Jinja2互換テンプレート用 |
 | テスト | JUnit 5 | 5.10.x | |
+| テスト (コンテナ) | Testcontainers (sshd) | 1.19.x | SSH接続テスト用 |
 | ビルド | Maven | 3.9.x | |
