@@ -108,7 +108,9 @@ public class PythonModule implements Module {
                     "    \n" +
                     "    # Monkeypatch globally before instantiation\n" +
                     "    ansible.module_utils.basic._load_params = lambda: (complex_args, 'main')\n" +
-                    "    ansible.module_utils.basic.AnsibleModule._load_params = lambda self: complex_args\n" +
+                    "    def mocked_load_params(self):\n" +
+                    "        self.params = complex_args\n" +
+                    "    ansible.module_utils.basic.AnsibleModule._load_params = mocked_load_params\n" +
                     "    ansible.module_utils.basic.AnsibleModule._check_locale = lambda self: None\n" +
                     "    ansible.module_utils.basic.AnsibleModule.run_command = lambda self, *args, **kwargs: (0, '', '')\n" +
                     "    ansible.module_utils.basic.AnsibleModule.get_bin_path = lambda self, *args, **kwargs: '/usr/bin/' + args[0] if args else None\n" +
