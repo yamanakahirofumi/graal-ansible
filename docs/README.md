@@ -15,7 +15,7 @@
 - **変数解決**: Jinjava による Jinja2 互換テンプレート、11段階の変数優先順位（all, group, host, play, extra-vars等）。
 - **タスク制御**: `when`, `loop`, `register`, `notify/handlers`, `until/retries`, `delegate_to`, `ignore_unreachable`, `delegate_facts` 等のサポート。
 - **権限昇格**: `become` (sudo, su) の実装。
-- **コレクション対応**: フェーズ 1 完了（ansible-core の完全ロードと Linux での全 72 モジュール動作確認）。
+- **コレクション対応**: フェーズ 1 進行中（ansible-core の完全ロードと Linux での全 72 モジュールロード検証）。
 - **接続**: `local` 接続および `ssh` (Apache MINA SSHD) の基盤。
 - **OS 抽象化**: `OSHandler` による Linux/Windows 間の差異吸収。
 - **配布**: GraalVM Native Image による単一バイナリ化と、GitHub Actions によるマルチプラットフォーム CI。

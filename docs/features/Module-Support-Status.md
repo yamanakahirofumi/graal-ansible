@@ -42,9 +42,9 @@
 ## 3. 実装フェーズと進捗状況 (Implementation Phases)
 100% の互換性と最適化を目指し、以下の 3 つのフェーズで開発を進めています。詳細は [コレクション実装ロードマップ](../implementation/Collection-Implementation-Roadmap.md) を参照してください。
 
-- **フェーズ 1: Ansible 本体の完全ロードと基本動作の実現 (Completed)**
+- **フェーズ 1: Ansible 本体の完全ロードと基本動作の実現 (Current)**
   - Linux/macOS 上での主要モジュールの動作確認。
-- **フェーズ 2: ハイブリッド実装による Windows サポート (Current)**
+- **フェーズ 2: ハイブリッド実装による Windows サポート (Planned)**
   - Windows 管理ノード対応の強化と、OS 固有の問題解決。
 - **フェーズ 3: Ansible 本体のロード排除と最適化 (Planned)**
   - 起動速度の向上と依存関係の最小化。
