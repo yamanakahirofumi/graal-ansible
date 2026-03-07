@@ -81,17 +81,20 @@ public class PythonModule implements Module {
                     "import os\n" +
                     "import types\n" +
                     "try:\n" +
-                    "    # Recursive mock to handle deep imports of native modules\n" +
-                    "    class RecursiveMock(types.ModuleType):\n" +
-                    "        def __getattr__(self, name):\n" +
-                    "            return RecursiveMock(name)\n" +
-                    "        def __call__(self, *args, **kwargs):\n" +
-                    "            return RecursiveMock('called')\n" +
-                    "    \n" +
                     "    # Aggressively mock native/problematic modules before any imports\n" +
-                    "    for mname in ['cryptography', 'cryptography.hazmat', 'cryptography.hazmat.bindings', '_cffi_backend', 'yaml._yaml', 'selinux', 'grp', 'pwd']:\n" +
-                    "        if mname not in sys.modules:\n" +
-                    "            sys.modules[mname] = RecursiveMock(mname)\n" +
+                    "    # Setting to None triggers ImportError, which is better for many libraries\n" +
+                    "    for mname in ['cryptography', 'cryptography.hazmat', 'cryptography.hazmat.bindings', '_cffi_backend', 'yaml._yaml', 'selinux']:\n" +
+                    "        sys.modules[mname] = None\n" +
+                    "\n" +
+                    "    # Mock missing system modules as actual modules\n" +
+                    "    if 'grp' not in sys.modules:\n" +
+                    "        m = types.ModuleType('grp')\n" +
+                    "        m.getgrnam = m.getgrgid = lambda x: None\n" +
+                    "        sys.modules['grp'] = m\n" +
+                    "    if 'pwd' not in sys.modules:\n" +
+                    "        m = types.ModuleType('pwd')\n" +
+                    "        m.getpwnam = m.getpwuid = lambda x: None\n" +
+                    "        sys.modules['pwd'] = m\n" +
                     "\n" +
                     "    from ansible.plugins.loader import module_loader\n" +
                     "    import ansible.module_utils.basic\n" +
