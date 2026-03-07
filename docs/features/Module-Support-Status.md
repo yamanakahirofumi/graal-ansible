@@ -8,18 +8,19 @@
 - **○**: サポート済み (Supported / Verified)
 - **？**: 計画中 または 動作未確認 (Planned / Experimental / Unverified)
 - **×**: 未サポート (Not Supported)
+- **-**: 対象 OS 自体が本家 Ansible のサポート対象外 (Not Supported by original Ansible)
 
 | コレクション / モジュール | Linux | macOS | Windows | 備考 |
 | :--- | :---: | :---: | :---: | :--- |
 | **ansible.builtin** (Collection) | ○ | ○ | ？ | コアコレクション。Linux/macOS は Phase 1 で対応済。 |
 | - `debug` | ○ | ○ | ○ | Java による内部実装。 |
-| - `command` | ○ | ○ | ○ | OS 抽象化レイヤー経由で実行。 |
-| - `shell` | ○ | ○ | ○ | OS 抽象化レイヤー経由で実行。 |
-| - `ping` | ○ | ○ | ？ | Python 実装。Windows は Phase 2 で対応予定。 |
-| - `copy` | ○ | ○ | ？ | Python 実装。Windows は Phase 2 で対応予定。 |
-| - `file` | ○ | ○ | ？ | Python 実装。Windows は Phase 2 で対応予定。 |
-| - `template` | ？ | ？ | ？ | 実装予定。 |
-| - `stat` | ？ | ？ | ？ | 実装予定。 |
+| - `command` | ○ | ○ | - | 本家は Windows 非対応。本プロジェクトでは OS 抽象化レイヤーで限定的に動作可。 |
+| - `shell` | ○ | ○ | - | 本家は Windows 非対応。本プロジェクトでは OS 抽象化レイヤーで限定的に動作可。 |
+| - `ping` | ○ | ○ | - | 本家は Windows 非対応 (`ansible.windows.win_ping` を推奨)。 |
+| - `copy` | ○ | ○ | - | 本家は Windows 非対応 (`ansible.windows.win_copy` を推奨)。 |
+| - `file` | ○ | ○ | - | 本家は Windows 非対応 (`ansible.windows.win_file` を推奨)。 |
+| - `template` | ？ | ？ | - | 本家は Windows 非対応 (`ansible.windows.win_template` を推奨)。 |
+| - `stat` | ？ | ？ | - | 本家は Windows 非対応 (`ansible.windows.win_stat` を推奨)。 |
 | **community.general** | ？ | ？ | × | 今後の拡張対象。 |
 
 ## 2. 実装フェーズとの関係
