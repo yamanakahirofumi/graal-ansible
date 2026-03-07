@@ -33,6 +33,7 @@
 - [Playbook実行仕様](features/Playbook-Execution.md)：タスク実行、ループ、条件分岐のサポート範囲
 - [Ansible用語集](features/Ansible-Terminology.md)：コレクション、モジュール、ロール等の用語定義
 - [モジュール互換性](features/Module-Compatibility.md)：実装済みのコアモジュール一覧
+- [モジュールサポート状態](features/Module-Support-Status.md)：OSごとのコレクション・モジュールサポート状況
 - [モジュールの開発方針](features/Module-Development-Policy.md)：Ansibleモジュールの実行および再実装禁止の方針
 
 ## 3. 技術・開発設定 (`docs/tech/`)
