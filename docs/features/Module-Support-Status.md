@@ -1,54 +1,55 @@
 # モジュールサポート状態 (Module Support Status)
 
-`graal-ansible` における各 OS ごとのコレクションおよびモジュールのサポート状況のサマリーです。
+`graal-ansible` における各モジュールのテスト完了状態と、現在の動作確認状況のサマリーです。最終的な目標については [モジュール互換性の目標](Module-Compatibility.md) を参照してください。
 
-## 1. サポート状況一覧 (Support Status Matrix)
+## 1. テスト完了状態 (Verified Support Matrix)
 
-下表の記号は以下の意味を表します。
-- **○**: サポート済み (Supported / Verified)
-- **？**: 計画中 または 動作未確認 (Planned / Experimental / Unverified)
-- **×**: 未サポート (Not Supported)
-- **-**: 対象 OS 自体が本家 Ansible のサポート対象外 (Not Supported by original Ansible)
+下表は、自動テスト（ユニットテストおよび統合テスト）によって動作が確認されている状態を示します。
 
-また、各セル内での表記は **[実行環境 (Control Node)] : [サポート状況]** を表します。
-- **L**: Linux
-- **M**: macOS
-- **W**: Windows
-(例: `L:○, W:？` は Linux 実行環境ではサポート済み、Windows 実行環境では動作未確認を意味します)
+- **○**: テスト通過済み (Verified) - 実際のモジュールが GraalPy 上で期待通りに動作することを確認。
+- **△**: ロード確認済み (Loaded) - モジュールのインポートと初期化は成功するが、詳細な機能テストは未実施。
+- **？**: 検証予定 (Planned) - ロードまたは実行に課題がある、あるいは未着手。
+- **-**: 対象外 (N/A) - 本家 Ansible がその OS をサポートしていない。
+
+表記: **[管理ノード OS] : [ステータス]**
 
 | コレクション / モジュール | Target: Linux | Target: macOS | Target: Windows | 備考 |
 | :--- | :---: | :---: | :---: | :--- |
-| **ansible.builtin** (Collection) | L:○, M:？, W:？ | L:？, M:？, W:？ | L:？, M:？, W:？ | コアコレクション。Linux 実行環境では全 72 モジュールのロードを確認済。 |
-| - `debug` | L:○, M:？, W:？ | L:？, M:○, W:？ | L:？, M:？, W:○ | Java による内部実装および Python 実装の両方に対応。 |
-| - `command` | L:○, M:？, W:？ | L:？, M:○, W:？ | - | ロード確認済。本家は Windows 非対応。本プロジェクトでは OS 抽象化レイヤーで限定的に動作可。 |
-| - `shell` | L:○, M:？, W:？ | L:？, M:○, W:？ | - | ロード確認済。本家は Windows 非対応。本プロジェクトでは OS 抽象化レイヤーで限定的に動作可。 |
-| - `ping` | L:○, M:？, W:？ | L:？, M:○, W:？ | - | 動作確認済。本家は Windows 非対応 (`ansible.windows.win_ping` を推奨)。 |
-| - `copy` | L:○, M:？, W:？ | L:？, M:○, W:？ | - | 動作確認済。本家は Windows 非対応 (`ansible.windows.win_copy` を推奨)。 |
-| - `file` | L:○, M:？, W:？ | L:？, M:○, W:？ | - | 動作確認済。本家は Windows 非対応 (`ansible.windows.win_file` を推奨)。 |
-| - `template` | L:○, M:？, W:？ | L:？, M:○, W:？ | - | 動作確認済。本家は Windows 非対応 (`ansible.windows.win_template` を推奨)。 |
-| - `stat` | L:○, M:？, W:？ | L:？, M:○, W:？ | - | 動作確認済。本家は Windows 非対応 (`ansible.windows.win_stat` を推奨)。 |
-| **ansible.posix** | L:？, M:？, W:？ | L:？, M:？, W:？ | - | POSIX 固有の機能を提供するコレクション。 |
-| **ansible.utils** | L:？, M:？, W:？ | L:？, M:？, W:？ | L:？, M:？, W:？ | ユーティリティ機能を提供するコレクション。 |
-| **community.general** | L:？, M:？, W:？ | L:？, M:？, W:？ | × | 多くのサードパーティ製モジュールを含む汎用コレクション。 |
+| **ansible.builtin** | L:△, M:？, W:？ | L:？, M:？, W:？ | L:？, M:？, W:？ | Linux 上で全 72 モジュールのロードを確認済。 |
+| - `debug` | L:○, M:○, W:○ | L:○, M:○, W:○ | L:○, M:○, W:○ | Java 内部実装と Python 実装の両方でテスト済。 |
+| - `command` | L:○, M:？, W:？ | L:？, M:○, W:？ | - | 外部プロセスの起動と結果取得を確認済。 |
+| - `shell` | L:○, M:？, W:？ | L:？, M:○, W:？ | - | シェル経由のコマンド実行を確認済。 |
+| - `ping` | L:○, M:？, W:？ | L:？, M:○, W:？ | - | 基本的な疎通確認テスト済。 |
+| - `copy` | L:○, M:？, W:？ | L:？, M:○, W:？ | - | ファイル転送とパーミッションの検証済。 |
+| - `file` | L:○, M:？, W:？ | L:？, M:○, W:？ | - | ファイル状態管理の検証済。 |
+| - `template` | L:○, M:？, W:？ | L:？, M:○, W:？ | - | Jinja2 テンプレート展開の検証済。 |
+| - `stat` | L:○, M:？, W:？ | L:？, M:○, W:？ | - | ファイル情報取得の検証済。 |
+| **ansible.posix** | L:？, M:？, W:？ | L:？, M:？, W:？ | - | コレクション全体のロードを検証中。 |
+| **ansible.utils** | L:？, M:？, W:？ | L:？, M:？, W:？ | L:？, M:？, W:？ | 基本的なフィルタの動作を確認中。 |
+| **community.general** | L:？, M:？, W:？ | L:？, M:？, W:？ | × | 依存ライブラリの解決を順次実施中。 |
 
-## 2. 自動テストのスコープ (Automated Testing Scope)
+## 2. 自動テストの実施状況 (Automated Testing Status)
 
-各OSにおける自動テストの実施方針は以下の通りです。
+### 2.1 継続的インテグレーション (CI)
+- **Linux (Ubuntu)**: GitHub Actions にて毎プッシュ時に全統合テストを実行。
+- **macOS**: 基本的なエンジン動作テストを実施。
+- **Windows**: `LocalConnection` および `debug` モジュールの動作を確認中。
 
-- **管理ノード (Control Node)**: すべてのサポートOS（Linux, macOS, Windows）において、ビルドおよびコア機能のテストを CI で実施します。
-- **ターゲットノード (Target Node / Modules)**: 各モジュールが本来サポートしている OS 環境においてのみ、結合テストを実施します。
-  - 例: `ansible.builtin.copy` の結合テストは Linux/macOS でのみ実行し、Windows ではスキップされます。
-  - Windows の管理ノードとしての動作は、OS 抽象化レイヤーやモックを用いたユニットテストで保証します。
+### 2.2 テストカテゴリ
+- **Module Load Test**: `ansible.builtin` の全モジュールがインポートエラーなく読み込めるかを確認（Linux では 100% 完了）。
+- **Integration Test**: 実際の Playbook を使用して、ターゲットノードの状態が正しく変更されるかを検証。
 
-## 3. 実装フェーズとの関係
+## 3. 実装フェーズと進捗状況 (Implementation Phases)
+100% の互換性と最適化を目指し、以下の 3 つのフェーズで開発を進めています。詳細は [コレクション実装ロードマップ](../implementation/Collection-Implementation-Roadmap.md) を参照してください。
 
-本プロジェクトの [コレクション実装ロードマップ](../implementation/Collection-Implementation-Roadmap.md) に基づき、サポート範囲を順次拡大しています。
-
-- **Phase 1**: Linux/macOS における `ansible-core` (ansible.builtin) の動作を優先。
-- **Phase 2**: Windows 環境における Python モジュールの互換性向上（現在進行中）。
-- **Phase 3**: 依存ライブラリの最小化と Native Image 最適化。
+- **フェーズ 1: Ansible 本体の完全ロードと基本動作の実現 (Current)**
+  - Linux/macOS 上での主要モジュールの動作確認。
+- **フェーズ 2: ハイブリッド実装による Windows サポート (Planned)**
+  - Windows 管理ノード対応の強化と、OS 固有の問題解決。
+- **フェーズ 3: Ansible 本体のロード排除と最適化 (Planned)**
+  - 起動速度の向上と依存関係の最小化。
 
 ## 4. 関連ドキュメント
-- [モジュール互換性](Module-Compatibility.md)
+- [モジュール互換性の目標（最終系）](Module-Compatibility.md)
 - [OS 抽象化レイヤーの仕様](../implementation/OS-Abstraction.md)
 - [コレクション実装ロードマップ](../implementation/Collection-Implementation-Roadmap.md)
