@@ -23,7 +23,16 @@
 | - `stat` | ？ | ？ | - | 本家は Windows 非対応 (`ansible.windows.win_stat` を推奨)。 |
 | **community.general** | ？ | ？ | × | 今後の拡張対象。 |
 
-## 2. 実装フェーズとの関係
+## 2. 自動テストのスコープ (Automated Testing Scope)
+
+各OSにおける自動テストの実施方針は以下の通りです。
+
+- **管理ノード (Control Node)**: すべてのサポートOS（Linux, macOS, Windows）において、ビルドおよびコア機能のテストを CI で実施します。
+- **ターゲットノード (Target Node / Modules)**: 各モジュールが本来サポートしている OS 環境においてのみ、結合テストを実施します。
+  - 例: `ansible.builtin.copy` の結合テストは Linux/macOS でのみ実行し、Windows ではスキップされます。
+  - Windows の管理ノードとしての動作は、OS 抽象化レイヤーやモックを用いたユニットテストで保証します。
+
+## 3. 実装フェーズとの関係
 
 本プロジェクトの [コレクション実装ロードマップ](../implementation/Collection-Implementation-Roadmap.md) に基づき、サポート範囲を順次拡大しています。
 
@@ -31,7 +40,7 @@
 - **Phase 2**: Windows 環境における Python モジュールの互換性向上（現在進行中）。
 - **Phase 3**: 依存ライブラリの最小化と Native Image 最適化。
 
-## 3. 関連ドキュメント
+## 4. 関連ドキュメント
 - [モジュール互換性](Module-Compatibility.md)
 - [OS 抽象化レイヤーの仕様](../implementation/OS-Abstraction.md)
 - [コレクション実装ロードマップ](../implementation/Collection-Implementation-Roadmap.md)
