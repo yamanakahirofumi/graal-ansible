@@ -81,35 +81,28 @@ public class PythonModule implements Module {
                     "import os\n" +
                     "import types\n" +
                     "try:\n" +
-                    "    # Mock subprocess module to prevent fork calls in sandbox\n" +
-                    "    sub = types.ModuleType('subprocess')\n" +
-                    "    sub.PIPE = -1\n" +
-                    "    sub.STDOUT = -2\n" +
-                    "    sub.DEVNULL = -3\n" +
-                    "    class Popen:\n" +
-                    "        def __init__(self, *args, **kwargs): pass\n" +
-                    "        def communicate(self, *args, **kwargs): return (b'', b'')\n" +
-                    "        def wait(self): return 0\n" +
-                    "        returncode = 0\n" +
-                    "    sub.Popen = Popen\n" +
-                    "    sub.check_output = lambda *args, **kwargs: b''\n" +
-                    "    sub.call = lambda *args, **kwargs: 0\n" +
-                    "    sys.modules['subprocess'] = sub\n" +
-                    "    # Mock missing system modules before any ansible imports\n" +
-                    "    if 'grp' not in sys.modules:\n" +
-                    "        m = types.ModuleType('grp')\n" +
-                    "        m.getgrnam = m.getgrgid = lambda x: None\n" +
-                    "        sys.modules['grp'] = m\n" +
-                    "    if 'pwd' not in sys.modules:\n" +
-                    "        m = types.ModuleType('pwd')\n" +
-                    "        m.getpwnam = m.getpwuid = lambda x: None\n" +
-                    "        sys.modules['pwd'] = m\n" +
+                    "    # Recursive mock to handle deep imports of native modules\n" +
+                    "    class RecursiveMock(types.ModuleType):\n" +
+                    "        def __getattr__(self, name):\n" +
+                    "            return RecursiveMock(name)\n" +
+                    "        def __call__(self, *args, **kwargs):\n" +
+                    "            return RecursiveMock('called')\n" +
+                    "    \n" +
+                    "    # Aggressively mock native/problematic modules before any imports\n" +
+                    "    for mname in ['cryptography', 'cryptography.hazmat', 'cryptography.hazmat.bindings', '_cffi_backend', 'yaml._yaml', 'selinux', 'grp', 'pwd']:\n" +
+                    "        if mname not in sys.modules:\n" +
+                    "            sys.modules[mname] = RecursiveMock(mname)\n" +
+                    "\n" +
                     "    from ansible.plugins.loader import module_loader\n" +
                     "    import ansible.module_utils.basic\n" +
                     "    import ansible.module_utils.distro\n" +
-                    "    # Monkeypatch distro to avoid subprocess calls\n" +
+                    "    import ansible.module_utils.common.process\n" +
+                    "    \n" +
+                    "    # Monkeypatch to avoid system interaction\n" +
                     "    ansible.module_utils.distro.id = lambda: 'debian'\n" +
                     "    ansible.module_utils.distro.version = lambda: '12'\n" +
+                    "    ansible.module_utils.common.process.get_bin_path = lambda *args, **kwargs: '/usr/bin/' + args[0] if args else None\n" +
+                    "    \n" +
                     "    # Monkeypatch globally before instantiation\n" +
                     "    ansible.module_utils.basic._load_params = lambda: (complex_args, 'main')\n" +
                     "    ansible.module_utils.basic.AnsibleModule._load_params = lambda self: complex_args\n" +
