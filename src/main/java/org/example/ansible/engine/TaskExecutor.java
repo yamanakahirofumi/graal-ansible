@@ -27,7 +27,6 @@ public class TaskExecutor implements AutoCloseable {
         this.context = Context.newBuilder("python")
                 .allowAllAccess(true)
                 .option("python.IsolateNativeModules", "true")
-                .option("python.PosixModuleBackend", "native")
                 .build();
     }
 

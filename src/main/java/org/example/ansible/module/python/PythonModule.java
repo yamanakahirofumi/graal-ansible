@@ -79,51 +79,50 @@ public class PythonModule implements Module {
                     "import json\n" +
                     "import sys\n" +
                     "import os\n" +
-                "import types\n" +
+                    "import types\n" +
                     "try:\n" +
-                "    # Mock subprocess module to prevent fork calls in sandbox\n" +
-                "    if 'subprocess' not in sys.modules:\n" +
-                "        sub = types.ModuleType('subprocess')\n" +
-                "        sub.PIPE = -1\n" +
-                "        sub.STDOUT = -2\n" +
-                "        sub.DEVNULL = -3\n" +
-                "        class Popen:\n" +
-                "            def __init__(self, *args, **kwargs): pass\n" +
-                "            def communicate(self, *args, **kwargs): return (b'', b'')\n" +
-                "            def wait(self): return 0\n" +
-                "            returncode = 0\n" +
-                "        sub.Popen = Popen\n" +
-                "        sub.check_output = lambda *args, **kwargs: b''\n" +
-                "        sub.call = lambda *args, **kwargs: 0\n" +
-                "        sys.modules['subprocess'] = sub\n" +
-                "    # Mock missing system modules before any ansible imports\n" +
-                "    if 'grp' not in sys.modules:\n" +
-                "        m = types.ModuleType('grp')\n" +
-                "        m.getgrnam = m.getgrgid = lambda x: None\n" +
-                "        sys.modules['grp'] = m\n" +
-                "    if 'pwd' not in sys.modules:\n" +
-                "        m = types.ModuleType('pwd')\n" +
-                "        m.getpwnam = m.getpwuid = lambda x: None\n" +
-                "        sys.modules['pwd'] = m\n" +
+                    "    # Mock subprocess module to prevent fork calls in sandbox\n" +
+                    "    sub = types.ModuleType('subprocess')\n" +
+                    "    sub.PIPE = -1\n" +
+                    "    sub.STDOUT = -2\n" +
+                    "    sub.DEVNULL = -3\n" +
+                    "    class Popen:\n" +
+                    "        def __init__(self, *args, **kwargs): pass\n" +
+                    "        def communicate(self, *args, **kwargs): return (b'', b'')\n" +
+                    "        def wait(self): return 0\n" +
+                    "        returncode = 0\n" +
+                    "    sub.Popen = Popen\n" +
+                    "    sub.check_output = lambda *args, **kwargs: b''\n" +
+                    "    sub.call = lambda *args, **kwargs: 0\n" +
+                    "    sys.modules['subprocess'] = sub\n" +
+                    "    # Mock missing system modules before any ansible imports\n" +
+                    "    if 'grp' not in sys.modules:\n" +
+                    "        m = types.ModuleType('grp')\n" +
+                    "        m.getgrnam = m.getgrgid = lambda x: None\n" +
+                    "        sys.modules['grp'] = m\n" +
+                    "    if 'pwd' not in sys.modules:\n" +
+                    "        m = types.ModuleType('pwd')\n" +
+                    "        m.getpwnam = m.getpwuid = lambda x: None\n" +
+                    "        sys.modules['pwd'] = m\n" +
                     "    from ansible.plugins.loader import module_loader\n" +
-                "    import ansible.module_utils.basic\n" +
-                "    import ansible.module_utils.distro\n" +
-                "    # Monkeypatch distro to avoid subprocess calls\n" +
-                "    ansible.module_utils.distro.id = lambda: 'debian'\n" +
-                "    ansible.module_utils.distro.version = lambda: '12'\n" +
-                "    # Monkeypatch globally before instantiation\n" +
-                "    ansible.module_utils.basic._load_params = lambda: (complex_args, 'main')\n" +
-                "    ansible.module_utils.basic.AnsibleModule._load_params = lambda self: setattr(self, 'params', complex_args)\n" +
-                "    ansible.module_utils.basic.AnsibleModule._check_locale = lambda self: None\n" +
-                "    ansible.module_utils.basic.AnsibleModule.run_command = lambda self, *args, **kwargs: (0, '', '')\n" +
-                "    ansible.module_utils.basic.AnsibleModule.get_bin_path = lambda self, *args, **kwargs: '/usr/bin/' + args[0] if args else None\n" +
-                "    ansible.module_utils.basic.AnsibleModule._record_module_result = lambda self, o: print(json.dumps(o))\n" +
-                "\n" +
+                    "    import ansible.module_utils.basic\n" +
+                    "    import ansible.module_utils.distro\n" +
+                    "    # Monkeypatch distro to avoid subprocess calls\n" +
+                    "    ansible.module_utils.distro.id = lambda: 'debian'\n" +
+                    "    ansible.module_utils.distro.version = lambda: '12'\n" +
+                    "    # Monkeypatch globally before instantiation\n" +
+                    "    ansible.module_utils.basic._load_params = lambda: (complex_args, 'main')\n" +
+                    "    ansible.module_utils.basic.AnsibleModule._load_params = lambda self: complex_args\n" +
+                    "    ansible.module_utils.basic.AnsibleModule._check_locale = lambda self: None\n" +
+                    "    ansible.module_utils.basic.AnsibleModule.run_command = lambda self, *args, **kwargs: (0, '', '')\n" +
+                    "    ansible.module_utils.basic.AnsibleModule.get_bin_path = lambda self, *args, **kwargs: '/usr/bin/' + args[0] if args else None\n" +
+                    "    ansible.module_utils.basic.AnsibleModule._record_module_result = lambda self, o: print(json.dumps(o))\n" +
+                    "\n" +
                     "    def run_module():\n" +
                     "        path = module_loader.find_plugin(module_name)\n" +
                     "        if not path:\n" +
                     "            return json.dumps({'failed': True, 'msg': f'Module {module_name} not found'})\n" +
-                "        # Capture stdout\n" +
+                    "        # Capture stdout\n" +
                     "        from io import StringIO\n" +
                     "        old_stdout = sys.stdout\n" +
                     "        sys.stdout = mystdout = StringIO()\n" +
@@ -134,15 +133,15 @@ public class PythonModule implements Module {
                     "                exec(code, {'__name__': '__main__', '__file__': path})\n" +
                     "            except SystemExit:\n" +
                     "                pass\n" +
-                "            except Exception as e:\n" +
-                "                import traceback\n" +
-                "                return json.dumps({'failed': True, 'msg': f'Execution error: {str(e)}', 'traceback': traceback.format_exc()})\n" +
+                    "            except Exception as e:\n" +
+                    "                import traceback\n" +
+                    "                return json.dumps({'failed': True, 'msg': f'Execution error: {str(e)}', 'traceback': traceback.format_exc()})\n" +
                     "            return mystdout.getvalue()\n" +
                     "        finally:\n" +
                     "            sys.stdout = old_stdout\n" +
                     "    result = run_module()\n" +
-                "except ImportError as e:\n" +
-                "    result = json.dumps({'failed': True, 'msg': f'Import error: {str(e)}'})\n";
+                    "except ImportError as e:\n" +
+                    "    result = json.dumps({'failed': True, 'msg': f'Import error: {str(e)}'})\n";
             }
 
             context.eval("python", wrapperScript);
