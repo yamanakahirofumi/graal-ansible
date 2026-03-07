@@ -50,8 +50,11 @@ public class PythonModule implements Module {
             }
 
             // Bind values to the Python context
-            context.getBindings("python").putMember("complex_args", args);
+            context.getBindings("python").putMember("complex_args_java", args);
             context.getBindings("python").putMember("module_name", moduleName);
+
+            // Convert Java Map to native Python dict to avoid pickling issues (e.g., 'ForeignDict')
+            context.eval("python", "complex_args = dict(complex_args_java) if complex_args_java is not None else {}");
 
             String wrapperScript;
             if (scriptContent != null) {
