@@ -90,13 +90,16 @@ public class PythonModule implements Module {
                     "        sys.modules[mname] = None\n" +
                     "\n" +
                     "    # Mock missing system modules as actual modules\n" +
+                    "    import collections\n" +
+                    "    passwd = collections.namedtuple('passwd', ['pw_name', 'pw_passwd', 'pw_uid', 'pw_gid', 'pw_gecos', 'pw_dir', 'pw_shell'])\n" +
+                    "    group = collections.namedtuple('group', ['gr_name', 'gr_passwd', 'gr_gid', 'gr_mem'])\n" +
                     "    if 'grp' not in sys.modules:\n" +
                     "        m = types.ModuleType('grp')\n" +
-                    "        m.getgrnam = m.getgrgid = lambda x: None\n" +
+                    "        m.getgrnam = m.getgrgid = lambda x: group('root', 'x', 0, [])\n" +
                     "        sys.modules['grp'] = m\n" +
                     "    if 'pwd' not in sys.modules:\n" +
                     "        m = types.ModuleType('pwd')\n" +
-                    "        m.getpwnam = m.getpwuid = lambda x: None\n" +
+                    "        m.getpwnam = m.getpwuid = lambda x: passwd('root', 'x', 0, 0, 'root', '/root', '/bin/bash')\n" +
                     "        sys.modules['pwd'] = m\n" +
                     "\n" +
                     "    from ansible.plugins.loader import module_loader\n" +
