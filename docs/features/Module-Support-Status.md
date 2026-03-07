@@ -21,9 +21,9 @@
 | - `file` | ○ | ○ | - | 本家は Windows 非対応 (`ansible.windows.win_file` を推奨)。 |
 | - `template` | ○ | ○ | - | 本家は Windows 非対応 (`ansible.windows.win_template` を推奨)。 |
 | - `stat` | ○ | ○ | - | 本家は Windows 非対応 (`ansible.windows.win_stat` を推奨)。 |
-| **ansible.posix** | ○ | ○ | - | POSIX 固有の機能を提供するコレクション。 |
-| **ansible.utils** | ○ | ○ | ○ | ユーティリティ機能を提供するコレクション。 |
-| **community.general** | ○ | ○ | × | 多くのサードパーティ製モジュールを含む汎用コレクション。 |
+| **ansible.posix** | ？ | ？ | - | POSIX 固有の機能を提供するコレクション。 |
+| **ansible.utils** | ？ | ？ | ？ | ユーティリティ機能を提供するコレクション。 |
+| **community.general** | ？ | ？ | × | 多くのサードパーティ製モジュールを含む汎用コレクション。 |
 
 ## 2. 自動テストのスコープ (Automated Testing Scope)
 
