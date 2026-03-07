@@ -20,9 +20,9 @@
 ## 3. 実装方針
 
 ### 3.1 コネクションプラグインとの連携
-権限昇格は、[コネクションプラグイン](Connection-Plugins.md) の `exec_command` メソッド内で処理されます。
+権限昇格は、[コネクションプラグイン](Connection-Plugins.md) の `execCommand` メソッド内で処理されます。
 
-- `exec_command` の引数に `BecomeContext`（昇格要否、メソッド、ユーザー等の情報を保持するオブジェクト）を追加することを検討します。
+- `execCommand` の引数として `BecomeContext`（昇格要否、メソッド、ユーザー等の情報を保持する Record）を導入し、統合済みです。
 - コネクションプラグインは、指定された `become_method` に基づいて実行コマンドをラップします。
 
 #### sudo の例
@@ -47,11 +47,11 @@ sudo -p "BECOME-PROMPT" -u root /bin/sh -c "/usr/bin/python3 /tmp/ansible_module
 
 ## 4. 実行順序における適用タイミング
 
-[タスク実行エンジン](Task-Executor.md) において、以下のタイミングで適用されます。
+[PlaybookExecutor](Task-Control.md) および [タスク実行エンジン](Task-Executor.md) において、以下のタイミングで適用されます。
 
 1. 変数解決後、タスク引数を確定。
-2. タスクまたはプレイの `become` 設定を確認。
-3. `Connection.exec_command` を呼び出す際、昇格情報を付与。
+2. Play レベルおよび Task レベルの `become` 設定をマージ・評価（`Truthiness` による判定）。
+3. `Connection.execCommand` を呼び出す際、`BecomeContext` として昇格情報を付与。
 4. モジュール実行完了後、結果を取得。
 
 ## 5. 制約事項と留意点

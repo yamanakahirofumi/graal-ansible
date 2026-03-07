@@ -85,13 +85,13 @@
 - **留意点**:
     - 各試行の結果は `register` された変数（`results` リスト）に蓄積される必要があります。
 
-## 8. 委譲と実行制御 (`delegate_to`, `run_once`, `ignore_errors`)
+## 8. 委譲と実行制御 (`delegate_to`, `run_once`, `ignore_errors`, `ignore_unreachable`, `delegate_facts`)
 
 - **delegate_to**: タスクを指定された別のホスト（例: localhost）で実行します。
-- **delegate_facts**: `delegate_to` 使用時に、収集されたファクトを委譲先ではなく元のホストに割り当てるかを制御します。
+- **delegate_facts**: `delegate_to` 使用時に、収集されたファクトを委譲先ではなく元のホストに割り当てるかを制御します（実装済み）。
 - **run_once**: 複数のターゲットホストがある場合でも、1つのホストで1回だけ実行します。
 - **ignore_errors**: タスクが失敗しても、そのホストでのプレイ実行を継続します。
-- **ignore_unreachable**: ホストが到達不能（unreachable）な場合にエラーを無視します。
+- **ignore_unreachable**: ホストが到達不能（unreachable）な場合にエラーを無視します（実装済み）。
 
 ## 9. 実行エンジン (`PlaybookExecutor`) での処理順序
 
