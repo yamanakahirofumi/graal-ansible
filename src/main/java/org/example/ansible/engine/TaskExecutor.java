@@ -28,8 +28,9 @@ public class TaskExecutor implements AutoCloseable {
                 .allowAllAccess(true)
                 .option("python.IsolateNativeModules", "true");
 
-        // Enable native POSIX backend only on non-Windows systems for better file handling compatibility
-        if (!"Windows".equals(osHandler.getOSFamily())) {
+        // Enable native POSIX backend only on Linux systems for better file handling compatibility.
+        // It's disabled on Windows (not supported) and macOS (to avoid ShouldNotReachHere errors in some CI environments).
+        if ("Linux".equals(osHandler.getOSFamily())) {
             builder.option("python.PosixModuleBackend", "native");
         }
 

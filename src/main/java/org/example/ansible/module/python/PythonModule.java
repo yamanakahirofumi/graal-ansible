@@ -5,6 +5,7 @@ import org.example.ansible.engine.TaskResult;
 import org.example.ansible.module.Module;
 import org.example.ansible.util.PythonEnv;
 import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Value;
 
 import java.util.Map;
@@ -180,7 +181,9 @@ public class PythonModule implements Module {
             }
 
             return TaskResult.success(resultMap);
-            
+
+        } catch (PolyglotException e) {
+            return TaskResult.failure("GraalPy execution failed (PolyglotException): " + e.getMessage());
         } catch (Exception e) {
             return TaskResult.failure("GraalPy execution failed: " + e.getMessage());
         }
