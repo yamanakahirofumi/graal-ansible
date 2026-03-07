@@ -29,6 +29,12 @@ public class PythonEnv {
             paths.addAll(Arrays.asList(propPaths.split(File.pathSeparator)));
         }
 
+        // 3. Add default target/python-packages if it exists
+        File defaultDir = new File("target/python-packages");
+        if (defaultDir.exists() && defaultDir.isDirectory()) {
+            paths.add(defaultDir.getAbsolutePath());
+        }
+
         return paths;
     }
 }
