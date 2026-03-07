@@ -19,13 +19,6 @@
     - `ansible.builtin.template`, `ansible.builtin.file`, `ansible.builtin.stat` 等のテスト実装。
     - 各 OS（Linux, Windows, macOS）固有のモジュール挙動の検証。
 
-### [ ] 本物のコレクション実行に向けた段階的実装 (フェーズ1)
-- **概要**: `ansible-core` を完全にロードし、Linux/macOS での基本動作を実現する。
-- **検討内容**:
-    - ビルド時の `pip` による `ansible-core` 取得の自動化。
-    - GraalPy へのライブラリパス統合。
-    - 不足している Python 依存パッケージの特定。
-
 ### [ ] 本物のコレクション実行に向けた段階的実装 (フェーズ2)
 - **概要**: ハイブリッド実装（モンキーパッチ等）による Windows サポート。
 - **検討内容**:
@@ -103,6 +96,13 @@
 - **解決策**:
     - [タスク制御の実装詳細](implementation/Task-Control.md) に基づき、`PlaybookExecutor` および `TaskExecutor` へ全機能を組み込み済み。
     - `when`, `loop` (`with_items`), `register`, `handlers` (`notify`), `block/rescue/always`, `until/retries/delay`, `failed_when/changed_when`, `delegate_to`, `run_once`, `ignore_errors` をサポート。
+
+### [x] 本物のコレクション実行に向けた段階的実装 (フェーズ1)
+- **完了日**: 2026-03-05
+- **概要**: `ansible-core` を完全にロードし、Linux/macOS での基本動作を実現する。
+- **解決策**:
+    - [コレクション実装ロードマップ](implementation/Collection-Implementation-Roadmap.md) に基づき、ビルド時に `pip` で `ansible-core` を取得し、GraalPy の `sys.path` へ自動統合する仕組みを実装済み。
+    - Linux 上で全 72 モジュールのロード検証および主要モジュールの統合テストを完了。
 
 ### [✓] Ansible 互換性の維持レベル
 - **決定事項**: **Ansible 13** で動くコレクションが動作することを目標とする。

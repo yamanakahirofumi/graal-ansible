@@ -45,11 +45,19 @@ Ansible と同様に、変数は定義時ではなく、実際に使用される
 
 ## 4. 独自フィルターとテストの拡張
 
-Ansible 特有のフィルター（`ipaddr`, `dict2items`, `default` 等）は、Jinjava の `Filter` インターフェースを実装して追加します。
+Ansible 特有のフィルターは、Jinjava の `Filter` インターフェースを実装して追加されています。現在、以下のフィルターが実装済みです。
+
+- `bool`: 値を真偽値に変換。
+- `combine`: 辞書（Map）をマージ。
+- `default`: 未定義値に対するデフォルト値を設定。
+- `dict2items`: 辞書をリスト形式に変換。
+- `ipaddr`: IP アドレスの検証・操作。
+- `to_json`: オブジェクトを JSON 文字列に変換。
+- `to_yaml`: オブジェクトを YAML 文字列に変換。
 
 ```java
 // 実装イメージ
-jinjava.getGlobalContext().registerFilter(new AnsibleIpAddrFilter());
+jinjava.getGlobalContext().registerFilter(new CombineFilter());
 ```
 
 ## 5. Native Image への対応
