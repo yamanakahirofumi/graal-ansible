@@ -7,6 +7,8 @@ import org.example.ansible.engine.TaskResult;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 
 import java.util.Map;
 
@@ -32,6 +34,7 @@ class ActualModuleIntegrationTest {
     }
 
     @Test
+    @EnabledOnOs({OS.LINUX, OS.MAC})
     void testActualPingModule() {
         // ansible.builtin.ping is part of ansible-core
         taskExecutor.registerModule("ping", new PythonModule("ping"));
