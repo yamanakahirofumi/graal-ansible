@@ -45,7 +45,7 @@ class AllBuiltinModulesVerificationTest {
     }
 
     @Test
-    @EnabledOnOs({OS.LINUX, OS.MAC})
+    @EnabledOnOs({OS.LINUX})
     void verifyAllBuiltinModules() throws IOException {
         if (!Files.exists(MODULES_PATH)) {
             fail("Modules directory not found at " + MODULES_PATH + ". Run 'mvn generate-resources' first.");

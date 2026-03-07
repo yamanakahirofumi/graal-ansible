@@ -25,12 +25,12 @@ public class TaskExecutor implements AutoCloseable {
     public TaskExecutor(OSHandler osHandler) {
         this.osHandler = osHandler;
         Context.Builder builder = Context.newBuilder("python")
-                .allowAllAccess(true)
-                .option("python.IsolateNativeModules", "true");
+                .allowAllAccess(true);
 
-        // Enable native POSIX backend only on Linux systems for better file handling compatibility.
-        // It's disabled on Windows (not supported) and macOS (to avoid ShouldNotReachHere errors in some CI environments).
+        // Native/POSIX specific options are enabled only on Linux for maximum compatibility and performance.
+        // On Windows and macOS, these can cause stability issues or are not supported.
         if ("Linux".equals(osHandler.getOSFamily())) {
+            builder.option("python.IsolateNativeModules", "true");
             builder.option("python.PosixModuleBackend", "native");
         }
 

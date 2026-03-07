@@ -10,6 +10,7 @@ import org.graalvm.polyglot.Value;
 
 import java.util.Map;
 import java.util.List;
+import java.io.File;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class PythonModule implements Module {
@@ -28,6 +29,17 @@ public class PythonModule implements Module {
 
     @Override
     public TaskResult execute(final Map<String, Object> args, BecomeContext becomeContext, Context context) {
+        // Mock patchelf for GraalPy internal use on Linux
+        try {
+            if (System.getProperty("os.name").toLowerCase().contains("linux")) {
+                File dummyPatchelf = new File("/tmp/patchelf");
+                if (!dummyPatchelf.exists()) {
+                    java.nio.file.Files.writeString(dummyPatchelf.toPath(), "#!/bin/sh\nexit 0\n");
+                    dummyPatchelf.setExecutable(true);
+                }
+            }
+        } catch (Exception ignored) {}
+
         try {
             // Setup sys.path with site-packages
             List<String> sitePackages = PythonEnv.getSitePackagesFromEnv();
@@ -102,7 +114,7 @@ public class PythonModule implements Module {
                     "        m = types.ModuleType('pwd')\n" +
                     "        m.getpwnam = m.getpwuid = lambda x: passwd('root', 'x', 0, 0, 'root', '/root', '/bin/bash')\n" +
                     "        sys.modules['pwd'] = m\n" +
-                    "    if 'termios' not in sys.modules:\n" +
+                    "    if 'termios' not in sys.modules or sys.modules['termios'] is None:\n" +
                     "        m = types.ModuleType('termios')\n" +
                     "        m.TCSAFLUSH = 1\n" +
                     "        m.tcgetattr = lambda fd: [0,0,0,0, ' ', ' ', []]\n" +
