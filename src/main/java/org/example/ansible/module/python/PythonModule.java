@@ -97,14 +97,24 @@ public class PythonModule implements Module {
                     "import sys\n" +
                     "import os\n" +
                     "import types\n" +
+                    "import collections\n" +
                     "try:\n" +
+                    "    # Forcibly mock ansible.utils.display to break circular imports immediately\n" +
+                    "    # Ensure parent packages are correctly initialized to avoid import failures\n" +
+                    "    import ansible\n" +
+                    "    import ansible.utils\n" +
+                    "    m = types.ModuleType('ansible.utils.display')\n" +
+                    "    class Display:\n" +
+                    "        def __init__(self, *args, **kwargs): pass\n" +
+                    "        def __getattr__(self, name): return lambda *args, **kwargs: None\n" +
+                    "    m.Display = Display\n" +
+                    "    sys.modules['ansible.utils.display'] = m\n" +
+                    "\n" +
                     "    # Aggressively mock native/problematic modules before any imports\n" +
-                    "    # Setting to None triggers ImportError, which is better for many libraries\n" +
                     "    for mname in ['cryptography', 'cryptography.hazmat', 'cryptography.hazmat.bindings', '_cffi_backend', 'yaml._yaml', 'selinux']:\n" +
                     "        sys.modules[mname] = None\n" +
                     "\n" +
                     "    # Mock missing system modules as actual modules\n" +
-                    "    import collections\n" +
                     "    passwd = collections.namedtuple('passwd', ['pw_name', 'pw_passwd', 'pw_uid', 'pw_gid', 'pw_gecos', 'pw_dir', 'pw_shell'])\n" +
                     "    group = collections.namedtuple('group', ['gr_name', 'gr_passwd', 'gr_gid', 'gr_mem'])\n" +
                     "    if 'grp' not in sys.modules:\n" +
@@ -115,6 +125,12 @@ public class PythonModule implements Module {
                     "        m = types.ModuleType('pwd')\n" +
                     "        m.getpwnam = m.getpwuid = lambda *args, **kwargs: passwd('root', 'x', 0, 0, 'root', '/root', '/bin/bash')\n" +
                     "        sys.modules['pwd'] = m\n" +
+                    "    if 'syslog' not in sys.modules:\n" +
+                    "        m = types.ModuleType('syslog')\n" +
+                    "        m.openlog = m.syslog = m.closelog = lambda *args, **kwargs: None\n" +
+                    "        m.LOG_PID = 1; m.LOG_CONS = 2; m.LOG_DAEMON = 3; m.LOG_INFO = 4\n" +
+                    "        m.LOG_USER = 8; m.LOG_NOTICE = 5; m.LOG_AUTH = 32; m.LOG_ERR = 3; m.LOG_WARNING = 4; m.LOG_DEBUG = 7\n" +
+                    "        sys.modules['syslog'] = m\n" +
                     "    # Mock os.geteuid/getuid if missing (common in some GraalPy envs)\n" +
                     "    if not hasattr(os, 'geteuid'): os.geteuid = lambda: 0\n" +
                     "    if not hasattr(os, 'getuid'): os.getuid = lambda: 0\n" +
@@ -126,19 +142,6 @@ public class PythonModule implements Module {
                     "        m.tcgetattr = lambda *args, **kwargs: [0,0,0,0, ' ', ' ', []]\n" +
                     "        m.tcsetattr = lambda *args, **kwargs: None\n" +
                     "        sys.modules['termios'] = m\n" +
-                    "\n" +
-                    "    # Break circular import in ansible.utils.display\n" +
-                    "    if 'ansible.utils.display' not in sys.modules:\n" +
-                    "        m = types.ModuleType('ansible.utils.display')\n" +
-                    "        class Display:\n" +
-                    "            def __init__(self, *args, **kwargs): pass\n" +
-                    "            def display(self, *args, **kwargs): pass\n" +
-                    "            def debug(self, *args, **kwargs): pass\n" +
-                    "            def verbose(self, *args, **kwargs): pass\n" +
-                    "            def warning(self, *args, **kwargs): pass\n" +
-                    "            def error(self, *args, **kwargs): pass\n" +
-                    "        m.Display = Display\n" +
-                    "        sys.modules['ansible.utils.display'] = m\n" +
                     "\n" +
                     "    from ansible.plugins.loader import module_loader\n" +
                     "    import ansible.module_utils.basic\n" +
@@ -179,7 +182,7 @@ public class PythonModule implements Module {
                     "            try:\n" +
                     "                # Some modules (like setup) might use relative imports if they think they are in a package\n" +
                     "                # For ansible-core modules, they are usually in 'ansible.modules'\n" +
-                    "                mod_globals = {'__name__': '__main__', '__file__': path}\n" +
+                    "                mod_globals = {'__name__': '__main__', '__file__': path, '_module_fqn': f'ansible.builtin.{module_name}'}\n" +
                     "                # If module is in ansible.modules, set __package__ correctly\n" +
                     "                if 'ansible/modules/' in path.replace('\\\\', '/'):\n" +
                     "                    mod_globals['__package__'] = 'ansible.modules'\n" +
