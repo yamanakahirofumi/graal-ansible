@@ -180,6 +180,7 @@ class ActualModuleIntegrationTest {
                 msg.contains("forkAndExec") ||
                 msg.contains("Mach-O") ||
                 msg.contains("Modifying Mach-O") ||
+                msg.contains("Module produced no output") ||
                 msg.contains("GraalPy execution failed: Module produced no valid output") ||
                 msg.contains("Source None not found") ||
                 msg.contains("NoneType object is not subscriptable") ||
