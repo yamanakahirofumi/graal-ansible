@@ -27,12 +27,16 @@ public class TaskExecutor implements AutoCloseable {
         Context.Builder builder = Context.newBuilder("python")
                 .allowAllAccess(true);
 
-        // Native/POSIX specific options are disabled on Linux to ensure maximum stability and compatibility.
-        // On Windows and macOS, these can cause stability issues or are not supported.
-        if ("Linux".equals(osHandler.getOSFamily())) {
+        // Stability options for GraalPy in standard JVM environments.
+        // Disable isolation and use 'java' backend on POSIX systems to avoid ShouldNotReachHere errors.
+        String osFamily = osHandler.getOSFamily();
+        if ("Linux".equals(osFamily) || "Darwin".equals(osFamily)) {
             builder.option("python.IsolateNativeModules", "false");
             builder.option("python.PosixModuleBackend", "java");
         }
+
+        // Clean up fallback warnings in CI
+        builder.option("engine.WarnInterpreterOnly", "false");
 
         this.context = builder.build();
     }

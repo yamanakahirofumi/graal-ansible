@@ -29,20 +29,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class AllBuiltinModulesVerificationTest {
 
-    private TaskExecutor taskExecutor;
     private static final Path MODULES_PATH = Paths.get("target", "python-packages", "ansible", "modules");
-
-    @BeforeEach
-    void setUp() {
-        taskExecutor = new TaskExecutor();
-    }
-
-    @AfterEach
-    void tearDown() {
-        if (taskExecutor != null) {
-            taskExecutor.close();
-        }
-    }
 
     @Test
     @EnabledOnOs({OS.LINUX, OS.MAC, OS.WINDOWS})
@@ -67,25 +54,28 @@ class AllBuiltinModulesVerificationTest {
 
         List<String> success = new ArrayList<>();
         List<String> failedWithArgsError = new ArrayList<>();
-        List<String> failedWithImportError = new ArrayList<>();
-        List<String> failedWithOtherError = new ArrayList<>();
+        Map<String, String> importErrors = new java.util.TreeMap<>();
+        Map<String, String> otherErrors = new java.util.TreeMap<>();
 
-        for (String moduleName : modules) {
-            taskExecutor.registerModule(moduleName, new PythonModule(moduleName));
-            Task task = new Task("verify_" + moduleName, moduleName, Map.of());
-            TaskResult result = taskExecutor.execute(task, BecomeContext.empty());
+        // Use a single TaskExecutor/Context for efficiency in verification tests
+        try (TaskExecutor taskExecutor = new TaskExecutor()) {
+            for (String moduleName : modules) {
+                taskExecutor.registerModule(moduleName, new PythonModule(moduleName));
+                Task task = new Task("verify_" + moduleName, moduleName, Map.of());
+                TaskResult result = taskExecutor.execute(task, BecomeContext.empty());
 
-            String msg = result.message() != null ? result.message() : "";
+                String msg = result.message() != null ? result.message() : "";
 
-            if (result.success()) {
-                success.add(moduleName);
-            } else if (msg.contains("missing required arguments") || msg.contains("at least one of the following is required")) {
-                // This means the module loaded and started executing!
-                failedWithArgsError.add(moduleName);
-            } else if (msg.contains("Import error") || msg.contains("ModuleNotFoundError")) {
-                failedWithImportError.add(moduleName);
-            } else {
-                failedWithOtherError.add(moduleName);
+                if (result.success()) {
+                    success.add(moduleName);
+                } else if (msg.contains("missing required arguments") || msg.contains("at least one of the following is required")) {
+                    // This means the module loaded and started executing!
+                    failedWithArgsError.add(moduleName);
+                } else if (msg.contains("Import error") || msg.contains("ModuleNotFoundError") || msg.contains("ImportError")) {
+                    importErrors.put(moduleName, msg);
+                } else {
+                    otherErrors.put(moduleName, msg);
+                }
             }
         }
 
@@ -94,25 +84,17 @@ class AllBuiltinModulesVerificationTest {
         System.out.println("Total modules: " + modules.size());
         System.out.println("Success (executed): " + success.size());
         System.out.println("Success (loaded, but missing args): " + failedWithArgsError.size());
-        System.out.println("Failed (Import error): " + failedWithImportError.size());
-        System.out.println("Failed (Other error): " + failedWithOtherError.size());
+        System.out.println("Failed (Import error): " + importErrors.size());
+        System.out.println("Failed (Other error): " + otherErrors.size());
 
-        if (!failedWithImportError.isEmpty()) {
+        if (!importErrors.isEmpty()) {
             System.out.println("\nImport Errors:");
-            failedWithImportError.forEach(m -> {
-                Task task = new Task("debug_import_" + m, m, Map.of());
-                TaskResult result = taskExecutor.execute(task, BecomeContext.empty());
-                System.out.println(" - " + m + ": " + result.message());
-            });
+            importErrors.forEach((m, msg) -> System.out.println(" - " + m + ": " + msg));
         }
 
-        if (!failedWithOtherError.isEmpty()) {
+        if (!otherErrors.isEmpty()) {
             System.out.println("\nOther Errors:");
-            failedWithOtherError.forEach(m -> {
-                Task task = new Task("debug_" + m, m, Map.of());
-                TaskResult result = taskExecutor.execute(task, BecomeContext.empty());
-                System.out.println(" - " + m + ": " + result.message());
-            });
+            otherErrors.forEach((m, msg) -> System.out.println(" - " + m + ": " + msg));
         }
 
         // In Phase 1, we expect a certain number of modules to load successfully (either success or missing args)
