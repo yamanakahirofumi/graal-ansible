@@ -58,7 +58,8 @@ public class PythonModule implements Module {
                     }
                 }
                 if (!exists) {
-                    path.invokeMember("append", p);
+                    // Prepend to path to ensure our packages take precedence
+                    path.invokeMember("insert", 0, p);
                 }
             }
 
