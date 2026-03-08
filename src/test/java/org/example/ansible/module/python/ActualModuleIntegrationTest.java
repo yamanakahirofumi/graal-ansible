@@ -41,6 +41,20 @@ class ActualModuleIntegrationTest {
     }
 
     @Test
+    @EnabledOnOs({OS.LINUX, OS.MAC, OS.WINDOWS})
+    void testActualDebugModule() {
+        taskExecutor.registerModule("debug", new PythonModule("debug"));
+
+        Task task = new Task("test_debug", "debug", Map.of("msg", "Hello World"));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty());
+
+        if (checkEnvironmentRestriction(result)) return;
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        assertEquals("Hello World", result.data().get("msg"));
+    }
+
+    @Test
     @EnabledOnOs({OS.LINUX, OS.MAC})
     void testActualPingModule() {
         // ansible.builtin.ping is part of ansible-core

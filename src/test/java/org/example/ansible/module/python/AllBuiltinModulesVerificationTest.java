@@ -45,7 +45,7 @@ class AllBuiltinModulesVerificationTest {
     }
 
     @Test
-    @EnabledOnOs({OS.LINUX})
+    @EnabledOnOs({OS.LINUX, OS.MAC, OS.WINDOWS})
     void verifyAllBuiltinModules() throws IOException {
         if (!Files.exists(MODULES_PATH)) {
             fail("Modules directory not found at " + MODULES_PATH + ". Run 'mvn generate-resources' first.");
@@ -115,8 +115,14 @@ class AllBuiltinModulesVerificationTest {
             });
         }
 
-        // In Phase 1, we expect at least 30 modules to load successfully (either success or missing args)
+        // In Phase 1, we expect a certain number of modules to load successfully (either success or missing args)
         int loadedCount = success.size() + failedWithArgsError.size();
-        assertTrue(loadedCount >= 30, "Expected at least 30 modules to load, but only " + loadedCount + " did.");
+        int threshold = 30;
+        String osName = System.getProperty("os.name").toLowerCase();
+        if (osName.contains("win")) {
+            threshold = 5; // Windows is expected to have lower compatibility in Phase 1
+        }
+
+        assertTrue(loadedCount >= threshold, "Expected at least " + threshold + " modules to load on " + osName + ", but only " + loadedCount + " did.");
     }
 }
