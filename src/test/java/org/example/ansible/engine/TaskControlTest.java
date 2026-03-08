@@ -564,4 +564,47 @@ class TaskControlTest {
         assertEquals(2, results.get("host1").size());
         assertFalse(results.get("host1").get(1).success());
     }
+
+    @Test
+    void testFlushHandlers() {
+        String inventoryIni = "host1";
+        Inventory inventory = new IniInventoryParser().parse(new ByteArrayInputStream(inventoryIni.getBytes(StandardCharsets.UTF_8)));
+
+        String playbookYaml = """
+                - name: test flush_handlers
+                  hosts: all
+                  tasks:
+                    - name: trigger handler
+                      debug:
+                        msg: "trigger"
+                      changed_when: true
+                      notify: my handler
+                    - name: flush
+                      meta: flush_handlers
+                    - name: after flush
+                      debug:
+                        msg: "after"
+                  handlers:
+                    - name: my handler
+                      debug:
+                        msg: "handled"
+                """;
+        Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
+        taskExecutor.registerModule("debug", (args, become, context) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+
+        Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
+
+        List<TaskResult> host1Results = results.get("host1");
+        // Expected results:
+        // 0: trigger handler
+        // 1: flush (meta)
+        // 2: my handler (flushed)
+        // 3: after flush
+
+        assertEquals(4, host1Results.size(), "Should have 4 results: trigger, flush, handler, after");
+        assertEquals("trigger", host1Results.get(0).data().get("msg"));
+        // host1Results.get(1) is the result of 'meta: flush_handlers'
+        assertEquals("handled", host1Results.get(2).data().get("msg"));
+        assertEquals("after", host1Results.get(3).data().get("msg"));
+    }
 }

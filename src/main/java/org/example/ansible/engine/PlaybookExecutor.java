@@ -90,20 +90,27 @@ public class PlaybookExecutor {
             }
         }
 
-        // Execute handlers
+        // Execute handlers at the end of the play
         for (Host host : targetHosts) {
-            Set<String> notifiedHandlers = hostNotifications.getOrDefault(host.name(), Collections.emptySet());
-            if (notifiedHandlers.isEmpty()) continue;
+            flushHandlersForHost(play, host, variableManager, results, failedHosts, hostNotifications);
+        }
+    }
 
-            for (Task handler : play.handlers()) {
-                if (notifiedHandlers.contains(handler.name())) {
-                    // Handlers ignore failedHosts check usually, or they only run for hosts that didn't fail earlier?
-                    // Ansible runs handlers even if some earlier tasks failed, as long as the host is still in the play.
-                    if (failedHosts.contains(host.name())) continue;
-                    executeTaskOnHost(play, host, handler, variableManager, results, failedHosts, hostNotifications);
+    private void flushHandlersForHost(Play play, Host host, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications) {
+        boolean anyNotified;
+        do {
+            anyNotified = false;
+            Set<String> notifiedHandlers = hostNotifications.remove(host.name());
+            if (notifiedHandlers != null && !notifiedHandlers.isEmpty()) {
+                anyNotified = true;
+                for (Task handler : play.handlers()) {
+                    if (notifiedHandlers.contains(handler.name())) {
+                        if (failedHosts.contains(host.name())) continue;
+                        executeTaskOnHost(play, host, handler, variableManager, results, failedHosts, hostNotifications);
+                    }
                 }
             }
-        }
+        } while (anyNotified);
     }
 
     private void executeTaskOnHost(Play play, Host host, Task task, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications) {
@@ -126,6 +133,10 @@ public class PlaybookExecutor {
             result = evaluateResultCustomization(task, result, allVars);
 
             results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(result);
+
+            if (result.success() && !isSkipped(result) && "meta".equals(task.action()) && "flush_handlers".equals(task.args().get("_raw_params"))) {
+                flushHandlersForHost(play, host, variableManager, results, failedHosts, hostNotifications);
+            }
 
             if (task.register() != null) {
                 variableManager.registerVariable(host.name(), task.register(), result.data());
@@ -293,6 +304,10 @@ public class PlaybookExecutor {
         Task resolvedTask = new Task(task.name(), task.action(), resolvedArgs, task.vars(), task.when(), task.register(), task.loop(), task.notifications(), task.failedWhen(), task.changedWhen(), task.ignoreErrors(),
                 task.until(), task.retries(), task.delay(), resolvedDelegateTo, task.delegateFacts(), task.runOnce(), task.ignoreUnreachable(), task.block(), task.rescue(), task.always(),
                 task.become(), task.becomeMethod(), task.becomeUser(), task.becomeFlags());
+
+        if ("meta".equals(resolvedTask.action())) {
+            return TaskResult.success(false, Map.of("meta", resolvedTask.args().getOrDefault("_raw_params", ""), "changed", false));
+        }
 
         BecomeContext becomeContext = resolveBecomeContext(play, resolvedTask, variables);
 
