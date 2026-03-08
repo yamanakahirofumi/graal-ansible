@@ -6,35 +6,24 @@
 ## 1. 技術面 (Technical)
 
 ### [ ] CI における Native Image ビルドの安定化
-- **概要**: GitHub Actions 上での Native Image コンパイル時間の短縮とリソース最適化。
+- **概要**: 優先度低。GitHub Actions 上での Native Image コンパイル時間の短縮とリソース最適化。
 - **検討内容**:
     - Build Cache の有効活用。
     - Windows/macOS 環境でのビルドエラーの監視と修正。
 
 ## 2. 実装時の詳細事項
 
-### [ ] 実際の Ansible コレクションを使ったテストの拡充
-- **概要**: 主要なモジュールのテストを継続的に追加し、互換性を検証する。
-- **検討内容**:
-    - `ansible.builtin.template`, `ansible.builtin.file`, `ansible.builtin.stat` 等のテスト実装。
-    - 各 OS（Linux, Windows, macOS）固有のモジュール挙動の検証。
+### [ ] Ansible 本体の完全ロードと基本動作の実現 (フェーズ1)
+- **概要**: `ansible-core` を完全にロードし、Linux/macOS での主要モジュールの動作確認。
+- **詳細は [Module-Support-Status.md](features/Module-Support-Status.md) を参照。**
 
-### [ ] 本物のコレクション実行に向けた段階的実装 (フェーズ1)
-- **概要**: `ansible-core` を完全にロードし、Linux/macOS での基本動作を実現する。
-- **検討内容**:
-    - ビルド時の `pip` による `ansible-core` 取得の自動化。
-    - GraalPy へのライブラリパス統合。
-    - 不足している Python 依存パッケージの特定。
-
-### [ ] 本物のコレクション実行に向けた段階的実装 (フェーズ2)
+### [ ] ハイブリッド実装による Windows サポート (フェーズ2)
 - **概要**: ハイブリッド実装（モンキーパッチ等）による Windows サポート。
-- **検討内容**:
-    - Windows で動作しないモジュールの特定と代替実装。
+- **詳細は [Module-Support-Status.md](features/Module-Support-Status.md) を参照。**
 
-### [ ] 本物のコレクション実行に向けた段階的実装 (フェーズ3)
+### [ ] Ansible 本体のロード排除と最適化 (フェーズ3)
 - **概要**: `ansible-core` 全体のロードを排除し、最適化と安定化を図る。
-- **検討内容**:
-    - 最小限の `module_utils` 抽出とバンドル化。
+- **詳細は [Module-Support-Status.md](features/Module-Support-Status.md) を参照。**
 
 ## 完了済みの項目 (Completed)
 

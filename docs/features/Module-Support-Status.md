@@ -43,11 +43,22 @@
 100% の互換性と最適化を目指し、以下の 3 つのフェーズで開発を進めています。詳細は [コレクション実装ロードマップ](../implementation/Collection-Implementation-Roadmap.md) を参照してください。
 
 - **フェーズ 1: Ansible 本体の完全ロードと基本動作の実現 (Current)**
-  - Linux/macOS 上での主要モジュールの動作確認。
+  - Linux/macOS 上での主要モジュール（[Module-Compatibility.md](Module-Compatibility.md) の対象コレクションすべて）の動作確認。
+  - **完了条件**:
+    - ビルド時の `pip` による `ansible-core` 取得の自動化。
+    - GraalPy へのライブラリパス統合。
+    - 不足している Python 依存パッケージの特定。
 - **フェーズ 2: ハイブリッド実装による Windows サポート (Planned)**
   - Windows 管理ノード対応の強化と、OS 固有の問題解決。
+  - **検討内容**:
+    - Windows で動作を阻害する Python モジュールの特定とモンキーパッチ。
+    - `OSHandler` と連携した、Windows 特有のパス処理やシェル実行の調整。
 - **フェーズ 3: Ansible 本体のロード排除と最適化 (Planned)**
   - 起動速度の向上と依存関係の最小化。
+  - **検討内容**:
+    - 必要なライブラリ（`module_utils` のコア部分など）の依存関係解析とバンドル化。
+    - 実行エンジンの最適化。
+    - 起動スピードの高速化と Native Image のビルド安定化。
 
 ## 4. 関連ドキュメント
 - [モジュール互換性の目標（最終系）](Module-Compatibility.md)
