@@ -17,21 +17,6 @@ try:
     for mname in ['cryptography', 'cryptography.hazmat', 'cryptography.hazmat.bindings', '_cffi_backend', 'yaml._yaml', 'selinux']:
         sys.modules[mname] = None
 
-    # Mock Display to avoid circular imports during module discovery
-    if 'ansible.utils.display' not in sys.modules:
-        import types
-        display_mod = types.ModuleType('ansible.utils.display')
-        class Display:
-            def __init__(self, *args, **kwargs): pass
-            def display(self, *args, **kwargs): pass
-            def debug(self, *args, **kwargs): pass
-            def verbose(self, *args, **kwargs): pass
-            def warning(self, *args, **kwargs): pass
-            def error(self, *args, **kwargs): pass
-            def deprecated(self, *args, **kwargs): pass
-        display_mod.Display = Display
-        sys.modules['ansible.utils.display'] = display_mod
-
     # Mock missing system modules as actual modules
     import collections
     passwd = collections.namedtuple('passwd', ['pw_name', 'pw_passwd', 'pw_uid', 'pw_gid', 'pw_gecos', 'pw_dir', 'pw_shell'])
