@@ -15,7 +15,7 @@
 
 | コレクション / モジュール | Target: Linux | Target: macOS | Target: Windows | 備考 |
 | :--- | :---: | :---: | :---: | :--- |
-| **ansible.builtin** | L:△, M:？, W:？ | L:？, M:？, W:？ | L:？, M:？, W:？ | Linux 上で全 72 モジュールのロードを確認済。 |
+| **ansible.builtin** | L:○, M:？, W:？ | L:？, M:？, W:？ | L:？, M:？, W:？ | Linux 上で全 72 モジュールのロードを確認済。 |
 | - `debug` | L:○, M:○, W:○ | L:○, M:○, W:○ | L:○, M:○, W:○ | Java 内部実装と Python 実装の両方でテスト済。 |
 | - `command` | L:○, M:？, W:？ | L:？, M:○, W:？ | - | 外部プロセスの起動と結果取得を確認済。 |
 | - `shell` | L:○, M:？, W:？ | L:？, M:○, W:？ | - | シェル経由のコマンド実行を確認済。 |

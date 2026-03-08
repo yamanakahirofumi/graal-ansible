@@ -19,12 +19,14 @@
     - `ansible.builtin.template`, `ansible.builtin.file`, `ansible.builtin.stat` 等のテスト実装。
     - 各 OS（Linux, Windows, macOS）固有のモジュール挙動の検証。
 
-### [ ] 本物のコレクション実行に向けた段階的実装 (フェーズ1)
+### [x] 本物のコレクション実行に向けた段階的実装 (フェーズ1)
+- **完了日**: 2026-03-07
 - **概要**: `ansible-core` を完全にロードし、Linux/macOS での基本動作を実現する。
-- **検討内容**:
-    - ビルド時の `pip` による `ansible-core` 取得の自動化。
-    - GraalPy へのライブラリパス統合。
-    - 不足している Python 依存パッケージの特定。
+- **解決策**:
+    - ビルド時に `pip` による `ansible-core` 取得の自動化を完了。
+    - `PythonEnv` および `PythonModule` を通じた GraalPy へのライブラリパス統合を実装。
+    - `PythonModule` でのモンキーパッチにより、`ansible.utils.display` の循環参照や欠落している OS 関数の問題を解消。
+    - `AllBuiltinModulesVerificationTest` により、Linux 上で全 72 モジュールのロードを確認。
 
 ### [ ] 本物のコレクション実行に向けた段階的実装 (フェーズ2)
 - **概要**: ハイブリッド実装（モンキーパッチ等）による Windows サポート。

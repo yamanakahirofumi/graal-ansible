@@ -108,18 +108,36 @@ public class PythonModule implements Module {
                     "    group = collections.namedtuple('group', ['gr_name', 'gr_passwd', 'gr_gid', 'gr_mem'])\n" +
                     "    if 'grp' not in sys.modules:\n" +
                     "        m = types.ModuleType('grp')\n" +
-                    "        m.getgrnam = m.getgrgid = lambda x: group('root', 'x', 0, [])\n" +
+                    "        m.getgrnam = m.getgrgid = lambda *args, **kwargs: group('root', 'x', 0, [])\n" +
                     "        sys.modules['grp'] = m\n" +
                     "    if 'pwd' not in sys.modules:\n" +
                     "        m = types.ModuleType('pwd')\n" +
-                    "        m.getpwnam = m.getpwuid = lambda x: passwd('root', 'x', 0, 0, 'root', '/root', '/bin/bash')\n" +
+                    "        m.getpwnam = m.getpwuid = lambda *args, **kwargs: passwd('root', 'x', 0, 0, 'root', '/root', '/bin/bash')\n" +
                     "        sys.modules['pwd'] = m\n" +
+                    "    # Mock os.geteuid/getuid if missing (common in some GraalPy envs)\n" +
+                    "    if not hasattr(os, 'geteuid'): os.geteuid = lambda: 0\n" +
+                    "    if not hasattr(os, 'getuid'): os.getuid = lambda: 0\n" +
+                    "    if not hasattr(os, 'getgid'): os.getgid = lambda: 0\n" +
+                    "    if not hasattr(os, 'getegid'): os.getegid = lambda: 0\n" +
                     "    if 'termios' not in sys.modules or sys.modules['termios'] is None:\n" +
                     "        m = types.ModuleType('termios')\n" +
                     "        m.TCSAFLUSH = 1\n" +
-                    "        m.tcgetattr = lambda fd: [0,0,0,0, ' ', ' ', []]\n" +
-                    "        m.tcsetattr = lambda fd, opt, mode: None\n" +
+                    "        m.tcgetattr = lambda *args, **kwargs: [0,0,0,0, ' ', ' ', []]\n" +
+                    "        m.tcsetattr = lambda *args, **kwargs: None\n" +
                     "        sys.modules['termios'] = m\n" +
+                    "\n" +
+                    "    # Break circular import in ansible.utils.display\n" +
+                    "    if 'ansible.utils.display' not in sys.modules:\n" +
+                    "        m = types.ModuleType('ansible.utils.display')\n" +
+                    "        class Display:\n" +
+                    "            def __init__(self, *args, **kwargs): pass\n" +
+                    "            def display(self, *args, **kwargs): pass\n" +
+                    "            def debug(self, *args, **kwargs): pass\n" +
+                    "            def verbose(self, *args, **kwargs): pass\n" +
+                    "            def warning(self, *args, **kwargs): pass\n" +
+                    "            def error(self, *args, **kwargs): pass\n" +
+                    "        m.Display = Display\n" +
+                    "        sys.modules['ansible.utils.display'] = m\n" +
                     "\n" +
                     "    from ansible.plugins.loader import module_loader\n" +
                     "    import ansible.module_utils.basic\n" +
@@ -127,19 +145,24 @@ public class PythonModule implements Module {
                     "    import ansible.module_utils.common.process\n" +
                     "    \n" +
                     "    # Monkeypatch to avoid system interaction\n" +
-                    "    ansible.module_utils.distro.id = lambda: 'debian'\n" +
-                    "    ansible.module_utils.distro.version = lambda: '12'\n" +
+                    "    ansible.module_utils.distro.id = lambda *args, **kwargs: 'debian'\n" +
+                    "    ansible.module_utils.distro.version = lambda *args, **kwargs: '12'\n" +
                     "    ansible.module_utils.common.process.get_bin_path = lambda *args, **kwargs: '/usr/bin/' + args[0] if args else None\n" +
                     "    \n" +
                     "    # Monkeypatch globally before instantiation\n" +
-                    "    ansible.module_utils.basic._load_params = lambda: (complex_args, 'main')\n" +
-                    "    def mocked_load_params(self):\n" +
+                    "    ansible.module_utils.basic._load_params = lambda *args, **kwargs: (complex_args, 'main')\n" +
+                    "    def mocked_load_params(self, *args, **kwargs):\n" +
                     "        self.params = complex_args\n" +
                     "    ansible.module_utils.basic.AnsibleModule._load_params = mocked_load_params\n" +
-                    "    ansible.module_utils.basic.AnsibleModule._check_locale = lambda self: None\n" +
+                    "    ansible.module_utils.basic.AnsibleModule._check_locale = lambda self, *args, **kwargs: None\n" +
                     "    ansible.module_utils.basic.AnsibleModule.run_command = lambda self, *args, **kwargs: (0, '', '')\n" +
                     "    ansible.module_utils.basic.AnsibleModule.get_bin_path = lambda self, *args, **kwargs: '/usr/bin/' + args[0] if args else None\n" +
-                    "    ansible.module_utils.basic.AnsibleModule._record_module_result = lambda self, o: print(json.dumps(o))\n" +
+                    "    def mocked_record_result(self, o):\n" +
+                    "        def default_ser(obj):\n" +
+                    "            if isinstance(obj, set): return list(obj)\n" +
+                    "            return str(obj)\n" +
+                    "        print(json.dumps(o, default=default_ser))\n" +
+                    "    ansible.module_utils.basic.AnsibleModule._record_module_result = mocked_record_result\n" +
                     "\n" +
                     "    def run_module():\n" +
                     "        path = module_loader.find_plugin(module_name)\n" +
@@ -153,7 +176,13 @@ public class PythonModule implements Module {
                     "            with open(path, 'rb') as f:\n" +
                     "                code = compile(f.read(), path, 'exec')\n" +
                     "            try:\n" +
-                    "                exec(code, {'__name__': '__main__', '__file__': path})\n" +
+                    "                # Some modules (like setup) might use relative imports if they think they are in a package\n" +
+                    "                # For ansible-core modules, they are usually in 'ansible.modules'\n" +
+                    "                mod_globals = {'__name__': '__main__', '__file__': path}\n" +
+                    "                # If module is in ansible.modules, set __package__ correctly\n" +
+                    "                if 'ansible/modules/' in path.replace('\\\\', '/'):\n" +
+                    "                    mod_globals['__package__'] = 'ansible.modules'\n" +
+                    "                exec(code, mod_globals)\n" +
                     "            except SystemExit:\n" +
                     "                pass\n" +
                     "            except Exception as e:\n" +
