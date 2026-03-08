@@ -17,6 +17,19 @@ try:
     for mname in ['cryptography', 'cryptography.hazmat', 'cryptography.hazmat.bindings', '_cffi_backend', 'yaml._yaml', 'selinux']:
         sys.modules[mname] = None
 
+    # Mock Display to avoid circular imports during module discovery
+    display_mod = types.ModuleType('ansible.utils.display')
+    class Display:
+        def __init__(self, *args, **kwargs): pass
+        def display(self, *args, **kwargs): pass
+        def debug(self, *args, **kwargs): pass
+        def verbose(self, *args, **kwargs): pass
+        def warning(self, *args, **kwargs): pass
+        def error(self, *args, **kwargs): pass
+        def deprecated(self, *args, **kwargs): pass
+    display_mod.Display = Display
+    sys.modules['ansible.utils.display'] = display_mod
+
     # Mock missing system modules as actual modules
     import collections
     passwd = collections.namedtuple('passwd', ['pw_name', 'pw_passwd', 'pw_uid', 'pw_gid', 'pw_gecos', 'pw_dir', 'pw_shell'])
@@ -36,6 +49,11 @@ try:
         m.tcsetattr = lambda fd, opt, mode: None
         sys.modules['termios'] = m
 
+    if not hasattr(os, 'geteuid'):
+        os.geteuid = lambda: 0
+    if not hasattr(os, 'getuid'):
+        os.getuid = lambda: 0
+
     from ansible.plugins.loader import module_loader
     import ansible.module_utils.basic
     import ansible.module_utils.distro
@@ -47,6 +65,20 @@ try:
     ansible.module_utils.common.process.get_bin_path = lambda *args, **kwargs: '/usr/bin/' + args[0] if args else None
 
     # Monkeypatch globally before instantiation
+    # Injected variables for some modules that import __main__
+    main_mod = sys.modules['__main__']
+    main_mod._module_fqn = f"ansible.modules.{module_name}"
+    main_mod.complex_args = complex_args
+    main_mod._modlib_path = None
+
+    class AnsibleEncoder(json.JSONEncoder):
+        def default(self, obj):
+            if isinstance(obj, set):
+                return list(obj)
+            if isinstance(obj, range):
+                return list(obj)
+            return super().default(obj)
+
     ansible.module_utils.basic._load_params = lambda: (complex_args, 'main')
     def mocked_load_params(self):
         self.params = complex_args
@@ -54,7 +86,9 @@ try:
     ansible.module_utils.basic.AnsibleModule._check_locale = lambda self: None
     ansible.module_utils.basic.AnsibleModule.run_command = lambda self, *args, **kwargs: (0, '', '')
     ansible.module_utils.basic.AnsibleModule.get_bin_path = lambda self, *args, **kwargs: '/usr/bin/' + args[0] if args else None
-    ansible.module_utils.basic.AnsibleModule._record_module_result = lambda self, o: print(json.dumps(o))
+    def record_result(self, o):
+        sys._ansible_module_result = json.dumps(o, cls=AnsibleEncoder)
+    ansible.module_utils.basic.AnsibleModule._record_module_result = record_result
 
     def run_module():
         path = module_loader.find_plugin(module_name)
@@ -68,12 +102,17 @@ try:
             with open(path, 'rb') as f:
                 code = compile(f.read(), path, 'exec')
             try:
-                exec(code, {'__name__': '__main__', '__file__': path})
+                # Set __package__ to allow relative imports in some modules
+                exec(code, {'__name__': '__main__', '__file__': path, '__package__': 'ansible.modules'})
             except SystemExit:
+                pass
                 pass
             except Exception as e:
                 import traceback
                 return json.dumps({'failed': True, 'msg': f'Execution error: {str(e)}', 'traceback': traceback.format_exc()})
+
+            if hasattr(sys, '_ansible_module_result'):
+                return sys._ansible_module_result
             return mystdout.getvalue()
         finally:
             sys.stdout = old_stdout
