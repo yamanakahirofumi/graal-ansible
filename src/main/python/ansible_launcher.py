@@ -18,17 +18,19 @@ try:
         sys.modules[mname] = None
 
     # Mock Display to avoid circular imports during module discovery
-    display_mod = types.ModuleType('ansible.utils.display')
-    class Display:
-        def __init__(self, *args, **kwargs): pass
-        def display(self, *args, **kwargs): pass
-        def debug(self, *args, **kwargs): pass
-        def verbose(self, *args, **kwargs): pass
-        def warning(self, *args, **kwargs): pass
-        def error(self, *args, **kwargs): pass
-        def deprecated(self, *args, **kwargs): pass
-    display_mod.Display = Display
-    sys.modules['ansible.utils.display'] = display_mod
+    if 'ansible.utils.display' not in sys.modules:
+        import types
+        display_mod = types.ModuleType('ansible.utils.display')
+        class Display:
+            def __init__(self, *args, **kwargs): pass
+            def display(self, *args, **kwargs): pass
+            def debug(self, *args, **kwargs): pass
+            def verbose(self, *args, **kwargs): pass
+            def warning(self, *args, **kwargs): pass
+            def error(self, *args, **kwargs): pass
+            def deprecated(self, *args, **kwargs): pass
+        display_mod.Display = Display
+        sys.modules['ansible.utils.display'] = display_mod
 
     # Mock missing system modules as actual modules
     import collections
@@ -43,6 +45,7 @@ try:
         m.getpwnam = m.getpwuid = lambda x: passwd('root', 'x', 0, 0, 'root', '/root', '/bin/bash')
         sys.modules['pwd'] = m
     if 'termios' not in sys.modules or sys.modules['termios'] is None:
+        import types
         m = types.ModuleType('termios')
         m.TCSAFLUSH = 1
         m.tcgetattr = lambda fd: [0,0,0,0, ' ', ' ', []]
@@ -73,9 +76,7 @@ try:
 
     class AnsibleEncoder(json.JSONEncoder):
         def default(self, obj):
-            if isinstance(obj, set):
-                return list(obj)
-            if isinstance(obj, range):
+            if isinstance(obj, (set, range)):
                 return list(obj)
             return super().default(obj)
 

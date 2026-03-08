@@ -27,7 +27,7 @@ public class TaskExecutor implements AutoCloseable {
         Context.Builder builder = Context.newBuilder("python")
                 .allowAllAccess(true);
 
-        // Native/POSIX specific options are disabled on Linux for maximum compatibility with ansible-core.
+        // Native/POSIX specific options are disabled on Linux to ensure compatibility with ansible-core loading
         if ("Linux".equals(osHandler.getOSFamily())) {
             builder.option("python.IsolateNativeModules", "false");
             builder.option("python.PosixModuleBackend", "java");
