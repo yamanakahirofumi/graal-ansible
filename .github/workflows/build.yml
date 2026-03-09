@@ -38,6 +38,9 @@ jobs:
         sudo ln -sf ~/.colima/default/docker.sock /var/run/docker.sock
         # Set permissions for the socket
         sudo chmod 666 /var/run/docker.sock
+    - name: Show Colima VM error logs if VM startup fails
+      if: failure()
+      run: cat /Users/runner/.colima/_lima/colima/ha.stderr.log || echo "No error log found"
     - name: Build and Test
       run: mvn -B verify
       env:
