@@ -29,9 +29,11 @@ public class TaskExecutor implements AutoCloseable {
 
         // Native/POSIX specific options are enabled only on Linux for maximum compatibility and performance.
         // On Windows and macOS, these can cause stability issues or are not supported.
+        // NOTE: Even on Linux, native Posix backend is known to cause circular import issues in ansible-core.
+        // We disable these for now to ensure stability in Phase 1.
         if ("Linux".equals(osHandler.getOSFamily())) {
-            builder.option("python.IsolateNativeModules", "true");
-            builder.option("python.PosixModuleBackend", "native");
+            builder.option("python.IsolateNativeModules", "false");
+            builder.option("python.PosixModuleBackend", "java");
         }
 
         this.context = builder.build();
