@@ -36,6 +36,19 @@ try:
         m.tcsetattr = lambda fd, opt, mode: None
         sys.modules['termios'] = m
 
+    # Mock ansible.utils.display.Display to avoid circular imports
+    display_mod = types.ModuleType('ansible.utils.display')
+    class Display:
+        def __init__(self, *args, **kwargs): pass
+        def display(self, *args, **kwargs): pass
+        def debug(self, *args, **kwargs): pass
+        def verbose(self, *args, **kwargs): pass
+        def deprecated(self, *args, **kwargs): pass
+        def warning(self, *args, **kwargs): pass
+        def error(self, *args, **kwargs): pass
+    display_mod.Display = Display
+    sys.modules['ansible.utils.display'] = display_mod
+
     from ansible.plugins.loader import module_loader
     import ansible.module_utils.basic
     import ansible.module_utils.distro
