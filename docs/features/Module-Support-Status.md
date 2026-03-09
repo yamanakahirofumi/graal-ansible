@@ -60,7 +60,10 @@
     - 実行エンジンの最適化。
     - 起動スピードの高速化と Native Image のビルド安定化。
 
+- **Coverage**: モジュールごとに「ロード済 (△)」「正常系検証済 (○)」「異常系検証済 (◎)」のステータスを `Module-Support-Status.md` で管理。
+
 ## 4. 関連ドキュメント
+- [テストケース拡充戦略](../tech/Test-Expansion-Strategy.md)
 - [モジュール互換性の目標（最終系）](Module-Compatibility.md)
 - [OS 抽象化レイヤーの仕様](../implementation/OS-Abstraction.md)
 - [コレクション実装ロードマップ](../implementation/Collection-Implementation-Roadmap.md)

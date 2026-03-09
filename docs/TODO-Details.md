@@ -16,6 +16,7 @@
 ### [ ] Ansible 本体の完全ロードと基本動作の実現 (フェーズ1)
 - **概要**: `ansible-core` を完全にロードし、Linux/macOS での主要モジュールの動作確認。
 - **詳細は [Module-Support-Status.md](features/Module-Support-Status.md) を参照。**
+- **テスト拡充戦略については [Test-Expansion-Strategy.md](tech/Test-Expansion-Strategy.md) を参照。**
 
 ### [ ] ハイブリッド実装による Windows サポート (フェーズ2)
 - **概要**: ハイブリッド実装（モンキーパッチ等）による Windows サポート。
