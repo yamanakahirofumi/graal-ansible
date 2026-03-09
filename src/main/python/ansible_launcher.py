@@ -67,7 +67,13 @@ try:
     ansible.module_utils.basic.AnsibleModule._check_locale = lambda self: None
     ansible.module_utils.basic.AnsibleModule.run_command = lambda self, *args, **kwargs: (0, '', '')
     ansible.module_utils.basic.AnsibleModule.get_bin_path = lambda self, *args, **kwargs: '/usr/bin/' + args[0] if args else None
-    ansible.module_utils.basic.AnsibleModule._record_module_result = lambda self, o: print(json.dumps(o))
+
+    # Store result in a known location for reliable extraction
+    sys._ansible_module_result = None
+    def record_result(self, o):
+        sys._ansible_module_result = o
+        print(json.dumps(o))
+    ansible.module_utils.basic.AnsibleModule._record_module_result = record_result
 
     def run_module():
         path = module_loader.find_plugin(module_name)
@@ -81,12 +87,17 @@ try:
             with open(path, 'rb') as f:
                 code = compile(f.read(), path, 'exec')
             try:
-                exec(code, {'__name__': '__main__', '__file__': path})
+                # Set __package__ to 'ansible.modules' to support relative imports (e.g., in 'setup' module)
+                exec(code, {'__name__': '__main__', '__file__': path, '__package__': 'ansible.modules'})
             except SystemExit:
                 pass
             except Exception as e:
                 import traceback
                 return json.dumps({'failed': True, 'msg': f'Execution error: {str(e)}', 'traceback': traceback.format_exc()})
+
+            # Prefer recorded result over stdout capture if available
+            if getattr(sys, '_ansible_module_result', None) is not None:
+                return json.dumps(sys._ansible_module_result)
             return mystdout.getvalue()
         finally:
             sys.stdout = old_stdout
