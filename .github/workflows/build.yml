@@ -23,7 +23,21 @@ jobs:
         components: 'python'
         github-token: ${{ secrets.GITHUB_TOKEN }}
         native-image-job-reports: 'true'
+    - name: Set up Docker on macOS (Colima)
+      if: runner.os == 'macOS'
+      run: |
+        brew install colima docker
+        colima start --cpu 2 --memory 4 --disk 60
+        # Wait for docker.sock to be available
+        timeout 300 bash -c 'until [ -S ~/.colima/default/docker.sock ]; do sleep 5; done'
+        # Link colima's docker socket to the default location for Testcontainers
+        sudo ln -sf ~/.colima/default/docker.sock /var/run/docker.sock
+        # Set permissions for the socket
+        sudo chmod 666 /var/run/docker.sock
     - name: Build and Test
       run: mvn -B verify
+      env:
+        DOCKER_HOST: unix:///var/run/docker.sock
+        TESTCONTAINERS_RYUK_DISABLED: "true"
     - name: Build Native Image
       run: mvn -Pnative native:compile

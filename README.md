@@ -16,12 +16,17 @@ ansible-coreをGraalVM/Javaで再実装し、高速な実行とネイティブ�
 ### テスト実行
 - `ActualModuleIntegrationTest` を実行するには、Docker環境が必要です。Dockerが利用できない場合はテストがスキップされます。
 - macOS環境で Testcontainers が Docker を正しく検出できない場合（`isDockerAvailable()` が false を返す場合）、以下の設定を確認してください。
-    - Docker Desktop または OrbStack が起動していること。
+    - Docker Desktop, OrbStack, または Colima が起動していること。
     - `~/.docker/config.json` で現在のコンテキストが正しく設定されていること。
     - 必要に応じて、環境変数 `DOCKER_HOST` を設定してください。
       ```bash
-      export DOCKER_HOST=unix:///var/run/docker.sock
-      # または Docker Desktop のデフォルト
+      # Colima の場合
+      export DOCKER_HOST=unix://$HOME/.colima/default/docker.sock
+      # または /var/run/docker.sock へのシンボリックリンクを作成
+      sudo ln -sf $HOME/.colima/default/docker.sock /var/run/docker.sock
+      
+      # Docker Desktop のデフォルト
       export DOCKER_HOST=unix://$HOME/.docker/run/docker.sock
       ```
     - Docker Desktop の「Settings > Advanced > Allow the default Docker socket to be used」が有効になっているか確認してください。
+- GitHub Actions (macOS) では Colima を使用して Docker 環境を構築するように設定されています。

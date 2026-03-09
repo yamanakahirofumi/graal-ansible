@@ -1,32 +1,30 @@
 package org.example.ansible.module.python;
 
 import org.example.ansible.connection.BecomeContext;
+import org.example.ansible.connection.SshConnection;
 import org.example.ansible.engine.Task;
 import org.example.ansible.engine.TaskExecutor;
 import org.example.ansible.engine.TaskResult;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
-
-import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
-import org.example.ansible.connection.SshConnection;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Integration test using actual ansible-core modules.
@@ -38,12 +36,13 @@ class ActualModuleIntegrationTest {
 
     @Container
     private GenericContainer<?> targetNode = new GenericContainer<>(DockerImageName.parse("linuxserver/openssh-server:latest"))
-                    .withExposedPorts(2222)
-                    .withEnv("USER_PASSWORD", "password")
-                    .withEnv("USER_NAME", "testuser")
-                    .withEnv("PASSWORD_ACCESS", "true")
-                    .withEnv("SUDO_ACCESS", "true")
-                    .waitingFor(Wait.forListeningPort());
+            .withExposedPorts(2222)
+            .withEnv("USER_PASSWORD", "password")
+            .withEnv("USER_NAME", "testuser")
+            .withEnv("PASSWORD_ACCESS", "true")
+            .withEnv("SUDO_ACCESS", "true")
+            .waitingFor(Wait.forListeningPort())
+            .withStartupTimeout(java.time.Duration.ofMinutes(5));
 
     @TempDir
     Path tempDir;
@@ -85,7 +84,7 @@ class ActualModuleIntegrationTest {
 
         assertTrue(result.success(), "Execution failed: " + result.message());
         assertEquals("pong", result.data().get("ping"));
-        
+
         // Use connection to verify node is reachable
         var connResult = connection.execCommand("echo connected", BecomeContext.empty());
         assertEquals(0, connResult.exitCode());
@@ -102,11 +101,11 @@ class ActualModuleIntegrationTest {
                 "path", remotePath,
                 "state", "touch"
         ));
-        
+
         // Since we want to test SSH connection, we should ideally have a way to tell TaskExecutor
         // to use the connection. For now, we continue to use execInContainer for compatibility 
         // with the existing TaskExecutor which is local-only, but verify using SSH.
-        
+
         TaskResult result = taskExecutor.execute(task, BecomeContext.empty());
 
         if (checkEnvironmentRestriction(result)) return;
