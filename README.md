@@ -29,4 +29,4 @@ ansible-coreをGraalVM/Javaで再実装し、高速な実行とネイティブ�
       export DOCKER_HOST=unix://$HOME/.docker/run/docker.sock
       ```
     - Docker Desktop の「Settings > Advanced > Allow the default Docker socket to be used」が有効になっているか確認してください。
-- GitHub Actions (macOS) では Colima を使用して Docker 環境を構築するように設定されています。
+- GitHub Actions (macOS) では Docker 環境が利用できないため、Docker を使用する統合テストは自動的にスキップされます。検証は Linux 環境の CI で行われます。
