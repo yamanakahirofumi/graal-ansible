@@ -16,8 +16,6 @@ import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
-import org.testcontainers.DockerClientFactory;
-import org.junit.jupiter.api.Assumptions;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -32,7 +30,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Integration test using actual ansible-core modules.
  * Now using Testcontainers to verify target state.
  */
-@EnabledOnOs({OS.LINUX, OS.MAC})
+// @EnabledOnOs({OS.LINUX, OS.MAC}) TODO: Github Actionsのmacosも対応させるぞ
+@EnabledOnOs({OS.LINUX})
 @Testcontainers
 class ActualModuleIntegrationTest {
 
@@ -54,7 +53,6 @@ class ActualModuleIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        Assumptions.assumeTrue(DockerClientFactory.instance().isDockerAvailable(), "Docker is not available, skipping integration test");
         taskExecutor = new TaskExecutor();
         connection = new SshConnection(
                 targetNode.getHost(),
