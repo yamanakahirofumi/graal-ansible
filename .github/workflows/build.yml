@@ -29,7 +29,7 @@ jobs:
         # Ensure colima is not running and any old state is cleaned
         colima stop || true
         colima delete -f || true
-        brew install colima docker
+        brew install colima docker qemu
         # Start colima with explicit runtime
         colima start --cpu 2 --memory 4 --disk 60 --runtime docker --verbose --vm-type qemu
         # Wait for docker.sock to be available
