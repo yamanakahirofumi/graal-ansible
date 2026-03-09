@@ -26,10 +26,10 @@ jobs:
     - name: Set up Docker on macOS (Colima)
       if: runner.os == 'macOS'
       run: |
-        brew install colima docker
         # Ensure colima is not running and any old state is cleaned
         colima stop || true
         colima delete -f || true
+        brew install colima docker
         # Start colima with explicit runtime
         colima start --cpu 2 --memory 4 --disk 60 --runtime docker --verbose
         # Wait for docker.sock to be available
