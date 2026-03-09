@@ -68,11 +68,26 @@ try:
     ansible.module_utils.basic.AnsibleModule.run_command = lambda self, *args, **kwargs: (0, '', '')
     ansible.module_utils.basic.AnsibleModule.get_bin_path = lambda self, *args, **kwargs: '/usr/bin/' + args[0] if args else None
 
+    # Custom JSON encoder to handle sets and other non-serializable objects
+    class AnsibleEncoder(json.JSONEncoder):
+        def default(self, obj):
+            if isinstance(obj, (set, frozenset, range)):
+                return list(obj)
+            return super().default(obj)
+
+    # Monkeypatch json.dumps globally to handle non-serializable objects
+    orig_dumps = json.dumps
+    def wrapped_dumps(obj, **kwargs):
+        if 'cls' not in kwargs:
+            kwargs['cls'] = AnsibleEncoder
+        return orig_dumps(obj, **kwargs)
+    json.dumps = wrapped_dumps
+
     # Store result in a known location for reliable extraction
     sys._ansible_module_result = None
     def record_result(self, o):
         sys._ansible_module_result = o
-        print(json.dumps(o))
+        print(json.dumps(o, cls=AnsibleEncoder))
     ansible.module_utils.basic.AnsibleModule._record_module_result = record_result
 
     def run_module():
@@ -97,7 +112,7 @@ try:
 
             # Prefer recorded result over stdout capture if available
             if getattr(sys, '_ansible_module_result', None) is not None:
-                return json.dumps(sys._ansible_module_result)
+                return json.dumps(sys._ansible_module_result, cls=AnsibleEncoder)
             return mystdout.getvalue()
         finally:
             sys.stdout = old_stdout
