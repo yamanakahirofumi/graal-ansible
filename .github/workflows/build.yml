@@ -27,7 +27,11 @@ jobs:
       if: runner.os == 'macOS'
       run: |
         brew install colima docker
-        colima start --cpu 2 --memory 4 --disk 60
+        # Ensure colima is not running and any old state is cleaned
+        colima stop || true
+        colima delete -f || true
+        # Start colima with explicit runtime
+        colima start --cpu 2 --memory 4 --disk 60 --runtime docker --verbose
         # Wait for docker.sock to be available
         timeout 300 bash -c 'until [ -S ~/.colima/default/docker.sock ]; do sleep 5; done'
         # Link colima's docker socket to the default location for Testcontainers
