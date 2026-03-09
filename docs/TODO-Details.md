@@ -18,6 +18,7 @@
 - **詳細は [Module-Support-Status.md](features/Module-Support-Status.md) を参照。**
 - **テスト拡充戦略については [Test-Expansion-Strategy.md](tech/Test-Expansion-Strategy.md) を参照。**
 - **注意**: `python.IsolateNativeModules` と `python.PosixModuleBackend` はフェーズ 1 では変更しない。
+- **備考**: 検証には必要に応じて **Testcontainers** を**ターゲットノード**として活用する。
 
 ### [ ] ハイブリッド実装による Windows サポート (フェーズ2)
 - **概要**: ハイブリッド実装（モンキーパッチ等）による Windows サポート。

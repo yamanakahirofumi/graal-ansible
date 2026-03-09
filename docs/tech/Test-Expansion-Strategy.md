@@ -27,6 +27,7 @@
 - **拡充計画**:
     - **パラメータエラー**: 不正な引数、型違い、必須引数の欠落時における適切なエラーメッセージの返却。
     - **環境エラー**: ターゲットファイルが存在しない、書き込み権限がない、ディスクフル、タイムアウト等の異常系挙動の検証。
+    - **Testcontainers の活用**: 特定の OS 設定や権限（sudo 等）が必要なケースにおいて、Testcontainers を**ターゲットノード**として使用しテストを実施。
     - **Unicode 対応**: パス名やファイル内容、変数における Unicode 文字（日本語等）の適切な取り扱い。
 
 ### 2.4 エンジン・制御機能の統合検証 (Engine & Control Flow)
@@ -54,5 +55,6 @@
 ## 4. 実行・管理方法
 
 - **Test Runner**: JUnit 5 と GraalPy Polyglot API を引き続き使用。
+- **Infrastructure**: 必要に応じて **Testcontainers** を**ターゲットノード**として導入し、`become` (sudo) や特定のネットワーク状態を再現する。
 - **Test Data**: `src/test/resources/playbooks` 配下に、再利用可能な Playbook スニペットと想定結果（YAML/JSON）を蓄積。
 - **Coverage**: モジュールごとに「ロード済 (△)」「正常系検証済 (○)」「異常系検証済 (◎)」のステータスを `Module-Support-Status.md` で管理。

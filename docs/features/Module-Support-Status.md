@@ -37,7 +37,7 @@
 
 ### 2.2 テストカテゴリ
 - **Module Load Test**: `ansible.builtin` の全モジュールがインポートエラーなく読み込めるかを確認（Linux では 100% 完了）。
-- **Integration Test**: 実際の Playbook を使用して、ターゲットノードの状態が正しく変更されるかを検証。
+- **Integration Test**: 実際の Playbook を使用して、ターゲットノードの状態が正しく変更されるかを検証。必要に応じて **Testcontainers** を**ターゲットノード**として用いる。
 
 ## 3. 実装フェーズと進捗状況 (Implementation Phases)
 100% の互換性と最適化を目指し、以下の 3 つのフェーズで開発を進めています。詳細は [コレクション実装ロードマップ](../implementation/Collection-Implementation-Roadmap.md) を参照してください。
