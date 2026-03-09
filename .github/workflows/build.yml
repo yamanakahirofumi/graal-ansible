@@ -31,7 +31,7 @@ jobs:
         colima delete -f || true
         brew install colima docker
         # Start colima with explicit runtime
-        colima start --cpu 2 --memory 4 --disk 60 --runtime docker --verbose --vmtype qemu
+        colima start --cpu 2 --memory 4 --disk 60 --runtime docker --verbose --vm-type qemu
         # Wait for docker.sock to be available
         timeout 300 bash -c 'until [ -S ~/.colima/default/docker.sock ]; do sleep 5; done'
         # Link colima's docker socket to the default location for Testcontainers
