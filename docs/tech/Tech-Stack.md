@@ -7,7 +7,7 @@
 | 分類 | 技術・ツール | バージョン | 備考 |
 | :--- | :--- | :--- | :--- |
 | 言語 | Java | 21 (LTS) | GraalVM JDK |
-| スクリプト実行 | GraalPy | - | Ansible Python モジュールの実行用 |
+| スクリプト実行 | GraalPy | - | [GraalPy 統合の詳細](GraalPy-Integration.md) を参照 |
 | フレームワーク | GraalVM Native Image | - | ネイティブバイナリ化 |
 | YAML解析 | SnakeYAML | 2.x | Playbook解析用 |
 | 接続 | Apache MINA SSHD | 2.12+ | SSH接続実装 |
