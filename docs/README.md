@@ -42,6 +42,7 @@
 - [エラーハンドリング方針](tech/Error-Handling-Policy.md)：基本方針と各ケースでの対応
 - [ロギング方針](tech/Logging-Policy.md)：デバッグおよび保守のためのログ出力指針
 - [技術スタック](tech/Tech-Stack.md)：使用している言語、ライブラリ、ツールなどの情報
+- [GraalPy 統合の詳細](tech/GraalPy-Integration.md)：Ansible Python モジュールの実行環境と互換性維持のためのパッチ
 - [CI 設定](tech/CI-Setting.md)：GitHub Actions を利用した自動ビルドとテストの設定について
 - [実際のコレクションを用いたテスト](tech/Actual-Collection-Testing.md)：実際の Ansible コレクションを用いた自動テストの実施方法
 - [実際のコレクションを用いた自動テストの要件](tech/Automated-Testing-Requirements.md)：テスト実行に必要な環境設定や手順の詳細
