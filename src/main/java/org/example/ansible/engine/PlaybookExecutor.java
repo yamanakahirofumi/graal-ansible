@@ -22,10 +22,10 @@ import org.example.ansible.util.Truthiness;
  */
 public class PlaybookExecutor {
 
-    private final TaskExecutor taskExecutor;
+    private final ITaskExecutor taskExecutor;
     private final VariableResolver variableResolver = new VariableResolver();
 
-    public PlaybookExecutor(TaskExecutor taskExecutor) {
+    public PlaybookExecutor(ITaskExecutor taskExecutor) {
         this.taskExecutor = taskExecutor;
     }
 

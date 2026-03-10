@@ -23,6 +23,32 @@ import static org.mockito.Mockito.*;
 
 class BecomeTest {
 
+    private static class MockTaskExecutor implements ITaskExecutor {
+        private final OSHandler osHandler = mock(OSHandler.class);
+        public final List<Task> executedTasks = new java.util.ArrayList<>();
+        public final List<BecomeContext> executedContexts = new java.util.ArrayList<>();
+
+        @Override
+        public TaskResult execute(Task task, BecomeContext becomeContext) {
+            executedTasks.add(task);
+            executedContexts.add(becomeContext);
+            return TaskResult.success(Map.of());
+        }
+
+        @Override
+        public TaskResult execute(Task task, BecomeContext becomeContext, org.example.ansible.connection.Connection connection) {
+            return execute(task, becomeContext);
+        }
+
+        @Override
+        public OSHandler getOsHandler() {
+            return osHandler;
+        }
+
+        @Override
+        public void close() {}
+    }
+
     @Test
     void testBecomeResolution() {
         String yaml = """
@@ -47,21 +73,16 @@ class BecomeTest {
         YamlParser parser = new YamlParser();
         Playbook playbook = parser.parse(new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8)));
 
-        TaskExecutor taskExecutor = mock(TaskExecutor.class);
-        when(taskExecutor.getOsHandler()).thenReturn(mock(OSHandler.class));
+        MockTaskExecutor taskExecutor = new MockTaskExecutor();
         PlaybookExecutor playbookExecutor = new PlaybookExecutor(taskExecutor);
 
-        Inventory inventory = mock(Inventory.class);
         org.example.ansible.inventory.Group allGroup = new org.example.ansible.inventory.Group("all", List.of(new org.example.ansible.inventory.Host("localhost")), List.of(), Map.of());
-        when(inventory.all()).thenReturn(allGroup);
-        when(inventory.getVariablesForHost(anyString())).thenReturn(Map.of());
+        Inventory inventory = new Inventory(allGroup);
 
         playbookExecutor.execute(playbook, inventory);
 
-        ArgumentCaptor<BecomeContext> contextCaptor = ArgumentCaptor.forClass(BecomeContext.class);
-        verify(taskExecutor, times(3)).execute(any(Task.class), contextCaptor.capture());
-
-        List<BecomeContext> contexts = contextCaptor.getAllValues();
+        List<BecomeContext> contexts = taskExecutor.executedContexts;
+        assertEquals(3, contexts.size());
 
         // Task 1: inherits from play
         assertTrue(contexts.get(0).become());
@@ -94,21 +115,16 @@ class BecomeTest {
         YamlParser parser = new YamlParser();
         Playbook playbook = parser.parse(new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8)));
 
-        TaskExecutor taskExecutor = mock(TaskExecutor.class);
-        when(taskExecutor.getOsHandler()).thenReturn(mock(OSHandler.class));
+        MockTaskExecutor taskExecutor = new MockTaskExecutor();
         PlaybookExecutor playbookExecutor = new PlaybookExecutor(taskExecutor);
 
-        Inventory inventory = mock(Inventory.class);
         org.example.ansible.inventory.Group allGroup = new org.example.ansible.inventory.Group("all", List.of(new org.example.ansible.inventory.Host("localhost")), List.of(), Map.of());
-        when(inventory.all()).thenReturn(allGroup);
-        when(inventory.getVariablesForHost(anyString())).thenReturn(Map.of());
+        Inventory inventory = new Inventory(allGroup);
 
         playbookExecutor.execute(playbook, inventory);
 
-        ArgumentCaptor<BecomeContext> contextCaptor = ArgumentCaptor.forClass(BecomeContext.class);
-        verify(taskExecutor).execute(any(Task.class), contextCaptor.capture());
-
-        BecomeContext context = contextCaptor.getValue();
+        assertEquals(1, taskExecutor.executedContexts.size());
+        BecomeContext context = taskExecutor.executedContexts.get(0);
         assertTrue(context.become());
         assertEquals("deploy", context.becomeUser());
     }

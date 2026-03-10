@@ -13,7 +13,7 @@ import java.util.HashMap;
 /**
  * Executes individual tasks by delegating to modules.
  */
-public class TaskExecutor implements AutoCloseable {
+public class TaskExecutor implements ITaskExecutor {
 
     private static final ThreadLocal<Connection> currentConnection = new ThreadLocal<>();
 
