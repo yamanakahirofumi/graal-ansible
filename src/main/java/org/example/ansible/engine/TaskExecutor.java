@@ -1,6 +1,7 @@
 package org.example.ansible.engine;
 
 import org.example.ansible.connection.BecomeContext;
+import org.example.ansible.connection.Connection;
 import org.example.ansible.module.Module;
 import org.example.ansible.util.OSHandler;
 import org.example.ansible.util.OSHandlerFactory;
@@ -13,6 +14,31 @@ import java.util.HashMap;
  * Executes individual tasks by delegating to modules.
  */
 public class TaskExecutor implements AutoCloseable {
+
+    private static final ThreadLocal<Connection> currentConnection = new ThreadLocal<>();
+
+    /**
+     * Sets the connection for the current thread.
+     * @param connection The connection to set.
+     */
+    public static void setCurrentConnection(Connection connection) {
+        currentConnection.set(connection);
+    }
+
+    /**
+     * Gets the connection for the current thread.
+     * @return The current connection.
+     */
+    public static Connection getCurrentConnection() {
+        return currentConnection.get();
+    }
+
+    /**
+     * Clears the connection for the current thread.
+     */
+    public static void clearCurrentConnection() {
+        currentConnection.remove();
+    }
 
     private final Map<String, Module> modules = new HashMap<>();
     private final OSHandler osHandler;
@@ -71,6 +97,23 @@ public class TaskExecutor implements AutoCloseable {
             return module.execute(task.args(), becomeContext, context);
         } catch (Exception e) {
             return TaskResult.failure("Execution failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Executes the given task with a specific connection.
+     *
+     * @param task          The task to execute.
+     * @param becomeContext The privilege escalation context.
+     * @param connection    The connection to the target host.
+     * @return The execution result.
+     */
+    public TaskResult execute(Task task, BecomeContext becomeContext, Connection connection) {
+        setCurrentConnection(connection);
+        try {
+            return execute(task, becomeContext);
+        } finally {
+            clearCurrentConnection();
         }
     }
 

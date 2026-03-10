@@ -9,6 +9,7 @@ import org.example.ansible.engine.Playbook;
 import org.example.ansible.connection.Connection;
 import org.example.ansible.connection.ConnectionResult;
 import org.example.ansible.connection.LocalConnection;
+import org.example.ansible.connection.BecomeContext;
 import org.example.ansible.module.Module;
 import org.example.ansible.module.python.PythonModule;
 import org.example.ansible.engine.PlaybookExecutor;
@@ -140,57 +141,52 @@ public class PlaybookCli implements Callable<Integer> {
     }
 
     private void registerStandardModules(TaskExecutor executor) {
-        Connection localConnection = new LocalConnection(executor.getOsHandler());
-
-        executor.registerModule("debug", new Module() {
-            @Override
-            public TaskResult execute(Map<String, Object> args, org.example.ansible.connection.BecomeContext becomeContext, Context context) {
-                Object msg = args.getOrDefault("msg", "Hello world");
-                System.out.println("DEBUG: " + msg);
-                return TaskResult.success(false, Map.of("msg", msg));
-            }
+        executor.registerModule("debug", (args, becomeContext, context) -> {
+            Object msg = args.getOrDefault("msg", "Hello world");
+            System.out.println("DEBUG: " + msg);
+            return TaskResult.success(false, Map.of("msg", msg));
         });
 
-        executor.registerModule("command", new Module() {
-            @Override
-            public TaskResult execute(Map<String, Object> args, org.example.ansible.connection.BecomeContext becomeContext, Context context) {
-                String command = (String) args.get("_raw_params");
-                if (command == null) command = (String) args.get("cmd");
-                if (command == null) return TaskResult.failure("no command given");
+        executor.registerModule("command", (args, becomeContext, context) -> {
+            String command = (String) args.get("_raw_params");
+            if (command == null) command = (String) args.get("cmd");
+            if (command == null) return TaskResult.failure("no command given");
 
-                ConnectionResult result = localConnection.execCommand(command, becomeContext);
-                Map<String, Object> data = new HashMap<>();
-                data.put("stdout", result.stdout());
-                data.put("stderr", result.stderr());
-                data.put("rc", result.exitCode());
-                data.put("changed", result.exitCode() == 0);
+            org.example.ansible.connection.Connection connection = TaskExecutor.getCurrentConnection();
+            if (connection == null) connection = new LocalConnection();
 
-                if (result.exitCode() != 0) {
-                    return new TaskResult(false, false, "Command failed with rc " + result.exitCode(), data);
-                }
-                return TaskResult.success(data);
+            org.example.ansible.connection.ConnectionResult result = connection.execCommand(command, becomeContext);
+            Map<String, Object> data = new HashMap<>();
+            data.put("stdout", result.stdout());
+            data.put("stderr", result.stderr());
+            data.put("rc", result.exitCode());
+            data.put("changed", result.exitCode() == 0);
+
+            if (result.exitCode() != 0) {
+                return new TaskResult(false, false, "Command failed with rc " + result.exitCode(), data);
             }
+            return TaskResult.success(data);
         });
 
-        executor.registerModule("shell", new Module() {
-            @Override
-            public TaskResult execute(Map<String, Object> args, org.example.ansible.connection.BecomeContext becomeContext, Context context) {
-                String command = (String) args.get("_raw_params");
-                if (command == null) command = (String) args.get("cmd");
-                if (command == null) return TaskResult.failure("no command given");
+        executor.registerModule("shell", (args, becomeContext, context) -> {
+            String command = (String) args.get("_raw_params");
+            if (command == null) command = (String) args.get("cmd");
+            if (command == null) return TaskResult.failure("no command given");
 
-                ConnectionResult result = localConnection.execCommand(command, becomeContext);
-                Map<String, Object> data = new HashMap<>();
-                data.put("stdout", result.stdout());
-                data.put("stderr", result.stderr());
-                data.put("rc", result.exitCode());
-                data.put("changed", result.exitCode() == 0);
+            org.example.ansible.connection.Connection connection = TaskExecutor.getCurrentConnection();
+            if (connection == null) connection = new LocalConnection();
 
-                if (result.exitCode() != 0) {
-                    return new TaskResult(false, false, "Shell command failed with rc " + result.exitCode(), data);
-                }
-                return TaskResult.success(data);
+            org.example.ansible.connection.ConnectionResult result = connection.execCommand(command, becomeContext);
+            Map<String, Object> data = new HashMap<>();
+            data.put("stdout", result.stdout());
+            data.put("stderr", result.stderr());
+            data.put("rc", result.exitCode());
+            data.put("changed", result.exitCode() == 0);
+
+            if (result.exitCode() != 0) {
+                return new TaskResult(false, false, "Shell command failed with rc " + result.exitCode(), data);
             }
+            return TaskResult.success(data);
         });
 
         executor.registerModule("file", new PythonModule("ansible.builtin.file"));
