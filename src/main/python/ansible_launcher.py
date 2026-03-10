@@ -17,6 +17,24 @@ try:
     for mname in ['cryptography', 'cryptography.hazmat', 'cryptography.hazmat.bindings', '_cffi_backend', 'yaml._yaml', 'selinux']:
         sys.modules[mname] = None
 
+    # Mock Display to avoid circular imports in GraalPy
+    if 'ansible.utils.display' not in sys.modules:
+        display_mod = types.ModuleType('ansible.utils.display')
+        class Display:
+            def __init__(self, *args, **kwargs):
+                self.verbosity = 0
+                self.columns = 79
+                self.color = False
+            def display(self, *args, **kwargs): pass
+            def debug(self, *args, **kwargs): pass
+            def verbose(self, *args, **kwargs): pass
+            def warning(self, *args, **kwargs): pass
+            def error(self, *args, **kwargs): pass
+            def deprecated(self, *args, **kwargs): pass
+        display_mod.Display = Display
+        display_mod.display = Display()
+        sys.modules['ansible.utils.display'] = display_mod
+
     # Mock missing system modules as actual modules
     import collections
     passwd = collections.namedtuple('passwd', ['pw_name', 'pw_passwd', 'pw_uid', 'pw_gid', 'pw_gecos', 'pw_dir', 'pw_shell'])
@@ -38,6 +56,14 @@ try:
 
     from ansible.plugins.loader import module_loader
     import ansible.module_utils.basic
+    # Explicitly ensure basic is available on module_utils for some GraalPy versions
+    if not hasattr(ansible.module_utils, 'basic'):
+        ansible.module_utils.basic = sys.modules['ansible.module_utils.basic']
+    if not hasattr(ansible.module_utils.basic, 'AnsibleModule'):
+        # Force reload if partially initialized
+        import importlib
+        importlib.reload(ansible.module_utils.basic)
+
     import ansible.module_utils.distro
     import ansible.module_utils.common.process
 
@@ -45,6 +71,25 @@ try:
     ansible.module_utils.distro.id = lambda: 'debian'
     ansible.module_utils.distro.version = lambda: '12'
     ansible.module_utils.common.process.get_bin_path = lambda *args, **kwargs: '/usr/bin/' + args[0] if args else None
+
+    # Monkeypatch JSON to handle non-serializable objects (like sets from setup module)
+    import json
+    if not hasattr(json, '_graal_ansible_patched'):
+        class AnsibleEncoder(json.JSONEncoder):
+            def default(self, o):
+                if isinstance(o, (set, frozenset)):
+                    return list(o)
+                if isinstance(o, range):
+                    return list(o)
+                return str(o)
+
+        _original_json_dumps = json.dumps
+        def mocked_json_dumps(obj, **kwargs):
+            if 'cls' not in kwargs:
+                kwargs['cls'] = AnsibleEncoder
+            return _original_json_dumps(obj, **kwargs)
+        json.dumps = mocked_json_dumps
+        json._graal_ansible_patched = True
 
     # Monkeypatch globally before instantiation
     ansible.module_utils.basic._load_params = lambda: (complex_args, 'main')
@@ -60,6 +105,13 @@ try:
         path = module_loader.find_plugin(module_name)
         if not path:
             return json.dumps({'failed': True, 'msg': f'Module {module_name} not found'})
+
+        # Inject necessary attributes for modules that import __main__
+        import __main__
+        __main__._module_fqn = f"ansible.builtin.{module_name}"
+        __main__.complex_args = complex_args
+        __main__._modlib_path = None
+
         # Capture stdout
         from io import StringIO
         old_stdout = sys.stdout
@@ -68,7 +120,8 @@ try:
             with open(path, 'rb') as f:
                 code = compile(f.read(), path, 'exec')
             try:
-                exec(code, {'__name__': '__main__', '__file__': path})
+                # Set __package__ to support relative imports in some modules (like setup)
+                exec(code, {'__name__': '__main__', '__file__': path, '__package__': 'ansible.modules'})
             except SystemExit:
                 pass
             except Exception as e:
