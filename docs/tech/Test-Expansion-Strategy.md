@@ -16,7 +16,7 @@
     - **自動化**: `PythonModule` を直接生成してロードするだけの軽量なユニットテストスイートを作成し、CI に組み込む。
 
 ### 2.2 主要モジュールの機能網羅テスト (Functional Integration Tests)
-- **現状**: `ping`, `copy`, `file`, `stat`, `template` の一部の正常系のみがテストされている。
+- **現状**: `ping`, `copy`, `file`, `stat`, `template` の正常系テストが CI 環境に統合済み。
 - **拡充計画**:
     - **重要モジュールの追加**: `command`, `shell`, `setup` (facts 取得), `lineinfile` 等、Playbook 構築に不可欠なモジュールの追加。
     - **パラメータ・バリエーション**: 各モジュールの主要なオプション（`owner`, `group`, `mode`, `force`, `validate` 等）の組み合わせによる検証。

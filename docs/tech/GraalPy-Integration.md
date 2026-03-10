@@ -38,8 +38,14 @@ Ansible の `setup` モジュールなどは、戻り値として Python の `se
 POSIX 環境を前提とした `termios`, `grp`, `pwd` 等のモジュールが利用できない環境（または制限がある環境）に対応するため、必要最低限のメソッドを持つモックモジュールを `sys.modules` に直接注入しています。
 
 ### 4.4 `AnsibleModule` クラスの調整
-- `_record_module_result`: 実行結果を確実に Java 側でキャプチャできるよう、結果を `sys._ansible_module_result` に格納するか、特定の形式で標準出力に書き出すように変更しています。
+- `_record_module_result`: 実行結果を確実に Java 側でキャプチャできるよう、結果を JSON 形式で標準出力に書き出すように変更しています。
 - `get_bin_path`: 外部コマンドの検索パスを、プロジェクトが管理するパスや OS 抽象化レイヤーのパスに誘導します。
+- `_load_params`: GraalVM Context から渡された `complex_args` を直接参照するように変更しています。
+
+### 4.5 その他のモンキーパッチ
+- **`ansible.module_utils.distro`**: OS 判定において常に特定の値を返すように固定（例: ID='debian'）。
+- **`ansible.module_utils.common.process`**: `get_bin_path` をパッチし、常に `/usr/bin/` 以下のパスを返すように調整。
+- **`sys.modules` への直接注入**: `cryptography` や `selinux` 等、GraalPy 環境で問題となるモジュールを `None` またはモックに差し替えています。
 
 ## 5. 実行モデル
 

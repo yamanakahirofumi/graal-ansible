@@ -5,6 +5,13 @@
 
 ## 1. 技術面 (Technical)
 
+### [ ] 実際の Ansible コレクションを使ったテストの実施
+- **概要**: [実際のコレクションを使ったテスト方法の設計](tech/Actual-Collection-Testing.md) に基づき、主要なモジュールのテストを統合。
+- **進捗**:
+    - `ansible.builtin.ping`, `copy`, `file`, `stat`, `template` の統合テストを CI 環境へ統合済み。
+    - `command`, `shell`, `setup`, `lineinfile` 等のテスト統合が進行中。
+    - GraalPy および `ansible-core` のセットアップを GitHub Actions 上で自動化済み。
+
 ### [ ] CI における Native Image ビルドの安定化
 - **概要**: 優先度低。GitHub Actions 上での Native Image コンパイル時間の短縮とリソース最適化。
 - **検討内容**:
@@ -53,12 +60,6 @@
     - シェル実行コマンド (`/bin/sh -c` vs `cmd.exe /c`) や一時ディレクトリ、パス区切り文字の共通化を実現。
     - `OSHandlerFactory` による実行環境に応じた動的なハンドラ切り替えを実装済み。
 
-### [x] 実際の Ansible コレクションを使ったテストの実施
-- **完了日**: 2026-03-05
-- **概要**: [実際のコレクションを使ったテスト方法の設計](tech/Actual-Collection-Testing.md) に基づき、主要なモジュールのテストを統合。
-- **解決策**:
-    - `ansible.builtin.copy`, `ansible.builtin.command` 等のテストを CI 環境へ統合。
-    - GraalPy および `ansible-core` のセットアップを GitHub Actions 上で自動化済み。
 
 ### [x] GraalPy と Java のシームレスな統合
 - **完了日**: 2026-03-04
