@@ -20,7 +20,11 @@ Ansible モジュールやタスクが、実行対象 OS の違いを意識せ�
 
 ## 3. 設計方針：OS 固有ハンドラ
 
-`OSHandler` インターフェースを定義し、ターゲット OS ごとに具体的な実装（`LinuxHandler`, `MacOSHandler`, `WindowsHandler`）を提供します。
+`OSHandler` インターフェースを定義し、ターゲット OS ごとに具体的な実装を提供します。
+
+- **LinuxHandler**: 標準的な Linux ディストリビューション向けのハンドラ。
+- **WindowsHandler**: Windows 向けのハンドラ。
+- **MacOSHandler**: macOS 向けのハンドラ。内部的には `LinuxHandler` を継承または流用しつつ、OS Family として `Darwin` を返すなどの調整を行います（現状、`OSHandlerFactory` 内の匿名クラスとして実装されています）。
 
 ### インターフェースのメソッド例
 
