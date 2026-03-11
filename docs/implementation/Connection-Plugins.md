@@ -22,8 +22,7 @@ Ansible と同様に、ターゲットホストに対する実行環境（ロー
 ### 主要メソッド
 
 - `connect()`: ターゲットホストへの接続を確立。
-- `exec_command(command, environment=null, become_context=null)`: 指定されたコマンドを実行し、標準出力・標準エラー・終了コードを返す。
-    - `environment`: 実行時に設定する環境変数の Map。
+- `exec_command(command, become_context=null)`: 指定されたコマンドを実行し、標準出力・標準エラー・終了コードを返す。（※`environment` 引数の追加は計画中）
     - `become_context`: 権限昇格の情報。詳細は [権限昇格 (become)](Privilege-Escalation.md) を参照。
 - `put_file(local_path, remote_path)`: ファイルをターゲットホストへ転送。
 - `fetch_file(remote_path, local_path)`: ファイルをターゲットホストから取得。
