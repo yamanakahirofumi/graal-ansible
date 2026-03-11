@@ -183,6 +183,54 @@ class ActualModuleIntegrationTest {
         }
     }
 
+    @Test
+    @EnabledOnOs(OS.LINUX)
+    void testActualCommandModule() {
+        taskExecutor.registerModule("command", new PythonModule("command"));
+
+        Task task = new Task("test_command", "command", Map.of(
+                "_raw_params", "whoami"
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection);
+
+        if (checkEnvironmentRestriction(result)) return;
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        assertEquals("testuser", ((String) result.data().get("stdout")).trim());
+    }
+
+    @Test
+    @EnabledOnOs(OS.LINUX)
+    void testActualShellModule() {
+        taskExecutor.registerModule("shell", new PythonModule("shell"));
+
+        Task task = new Task("test_shell", "shell", Map.of(
+                "_raw_params", "echo 'hello shell' | grep 'shell'"
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection);
+
+        if (checkEnvironmentRestriction(result)) return;
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        assertTrue(((String) result.data().get("stdout")).contains("hello shell"));
+    }
+
+    @Test
+    @EnabledOnOs(OS.LINUX)
+    void testActualDebugModule() {
+        taskExecutor.registerModule("debug", new PythonModule("debug"));
+
+        Task task = new Task("test_debug", "debug", Map.of(
+                "msg", "Custom debug message"
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection);
+
+        if (checkEnvironmentRestriction(result)) return;
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        assertEquals("Custom debug message", result.data().get("msg"));
+    }
+
     private boolean checkEnvironmentRestriction(TaskResult result) {
         if (!result.success()) {
             String msg = result.message();

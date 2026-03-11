@@ -82,7 +82,32 @@ public class PythonModule implements Module {
                 // Template is complex, just return success if we are simulating
                 return TaskResult.success(false, Map.of("changed", false, "msg", "Template simulation"));
             }
-            
+
+            if ("command".equals(moduleName) || "ansible.builtin.command".equals(moduleName) ||
+                    "shell".equals(moduleName) || "ansible.builtin.shell".equals(moduleName)) {
+                String cmd = (String) args.get("_raw_params");
+                if (cmd == null) {
+                    return TaskResult.failure("No command given");
+                }
+                var res = connection.execCommand(cmd, becomeContext);
+                Map<String, Object> data = new java.util.HashMap<>(Map.of(
+                        "stdout", res.stdout(),
+                        "stderr", res.stderr(),
+                        "rc", res.exitCode(),
+                        "changed", true
+                ));
+                if (res.exitCode() == 0) {
+                    return TaskResult.success(data);
+                } else {
+                    return new TaskResult(false, true, "Command failed with rc " + res.exitCode(), data);
+                }
+            }
+
+            if ("debug".equals(moduleName) || "ansible.builtin.debug".equals(moduleName)) {
+                Object msg = args.getOrDefault("msg", "Hello world");
+                return TaskResult.success(false, Map.of("msg", msg));
+            }
+
             return TaskResult.failure("Remote execution for module '" + moduleName + "' is not fully implemented yet in this test rewrite.");
         }
 
