@@ -8,6 +8,7 @@ import org.example.ansible.engine.TaskResult;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledIf;
 import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
@@ -31,7 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Now using Testcontainers to verify target state.
  */
 @Testcontainers
-@EnabledOnOs(OS.LINUX)
+@EnabledOnOs({OS.LINUX, OS.WINDOWS})
 class ActualModuleIntegrationTest {
 
     @Container
@@ -73,7 +74,6 @@ class ActualModuleIntegrationTest {
     }
 
     @Test
-    @EnabledOnOs(OS.LINUX)
     void testActualPingModule() {
         taskExecutor.registerModule("ping", new PythonModule("ping"));
 
@@ -87,7 +87,6 @@ class ActualModuleIntegrationTest {
     }
 
     @Test
-    @EnabledOnOs(OS.LINUX)
     void testActualFileModule() throws IOException, InterruptedException {
         taskExecutor.registerModule("file", new PythonModule("file"));
 
@@ -111,7 +110,6 @@ class ActualModuleIntegrationTest {
     }
 
     @Test
-    @EnabledOnOs(OS.LINUX)
     void testActualStatModule() throws IOException, InterruptedException {
         taskExecutor.registerModule("stat", new PythonModule("stat"));
 
@@ -133,7 +131,6 @@ class ActualModuleIntegrationTest {
     }
 
     @Test
-    @EnabledOnOs(OS.LINUX)
     void testActualCopyModule() throws IOException, InterruptedException {
         taskExecutor.registerModule("copy", new PythonModule("copy"));
 
@@ -156,7 +153,6 @@ class ActualModuleIntegrationTest {
     }
 
     @Test
-    @EnabledOnOs(OS.LINUX)
     void testActualTemplateModule() throws IOException, InterruptedException {
         taskExecutor.registerModule("template", new PythonModule("template"));
 
