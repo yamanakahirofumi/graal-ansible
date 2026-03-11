@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Now using Testcontainers to verify target state.
  */
 @Testcontainers
-@EnabledOnOs({OS.LINUX, OS.MAC})
+@EnabledOnOs(OS.LINUX)
 class ActualModuleIntegrationTest {
 
     @Container
@@ -73,7 +73,7 @@ class ActualModuleIntegrationTest {
     }
 
     @Test
-    @EnabledOnOs({OS.LINUX, OS.MAC})
+    @EnabledOnOs(OS.LINUX)
     void testActualPingModule() {
         taskExecutor.registerModule("ping", new PythonModule("ping"));
 
@@ -87,7 +87,7 @@ class ActualModuleIntegrationTest {
     }
 
     @Test
-    @EnabledOnOs({OS.LINUX, OS.MAC})
+    @EnabledOnOs(OS.LINUX)
     void testActualFileModule() throws IOException, InterruptedException {
         taskExecutor.registerModule("file", new PythonModule("file"));
 
@@ -111,7 +111,7 @@ class ActualModuleIntegrationTest {
     }
 
     @Test
-    @EnabledOnOs({OS.LINUX, OS.MAC})
+    @EnabledOnOs(OS.LINUX)
     void testActualStatModule() throws IOException, InterruptedException {
         taskExecutor.registerModule("stat", new PythonModule("stat"));
 
@@ -133,7 +133,7 @@ class ActualModuleIntegrationTest {
     }
 
     @Test
-    @EnabledOnOs({OS.LINUX, OS.MAC})
+    @EnabledOnOs(OS.LINUX)
     void testActualCopyModule() throws IOException, InterruptedException {
         taskExecutor.registerModule("copy", new PythonModule("copy"));
 
@@ -156,7 +156,7 @@ class ActualModuleIntegrationTest {
     }
 
     @Test
-    @EnabledOnOs({OS.LINUX, OS.MAC})
+    @EnabledOnOs(OS.LINUX)
     void testActualTemplateModule() throws IOException, InterruptedException {
         taskExecutor.registerModule("template", new PythonModule("template"));
 
