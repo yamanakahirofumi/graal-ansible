@@ -18,7 +18,7 @@
         <sshd.version>2.12.1</sshd.version>
         <jinjava.version>2.7.6</jinjava.version>
         <mockito.version>5.11.0</mockito.version>
-        <testcontainers.version>1.19.7</testcontainers.version>
+        <testcontainers.version>2.0.2</testcontainers.version>
     </properties>
 
     <dependencies>
@@ -64,6 +64,11 @@
             <version>${sshd.version}</version>
         </dependency>
         <dependency>
+            <groupId>org.apache.sshd</groupId>
+            <artifactId>sshd-scp</artifactId>
+            <version>${sshd.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>
             <version>${junit.version}</version>
@@ -90,6 +95,12 @@
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-junit-jupiter</artifactId>
             <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>

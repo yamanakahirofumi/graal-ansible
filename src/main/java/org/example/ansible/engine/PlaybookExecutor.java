@@ -1,6 +1,7 @@
 package org.example.ansible.engine;
 
 import org.example.ansible.connection.BecomeContext;
+import org.example.ansible.connection.LocalConnection;
 import org.example.ansible.inventory.Group;
 import org.example.ansible.inventory.Host;
 import org.example.ansible.inventory.Inventory;
@@ -21,10 +22,10 @@ import org.example.ansible.util.Truthiness;
  */
 public class PlaybookExecutor {
 
-    private final TaskExecutor taskExecutor;
+    private final ITaskExecutor taskExecutor;
     private final VariableResolver variableResolver = new VariableResolver();
 
-    public PlaybookExecutor(TaskExecutor taskExecutor) {
+    public PlaybookExecutor(ITaskExecutor taskExecutor) {
         this.taskExecutor = taskExecutor;
     }
 
@@ -312,13 +313,13 @@ public class PlaybookExecutor {
         BecomeContext becomeContext = resolveBecomeContext(play, resolvedTask, variables);
 
         if (task.until() == null) {
-            return taskExecutor.execute(resolvedTask, becomeContext);
+            return taskExecutor.execute(resolvedTask, becomeContext, new LocalConnection());
         }
 
         // Retry logic
         TaskResult lastResult = null;
         for (int i = 0; i < task.retries(); i++) {
-            lastResult = taskExecutor.execute(resolvedTask, becomeContext);
+            lastResult = taskExecutor.execute(resolvedTask, becomeContext, new LocalConnection());
 
             if (task.register() != null && variableManager != null) {
                 variableManager.registerVariable(host.name(), task.register(), lastResult.data());
