@@ -1,7 +1,7 @@
 # graal-ansible
 
 <!-- badges: start -->
-[![Docs MD Lines](https://img.shields.io/badge/docs%20md%20lines-2110-blue)](./docs) [![Java LOC](https://img.shields.io/badge/Java%20LOC-4664-green)](.)
+[![Docs MD Lines](https://img.shields.io/badge/docs%20md%20lines-2109-blue)](./docs) [![Java LOC](https://img.shields.io/badge/Java%20LOC-4664-green)](.)
 <!-- badges: end -->
 
 ansible-coreをGraalVM/Javaで再実装し、高速な実行とネイティブバイナリ配布を可能にするプロジェクトです。
