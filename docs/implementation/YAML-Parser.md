@@ -28,5 +28,5 @@
 
 1. **InputStream** 経由で Playbook ファイルを読み込む。
 2. `Yaml` インスタンスにより、汎用的な `Map<String, Object>` または `List<Object>` に変換。
-3. **PlaybookValidator** により、Ansible スキーマに準拠しているかバリデーションを実行。
-4. バリデーション済みのデータを `Playbook`, `Play`, `Task` などの Record オブジェクトに変換。
+3. **PlaybookValidator** により、Ansible スキーマに準拠しているかバリデーションを実行（※バリデーターの実装は計画中）。
+4. 解析済みのデータを `Playbook`, `Play`, `Task` などの Record オブジェクトに変換。
