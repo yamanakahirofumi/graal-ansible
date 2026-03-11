@@ -97,7 +97,19 @@ try:
         self.params = complex_args
     ansible.module_utils.basic.AnsibleModule._load_params = mocked_load_params
     ansible.module_utils.basic.AnsibleModule._check_locale = lambda self: None
-    ansible.module_utils.basic.AnsibleModule.run_command = lambda self, *args, **kwargs: (0, '', '')
+
+    def mocked_run_command(self, args, **kwargs):
+        if connection_java is not None:
+            # If a command is passed as a list, join it to a string for simplicity
+            if isinstance(args, list):
+                cmd = ' '.join(args)
+            else:
+                cmd = args
+            res = connection_java.execCommand(cmd, become_context_java)
+            return (res.exitCode(), res.stdout(), res.stderr())
+        return (0, '', '')
+
+    ansible.module_utils.basic.AnsibleModule.run_command = mocked_run_command
     ansible.module_utils.basic.AnsibleModule.get_bin_path = lambda self, *args, **kwargs: '/usr/bin/' + args[0] if args else None
     ansible.module_utils.basic.AnsibleModule._record_module_result = lambda self, o: print(json.dumps(o))
 

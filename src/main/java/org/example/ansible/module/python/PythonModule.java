@@ -37,11 +37,7 @@ public class PythonModule implements Module {
     public TaskResult execute(final Map<String, Object> args, BecomeContext becomeContext, Context context) {
         org.example.ansible.connection.Connection connection = org.example.ansible.engine.TaskExecutor.getCurrentConnection();
         if (connection != null && !(connection instanceof LocalConnection)) {
-            // For non-local connections, we try to run the module via SSH
-            // As a simplified implementation for this issue, we handle 'ping' and 'command-like' behavior
-            if ("ping".equals(moduleName) || "ansible.builtin.ping".equals(moduleName)) {
-                return TaskResult.success(false, Map.of("ping", "pong"));
-            }
+            // For non-local connections, we handle some modules via simulation and others via real Python
             
             // For 'file' module, we can simulate or implement a basic version via execCommand
             if ("file".equals(moduleName) || "ansible.builtin.file".equals(moduleName)) {
@@ -82,33 +78,7 @@ public class PythonModule implements Module {
                 // Template is complex, just return success if we are simulating
                 return TaskResult.success(false, Map.of("changed", false, "msg", "Template simulation"));
             }
-
-            if ("command".equals(moduleName) || "ansible.builtin.command".equals(moduleName) ||
-                    "shell".equals(moduleName) || "ansible.builtin.shell".equals(moduleName)) {
-                String cmd = (String) args.get("_raw_params");
-                if (cmd == null) {
-                    return TaskResult.failure("No command given");
-                }
-                var res = connection.execCommand(cmd, becomeContext);
-                Map<String, Object> data = new java.util.HashMap<>(Map.of(
-                        "stdout", res.stdout(),
-                        "stderr", res.stderr(),
-                        "rc", res.exitCode(),
-                        "changed", true
-                ));
-                if (res.exitCode() == 0) {
-                    return TaskResult.success(data);
-                } else {
-                    return new TaskResult(false, true, "Command failed with rc " + res.exitCode(), data);
-                }
-            }
-
-            if ("debug".equals(moduleName) || "ansible.builtin.debug".equals(moduleName)) {
-                Object msg = args.getOrDefault("msg", "Hello world");
-                return TaskResult.success(false, Map.of("msg", msg));
-            }
-
-            return TaskResult.failure("Remote execution for module '" + moduleName + "' is not fully implemented yet in this test rewrite.");
+            // Other modules (ping, command, shell, debug) will fall through to real Python execution
         }
 
         // Mock patchelf for GraalPy internal use on Linux
@@ -130,6 +100,8 @@ public class PythonModule implements Module {
             context.getBindings("python").putMember("complex_args_java", args);
             context.getBindings("python").putMember("module_name", moduleName);
             context.getBindings("python").putMember("site_packages_java", sitePackages);
+            context.getBindings("python").putMember("connection_java", connection);
+            context.getBindings("python").putMember("become_context_java", becomeContext);
 
             Source source;
             if (scriptContent != null) {
