@@ -22,7 +22,9 @@ Ansible と同様に、ターゲットホストに対する実行環境（ロー
 ### 主要メソッド
 
 - `connect()`: ターゲットホストへの接続を確立。
-- `exec_command(command, become_context=null)`: 指定されたコマンドを実行し、標準出力・標準エラー・終了コードを返す。詳細は [権限昇格 (become)](Privilege-Escalation.md) を参照。
+- `exec_command(command, environment=null, become_context=null)`: 指定されたコマンドを実行し、標準出力・標準エラー・終了コードを返す。
+    - `environment`: 実行時に設定する環境変数の Map。
+    - `become_context`: 権限昇格の情報。詳細は [権限昇格 (become)](Privilege-Escalation.md) を参照。
 - `put_file(local_path, remote_path)`: ファイルをターゲットホストへ転送。
 - `fetch_file(remote_path, local_path)`: ファイルをターゲットホストから取得。
 - `close()`: 接続を終了。
@@ -41,7 +43,7 @@ GraalVM Native Image との相性を考慮し、純粋な Java 実装である *
 
 制御ノード上で直接コマンドを実行します。
 - `sudo` が指定された場合、`sudo -n` (non-interactive) を付与して実行します。
-- 環境変数の継承を適切に制御します。
+- 環境変数の継承を適切に制御し、`exec_command` で渡された環境変数を追加します。
 
 ## 6. 実装上の注意
 

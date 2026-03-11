@@ -47,18 +47,26 @@ POSIX 環境を前提とした `termios`, `grp`, `pwd` 等のモジュールが�
 - **`ansible.module_utils.common.process`**: `get_bin_path` をパッチし、常に `/usr/bin/` 以下のパスを返すように調整。
 - **`sys.modules` への直接注入**: `cryptography` や `selinux` 等、GraalPy 環境で問題となるモジュールを `None` またはモックに差し替えています。
 
-## 5. 実行モデル
+## 5. 環境変数の取り扱い
 
-### 5.1 モジュール呼び出しフロー
+Playbook の `environment` キーで指定された環境変数は、以下の通り GraalPy 環境へ伝播されます。
+
+- **モジュール実行時**: `PythonModule` を通じてモジュールを実行する際、Java 側から渡された環境変数を Python の `os.environ` に反映します。
+- **サブプロセスへの影響**: これにより、モジュール内から `subprocess` モジュール等を使用して外部コマンドを呼び出す際にも、指定された環境変数が正しく引き継がれます。
+- **スレッドセーフティ**: 共有の GraalVM コンテキストを使用する場合、環境変数の変更が他のタスク実行に影響を与えないよう、実行ごとに `os.environ` を適切にリストアするか、分離されたコンテキストでの実行を検討する必要があります。
+
+## 6. 実行モデル
+
+### 6.1 モジュール呼び出しフロー
 1. `PythonModule` クラスが GraalVM Context を作成/取得。
 2. `ansible_launcher.py` をリソースとして読み込み、実行。
 3. `ansible_launcher.py` 内で、指定されたモジュール名から `module_loader.find_plugin` を使用して実際の Python ファイルを特定。
 4. `exec()` によりモジュールを実行。この際、`__package__` を `ansible.modules` に設定し、相対インポートをサポートします。
 
-### 5.2 結果の抽出
+### 6.2 結果の抽出
 モジュールの終了コードや `exit_json` / `fail_json` の呼び出しをフックし、最終的な結果（JSON）を Java 側の `TaskResult` に変換します。
 
-## 6. 関連ドキュメント
+## 7. 関連ドキュメント
 - [技術スタック](Tech-Stack.md)
 - [タスク実行エンジン](../implementation/Task-Executor.md)
 - [OS 抽象化レイヤーの仕様](../implementation/OS-Abstraction.md)

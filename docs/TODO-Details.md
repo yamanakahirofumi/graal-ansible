@@ -27,6 +27,12 @@
 - **注意**: `python.IsolateNativeModules` と `python.PosixModuleBackend` はフェーズ 1 では変更しない。
 - **備考**: 検証には必要に応じて **Testcontainers** を**ターゲットノード**として活用する。
 
+### [ ] タスク制御キーワードの拡充 (environment, check_mode)
+- **概要**: [タスク制御の実装詳細](implementation/Task-Control.md) に基づき、`environment` および `check_mode` のサポートを追加。
+- **検討内容**:
+    - `environment` 変数のテンプレート展開とコネクションプラグインへの伝播。
+    - `check_mode` フラグの伝播と、各モジュールのドライラン対応。
+
 ### [ ] ハイブリッド実装による Windows サポート (フェーズ2)
 - **概要**: ハイブリッド実装（モンキーパッチ等）による Windows サポート。
 - **詳細は [Module-Support-Status.md](features/Module-Support-Status.md) を参照。**
@@ -49,7 +55,7 @@
 - **概要**: [権限昇格 (become)](implementation/Privilege-Escalation.md) に基づく sudo/su 等の実行サポート。
 - **解決策**:
     - `BecomeContext` レコードを定義し、`Connection` インターフェースの `execCommand` メソッドへ統合。
-    - `LocalConnection` において、`sudo` および `su` によるコマンドのラップ処理を実装。
+    - `LocalConnection` において、`sudo` および `su` によるコマンドのラップ処理を実装.
     - `PlaybookExecutor` にて Play レベルおよび Task レベルの `become` 設定の解決ロジックを実装済み。
 
 ### [x] OS 抽象化レイヤー (OSHandler) の実装

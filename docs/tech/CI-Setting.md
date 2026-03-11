@@ -8,7 +8,7 @@
 GitHub へのプッシュ（Push）またはプルリクエスト（Pull Request）が作成された際に、以下のプロセスが自動的に実行されます。
 
 1. **チェックアウト**：リポジトリのソースコードを取得します。
-2. **GraalVM のセットアップ**：ネイティブビルドに必要な GraalVM JDK をセットアップします。
+2. **GraalVM のセットアップ**：ネイティブビルドに必要な GraalVM JDK をセットアップします。`python` コンポーネントを明示的に指定して、Ansible コアの実行環境を構築します。
 3. **マルチプラットフォーム・マトリックス**：Ubuntu, Windows, macOS の各環境でテストを実行し、OS非依存性を検証します。
 4. **ビルドとテスト**：`mvn verify` を実行し、ユニットテストおよび結合テストを実施します。
 5. **Native Image ビルド**：各OS向けのネイティブバイナリを生成し、動作確認を行います。
@@ -39,6 +39,7 @@ jobs:
         java-version: '21'
         distribution: 'graalvm'
         version: '25.0.2'
+        components: 'python'
         github-token: ${{ secrets.GITHUB_TOKEN }}
         native-image-job-reports: 'true'
     - name: Build and Test
