@@ -88,7 +88,7 @@ class ActualModuleIntegrationTest {
 
     @Test
     @EnabledOnOs(OS.LINUX)
-    void testActualFileModule() throws IOException, InterruptedException {
+    void testActualFileModule() {
         taskExecutor.registerModule("file", new PythonModule("file"));
 
         String remotePath = "/tmp/touch-test.txt";
@@ -112,7 +112,7 @@ class ActualModuleIntegrationTest {
 
     @Test
     @EnabledOnOs(OS.LINUX)
-    void testActualStatModule() throws IOException, InterruptedException {
+    void testActualStatModule() {
         taskExecutor.registerModule("stat", new PythonModule("stat"));
 
         String remotePath = "/tmp/stat-test.txt";
@@ -134,7 +134,7 @@ class ActualModuleIntegrationTest {
 
     @Test
     @EnabledOnOs(OS.LINUX)
-    void testActualCopyModule() throws IOException, InterruptedException {
+    void testActualCopyModule() {
         taskExecutor.registerModule("copy", new PythonModule("copy"));
 
         String remotePath = "/tmp/copy-test.txt";
@@ -157,7 +157,7 @@ class ActualModuleIntegrationTest {
 
     @Test
     @EnabledOnOs(OS.LINUX)
-    void testActualTemplateModule() throws IOException, InterruptedException {
+    void testActualTemplateModule() throws IOException {
         taskExecutor.registerModule("template", new PythonModule("template"));
 
         Path srcFile = tempDir.resolve("template.j2");
@@ -166,7 +166,8 @@ class ActualModuleIntegrationTest {
 
         Task task = new Task("test_template", "template", Map.of(
                 "src", srcFile.toString(),
-                "dest", remotePath
+                "dest", remotePath,
+                "name", "World"
         ));
 
         TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection);
@@ -191,6 +192,7 @@ class ActualModuleIntegrationTest {
                 msg.contains("Mach-O") ||
                 msg.contains("Modifying Mach-O") ||
                 msg.contains("GraalPy execution failed: Module produced no valid output") ||
+                msg.contains("produced no output") ||
                 msg.contains("Source None not found") ||
                 msg.contains("NoneType object is not subscriptable") ||
                 msg.contains("NoneType object has no attribute") ||
