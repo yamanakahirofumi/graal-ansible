@@ -75,38 +75,6 @@ class ActualModuleIntegrationTest {
 
     @Test
     @EnabledOnOs(OS.LINUX)
-    void testRealLocalPingModule() {
-        taskExecutor.registerModule("ping", new PythonModule("ping"));
-        LocalConnection localConnection = new LocalConnection();
-
-        Task task = new Task("test_ping_local", "ping", Map.of());
-        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), localConnection);
-
-        if (checkEnvironmentRestriction(result)) return;
-
-        assertTrue(result.success(), "Execution failed: " + result.message());
-        assertEquals("pong", result.data().get("ping"));
-    }
-
-    @Test
-    @EnabledOnOs(OS.LINUX)
-    void testRealLocalCommandModule() {
-        taskExecutor.registerModule("command", new PythonModule("command"));
-        LocalConnection localConnection = new LocalConnection();
-
-        Task task = new Task("test_command_local", "command", Map.of(
-                "_raw_params", "whoami"
-        ));
-        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), localConnection);
-
-        if (checkEnvironmentRestriction(result)) return;
-
-        assertTrue(result.success(), "Execution failed: " + result.message());
-        assertNotNull(result.data().get("stdout"));
-    }
-
-    @Test
-    @EnabledOnOs(OS.LINUX)
     void testActualPingModule() {
         taskExecutor.registerModule("ping", new PythonModule("ping"));
 

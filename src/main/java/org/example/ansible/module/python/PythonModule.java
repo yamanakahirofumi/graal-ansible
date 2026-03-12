@@ -78,7 +78,34 @@ public class PythonModule implements Module {
                 // Template is complex, just return success if we are simulating
                 return TaskResult.success(false, Map.of("changed", false, "msg", "Template simulation"));
             }
-            // Other modules (ping, command, shell, debug) will fall through to real Python execution
+
+            if ("shell".equals(moduleName) || "ansible.builtin.shell".equals(moduleName)) {
+                // Shell is typically an action plugin; simulate it using execCommand
+                String cmd = (String) args.get("_raw_params");
+                if (cmd == null) {
+                    return TaskResult.failure("No command given");
+                }
+                var res = connection.execCommand(cmd, becomeContext);
+                Map<String, Object> data = new java.util.HashMap<>(Map.of(
+                        "stdout", res.stdout(),
+                        "stderr", res.stderr(),
+                        "rc", res.exitCode(),
+                        "changed", true
+                ));
+                if (res.exitCode() == 0) {
+                    return TaskResult.success(data);
+                } else {
+                    return new TaskResult(false, true, "Shell command failed with rc " + res.exitCode(), data);
+                }
+            }
+
+            if ("debug".equals(moduleName) || "ansible.builtin.debug".equals(moduleName)) {
+                // Debug is an action plugin; simulate it locally
+                Object msg = args.getOrDefault("msg", "Hello world");
+                return TaskResult.success(false, Map.of("msg", msg));
+            }
+
+            // Other modules (ping, command) will fall through to real Python execution
         }
 
         // Mock patchelf for GraalPy internal use on Linux
