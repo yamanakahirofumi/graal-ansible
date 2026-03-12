@@ -16,6 +16,7 @@ import java.util.Map;
  * @param becomeMethod The privilege escalation method (e.g., sudo, su).
  * @param becomeUser   The user to become.
  * @param becomeFlags  Additional flags for privilege escalation.
+ * @param checkMode    Whether to run this play in check mode.
  */
 public record Play(
         String name,
@@ -27,13 +28,14 @@ public record Play(
         Object become,
         String becomeMethod,
         String becomeUser,
-        String becomeFlags
+        String becomeFlags,
+        Object checkMode
 ) {
     public Play(String name, String hosts, List<Task> tasks) {
-        this(name, hosts, tasks, Map.of(), List.of(), List.of(), null, null, null, null);
+        this(name, hosts, tasks, Map.of(), List.of(), List.of(), null, null, null, null, null);
     }
 
     public Play(String name, String hosts, List<Task> tasks, Map<String, Object> vars) {
-        this(name, hosts, tasks, vars, List.of(), List.of(), null, null, null, null);
+        this(name, hosts, tasks, vars, List.of(), List.of(), null, null, null, null, null);
     }
 }

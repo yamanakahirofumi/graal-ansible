@@ -37,7 +37,7 @@ public class PlaybookExecutor {
      * @return A map of host names to their execution results for each task.
      */
     public Map<String, List<TaskResult>> execute(Playbook playbook, Inventory inventory) {
-        return execute(playbook, inventory, Map.of(), null);
+        return execute(playbook, inventory, Map.of(), null, false);
     }
 
     /**
@@ -49,7 +49,7 @@ public class PlaybookExecutor {
      * @return A map of host names to their execution results for each task.
      */
     public Map<String, List<TaskResult>> execute(Playbook playbook, Inventory inventory, Map<String, Object> extraVars) {
-        return execute(playbook, inventory, extraVars, null);
+        return execute(playbook, inventory, extraVars, null, false);
     }
 
     /**
@@ -62,17 +62,31 @@ public class PlaybookExecutor {
      * @return A map of host names to their execution results for each task.
      */
     public Map<String, List<TaskResult>> execute(Playbook playbook, Inventory inventory, Map<String, Object> extraVars, Path baseDir) {
+        return execute(playbook, inventory, extraVars, baseDir, false);
+    }
+
+    /**
+     * Executes the entire playbook with extra variables and a base directory for file resolution.
+     *
+     * @param playbook        The playbook to execute.
+     * @param inventory       The inventory to use.
+     * @param extraVars       Extra variables provided from outside.
+     * @param baseDir         The base directory for resolving relative paths (e.g., vars_files).
+     * @param globalCheckMode Whether the execution is in global check mode.
+     * @return A map of host names to their execution results for each task.
+     */
+    public Map<String, List<TaskResult>> execute(Playbook playbook, Inventory inventory, Map<String, Object> extraVars, Path baseDir, boolean globalCheckMode) {
         Map<String, List<TaskResult>> results = new HashMap<>();
         VariableManager variableManager = new VariableManager(inventory, extraVars, baseDir);
 
         for (Play play : playbook.plays()) {
-            executePlay(play, inventory, variableManager, results);
+            executePlay(play, inventory, variableManager, results, globalCheckMode);
         }
 
         return results;
     }
 
-    private void executePlay(Play play, Inventory inventory, VariableManager variableManager, Map<String, List<TaskResult>> results) {
+    private void executePlay(Play play, Inventory inventory, VariableManager variableManager, Map<String, List<TaskResult>> results, boolean globalCheckMode) {
         List<Host> targetHosts = getTargetHosts(play.hosts(), inventory);
         Set<String> failedHosts = new HashSet<>();
         Map<String, Set<String>> hostNotifications = new HashMap<>();
@@ -86,18 +100,40 @@ public class PlaybookExecutor {
                 if (task.runOnce() && executedOnce) {
                     continue;
                 }
-                executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications);
+
+                // Resolve Play level check_mode per host/task context
+                boolean playCheckMode = globalCheckMode;
+                if (play.checkMode() != null) {
+                    Map<String, Object> vars = variableManager.getAllVariables(play, host, task);
+                    Object resolved = play.checkMode();
+                    if (resolved instanceof String s && s.contains("{{")) {
+                        resolved = variableResolver.resolveValue(s, vars);
+                    }
+                    playCheckMode = Truthiness.isTrue(resolved);
+                }
+
+                executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications, playCheckMode);
                 executedOnce = true;
             }
         }
 
         // Execute handlers at the end of the play
         for (Host host : targetHosts) {
-            flushHandlersForHost(play, host, variableManager, results, failedHosts, hostNotifications);
+            // Resolve Play level check_mode per host context for handlers
+            boolean playCheckMode = globalCheckMode;
+            if (play.checkMode() != null) {
+                Map<String, Object> vars = variableManager.getAllVariables(play, host, null);
+                Object resolved = play.checkMode();
+                if (resolved instanceof String s && s.contains("{{")) {
+                    resolved = variableResolver.resolveValue(s, vars);
+                }
+                playCheckMode = Truthiness.isTrue(resolved);
+            }
+            flushHandlersForHost(play, host, variableManager, results, failedHosts, hostNotifications, playCheckMode);
         }
     }
 
-    private void flushHandlersForHost(Play play, Host host, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications) {
+    private void flushHandlersForHost(Play play, Host host, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode) {
         boolean anyNotified;
         do {
             anyNotified = false;
@@ -107,16 +143,16 @@ public class PlaybookExecutor {
                 for (Task handler : play.handlers()) {
                     if (notifiedHandlers.contains(handler.name())) {
                         if (failedHosts.contains(host.name())) continue;
-                        executeTaskOnHost(play, host, handler, variableManager, results, failedHosts, hostNotifications);
+                        executeTaskOnHost(play, host, handler, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode);
                     }
                 }
             }
         } while (anyNotified);
     }
 
-    private void executeTaskOnHost(Play play, Host host, Task task, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications) {
+    private void executeTaskOnHost(Play play, Host host, Task task, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode) {
         if (!task.block().isEmpty()) {
-            executeBlock(play, host, task, variableManager, results, failedHosts, hostNotifications);
+            executeBlock(play, host, task, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode);
             return;
         }
 
@@ -124,9 +160,9 @@ public class PlaybookExecutor {
         TaskResult result;
 
         if (task.loop() != null) {
-            result = executeLoopTask(play, host, task, variableManager, allVars);
+            result = executeLoopTask(play, host, task, variableManager, allVars, inheritedCheckMode);
         } else {
-            result = executeSingleTask(play, host, task, allVars, variableManager);
+            result = executeSingleTask(play, host, task, allVars, variableManager, inheritedCheckMode);
         }
 
         if (result != null) {
@@ -136,7 +172,7 @@ public class PlaybookExecutor {
             results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(result);
 
             if (result.success() && !isSkipped(result) && "meta".equals(task.action()) && "flush_handlers".equals(task.args().get("_raw_params"))) {
-                flushHandlersForHost(play, host, variableManager, results, failedHosts, hostNotifications);
+                flushHandlersForHost(play, host, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode);
             }
 
             if (task.register() != null) {
@@ -157,9 +193,19 @@ public class PlaybookExecutor {
         }
     }
 
-    private void executeBlock(Play play, Host host, Task blockTask, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications) {
+    private void executeBlock(Play play, Host host, Task blockTask, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode) {
         // Evaluate 'when' for the block itself
         Map<String, Object> blockVars = variableManager.getAllVariables(play, host, blockTask);
+
+        boolean blockCheckMode = inheritedCheckMode;
+        if (blockTask.checkMode() != null) {
+            Object resolved = blockTask.checkMode();
+            if (resolved instanceof String s && s.contains("{{")) {
+                resolved = variableResolver.resolveValue(s, blockVars);
+            }
+            blockCheckMode = Truthiness.isTrue(resolved);
+        }
+
         if (blockTask.when() != null) {
             List<String> conditions;
             if (blockTask.when() instanceof List<?> list) {
@@ -189,7 +235,7 @@ public class PlaybookExecutor {
                 blockFailed = true;
                 break;
             }
-            executeTaskOnHost(play, host, task, variableManager, results, blockFailedHosts, hostNotifications);
+            executeTaskOnHost(play, host, task, variableManager, results, blockFailedHosts, hostNotifications, blockCheckMode);
         }
 
         if (blockFailedHosts.contains(host.name())) {
@@ -199,12 +245,12 @@ public class PlaybookExecutor {
         if (blockFailed) {
             for (Task task : blockTask.rescue()) {
                 // rescue tasks run even if block failed
-                executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications);
+                executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications, blockCheckMode);
             }
         }
 
         for (Task task : blockTask.always()) {
-            executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications);
+            executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications, blockCheckMode);
         }
 
         if (blockFailed && blockTask.rescue().isEmpty()) {
@@ -274,7 +320,7 @@ public class PlaybookExecutor {
         return expression.toString();
     }
 
-    private TaskResult executeSingleTask(Play play, Host host, Task task, Map<String, Object> variables, VariableManager variableManager) {
+    private TaskResult executeSingleTask(Play play, Host host, Task task, Map<String, Object> variables, VariableManager variableManager, boolean inheritedCheckMode) {
         // Evaluate 'when' condition
         if (task.when() != null) {
             List<String> conditions;
@@ -295,7 +341,24 @@ public class PlaybookExecutor {
         }
 
         // Variable resolution for task arguments
-        Map<String, Object> resolvedArgs = variableResolver.resolve(task.args(), variables);
+        Map<String, Object> resolvedArgs = new HashMap<>(variableResolver.resolve(task.args(), variables));
+
+        // Determine effective check mode
+        boolean effectiveCheckMode = inheritedCheckMode;
+
+        // Task level check_mode
+        if (task.checkMode() != null) {
+            Object resolved = task.checkMode();
+            if (resolved instanceof String s && s.contains("{{")) {
+                resolved = variableResolver.resolveValue(s, variables);
+            }
+            effectiveCheckMode = Truthiness.isTrue(resolved);
+        }
+
+        if (effectiveCheckMode) {
+            resolvedArgs.put("_ansible_check_mode", true);
+        }
+
         String resolvedDelegateTo = null;
         if (task.delegateTo() != null) {
             Object resolved = variableResolver.resolveValue(wrapInJinja(task.delegateTo()), variables);
@@ -304,7 +367,7 @@ public class PlaybookExecutor {
 
         Task resolvedTask = new Task(task.name(), task.action(), resolvedArgs, task.vars(), task.when(), task.register(), task.loop(), task.notifications(), task.failedWhen(), task.changedWhen(), task.ignoreErrors(),
                 task.until(), task.retries(), task.delay(), resolvedDelegateTo, task.delegateFacts(), task.runOnce(), task.ignoreUnreachable(), task.block(), task.rescue(), task.always(),
-                task.become(), task.becomeMethod(), task.becomeUser(), task.becomeFlags());
+                task.become(), task.becomeMethod(), task.becomeUser(), task.becomeFlags(), task.checkMode());
 
         if ("meta".equals(resolvedTask.action())) {
             return TaskResult.success(false, Map.of("meta", resolvedTask.args().getOrDefault("_raw_params", ""), "changed", false));
@@ -353,7 +416,7 @@ public class PlaybookExecutor {
         return lastResult;
     }
 
-    private TaskResult executeLoopTask(Play play, Host host, Task task, VariableManager variableManager, Map<String, Object> allVars) {
+    private TaskResult executeLoopTask(Play play, Host host, Task task, VariableManager variableManager, Map<String, Object> allVars, boolean inheritedCheckMode) {
         Object loopValue = task.loop();
         if (loopValue instanceof String str && str.contains("{{")) {
             loopValue = variableResolver.resolveValue(str, allVars);
@@ -377,7 +440,7 @@ public class PlaybookExecutor {
             Map<String, Object> iterationVars = new HashMap<>(allVars);
             iterationVars.put("item", item);
 
-            TaskResult result = executeSingleTask(play, host, task, iterationVars, variableManager);
+            TaskResult result = executeSingleTask(play, host, task, iterationVars, variableManager, inheritedCheckMode);
 
             Map<String, Object> resultData = new HashMap<>(result.data());
             resultData.put("item", item);

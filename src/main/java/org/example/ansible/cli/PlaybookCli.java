@@ -110,7 +110,7 @@ public class PlaybookCli implements Callable<Integer> {
                 // Execute Playbook
                 PlaybookExecutor executor = new PlaybookExecutor(taskExecutor);
                 java.nio.file.Path baseDir = playbookFile.getAbsoluteFile().getParentFile().toPath();
-                Map<String, List<TaskResult>> results = executor.execute(playbook, inventory, parsedExtraVars, baseDir);
+                Map<String, List<TaskResult>> results = executor.execute(playbook, inventory, parsedExtraVars, baseDir, check);
 
                 // Print Results
                 printSummary(results);
