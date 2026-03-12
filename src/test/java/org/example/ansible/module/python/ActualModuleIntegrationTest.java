@@ -73,7 +73,6 @@ class ActualModuleIntegrationTest {
     }
 
     @Test
-    @EnabledOnOs(OS.LINUX)
     void testActualPingModule() {
         taskExecutor.registerModule("ping", new PythonModule("ping"));
 
@@ -87,7 +86,6 @@ class ActualModuleIntegrationTest {
     }
 
     @Test
-    @EnabledOnOs(OS.LINUX)
     void testActualFileModule() {
         taskExecutor.registerModule("file", new PythonModule("file"));
 
@@ -111,7 +109,6 @@ class ActualModuleIntegrationTest {
     }
 
     @Test
-    @EnabledOnOs(OS.LINUX)
     void testActualStatModule() {
         taskExecutor.registerModule("stat", new PythonModule("stat"));
 
@@ -133,7 +130,6 @@ class ActualModuleIntegrationTest {
     }
 
     @Test
-    @EnabledOnOs(OS.LINUX)
     void testActualCopyModule() {
         taskExecutor.registerModule("copy", new PythonModule("copy"));
 
@@ -156,7 +152,6 @@ class ActualModuleIntegrationTest {
     }
 
     @Test
-    @EnabledOnOs(OS.LINUX)
     void testActualTemplateModule() throws IOException {
         taskExecutor.registerModule("template", new PythonModule("template"));
 
