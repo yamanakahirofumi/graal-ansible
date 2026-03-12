@@ -27,11 +27,10 @@
 - **注意**: `python.IsolateNativeModules` と `python.PosixModuleBackend` はフェーズ 1 では変更しない。
 - **備考**: 検証には必要に応じて **Testcontainers** を**ターゲットノード**として活用する。
 
-### [ ] タスク制御キーワードの拡充 (environment, check_mode)
-- **概要**: [タスク制御の実装詳細](implementation/Task-Control.md) に基づき、`environment` および `check_mode` のサポートを追加。
+### [ ] タスク制御キーワードの拡充 (environment)
+- **概要**: [タスク制御の実装詳細](implementation/Task-Control.md) に基づき、`environment` のサポートを追加。
 - **検討内容**:
     - `environment` 変数のテンプレート展開とコネクションプラグインへの伝播。
-    - `check_mode` フラグの伝播と、各モジュールのドライラン対応。
 
 ### [ ] ハイブリッド実装による Windows サポート (フェーズ2)
 - **概要**: ハイブリッド実装（モンキーパッチ等）による Windows サポート。
@@ -96,12 +95,12 @@
     - `VariableResolver` にて Jinjava を統合し、動的な変数展開を実装済み。
     - 主要なフィルター（`bool`, `combine`, `default`, `dict2items`, `ipaddr`, `to_json`, `to_yaml`）を Java で実装し登録済み。
 
-### [x] タスク制御機能（when, register, loop, handlers, block, retry等）の実装
-- **完了日**: 2026-02-23
-- **概要**: 実行の動的制御や変数の再利用、繰り返し処理、エラーハンドリングのサポート。
+### [x] タスク制御機能（when, register, loop, handlers, block, retry, check_mode 等）の実装
+- **完了日**: 2026-03-05
+- **概要**: 実行の動的制御や変数の再利用、繰り返し処理、エラーハンドリング、およびドライランのサポート。
 - **解決策**:
     - [タスク制御の実装詳細](implementation/Task-Control.md) に基づき、`PlaybookExecutor` および `TaskExecutor` へ全機能を組み込み済み。
-    - `when`, `loop` (`with_items`), `register`, `handlers` (`notify`), `block/rescue/always`, `until/retries/delay`, `failed_when/changed_when`, `delegate_to`, `run_once`, `ignore_errors` をサポート。
+    - `when`, `loop` (`with_items`), `register`, `handlers` (`notify`), `block/rescue/always`, `until/retries/delay`, `failed_when/changed_when`, `delegate_to`, `run_once`, `ignore_errors`, `check_mode` をサポート。
 
 ### [✓] Ansible 互換性の維持レベル
 - **決定事項**: **Ansible 13** で動くコレクションが動作することを目標とする。

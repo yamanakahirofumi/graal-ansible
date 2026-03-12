@@ -49,6 +49,7 @@
     - ビルド時の `pip` による `ansible-core` 取得の自動化。
     - GraalPy へのライブラリパス統合。
     - 不足している Python 依存パッケージの特定。
+    - タスク制御キーワード（`check_mode` 等）の基盤実装。
     - **GraalPy コンテキスト設定の固定**: `python.IsolateNativeModules` と `python.PosixModuleBackend` を変更せずに検証を完了させる。
 - **フェーズ 2: ハイブリッド実装による Windows サポート (Planned)**
   - Windows 管理ノード対応の強化と、OS 固有の問題解決。
