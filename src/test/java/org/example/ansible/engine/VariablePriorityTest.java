@@ -131,7 +131,7 @@ class VariablePriorityTest {
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
 
         // Act
-        Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory, Map.of(), tempDir);
+        Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory, Map.of(), tempDir, false);
 
         // Assert
         // Priority 7 (vars_files) > Priority 6 (vars)

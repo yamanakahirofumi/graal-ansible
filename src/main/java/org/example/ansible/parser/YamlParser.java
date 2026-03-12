@@ -21,7 +21,7 @@ public class YamlParser {
             "ignore_errors", "ignore_unreachable", "tags", "become", "become_user", "become_method", "become_flags",
             "vars", "notify", "with_items", "with_list", "with_dict",
             "failed_when", "changed_when", "delegate_to", "delegate_facts", "run_once",
-            "block", "rescue", "always"
+            "block", "rescue", "always", "check_mode"
     );
 
     private final Yaml yaml;
@@ -95,8 +95,9 @@ public class YamlParser {
         String becomeMethod = (String) map.get("become_method");
         String becomeUser = (String) map.get("become_user");
         String becomeFlags = (String) map.get("become_flags");
+        Object checkMode = map.get("check_mode");
 
-        return new Play(name, hosts, tasks, vars, varsFiles, handlers, become, becomeMethod, becomeUser, becomeFlags);
+        return new Play(name, hosts, tasks, vars, varsFiles, handlers, become, becomeMethod, becomeUser, becomeFlags, checkMode);
     }
 
     @SuppressWarnings("unchecked")
@@ -154,6 +155,7 @@ public class YamlParser {
         String becomeMethod = (String) map.get("become_method");
         String becomeUser = (String) map.get("become_user");
         String becomeFlags = (String) map.get("become_flags");
+        Object checkMode = map.get("check_mode");
 
         List<String> notify = new ArrayList<>();
         Object notifyObj = map.get("notify");
@@ -167,7 +169,7 @@ public class YamlParser {
 
         return new Task(name, action, args, vars, when, register, loop, notify, failedWhen, changedWhen, ignoreErrors,
                 until, retries, delay, delegateTo, delegateFacts, runOnce, ignoreUnreachable, block, rescue, always,
-                become, becomeMethod, becomeUser, becomeFlags);
+                become, becomeMethod, becomeUser, becomeFlags, checkMode);
     }
 
     @SuppressWarnings("unchecked")

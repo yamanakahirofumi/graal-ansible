@@ -31,6 +31,7 @@ import java.util.List;
  * @param becomeMethod      The privilege escalation method (e.g., sudo, su).
  * @param becomeUser        The user to become.
  * @param becomeFlags       Additional flags for privilege escalation.
+ * @param checkMode         Whether to run this task in check mode.
  */
 public record Task(
         String name,
@@ -57,17 +58,18 @@ public record Task(
         Object become,
         String becomeMethod,
         String becomeUser,
-        String becomeFlags
+        String becomeFlags,
+        Object checkMode
 ) {
     public Task(String name, String action, Map<String, Object> args) {
         this(name, action, args, Map.of(), null, null, null, List.of(), null, null, false,
                 null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
-                null, null, null, null);
+                null, null, null, null, null);
     }
 
     public Task(String name, String action, Map<String, Object> args, Map<String, Object> vars) {
         this(name, action, args, vars, null, null, null, List.of(), null, null, false,
                 null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
-                null, null, null, null);
+                null, null, null, null, null);
     }
 }
