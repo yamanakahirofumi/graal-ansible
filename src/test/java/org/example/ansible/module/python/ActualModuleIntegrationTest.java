@@ -73,22 +73,18 @@ class ActualModuleIntegrationTest {
     }
 
     @Test
-    @EnabledOnOs(OS.LINUX)
     void testActualPingModule() {
         taskExecutor.registerModule("ping", new PythonModule("ping"));
 
         Task task = new Task("test_ping", "ping", Map.of());
         TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection);
 
-        if (checkEnvironmentRestriction(result)) return;
-
         assertTrue(result.success(), "Execution failed: " + result.message());
         assertEquals("pong", result.data().get("ping"));
     }
 
     @Test
-    @EnabledOnOs(OS.LINUX)
-    void testActualFileModule() throws IOException, InterruptedException {
+    void testActualFileModule() {
         taskExecutor.registerModule("file", new PythonModule("file"));
 
         String remotePath = "/tmp/touch-test.txt";
@@ -100,8 +96,6 @@ class ActualModuleIntegrationTest {
         // Now we use the actual SSH connection to execute the task on targetNode.
         TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection);
 
-        if (checkEnvironmentRestriction(result)) return;
-
         assertTrue(result.success(), "Execution failed: " + result.message());
         assertTrue(result.changed(), "File should have been created (changed=true)");
 
@@ -111,8 +105,7 @@ class ActualModuleIntegrationTest {
     }
 
     @Test
-    @EnabledOnOs(OS.LINUX)
-    void testActualStatModule() throws IOException, InterruptedException {
+    void testActualStatModule() {
         taskExecutor.registerModule("stat", new PythonModule("stat"));
 
         String remotePath = "/tmp/stat-test.txt";
@@ -124,8 +117,6 @@ class ActualModuleIntegrationTest {
         ));
         TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection);
 
-        if (checkEnvironmentRestriction(result)) return;
-
         assertTrue(result.success(), "Execution failed: " + result.message());
         Map<String, Object> stat = (Map<String, Object>) result.data().get("stat");
         assertNotNull(stat);
@@ -133,19 +124,19 @@ class ActualModuleIntegrationTest {
     }
 
     @Test
-    @EnabledOnOs(OS.LINUX)
-    void testActualCopyModule() throws IOException, InterruptedException {
+    void testActualCopyModule() throws IOException {
         taskExecutor.registerModule("copy", new PythonModule("copy"));
 
+        Path srcFile = tempDir.resolve("copy-src.txt");
+        String content = "Hello from Actual Copy Module (src)";
+        Files.writeString(srcFile, content);
+
         String remotePath = "/tmp/copy-test.txt";
-        String content = "Hello from Actual Copy Module";
         Task task = new Task("test_copy", "copy", Map.of(
-                "dest", remotePath,
-                "content", content
+                "src", srcFile.toString(),
+                "dest", remotePath
         ));
         TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection);
-
-        if (checkEnvironmentRestriction(result)) return;
 
         assertTrue(result.success(), "Execution failed: " + result.message());
 
@@ -156,8 +147,7 @@ class ActualModuleIntegrationTest {
     }
 
     @Test
-    @EnabledOnOs(OS.LINUX)
-    void testActualTemplateModule() throws IOException, InterruptedException {
+    void testActualTemplateModule() throws IOException {
         taskExecutor.registerModule("template", new PythonModule("template"));
 
         Path srcFile = tempDir.resolve("template.j2");
@@ -166,12 +156,11 @@ class ActualModuleIntegrationTest {
 
         Task task = new Task("test_template", "template", Map.of(
                 "src", srcFile.toString(),
-                "dest", remotePath
+                "dest", remotePath,
+                "name", "World"
         ));
 
         TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection);
-
-        if (checkEnvironmentRestriction(result)) return;
 
         assertTrue(result.success(), "Execution failed: " + result.message());
 
@@ -183,22 +172,4 @@ class ActualModuleIntegrationTest {
         }
     }
 
-    private boolean checkEnvironmentRestriction(TaskResult result) {
-        if (!result.success()) {
-            String msg = result.message();
-            if (msg.contains("error=2") ||
-                msg.contains("forkAndExec") ||
-                msg.contains("Mach-O") ||
-                msg.contains("Modifying Mach-O") ||
-                msg.contains("GraalPy execution failed: Module produced no valid output") ||
-                msg.contains("Source None not found") ||
-                msg.contains("NoneType object is not subscriptable") ||
-                msg.contains("NoneType object has no attribute") ||
-                msg.contains("ShouldNotReachHere")) {
-                System.out.println("Skipping due to environment restriction: " + msg);
-                return true;
-            }
-        }
-        return false;
-    }
 }
