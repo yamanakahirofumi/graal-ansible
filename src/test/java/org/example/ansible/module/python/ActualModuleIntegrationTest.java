@@ -73,6 +73,7 @@ class ActualModuleIntegrationTest {
     }
 
     @Test
+    @EnabledOnOs(OS.LINUX)
     void testActualPingModule() {
         taskExecutor.registerModule("ping", new PythonModule("ping"));
 
@@ -110,6 +111,7 @@ class ActualModuleIntegrationTest {
     }
 
     @Test
+    @EnabledOnOs(OS.LINUX)
     void testActualStatModule() throws IOException, InterruptedException {
         taskExecutor.registerModule("stat", new PythonModule("stat"));
 
@@ -131,6 +133,7 @@ class ActualModuleIntegrationTest {
     }
 
     @Test
+    @EnabledOnOs(OS.LINUX)
     void testActualCopyModule() throws IOException, InterruptedException {
         taskExecutor.registerModule("copy", new PythonModule("copy"));
 
@@ -153,6 +156,7 @@ class ActualModuleIntegrationTest {
     }
 
     @Test
+    @EnabledOnOs(OS.LINUX)
     void testActualTemplateModule() throws IOException, InterruptedException {
         taskExecutor.registerModule("template", new PythonModule("template"));
 
