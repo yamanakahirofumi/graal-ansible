@@ -11,6 +11,12 @@ for p in site_packages_java:
 # Convert Java Map to native Python dict
 complex_args = dict(complex_args_java) if complex_args_java is not None else {}
 
+if not hasattr(sys, '_ansible_launcher_initialized'):
+    sys._ansible_launcher_initialized = True
+else:
+    # Already initialized globally, but we still need to run the module
+    pass
+
 try:
     # Aggressively mock native/problematic modules before any imports
     # Setting to None triggers ImportError, which is better for many libraries
@@ -53,6 +59,19 @@ try:
         m.tcgetattr = lambda fd: [0,0,0,0, ' ', ' ', []]
         m.tcsetattr = lambda fd, opt, mode: None
         sys.modules['termios'] = m
+    if 'syslog' not in sys.modules:
+        m = types.ModuleType('syslog')
+        for k, v in {'LOG_PID': 1, 'LOG_CONS': 2, 'LOG_NDELAY': 8, 'LOG_NOWAIT': 16, 'LOG_PERROR': 32,
+                     'LOG_KERN': 0, 'LOG_USER': 8, 'LOG_MAIL': 16, 'LOG_DAEMON': 24, 'LOG_AUTH': 32,
+                     'LOG_SYSLOG': 40, 'LOG_LPR': 48, 'LOG_NEWS': 56, 'LOG_UUCP': 64, 'LOG_CRON': 72,
+                     'LOG_AUTHPRIV': 80, 'LOG_FTP': 88, 'LOG_EMERG': 0, 'LOG_ALERT': 1, 'LOG_CRIT': 2,
+                     'LOG_ERR': 3, 'LOG_WARNING': 4, 'LOG_NOTICE': 5, 'LOG_INFO': 6, 'LOG_DEBUG': 7}.items():
+            setattr(m, k, v)
+        m.openlog = lambda *args, **kwargs: None
+        m.syslog = lambda *args, **kwargs: None
+        m.closelog = lambda *args, **kwargs: None
+        m.setlogmask = lambda *args, **kwargs: 0
+        sys.modules['syslog'] = m
 
     from ansible.plugins.loader import module_loader
     import ansible.module_utils.basic
@@ -112,16 +131,24 @@ try:
 
     ansible.module_utils.basic.AnsibleModule.run_command = mocked_run_command
     ansible.module_utils.basic.AnsibleModule.get_bin_path = lambda self, *args, **kwargs: '/usr/bin/' + args[0] if args else None
-    ansible.module_utils.basic.AnsibleModule._record_module_result = lambda self, o: print(json.dumps(o))
+
+    def mocked_record_module_result(self, o):
+        sys._ansible_module_result = o
+        print(json.dumps(o))
+    ansible.module_utils.basic.AnsibleModule._record_module_result = mocked_record_module_result
 
     def run_module():
+        sys._ansible_module_result = None
         path = module_loader.find_plugin(module_name)
         if not path:
             return json.dumps({'failed': True, 'msg': f'Module {module_name} not found'})
 
         # Inject necessary attributes for modules that import __main__
         import __main__
-        __main__._module_fqn = f"ansible.builtin.{module_name}"
+        if '.' in module_name:
+            __main__._module_fqn = module_name
+        else:
+            __main__._module_fqn = f"ansible.builtin.{module_name}"
         __main__.complex_args = complex_args
         __main__._modlib_path = None
 
@@ -140,6 +167,9 @@ try:
             except Exception as e:
                 import traceback
                 return json.dumps({'failed': True, 'msg': f'Execution error: {str(e)}', 'traceback': traceback.format_exc()})
+
+            if hasattr(sys, '_ansible_module_result') and sys._ansible_module_result is not None:
+                return json.dumps(sys._ansible_module_result)
             return mystdout.getvalue()
         finally:
             sys.stdout = old_stdout

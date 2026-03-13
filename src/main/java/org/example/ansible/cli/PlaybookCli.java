@@ -197,11 +197,11 @@ public class PlaybookCli implements Callable<Integer> {
             return TaskResult.success(data);
         });
 
-        executor.registerModule("file", new PythonModule("ansible.builtin.file", true));
-        executor.registerModule("copy", new PythonModule("ansible.builtin.copy", true));
-        executor.registerModule("stat", new PythonModule("ansible.builtin.stat", true));
-        executor.registerModule("template", new PythonModule("ansible.builtin.template", true));
-        executor.registerModule("ping", new PythonModule("ansible.builtin.ping", true));
+        executor.registerModule("file", new PythonModule("file", true));
+        executor.registerModule("copy", new PythonModule("copy", true));
+        executor.registerModule("stat", new PythonModule("stat", true));
+        executor.registerModule("template", new PythonModule("template", true));
+        executor.registerModule("ping", new PythonModule("ping", true));
     }
 
     private void printSummary(Map<String, List<TaskResult>> results) {

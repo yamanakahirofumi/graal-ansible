@@ -50,17 +50,26 @@ public class TaskExecutor implements ITaskExecutor {
 
     public TaskExecutor(OSHandler osHandler) {
         this.osHandler = osHandler;
-        Context.Builder builder = Context.newBuilder("python")
-                .allowAllAccess(true);
 
+        Map<String, String> options = new HashMap<>();
         // Native/POSIX specific options are enabled only on Linux for maximum compatibility and performance.
         // On Windows and macOS, these can cause stability issues or are not supported.
         if ("Linux".equals(osHandler.getOSFamily())) {
-            builder.option("python.IsolateNativeModules", "true");
-            builder.option("python.PosixModuleBackend", "native");
+            options.put("python.IsolateNativeModules", "true");
+            options.put("python.PosixModuleBackend", "native");
         }
 
-        this.context = builder.build();
+        // Set PYTHONPATH to include our site-packages so that respawned processes can find 'ansible'
+        java.util.List<String> sitePackages = org.example.ansible.util.PythonEnv.getSitePackagesFromEnv();
+        if (!sitePackages.isEmpty()) {
+            String pythonPath = String.join(java.io.File.pathSeparator, sitePackages);
+            options.put("python.PythonPath", pythonPath);
+        }
+
+        this.context = Context.newBuilder("python")
+                .allowAllAccess(true)
+                .options(options)
+                .build();
     }
 
     /**
