@@ -52,7 +52,16 @@ class TaskControlTest {
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
 
-        taskExecutor.registerModule("debug", (args, become, context) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+        taskExecutor.registerModule("debug", new org.example.ansible.module.Module() {
+            @Override
+            public TaskResult execute(Map<String, Object> args, org.example.ansible.connection.BecomeContext becomeContext, org.graalvm.polyglot.Context context) {
+                return TaskResult.success(false, Map.of("msg", args.get("msg")));
+            }
+            @Override
+            public boolean supportsCheckMode() {
+                return true;
+            }
+        });
 
         // Act
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
@@ -88,7 +97,16 @@ class TaskControlTest {
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
 
-        taskExecutor.registerModule("debug", (args, become, context) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+        taskExecutor.registerModule("debug", new org.example.ansible.module.Module() {
+            @Override
+            public TaskResult execute(Map<String, Object> args, org.example.ansible.connection.BecomeContext becomeContext, org.graalvm.polyglot.Context context) {
+                return TaskResult.success(false, Map.of("msg", args.get("msg")));
+            }
+            @Override
+            public boolean supportsCheckMode() {
+                return true;
+            }
+        });
 
         // Act
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
@@ -119,7 +137,16 @@ class TaskControlTest {
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
 
-        taskExecutor.registerModule("debug", (args, become, context) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+        taskExecutor.registerModule("debug", new org.example.ansible.module.Module() {
+            @Override
+            public TaskResult execute(Map<String, Object> args, org.example.ansible.connection.BecomeContext becomeContext, org.graalvm.polyglot.Context context) {
+                return TaskResult.success(false, Map.of("msg", args.get("msg")));
+            }
+            @Override
+            public boolean supportsCheckMode() {
+                return true;
+            }
+        });
 
         // Act
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
@@ -154,7 +181,16 @@ class TaskControlTest {
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
 
-        taskExecutor.registerModule("debug", (args, become, context) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+        taskExecutor.registerModule("debug", new org.example.ansible.module.Module() {
+            @Override
+            public TaskResult execute(Map<String, Object> args, org.example.ansible.connection.BecomeContext becomeContext, org.graalvm.polyglot.Context context) {
+                return TaskResult.success(false, Map.of("msg", args.get("msg")));
+            }
+            @Override
+            public boolean supportsCheckMode() {
+                return true;
+            }
+        });
 
         // Act
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
@@ -191,7 +227,16 @@ class TaskControlTest {
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
 
-        taskExecutor.registerModule("debug", (args, become, context) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+        taskExecutor.registerModule("debug", new org.example.ansible.module.Module() {
+            @Override
+            public TaskResult execute(Map<String, Object> args, org.example.ansible.connection.BecomeContext becomeContext, org.graalvm.polyglot.Context context) {
+                return TaskResult.success(false, Map.of("msg", args.get("msg")));
+            }
+            @Override
+            public boolean supportsCheckMode() {
+                return true;
+            }
+        });
 
         // Act
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
@@ -217,7 +262,16 @@ class TaskControlTest {
                       failed_when: true
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
-        taskExecutor.registerModule("debug", (args, become, context) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+        taskExecutor.registerModule("debug", new org.example.ansible.module.Module() {
+            @Override
+            public TaskResult execute(Map<String, Object> args, org.example.ansible.connection.BecomeContext becomeContext, org.graalvm.polyglot.Context context) {
+                return TaskResult.success(false, Map.of("msg", args.get("msg")));
+            }
+            @Override
+            public boolean supportsCheckMode() {
+                return true;
+            }
+        });
 
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
 
@@ -239,7 +293,16 @@ class TaskControlTest {
                       changed_when: true
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
-        taskExecutor.registerModule("debug", (args, become, context) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+        taskExecutor.registerModule("debug", new org.example.ansible.module.Module() {
+            @Override
+            public TaskResult execute(Map<String, Object> args, org.example.ansible.connection.BecomeContext becomeContext, org.graalvm.polyglot.Context context) {
+                return TaskResult.success(false, Map.of("msg", args.get("msg")));
+            }
+            @Override
+            public boolean supportsCheckMode() {
+                return true;
+            }
+        });
 
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
 
@@ -265,7 +328,16 @@ class TaskControlTest {
                         msg: "ran"
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
-        taskExecutor.registerModule("debug", (args, become, context) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+        taskExecutor.registerModule("debug", new org.example.ansible.module.Module() {
+            @Override
+            public TaskResult execute(Map<String, Object> args, org.example.ansible.connection.BecomeContext becomeContext, org.graalvm.polyglot.Context context) {
+                return TaskResult.success(false, Map.of("msg", args.get("msg")));
+            }
+            @Override
+            public boolean supportsCheckMode() {
+                return true;
+            }
+        });
 
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
 
@@ -294,7 +366,16 @@ class TaskControlTest {
                         msg: "handled"
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
-        taskExecutor.registerModule("debug", (args, become, context) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+        taskExecutor.registerModule("debug", new org.example.ansible.module.Module() {
+            @Override
+            public TaskResult execute(Map<String, Object> args, org.example.ansible.connection.BecomeContext becomeContext, org.graalvm.polyglot.Context context) {
+                return TaskResult.success(false, Map.of("msg", args.get("msg")));
+            }
+            @Override
+            public boolean supportsCheckMode() {
+                return true;
+            }
+        });
 
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
 
@@ -319,7 +400,16 @@ class TaskControlTest {
                         - two
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
-        taskExecutor.registerModule("debug", (args, become, context) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+        taskExecutor.registerModule("debug", new org.example.ansible.module.Module() {
+            @Override
+            public TaskResult execute(Map<String, Object> args, org.example.ansible.connection.BecomeContext becomeContext, org.graalvm.polyglot.Context context) {
+                return TaskResult.success(false, Map.of("msg", args.get("msg")));
+            }
+            @Override
+            public boolean supportsCheckMode() {
+                return true;
+            }
+        });
 
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
 
@@ -346,7 +436,16 @@ class TaskControlTest {
                         - true
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
-        taskExecutor.registerModule("debug", (args, become, context) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+        taskExecutor.registerModule("debug", new org.example.ansible.module.Module() {
+            @Override
+            public TaskResult execute(Map<String, Object> args, org.example.ansible.connection.BecomeContext becomeContext, org.graalvm.polyglot.Context context) {
+                return TaskResult.success(false, Map.of("msg", args.get("msg")));
+            }
+            @Override
+            public boolean supportsCheckMode() {
+                return true;
+            }
+        });
 
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
 
@@ -376,7 +475,16 @@ class TaskControlTest {
                         - false
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
-        taskExecutor.registerModule("debug", (args, become, context) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+        taskExecutor.registerModule("debug", new org.example.ansible.module.Module() {
+            @Override
+            public TaskResult execute(Map<String, Object> args, org.example.ansible.connection.BecomeContext becomeContext, org.graalvm.polyglot.Context context) {
+                return TaskResult.success(false, Map.of("msg", args.get("msg")));
+            }
+            @Override
+            public boolean supportsCheckMode() {
+                return true;
+            }
+        });
 
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
 
@@ -399,7 +507,16 @@ class TaskControlTest {
                       run_once: true
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
-        taskExecutor.registerModule("debug", (args, become, context) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+        taskExecutor.registerModule("debug", new org.example.ansible.module.Module() {
+            @Override
+            public TaskResult execute(Map<String, Object> args, org.example.ansible.connection.BecomeContext becomeContext, org.graalvm.polyglot.Context context) {
+                return TaskResult.success(false, Map.of("msg", args.get("msg")));
+            }
+            @Override
+            public boolean supportsCheckMode() {
+                return true;
+            }
+        });
 
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
 
@@ -496,7 +613,16 @@ class TaskControlTest {
                             msg: "always"
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
-        taskExecutor.registerModule("debug", (args, become, context) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+        taskExecutor.registerModule("debug", new org.example.ansible.module.Module() {
+            @Override
+            public TaskResult execute(Map<String, Object> args, org.example.ansible.connection.BecomeContext becomeContext, org.graalvm.polyglot.Context context) {
+                return TaskResult.success(false, Map.of("msg", args.get("msg")));
+            }
+            @Override
+            public boolean supportsCheckMode() {
+                return true;
+            }
+        });
 
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
 
@@ -526,7 +652,16 @@ class TaskControlTest {
                       when: false
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
-        taskExecutor.registerModule("debug", (args, become, context) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+        taskExecutor.registerModule("debug", new org.example.ansible.module.Module() {
+            @Override
+            public TaskResult execute(Map<String, Object> args, org.example.ansible.connection.BecomeContext becomeContext, org.graalvm.polyglot.Context context) {
+                return TaskResult.success(false, Map.of("msg", args.get("msg")));
+            }
+            @Override
+            public boolean supportsCheckMode() {
+                return true;
+            }
+        });
 
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
 
@@ -556,7 +691,16 @@ class TaskControlTest {
                           failed_when: true
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
-        taskExecutor.registerModule("debug", (args, become, context) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+        taskExecutor.registerModule("debug", new org.example.ansible.module.Module() {
+            @Override
+            public TaskResult execute(Map<String, Object> args, org.example.ansible.connection.BecomeContext becomeContext, org.graalvm.polyglot.Context context) {
+                return TaskResult.success(false, Map.of("msg", args.get("msg")));
+            }
+            @Override
+            public boolean supportsCheckMode() {
+                return true;
+            }
+        });
 
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
 
@@ -590,7 +734,16 @@ class TaskControlTest {
                         msg: "handled"
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
-        taskExecutor.registerModule("debug", (args, become, context) -> TaskResult.success(false, Map.of("msg", args.get("msg"))));
+        taskExecutor.registerModule("debug", new org.example.ansible.module.Module() {
+            @Override
+            public TaskResult execute(Map<String, Object> args, org.example.ansible.connection.BecomeContext becomeContext, org.graalvm.polyglot.Context context) {
+                return TaskResult.success(false, Map.of("msg", args.get("msg")));
+            }
+            @Override
+            public boolean supportsCheckMode() {
+                return true;
+            }
+        });
 
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
 

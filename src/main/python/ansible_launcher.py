@@ -68,8 +68,8 @@ try:
     import ansible.module_utils.common.process
 
     # Monkeypatch to avoid system interaction
-    ansible.module_utils.distro.id = lambda: 'debian'
-    ansible.module_utils.distro.version = lambda: '12'
+    ansible.module_utils.distro.id = lambda *args, **kwargs: 'debian'
+    ansible.module_utils.distro.version = lambda *args, **kwargs: '12'
     ansible.module_utils.common.process.get_bin_path = lambda *args, **kwargs: '/usr/bin/' + args[0] if args else None
 
     # Monkeypatch JSON to handle non-serializable objects (like sets from setup module)
@@ -92,11 +92,11 @@ try:
         json._graal_ansible_patched = True
 
     # Monkeypatch globally before instantiation
-    ansible.module_utils.basic._load_params = lambda: (complex_args, 'main')
-    def mocked_load_params(self):
+    ansible.module_utils.basic._load_params = lambda *args, **kwargs: (complex_args, 'main')
+    def mocked_load_params(self, *args, **kwargs):
         self.params = complex_args
     ansible.module_utils.basic.AnsibleModule._load_params = mocked_load_params
-    ansible.module_utils.basic.AnsibleModule._check_locale = lambda self: None
+    ansible.module_utils.basic.AnsibleModule._check_locale = lambda self, *args, **kwargs: None
 
     def mocked_run_command(self, args, **kwargs):
         # connection_java is the Java Connection object
