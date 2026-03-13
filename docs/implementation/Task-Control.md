@@ -98,11 +98,19 @@
 タスク実行時の環境変数を定義します。
 
 - **実装方針**:
-    - `environment` フィールドに指定された Map（または Map を返すテンプレート）を `VariableResolver` で評価します。
-    - 評価された環境変数は、コネクションプラグインを通じてコマンド実行時に設定されます。
-    - Play レベルと Task レベルの両方で定義可能であり、Task レベルが優先されます。
+    - **マージルール**: `environment` は Play, Block, Task の各レベルで定義可能です。
+        - 優先順位は **Task > Block > Play** です。
+        - 同一キーの環境変数が複数のレベルで定義されている場合、より低い（Taskに近い）レベルの値が優先されます。
+        - 異なるキーの変数はマージされ、最終的な環境変数セットとして構築されます。
+    - **テンプレート評価**:
+        - `environment` フィールド（Map または Map を返す文字列）は、タスク実行の直前に `VariableResolver` を用いて遅延評価（Lazy Evaluation）されます。
+        - これにより、`register` 変数や `loop` の `item` を環境変数内で動的に参照可能です。
+    - **伝播**:
+        - 評価結果の Map は、`TaskExecutor` を経由してコネクションプラグインの `execCommand` メソッドに渡されます。
+        - コネクションプラグインは、この Map を実際のプロセス実行環境（`ProcessBuilder` の `environment()` や SSH の環境変数設定）に反映します。
 - **データ構造**:
-    - `Task` レコードおよび `Play` レコードに `Object environment` フィールドを保持します。（※Java レコードへのフィールド追加は計画中。現在は `VariableResolver` による評価ロジックのみ検討中）
+    - `Play`, `Task` レコードに `Object environment` フィールドを保持します。
+    - 評価後のデータ型は `Map<String, String>` となります。
 
 ## 10. チェックモード (`check_mode`)
 
