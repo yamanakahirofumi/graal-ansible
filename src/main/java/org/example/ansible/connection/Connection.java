@@ -24,17 +24,17 @@ public interface Connection extends AutoCloseable {
      * Transfers a file to the target host.
      *
      * @param localPath  The path on the control node.
-     * @param remotePath The path on the target host.
+     * @param remotePath The path on the target host as a string to avoid OS-specific separators.
      */
-    void putFile(Path localPath, Path remotePath);
+    void putFile(Path localPath, String remotePath);
 
     /**
      * Fetches a file from the target host.
      *
-     * @param remotePath The path on the target host.
+     * @param remotePath The path on the target host as a string to avoid OS-specific separators.
      * @param localPath  The path on the control node.
      */
-    void fetchFile(Path remotePath, Path localPath);
+    void fetchFile(String remotePath, Path localPath);
 
     /**
      * Closes the connection.
