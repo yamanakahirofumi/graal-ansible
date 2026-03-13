@@ -10,9 +10,6 @@ for p in site_packages_java:
 # Convert Java Map to native Python dict
 complex_args = dict(complex_args_java) if complex_args_java is not None else {}
 
-# Enforce check_mode = False at the module level
-complex_args['_ansible_check_mode'] = False
-
 def run_module():
     old_stdout = sys.stdout
     sys.stdout = mystdout = StringIO()
