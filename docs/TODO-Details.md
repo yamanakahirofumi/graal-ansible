@@ -40,7 +40,7 @@
 - **概要**: `ansible-core` 全体のロードを排除し、最適化と安定化を図る。
 - **詳細は [Module-Support-Status.md](features/Module-Support-Status.md) を参照。**
 
-## 完了済みの項目 (Completed)
+## 3. 完了済みの項目 (Completed)
 
 ### [x] Native Image 時のリフレクション設定
 - **完了日**: 2026-03-05
@@ -105,7 +105,7 @@
 ### [✓] Ansible 互換性の維持レベル
 - **決定事項**: **Ansible 13** で動くコレクションが動作することを目標とする。
 
-## 3. 整理・調整済み (Refactored/Adjusted)
+## 4. 整理・調整済み (Refactored/Adjusted)
 
 ### [x] GitHub Actions CI ワークフローの構築
 - **完了日**: 2026-03-05
