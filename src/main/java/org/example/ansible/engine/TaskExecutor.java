@@ -94,9 +94,7 @@ public class TaskExecutor implements ITaskExecutor {
             return TaskResult.failure("Module not found: " + task.action());
         }
         try {
-            Map<String, Object> moduleArgs = new HashMap<>(task.args());
-            moduleArgs.put("_ansible_check_mode", false);
-            return module.execute(moduleArgs, becomeContext, context);
+            return module.execute(task.args(), becomeContext, context);
         } catch (Exception e) {
             return TaskResult.failure("Execution failed: " + e.getMessage());
         }

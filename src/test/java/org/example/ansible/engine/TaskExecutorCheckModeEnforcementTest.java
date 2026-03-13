@@ -1,13 +1,13 @@
 package org.example.ansible.engine;
 
 import org.example.ansible.connection.BecomeContext;
+import org.example.ansible.module.python.PythonModule;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -28,28 +28,33 @@ class TaskExecutorCheckModeEnforcementTest {
     }
 
     @Test
-    void testCheckModeIsEnforcedToFalse() {
+    void testCheckModeIsEnforcedToFalseInPythonModule() {
         // Arrange
-        AtomicReference<Map<String, Object>> capturedArgs = new AtomicReference<>();
-        executor.registerModule("test_module", (args, becomeContext, context) -> {
-            capturedArgs.set(new HashMap<>(args));
-            return TaskResult.success(Map.of());
-        });
+        // We use a script that echoes back whether _ansible_check_mode was true or false
+        String script = """
+            import json
+            import sys
+            result = {
+                "changed": False,
+                "check_mode_value": complex_args.get('_ansible_check_mode')
+            }
+            sys.stdout.write(json.dumps(result))
+            """;
+
+        executor.registerModule("test_module", new PythonModule("test_module", script));
 
         // Arguments that include _ansible_check_mode: true
         Map<String, Object> args = new HashMap<>();
-        args.put("param1", "value1");
         args.put("_ansible_check_mode", true);
 
         Task task = new Task("test task", "test_module", args);
 
         // Act
-        executor.execute(task, BecomeContext.empty());
+        TaskResult result = executor.execute(task, BecomeContext.empty());
 
         // Assert
-        assertNotNull(capturedArgs.get());
-        assertEquals("value1", capturedArgs.get().get("param1"));
-        assertEquals(false, capturedArgs.get().get("_ansible_check_mode"),
-            "TaskExecutor should have overridden _ansible_check_mode to false");
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        assertEquals(false, result.data().get("check_mode_value"),
+            "Python module should have seen _ansible_check_mode as false");
     }
 }
