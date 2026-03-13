@@ -59,6 +59,7 @@
 - [インベントリシステム実装](implementation/Inventory-System.md)：静的インベントリの解析と管理
 - [タスク実行エンジン](implementation/Task-Executor.md)：マルチスレッド実行と順序制御
 - [タスク制御の実装詳細](implementation/Task-Control.md)：when, loop, register, block, retry等の制御ロジック
+- [Ansible モジュールの初期化と設定](implementation/Ansible-Module-Initialization.md)：AnsibleModule のインスタンス構成、引数の受け渡し、モンキーパッチの詳細
 - [接続プラグイン実装](implementation/Connection-Plugins.md)：Local, SSH(JSch/Apache MINA SSHD)の実装
 - [権限昇格 (become)](implementation/Privilege-Escalation.md)：sudo, su等による実行ユーザーの切り替え
 - [変数とテンプレート](implementation/Variables-Templating.md)：Jinja2互換エンジンの統合

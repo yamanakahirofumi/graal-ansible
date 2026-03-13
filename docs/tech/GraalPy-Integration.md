@@ -41,6 +41,7 @@ POSIX 環境を前提とした `termios`, `grp`, `pwd` 等のモジュールが�
 - `_record_module_result`: 実行結果を確実に Java 側でキャプチャできるよう、結果を JSON 形式で標準出力に書き出すように変更しています。
 - `get_bin_path`: 外部コマンドの検索パスを、プロジェクトが管理するパスや OS 抽象化レイヤーのパスに誘導します。
 - `_load_params`: GraalVM Context から渡された `complex_args` を直接参照するように変更しています。
+    - 詳細なパッチ内容については、[Ansible モジュールの初期化と設定](../implementation/Ansible-Module-Initialization.md) を参照してください。
 
 ### 4.5 その他のモンキーパッチ
 - **`ansible.module_utils.distro`**: OS 判定において常に特定の値を返すように固定（例: ID='debian'）。
