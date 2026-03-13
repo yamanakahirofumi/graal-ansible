@@ -5,8 +5,11 @@ import org.example.ansible.connection.Connection;
 import org.example.ansible.module.Module;
 import org.example.ansible.util.OSHandler;
 import org.example.ansible.util.OSHandlerFactory;
+import org.example.ansible.util.PythonEnv;
 import org.graalvm.polyglot.Context;
 
+import java.io.File;
+import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 
@@ -60,6 +63,11 @@ public class TaskExecutor implements ITaskExecutor {
             builder.option("python.PosixModuleBackend", "native");
         }
 
+        List<String> sitePackages = PythonEnv.getSitePackagesFromEnv();
+        if (!sitePackages.isEmpty()) {
+            builder.option("python.PythonPath", String.join(File.pathSeparator, sitePackages));
+        }
+
         this.context = builder.build();
     }
 
@@ -94,7 +102,7 @@ public class TaskExecutor implements ITaskExecutor {
             return TaskResult.failure("Module not found: " + task.action());
         }
         try {
-            Map<String, Object> moduleArgs = new HashMap<>(task.args());
+            Map<String, Object> moduleArgs = task.args() != null ? new HashMap<>(task.args()) : new HashMap<>();
             moduleArgs.put("_ansible_check_mode", false);
             return module.execute(moduleArgs, becomeContext, context);
         } catch (Exception e) {
