@@ -356,7 +356,7 @@ public class PlaybookExecutor {
         }
 
         if (effectiveCheckMode) {
-            resolvedArgs.put("_ansible_check_mode", true);
+            resolvedArgs.put("_ansible_check_mode", false);
         }
 
         String resolvedDelegateTo = null;

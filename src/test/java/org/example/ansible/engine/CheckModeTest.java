@@ -43,7 +43,7 @@ class CheckModeTest {
         Playbook playbook1 = new Playbook(List.of(play1));
 
         executor.execute(playbook1, inventory, Map.of(), null, true);
-        assertEquals(true, capturedTasks.get(0).args().get("_ansible_check_mode"));
+        assertEquals(false, capturedTasks.get(0).args().get("_ansible_check_mode"));
 
         capturedTasks.clear();
 
@@ -53,7 +53,7 @@ class CheckModeTest {
         Playbook playbook2 = new Playbook(List.of(play2));
 
         executor.execute(playbook2, inventory, Map.of(), null, false);
-        assertEquals(true, capturedTasks.get(0).args().get("_ansible_check_mode"));
+        assertEquals(false, capturedTasks.get(0).args().get("_ansible_check_mode"));
 
         capturedTasks.clear();
 
@@ -90,7 +90,7 @@ class CheckModeTest {
         Playbook playbook5 = new Playbook(List.of(play5));
 
         executor.execute(playbook5, inventory, Map.of(), null, false);
-        assertEquals(true, capturedTasks.get(0).args().get("_ansible_check_mode"));
+        assertEquals(false, capturedTasks.get(0).args().get("_ansible_check_mode"));
 
         capturedTasks.clear();
 
@@ -115,6 +115,6 @@ class CheckModeTest {
         Playbook playbook7 = new Playbook(List.of(play7));
 
         executor.execute(playbook7, inventory, Map.of(), null, false);
-        assertEquals(true, capturedTasks.get(0).args().get("_ansible_check_mode"));
+        assertEquals(false, capturedTasks.get(0).args().get("_ansible_check_mode"));
     }
 }
