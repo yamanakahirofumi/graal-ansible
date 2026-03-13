@@ -1,73 +1,47 @@
-# リモートノードでのモジュール実行仕様 (GraalPy 委譲モデル)
+# リモートノードでのモジュール実行仕様
 
-本ドキュメントでは、`graal-ansible` におけるデフォルトの実行方式である、GraalPy を利用した制御ノード側実行とリモートへの操作委譲について詳述します。
+本ドキュメントでは、`graal-ansible` がターゲットノード（リモートホスト）に対して Ansible モジュールを実行する際の仕組みについて詳述します。本プロジェクトでは、本家 Ansible と同様に、モジュールファイルをターゲットノードに転送し、ターゲット上の Python インタプリタで実行する「モジュール転送型」のモデルを採用しています。
 
-## 1. 実行モデル：制御ノード側実行とリモート委譲
+## 1. 実行モデル：モジュール転送型実行
 
-Ansible 本家では、モジュール（Python スクリプト）をターゲットノードに転送し、ターゲット上の Python インタプリタで実行します（[モジュール転送型](Module-Transfer-Execution.md)）。
-対して `graal-ansible` の標準実装では、**「モジュール本体は制御ノード上の GraalPy で実行し、システム操作のみをリモートに委譲する」**というモデルを採用しています。
-
-### メリット
-- ターゲットノードに Python インタプリタをインストールする必要がない。
-- モジュールの転送・クリーンアップのオーバーヘッドがない。
-- 制御ノード側の Java リソース（接続プール、変数管理）を直接利用できる。
+モジュール転送型実行は、ターゲットノード上で直接モジュールを動作させる方式です。制御ノード側の GraalPy に依存せず、ターゲット環境の Python インタプリタとライブラリを利用します。
 
 ### 仕組み
-1. **Python 実行**: `PythonModule` が制御ノードの JVM 内で GraalPy を起動し、モジュールを実行。
-2. **操作のインターセプト**: モジュールが `AnsibleModule.run_command` などのメソッドを呼び出した際、それをモンキーパッチにより捕捉。
-3. **リモート実行**: 捕捉したコマンドを、Java 側の `Connection` オブジェクト（SSH 等）を経由してターゲットノードで実行。
-4. **結果の還元**: コマンドの標準出力・標準エラー・終了コードを Python 側に返し、モジュールのロジックを継続。
+1. **モジュールのパッケージング**:
+    - 実行対象のモジュール（Python スクリプト）と、依存する `module_utils` を一つの実行可能ユニットにまとめます。
+    - Ansible 本家における Ansiballz 形式（ZIP 圧縮されたスクリプト）と同様のパッケージングを行います。
+2. **一時ディレクトリの作成**:
+    - ターゲットノード上に実行用のテンポラリディレクトリ（例: `~/.ansible/tmp/`）を作成します。
+3. **ファイルの転送**:
+    - Java 側の `Connection.putFile()` メソッド（SSH の場合は SCP/SFTP）を使用して、パッケージングされたモジュールをターゲットの一時ディレクトリに転送します。
+4. **リモート実行**:
+    - ターゲットノード上の Python インタプリタを呼び出し、転送したモジュールを実行します。
+    - `Connection.execCommand()` を通じて、リモートコマンド（例: `python3 /tmp/ansible_module_XXXX.py`）を発行します。
+5. **結果の回収**:
+    - モジュールが標準出力に書き出した JSON 形式の実行結果をキャプチャし、Java 側の `TaskResult` に変換します。
+6. **クリーンアップ**:
+    - 実行完了後、ターゲットノード上の一時ディレクトリとファイルを削除します。
 
-## 2. Java と Python のブリッジ
+## 2. SSH 接続の実装 (`SshConnection`)
 
-`PythonModule.java` は実行時に以下のオブジェクトを Python コンテキストに注入します。
-
-- `connection_java`: `org.example.ansible.connection.Connection` インターフェースの実装。
-- `become_context_java`: 権限昇格設定（`BecomeContext`）。
-
-これらは `ansible_launcher.py` 内で利用されます。
-
-## 3. `ansible_launcher.py` によるモンキーパッチ
-
-リモート実行を実現するため、`ansible_launcher.py` は `AnsibleModule` に対して以下のパッチを適用します。
-
-### `run_command` の委譲
-モジュールが外部コマンドを実行しようとすると、以下の関数が呼ばれます。
-
-```python
-def mocked_run_command(self, args, **kwargs):
-    if connection_java:
-        if isinstance(args, list):
-            command = " ".join(args)
-        else:
-            command = args
-        # Java 側の接続オブジェクトを使用してリモートで実行
-        res = connection_java.execCommand(command, become_context_java)
-        return (res.exitCode(), res.stdout(), res.stderr())
-    return (0, '', '')
-```
-
-## 4. SSH 接続の実装 (`SshConnection`)
-
-SSH 経由のリモート実行は `SshConnection.java` で実装されています。
+SSH 経由のリモート実行およびファイル転送は `SshConnection.java` で実装されています。
 
 - **ライブラリ**: Apache MINA SSHD を使用。
-- **認証**: パスワード認証および公開鍵認証（基本実装）をサポート。
-- **実行方式**: `ChannelExec` を使用してコマンドを非対話的に実行。
-- **ファイル転送**: SCP（`ScpClient`）を使用して `putFile` / `fetchFile` を実現。
+- **認証**: パスワード認証および公開鍵認証をサポート。
+- **コマンド実行**: `ChannelExec` を使用してリモートコマンドを実行。
+- **ファイル転送**: `ScpClient` を使用して、パッケージングされたモジュールのアップロード（`putFile`）を実現。
 
-## 5. モジュールごとの対応状況と制限
+## 3. 利点と要件
 
-このモデル（制御ノード側実行）には、モジュールの実装に依存した制限があります。
+### 利点
+- **完全な互換性**: ターゲットノードの Python 環境で実行されるため、ネイティブな `os` 操作や複雑な依存関係を持つモジュールが本家 Ansible と同様に動作します。
+- **隔離性**: 各タスクがターゲット上の独立したプロセスとして実行されます。
 
-- **コマンドベースのモジュール**: `apt`, `yum`, `command`, `shell` など、主に外部コマンドを呼び出して動作するモジュールは、`run_command` がパッチされているため正しく動作します。
-- **Python ネイティブ操作を行うモジュール**: Python の `os` や `shutil` モジュールを直接使用してファイル操作（`os.mkdir`, `os.chown` 等）を行う場合、それらは**制御ノード側に対して実行されてしまいます**。
-- **対応策**:
-    - 重要なモジュール（`file`, `copy`, `template` 等）については、モジュール内部で `run_command` を使用するように誘導するか、あるいは `os` モジュール自体をパッチすることでリモート操作に変換する検討が行われています。
-    - 現在、`file` モジュールの `state=touch` など、一部の機能は `run_command` を介してリモートで動作することが確認されています。
+### 要件
+- **ターゲットノード**: Python インタプリタがインストールされている必要があります。
+- **制御ノード**: ターゲットへのファイル転送権限が必要です。
 
-## 6. 関連ドキュメント
-- [モジュール転送型実行仕様 (Ansible 互換モデル)](Module-Transfer-Execution.md)
-- [GraalPy 統合の詳細](../tech/GraalPy-Integration.md)
+## 4. 関連ドキュメント
 - [接続プラグイン実装](Connection-Plugins.md)
-- [Ansible モジュールの初期化と設定](Ansible-Module-Initialization.md)
+- [OS 抽象化レイヤーの仕様](OS-Abstraction.md)
+- [権限昇格 (become)](Privilege-Escalation.md)
