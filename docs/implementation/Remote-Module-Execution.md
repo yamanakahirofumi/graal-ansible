@@ -1,11 +1,11 @@
-# リモートノードでのモジュール実行仕様
+# リモートノードでのモジュール実行仕様 (GraalPy 委譲モデル)
 
-本ドキュメントでは、`graal-ansible` がターゲットノード（リモートホスト）に対して Ansible モジュールを実行する際の仕組みについて詳述します。
+本ドキュメントでは、`graal-ansible` におけるデフォルトの実行方式である、GraalPy を利用した制御ノード側実行とリモートへの操作委譲について詳述します。
 
 ## 1. 実行モデル：制御ノード側実行とリモート委譲
 
-Ansible 本家では、モジュール（Python スクリプト）をターゲットノードに転送し、ターゲット上の Python インタプリタで実行します。
-対して `graal-ansible` では、**「モジュール本体は制御ノード上の GraalPy で実行し、システム操作のみをリモートに委譲する」**というモデルを採用しています。
+Ansible 本家では、モジュール（Python スクリプト）をターゲットノードに転送し、ターゲット上の Python インタプリタで実行します（[モジュール転送型](Module-Transfer-Execution.md)）。
+対して `graal-ansible` の標準実装では、**「モジュール本体は制御ノード上の GraalPy で実行し、システム操作のみをリモートに委譲する」**というモデルを採用しています。
 
 ### メリット
 - ターゲットノードに Python インタプリタをインストールする必要がない。
@@ -67,6 +67,7 @@ SSH 経由のリモート実行は `SshConnection.java` で実装されていま
     - 現在、`file` モジュールの `state=touch` など、一部の機能は `run_command` を介してリモートで動作することが確認されています。
 
 ## 6. 関連ドキュメント
+- [モジュール転送型実行仕様 (Ansible 互換モデル)](Module-Transfer-Execution.md)
 - [GraalPy 統合の詳細](../tech/GraalPy-Integration.md)
 - [接続プラグイン実装](Connection-Plugins.md)
 - [Ansible モジュールの初期化と設定](Ansible-Module-Initialization.md)
