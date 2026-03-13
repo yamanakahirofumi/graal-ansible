@@ -42,8 +42,16 @@ Ansible の一部のモジュール（`apt`, `package_facts` など）は、メ�
 また、`exec()` を用いてモジュールコードを実行する際、以下の設定を行っています。
 
 - **`__name__` の設定**: グローバル辞書の `__name__` を `'__main__'` に設定することで、多くのモジュールに含まれる `if __name__ == '__main__':` ブロックが正しく実行されるようにしています。
-- **`module` インスタンスの参照**: 通常、Ansible モジュール内では `module = AnsibleModule(...)` のようにインスタンス化が行われます。この `module` 変数は通常そのスコープ（`main()` 関数内など）のローカル変数ですが、一部の共通コード（特に古いモジュールや特定の `module_utils`）が `from __main__ import module` のようにグローバルの `module` インスタンスを直接参照しようとするケースがあります。
-- **インスタンスの生存期間**: `exec()` 内でモジュールが実行される際、`AnsibleModule` が作成されると、そのインスタンスはモジュールの `main()` 関数のローカル変数として保持されます。グローバルからの参照が必要な特殊なモジュールについては、この実行モデルとの整合性を保つための配慮がなされています。
+- **`module` インスタンスの参照**:
+    - 通常、Ansible モジュール内では `module = AnsibleModule(...)` のようにインスタンス化が行われます。
+    - この `module` 変数は通常 `main()` 関数などのローカル変数ですが、一部の共通コード（特に古いモジュールや特定の `module_utils`）は `from __main__ import module` のようにグローバルな `module` インスタンスを直接参照しようとします。
+    - `ansible_launcher.py` は `__main__` モジュールとして動作しているため、モジュールがグローバルスコープで `module` を定義（または `main` 内で `global module` を使用）すると、それが `sys.modules['__main__']` の属性として保持され、他のユーティリティから参照可能になります。
+- **グローバル環境の構築**:
+    - `ansible_launcher.py` は、モジュールコードを `exec()` で実行する際、第2引数（globals）として渡す辞書を慎重に制御します。
+    - この辞書には `__name__: '__main__'` が設定されており、実行されるモジュールコードにとってはこの辞書自体がグローバルスコープ（`__main__` の `__dict__`）として機能します。
+- **インスタンスの生存期間**:
+    - `exec()` 内で `AnsibleModule` が作成されると、そのインスタンスはモジュールの実行コンテキスト内で保持されます。
+    - インスタンス化の過程で、モンキーパッチされた `_load_params` や `run_command` が呼び出され、Java 側から渡された引数や接続設定がインスタンスに統合されます。
 
 ## 5. `AnsibleModule` へのモンキーパッチ
 
@@ -59,6 +67,10 @@ ansible.module_utils.basic.AnsibleModule._load_params = lambda self: (complex_ar
 モジュール内でのコマンド実行を、Java 側の `Connection` オブジェクトを経由するように変更します。これにより、SSH 経由の実行などが透過的に行われます。
 ```python
 def mocked_run_command(self, args, **kwargs):
+    if isinstance(args, list):
+        command = " ".join(args)
+    else:
+        command = args
     # Java の Connection.execCommand を呼び出す
     res = connection_java.execCommand(command, become_context_java)
     return (res.exitCode(), res.stdout(), res.stderr())
