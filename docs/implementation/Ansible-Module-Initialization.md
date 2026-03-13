@@ -27,17 +27,34 @@ Ansible モジュールは通常、標準入力経由で引数（JSON または 
 3.  **システムモジュールのモック**: GraalPy 環境で問題となるモジュールや、Java 側で処理を代替したいモジュールをモック化します。
 4.  **`AnsibleModule` のパッチ**: `ansible.module_utils.basic.AnsibleModule` クラスのメソッドを上書きし、本プロジェクト独自の実行モデルに適合させます。
 
-## 4. `AnsibleModule` へのモンキーパッチ
+## 4. グローバルスコープ (`__main__`) への属性注入
+
+Ansible の一部のモジュール（`apt`, `package_facts` など）は、メタデータや引数を取得するために自分自身（`__main__`）をインポートしたり、特定のグローバル変数が存在することを期待したりします。
+
+`ansible_launcher.py` では、モジュールの実行直前に `sys.modules['__main__']` に対して以下の属性を注入します。
+
+| 属性名 | 説明 |
+| :--- | :--- |
+| `_module_fqn` | モジュールの完全修飾名（例: `ansible.builtin.ping`）。 |
+| `complex_args` | 変換済みの引数辞書。 |
+| `_modlib_path` | モジュールライブラリのパス（本プロジェクトでは原則 `None`）。 |
+
+また、`exec()` を用いてモジュールコードを実行する際、以下の設定を行っています。
+
+- **`__name__` の設定**: グローバル辞書の `__name__` を `'__main__'` に設定することで、多くのモジュールに含まれる `if __name__ == '__main__':` ブロックが正しく実行されるようにしています。
+- **`module` インスタンスの参照**: 通常、Ansible モジュール内では `module = AnsibleModule(...)` のようにインスタンス化が行われます。この `module` 変数は通常そのスコープ（`main()` 関数内など）のローカル変数ですが、一部の共通コード（`module_utils`）がグローバルの `module` インスタンスを直接参照しようとするケースに備え、環境を構築しています。
+
+## 5. `AnsibleModule` へのモンキーパッチ
 
 Ansible モジュールの基盤となる `AnsibleModule` クラスに対して、以下のパッチを適用しています。
 
-### 4.1 引数のロード (`_load_params`)
+### 5.1 引数のロード (`_load_params`)
 通常は標準入力から読み取る引数を、Java から渡された `complex_args` を直接使用するように変更します。
 ```python
 ansible.module_utils.basic.AnsibleModule._load_params = lambda self: (complex_args, 'main')
 ```
 
-### 4.2 コマンド実行 (`run_command`)
+### 5.2 コマンド実行 (`run_command`)
 モジュール内でのコマンド実行を、Java 側の `Connection` オブジェクトを経由するように変更します。これにより、SSH 経由の実行などが透過的に行われます。
 ```python
 def mocked_run_command(self, args, **kwargs):
@@ -46,13 +63,13 @@ def mocked_run_command(self, args, **kwargs):
     return (res.exitCode(), res.stdout(), res.stderr())
 ```
 
-### 4.3 バイナリパスの検索 (`get_bin_path`)
+### 5.3 バイナリパスの検索 (`get_bin_path`)
 システム探索を避け、パフォーマンスと安全性のために `/usr/bin/` 以下のパスを優先的に返すように固定します。
 
-### 4.4 結果の記録 (`_record_module_result`)
+### 5.4 結果の記録 (`_record_module_result`)
 モジュールの実行結果（辞書型）を JSON シリアライズし、Java 側がキャプチャ可能な形式で出力（標準出力または内部変数への代入）します。
 
-## 5. システムモジュールのモック
+## 6. システムモジュールのモック
 
 GraalPy の制限や、Ansible 内部の複雑な依存関係を回避するため、以下のモジュールをモックに差し替えています。
 
@@ -61,7 +78,7 @@ GraalPy の制限や、Ansible 内部の複雑な依存関係を回避するた�
 -   **`termios`**: 端末制御関連の定数とメソッドをスタブ化します。
 -   **`cryptography`, `selinux`**: ネイティブ依存が強い、あるいは不要なモジュールを `None` に設定し、インポートエラーを制御します。
 
-## 6. チェックモードの制御
+## 7. チェックモードの制御
 
 チェックモード（ドライラン）の動作は、Playbook レベルおよびタスクレベルの設定に基づき、`PlaybookExecutor` によって決定されます。
 
@@ -69,7 +86,7 @@ GraalPy の制限や、Ansible 内部の複雑な依存関係を回避するた�
 -   **モジュールの動作**: `AnsibleModule` インスタンスは、自身に渡された `_ansible_check_mode` 引数を参照し、実際の変更を伴う処理をスキップするかどうかを判断します（これは Ansible 本来の動作と同じです）。
 -   **一貫性の維持**: Java 側でチェックモードの判定（テンプレート評価等）を完結させ、Python 側には最終的な真偽値のみを渡すことで、複雑な条件分岐の二重実装を防いでいます。
 
-## 7. 関連ドキュメント
+## 8. 関連ドキュメント
 - [タスク実行エンジン](Task-Executor.md)
 - [タスク制御の実装詳細](Task-Control.md)
 - [GraalPy 統合の詳細](../tech/GraalPy-Integration.md)
