@@ -141,10 +141,18 @@ public class PlaybookCli implements Callable<Integer> {
     }
 
     private void registerStandardModules(TaskExecutor executor) {
-        executor.registerModule("debug", (args, becomeContext, context) -> {
-            Object msg = args.getOrDefault("msg", "Hello world");
-            System.out.println("DEBUG: " + msg);
-            return TaskResult.success(false, Map.of("msg", msg));
+        executor.registerModule("debug", new Module() {
+            @Override
+            public TaskResult execute(Map<String, Object> args, BecomeContext becomeContext, Context context) {
+                Object msg = args.getOrDefault("msg", "Hello world");
+                System.out.println("DEBUG: " + msg);
+                return TaskResult.success(false, Map.of("msg", msg));
+            }
+
+            @Override
+            public boolean supportsCheckMode() {
+                return true;
+            }
         });
 
         executor.registerModule("command", (args, becomeContext, context) -> {
@@ -189,8 +197,11 @@ public class PlaybookCli implements Callable<Integer> {
             return TaskResult.success(data);
         });
 
-        executor.registerModule("file", new PythonModule("ansible.builtin.file"));
-        executor.registerModule("copy", new PythonModule("ansible.builtin.copy"));
+        executor.registerModule("file", new PythonModule("ansible.builtin.file", true));
+        executor.registerModule("copy", new PythonModule("ansible.builtin.copy", true));
+        executor.registerModule("stat", new PythonModule("ansible.builtin.stat", true));
+        executor.registerModule("template", new PythonModule("ansible.builtin.template", true));
+        executor.registerModule("ping", new PythonModule("ansible.builtin.ping", true));
     }
 
     private void printSummary(Map<String, List<TaskResult>> results) {

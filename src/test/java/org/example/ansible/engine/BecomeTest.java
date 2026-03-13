@@ -46,6 +46,11 @@ class BecomeTest {
         }
 
         @Override
+        public org.example.ansible.module.Module getModule(String action) {
+            return (args, becomeContext, context) -> TaskResult.success(Map.of());
+        }
+
+        @Override
         public void close() {}
     }
 

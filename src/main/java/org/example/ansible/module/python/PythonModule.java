@@ -22,15 +22,30 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class PythonModule implements Module {
     private final String moduleName;
     private final String scriptContent; // Added back for mocking/legacy support
+    private final boolean supportsCheckMode;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public PythonModule(String moduleName) {
-        this(moduleName, null);
+        this(moduleName, null, false);
+    }
+
+    public PythonModule(String moduleName, boolean supportsCheckMode) {
+        this(moduleName, null, supportsCheckMode);
     }
 
     public PythonModule(String moduleName, String scriptContent) {
+        this(moduleName, scriptContent, false);
+    }
+
+    public PythonModule(String moduleName, String scriptContent, boolean supportsCheckMode) {
         this.moduleName = moduleName;
         this.scriptContent = scriptContent;
+        this.supportsCheckMode = supportsCheckMode;
+    }
+
+    @Override
+    public boolean supportsCheckMode() {
+        return supportsCheckMode;
     }
 
     @Override

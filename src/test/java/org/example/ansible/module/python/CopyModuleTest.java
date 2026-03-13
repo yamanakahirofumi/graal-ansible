@@ -57,7 +57,7 @@ public class CopyModuleTest {
             "    changed = True\n" +
             "print(json.dumps({'changed': changed, 'dest': dest, 'success': True}))\n";
 
-        taskExecutor.registerModule("copy", new PythonModule("copy", copyModuleMock));
+        taskExecutor.registerModule("copy", new PythonModule("copy", copyModuleMock, true));
         
         Map<String, Object> args = Map.of(
             "content", content,

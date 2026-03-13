@@ -32,6 +32,19 @@ class CheckModeTest {
             public org.example.ansible.util.OSHandler getOsHandler() { return null; }
             @Override
             public void close() {}
+            @Override
+            public org.example.ansible.module.Module getModule(String action) {
+                return new org.example.ansible.module.Module() {
+                    @Override
+                    public TaskResult execute(Map<String, Object> args, BecomeContext becomeContext, org.graalvm.polyglot.Context context) {
+                        return TaskResult.success(Map.of());
+                    }
+                    @Override
+                    public boolean supportsCheckMode() {
+                        return true;
+                    }
+                };
+            }
         };
 
         PlaybookExecutor executor = new PlaybookExecutor(taskExecutor);
@@ -116,5 +129,57 @@ class CheckModeTest {
 
         executor.execute(playbook7, inventory, Map.of(), null, false);
         assertEquals(true, capturedTasks.get(0).args().get("_ansible_check_mode"));
+    }
+
+    @Test
+    void testCheckModeSkippingWhenNotSupported() {
+        ITaskExecutor taskExecutor = new ITaskExecutor() {
+            private final Map<String, org.example.ansible.module.Module> modules = new java.util.HashMap<>();
+            @Override
+            public TaskResult execute(Task task, BecomeContext becomeContext) { return null; }
+            @Override
+            public TaskResult execute(Task task, BecomeContext becomeContext, Connection connection) { return null; }
+            @Override
+            public org.example.ansible.util.OSHandler getOsHandler() { return null; }
+            @Override
+            public void close() {}
+            @Override
+            public org.example.ansible.module.Module getModule(String action) { return modules.get(action); }
+            public void registerModule(String action, org.example.ansible.module.Module module) { modules.put(action, module); }
+        };
+
+        // Module that DOES NOT support check mode
+        ((ITaskExecutor) taskExecutor).getModule(""); // dummy to allow cast if needed, but I'll just use a local class or similar
+
+        // Actually I can just use TaskExecutor and mock the modules
+        TaskExecutor realTaskExecutor = new TaskExecutor();
+        realTaskExecutor.registerModule("no_check", new org.example.ansible.module.python.PythonModule("no_check", false));
+        realTaskExecutor.registerModule("with_check", new org.example.ansible.module.python.PythonModule("with_check", true));
+
+        PlaybookExecutor executor = new PlaybookExecutor(realTaskExecutor);
+        Inventory inventory = new Inventory(new Group("all", List.of(new Host("localhost")), List.of(), Map.of()));
+
+        // 1. Task with no_check module in check mode
+        Task task1 = new Task("task1", "no_check", Map.of());
+        Play play1 = new Play("play1", "all", List.of(task1));
+        Playbook playbook1 = new Playbook(List.of(play1));
+
+        Map<String, List<TaskResult>> results1 = executor.execute(playbook1, inventory, Map.of(), null, true);
+        TaskResult res1 = results1.get("localhost").get(0);
+        assertTrue(Boolean.TRUE.equals(res1.data().get("skipped")));
+        assertEquals("check_mode_not_supported", res1.data().get("skipped_reason"));
+
+        // 2. Task with with_check module in check mode
+        // Note: this will try to execute and fail if no actual python is there, but it should NOT be skipped immediately by PlaybookExecutor
+        Task task2 = new Task("task2", "with_check", Map.of());
+        Play play2 = new Play("play2", "all", List.of(task2));
+        Playbook playbook2 = new Playbook(List.of(play2));
+
+        Map<String, List<TaskResult>> results2 = executor.execute(playbook2, inventory, Map.of(), null, true);
+        TaskResult res2 = results2.get("localhost").get(0);
+        // It should NOT have the skipped_reason from PlaybookExecutor
+        assertNotEquals("check_mode_not_supported", res2.data().get("skipped_reason"));
+
+        realTaskExecutor.close();
     }
 }

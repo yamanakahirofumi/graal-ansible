@@ -74,7 +74,7 @@ class ActualModuleIntegrationTest {
 
     @Test
     void testActualPingModule() {
-        taskExecutor.registerModule("ping", new PythonModule("ping"));
+        taskExecutor.registerModule("ping", new PythonModule("ping", true));
 
         Task task = new Task("test_ping", "ping", Map.of());
         TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection);
@@ -85,7 +85,7 @@ class ActualModuleIntegrationTest {
 
     @Test
     void testActualFileModule() {
-        taskExecutor.registerModule("file", new PythonModule("file"));
+        taskExecutor.registerModule("file", new PythonModule("file", true));
 
         String remotePath = "/tmp/touch-test.txt";
         Task task = new Task("test_file", "file", Map.of(
@@ -106,7 +106,7 @@ class ActualModuleIntegrationTest {
 
     @Test
     void testActualStatModule() {
-        taskExecutor.registerModule("stat", new PythonModule("stat"));
+        taskExecutor.registerModule("stat", new PythonModule("stat", true));
 
         String remotePath = "/tmp/stat-test.txt";
         // Setup state using SSH
@@ -125,7 +125,7 @@ class ActualModuleIntegrationTest {
 
     @Test
     void testActualCopyModule() throws IOException {
-        taskExecutor.registerModule("copy", new PythonModule("copy"));
+        taskExecutor.registerModule("copy", new PythonModule("copy", true));
 
         Path srcFile = tempDir.resolve("copy-src.txt");
         String content = "Hello from Actual Copy Module (src)";
@@ -148,7 +148,7 @@ class ActualModuleIntegrationTest {
 
     @Test
     void testActualTemplateModule() throws IOException {
-        taskExecutor.registerModule("template", new PythonModule("template"));
+        taskExecutor.registerModule("template", new PythonModule("template", true));
 
         Path srcFile = tempDir.resolve("template.j2");
         String remotePath = "/tmp/template-out.txt";

@@ -44,7 +44,7 @@ class PythonModuleTest {
             sys.stdout.write(json.dumps(result))
             """;
 
-        taskExecutor.registerModule("test_module", new PythonModule("test_module", script));
+        taskExecutor.registerModule("test_module", new PythonModule("test_module", script, true));
         Task task = new Task("test", "test_module", Map.of("foo", "bar"));
 
         TaskResult result = taskExecutor.execute(task, BecomeContext.empty());
@@ -70,7 +70,7 @@ class PythonModuleTest {
             print(json.dumps(result))
             """;
 
-        taskExecutor.registerModule("fail_module", new PythonModule("fail_module", script));
+        taskExecutor.registerModule("fail_module", new PythonModule("fail_module", script, true));
         Task task = new Task("test", "fail_module", Map.of());
         TaskResult result = taskExecutor.execute(task, BecomeContext.empty());
 

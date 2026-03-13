@@ -81,6 +81,11 @@ public class TaskExecutor implements ITaskExecutor {
         modules.put(action, module);
     }
 
+    @Override
+    public Module getModule(String action) {
+        return modules.get(action);
+    }
+
     /**
      * Executes the given task.
      *

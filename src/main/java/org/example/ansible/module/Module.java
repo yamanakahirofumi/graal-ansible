@@ -20,4 +20,13 @@ public interface Module {
      * @return The result of the execution.
      */
     TaskResult execute(Map<String, Object> args, BecomeContext becomeContext, Context context);
+
+    /**
+     * Indicates if this module supports check mode (dry-run).
+     *
+     * @return true if it supports check mode, false otherwise.
+     */
+    default boolean supportsCheckMode() {
+        return false;
+    }
 }

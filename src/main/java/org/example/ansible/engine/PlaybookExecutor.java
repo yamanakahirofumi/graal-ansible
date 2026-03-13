@@ -373,6 +373,12 @@ public class PlaybookExecutor {
             return TaskResult.success(false, Map.of("meta", resolvedTask.args().getOrDefault("_raw_params", ""), "changed", false));
         }
 
+        // Check if module supports check mode
+        org.example.ansible.module.Module module = taskExecutor.getModule(resolvedTask.action());
+        if (effectiveCheckMode && module != null && !module.supportsCheckMode()) {
+            return new TaskResult(true, false, "Skipped: module does not support check mode", Map.of("skipped", true, "skipped_reason", "check_mode_not_supported"));
+        }
+
         BecomeContext becomeContext = resolveBecomeContext(play, resolvedTask, variables);
 
         if (task.until() == null) {

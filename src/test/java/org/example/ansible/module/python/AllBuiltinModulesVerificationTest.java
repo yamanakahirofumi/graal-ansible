@@ -71,7 +71,7 @@ class AllBuiltinModulesVerificationTest {
         List<String> failedWithOtherError = new ArrayList<>();
 
         for (String moduleName : modules) {
-            taskExecutor.registerModule(moduleName, new PythonModule(moduleName));
+            taskExecutor.registerModule(moduleName, new PythonModule(moduleName, true));
             Task task = new Task("verify_" + moduleName, moduleName, Map.of());
             TaskResult result = taskExecutor.execute(task, BecomeContext.empty());
 
