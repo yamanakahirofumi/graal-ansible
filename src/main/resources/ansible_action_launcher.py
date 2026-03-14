@@ -61,6 +61,10 @@ try:
         m.tcsetattr = lambda fd, opt, mode: None
         sys.modules['termios'] = m
 
+    # Mock wcwidth in display to avoid ctypes issues on some environments
+    import ansible.utils.display
+    ansible.utils.display.wcwidth = lambda c: 1
+
     from ansible.plugins.loader import action_loader
     from ansible.utils.display import Display
     from ansible.template import Templar

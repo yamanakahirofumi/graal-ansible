@@ -91,6 +91,34 @@ try:
         json.dumps = mocked_json_dumps
         json._graal_ansible_patched = True
 
+    # Mock multiprocessing to avoid fork issues on Windows and native process issues in sandbox
+    import multiprocessing
+    if not hasattr(multiprocessing, '_graal_ansible_patched'):
+        class MockProcessContext:
+            def Process(self, *args, **kwargs):
+                class DummyProcess:
+                    def __init__(self): self.exitcode = 0
+                    def start(self): pass
+                    def join(self, timeout=None): pass
+                    def is_alive(self): return False
+                    def terminate(self): pass
+                return DummyProcess()
+            def Queue(self, *args, **kwargs):
+                class DummyQueue:
+                    def put(self, *args, **kwargs): pass
+                    def get(self, *args, **kwargs): return None
+                return DummyQueue()
+            def Event(self):
+                class DummyEvent:
+                    def set(self): pass
+                    def is_set(self): return True
+                    def wait(self, timeout=None): return True
+                return DummyEvent()
+
+        multiprocessing.get_context = lambda method=None: MockProcessContext()
+        multiprocessing.set_start_method = lambda method, force=False: None
+        multiprocessing._graal_ansible_patched = True
+
     # Monkeypatch globally before instantiation
     ansible.module_utils.basic._load_params = lambda: (complex_args, 'main')
     def mocked_load_params(self):
