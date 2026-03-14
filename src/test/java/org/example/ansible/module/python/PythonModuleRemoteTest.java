@@ -39,10 +39,16 @@ class PythonModuleRemoteTest {
         Path sitePackages = tempDir.resolve("site-packages");
         Path ansibleDir = sitePackages.resolve("ansible");
         Files.createDirectories(ansibleDir.resolve("module_utils"));
+        Files.createDirectories(ansibleDir.resolve("_vendor"));
+        Files.createDirectories(ansibleDir.resolve("_internal"));
+        Files.createDirectories(ansibleDir.resolve("compat"));
         Files.createDirectories(ansibleDir.resolve("modules"));
         Files.writeString(ansibleDir.resolve("__init__.py"), "");
         Files.writeString(ansibleDir.resolve("release.py"), "__version__ = '1.0.0'");
         Files.writeString(ansibleDir.resolve("module_utils/basic.py"), "class AnsibleModule: pass");
+        Files.writeString(ansibleDir.resolve("_vendor/__init__.py"), "");
+        Files.writeString(ansibleDir.resolve("_internal/__init__.py"), "");
+        Files.writeString(ansibleDir.resolve("compat/__init__.py"), "");
         Files.writeString(ansibleDir.resolve("modules/ping.py"), "print('{\"ping\": \"pong\"}')");
 
         // Set system property for PythonEnv

@@ -241,17 +241,20 @@ public class PythonModule implements Module {
                     addFileToZip(zos, ansibleBase.resolve("__init__.py"), "ansible/__init__.py");
                     addFileToZip(zos, ansibleBase.resolve("release.py"), "ansible/release.py");
 
-                    // Add module_utils recursively
-                    Path moduleUtils = ansibleBase.resolve("module_utils");
-                    if (Files.exists(moduleUtils) && Files.isDirectory(moduleUtils)) {
-                        Files.walkFileTree(moduleUtils, new SimpleFileVisitor<>() {
-                            @Override
-                            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                                String relativePath = "ansible/module_utils/" + moduleUtils.relativize(file).toString().replace(File.separatorChar, '/');
-                                addFileToZip(zos, file, relativePath);
-                                return FileVisitResult.CONTINUE;
-                            }
-                        });
+                    // Add core directories recursively
+                    String[] coreDirs = {"module_utils", "_vendor", "_internal", "compat"};
+                    for (String dirName : coreDirs) {
+                        Path dirPath = ansibleBase.resolve(dirName);
+                        if (Files.exists(dirPath) && Files.isDirectory(dirPath)) {
+                            Files.walkFileTree(dirPath, new SimpleFileVisitor<>() {
+                                @Override
+                                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                                    String relativePath = "ansible/" + dirName + "/" + dirPath.relativize(file).toString().replace(File.separatorChar, '/');
+                                    addFileToZip(zos, file, relativePath);
+                                    return FileVisitResult.CONTINUE;
+                                }
+                            });
+                        }
                     }
                     // For now, we only take from the first site-package that has 'ansible'
                     break;
