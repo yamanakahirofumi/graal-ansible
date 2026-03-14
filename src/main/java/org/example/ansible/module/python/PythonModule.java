@@ -198,6 +198,8 @@ public class PythonModule implements Module {
 
         StringBuilder sb = new StringBuilder();
         sb.append("import json, sys, os, base64\n");
+        sb.append("import __main__\n");
+        sb.append("__main__._module_fqn = 'ansible.builtin.").append(moduleName).append("'\n");
         if (zipFileName != null) {
             sb.append("script_dir = os.path.dirname(os.path.abspath(__file__))\n");
             sb.append("sys.path.insert(0, os.path.join(script_dir, '").append(zipFileName).append("'))\n");
@@ -211,8 +213,6 @@ public class PythonModule implements Module {
         sb.append("except Exception: pass\n");
         sb.append("module_code = base64.b64decode('").append(base64ModuleCode).append("').decode('utf-8')\n");
         sb.append("if __name__ == '__main__':\n");
-        sb.append("    import __main__\n");
-        sb.append("    __main__._module_fqn = 'ansible.builtin.").append(moduleName).append("'\n");
         sb.append("    __main__.complex_args = complex_args\n");
         sb.append("    exec(compile(module_code, '").append(moduleName).append(".py', 'exec'), globals())\n");
 
