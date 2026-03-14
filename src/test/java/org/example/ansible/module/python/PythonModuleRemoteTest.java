@@ -78,12 +78,12 @@ class PythonModuleRemoteTest {
                 if (remotePath.endsWith("ansible_lib.zip")) {
                     zipTransferred = true;
                 }
-                if (remotePath.endsWith("/Ansiballz_ping.py")) {
+                if (remotePath.endsWith("/ansible_module_ping.py")) {
                     moduleTransferredWithPrefix = true;
                 }
             }
             assertTrue(zipTransferred, "ansible_lib.zip should have been transferred");
-            assertTrue(moduleTransferredWithPrefix, "Module should have been transferred with 'Ansiballz_' prefix");
+            assertTrue(moduleTransferredWithPrefix, "Module should have been transferred with 'ansible_module_' prefix");
 
             // Verify script contains sys.path.insert
             boolean scriptHasSysPath = false;
@@ -105,7 +105,7 @@ class PythonModuleRemoteTest {
                 if (content.contains("ansible.module_utils.basic._ANSIBLE_PROFILE = 'modern'")) {
                     scriptHasProfile = true;
                 }
-                if (content.contains("exec(compile(module_code, 'Ansiballz_ping.py', 'exec'), globals())")) {
+                if (content.contains("exec(compile(module_code, 'ansible_module_ping.py', 'exec'), globals())")) {
                     scriptHasCompileWithPrefix = true;
                 }
             }
@@ -113,7 +113,7 @@ class PythonModuleRemoteTest {
             assertTrue(scriptHasMonkeyPatch, "Wrapped script should include monkeypatch for _load_params");
             assertTrue(scriptHasModuleFqn, "Wrapped script should set __main__._module_fqn");
             assertTrue(scriptHasProfile, "Wrapped script should set _ANSIBLE_PROFILE");
-            assertTrue(scriptHasCompileWithPrefix, "Wrapped script should use 'Ansiballz_' prefix in compile()");
+            assertTrue(scriptHasCompileWithPrefix, "Wrapped script should use 'ansible_module_' prefix in compile()");
 
         } finally {
             System.clearProperty("ansible.site.packages");

@@ -150,7 +150,7 @@ public class PythonModule implements Module {
             connection.putFile(dependencyZip, remoteZipPath);
 
             // Transfer module
-            String remoteModulePath = remoteTmpDir + "/Ansiballz_" + moduleName + ".py";
+            String remoteModulePath = remoteTmpDir + "/ansible_module_" + moduleName + ".py";
             Path localTempFile = Files.createTempFile("ansible-module-", ".py");
             try {
                 Files.writeString(localTempFile, wrappedScript, StandardCharsets.UTF_8);
