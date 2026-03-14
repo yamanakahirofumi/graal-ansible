@@ -7,6 +7,7 @@ import org.example.ansible.engine.TaskExecutor;
 import org.example.ansible.engine.TaskResult;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
@@ -151,6 +152,7 @@ class ActualModuleIntegrationTest {
     }
 
     @Test
+    @Disabled("Template module is an action plugin and cannot be run as a standalone remote module")
     void testActualTemplateModule() throws IOException {
         taskExecutor.registerModule("template", new PythonModule("template"));
 
