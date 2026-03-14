@@ -85,6 +85,7 @@ class PythonModuleRemoteTest {
             boolean scriptHasSysPath = false;
             boolean scriptHasMonkeyPatch = false;
             boolean scriptHasModuleFqn = false;
+            boolean scriptHasProfile = false;
             for (String content : capturedContents) {
                 if (content.contains("sys.path.insert(0, os.path.join(script_dir, 'ansible_lib.zip'))")) {
                     scriptHasSysPath = true;
@@ -96,10 +97,14 @@ class PythonModuleRemoteTest {
                 if (content.contains("__main__._module_fqn = 'ansible.builtin.ping'")) {
                     scriptHasModuleFqn = true;
                 }
+                if (content.contains("ansible.module_utils.basic._ANSIBLE_PROFILE = 'modern'")) {
+                    scriptHasProfile = true;
+                }
             }
             assertTrue(scriptHasSysPath, "Wrapped script should include ansible_lib.zip in sys.path");
             assertTrue(scriptHasMonkeyPatch, "Wrapped script should include monkeypatch for _load_params");
             assertTrue(scriptHasModuleFqn, "Wrapped script should set __main__._module_fqn");
+            assertTrue(scriptHasProfile, "Wrapped script should set _ANSIBLE_PROFILE");
 
         } finally {
             System.clearProperty("ansible.site.packages");

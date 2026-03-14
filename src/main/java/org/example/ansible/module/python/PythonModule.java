@@ -197,8 +197,7 @@ public class PythonModule implements Module {
         String base64Args = Base64.getEncoder().encodeToString(jsonArgs.getBytes(StandardCharsets.UTF_8));
 
         StringBuilder sb = new StringBuilder();
-        sb.append("import json, sys, os, base64\n");
-        sb.append("import __main__\n");
+        sb.append("import json, sys, os, base64, __main__\n");
         sb.append("__main__._module_fqn = 'ansible.builtin.").append(moduleName).append("'\n");
         if (zipFileName != null) {
             sb.append("script_dir = os.path.dirname(os.path.abspath(__file__))\n");
@@ -208,6 +207,7 @@ public class PythonModule implements Module {
         sb.append("try:\n");
         sb.append("    import ansible.module_utils.basic\n");
         sb.append("    ansible.module_utils.basic._load_params = lambda: (complex_args, 'main')\n");
+        sb.append("    ansible.module_utils.basic._ANSIBLE_PROFILE = 'modern'\n");
         sb.append("    def mocked_load_params(self): self.params = complex_args\n");
         sb.append("    ansible.module_utils.basic.AnsibleModule._load_params = mocked_load_params\n");
         sb.append("except Exception: pass\n");
@@ -219,7 +219,7 @@ public class PythonModule implements Module {
         return sb.toString();
     }
 
-    private synchronized Path getOrCreateDependencyZip() throws IOException {
+    private static synchronized Path getOrCreateDependencyZip() throws IOException {
         List<String> sitePackages = PythonEnv.getSitePackagesFromEnv();
         String key = String.join(":", sitePackages);
 
@@ -230,8 +230,8 @@ public class PythonModule implements Module {
             }
         }
 
-        Path zipPath = Paths.get("target", "ansible_lib.zip");
-        Files.createDirectories(zipPath.getParent());
+        Path zipPath = Files.createTempFile("ansible_lib-", ".zip");
+        zipPath.toFile().deleteOnExit();
 
         try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(zipPath.toFile()))) {
             for (String sitePackage : sitePackages) {
@@ -266,7 +266,7 @@ public class PythonModule implements Module {
         return zipPath;
     }
 
-    private void addFileToZip(ZipOutputStream zos, Path file, String zipPath) throws IOException {
+    private static void addFileToZip(ZipOutputStream zos, Path file, String zipPath) throws IOException {
         if (!Files.exists(file)) return;
         ZipEntry zipEntry = new ZipEntry(zipPath);
         zos.putNextEntry(zipEntry);
