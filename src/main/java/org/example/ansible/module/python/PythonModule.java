@@ -150,7 +150,7 @@ public class PythonModule implements Module {
             connection.putFile(dependencyZip, remoteZipPath);
 
             // Transfer module
-            String remoteModulePath = remoteTmpDir + "/" + moduleName + ".py";
+            String remoteModulePath = remoteTmpDir + "/ansible_module_" + moduleName + ".py";
             Path localTempFile = Files.createTempFile("ansible-module-", ".py");
             try {
                 Files.writeString(localTempFile, wrappedScript, StandardCharsets.UTF_8);
@@ -214,7 +214,7 @@ public class PythonModule implements Module {
         sb.append("module_code = base64.b64decode('").append(base64ModuleCode).append("').decode('utf-8')\n");
         sb.append("if __name__ == '__main__':\n");
         sb.append("    __main__.complex_args = complex_args\n");
-        sb.append("    exec(compile(module_code, '").append(moduleName).append(".py', 'exec'), globals())\n");
+        sb.append("    exec(compile(module_code, 'ansible_module_").append(moduleName).append(".py', 'exec'), globals())\n");
 
         return sb.toString();
     }
