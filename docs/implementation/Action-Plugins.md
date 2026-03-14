@@ -1,6 +1,6 @@
-# Action Plugin 実装仕様
+# Action Plugin 実装仕様 (将来の設計指針)
 
-本ドキュメントでは、`graal-ansible` における Ansible Action Plugin の実行メカニズムについて詳述します。Action Plugin は、ターゲットノードではなく**制御ノード（Java 実行環境）側**で動作する特殊なプラグインであり、複雑なロジックや、複数のモジュール実行を制御するために使用されます。
+本ドキュメントでは、`graal-ansible` における Ansible Action Plugin の実行メカニズムの設計方針について詳述します。 **(注意: 本ドキュメントは将来の実装に向けた設計仕様であり、現時点では未実装です)**
 
 ## 1. Action Plugin の概要
 
