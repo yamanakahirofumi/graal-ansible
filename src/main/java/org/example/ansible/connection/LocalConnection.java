@@ -99,18 +99,18 @@ public class LocalConnection implements Connection {
     }
 
     @Override
-    public void putFile(Path localPath, Path remotePath) {
+    public void putFile(Path localPath, String remotePath) {
         try {
-            Files.copy(localPath, remotePath, StandardCopyOption.REPLACE_EXISTING);
+            Files.copy(localPath, Path.of(remotePath), StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException e) {
             throw new RuntimeException("Failed to copy file locally (putFile): " + e.getMessage(), e);
         }
     }
 
     @Override
-    public void fetchFile(Path remotePath, Path localPath) {
+    public void fetchFile(String remotePath, Path localPath) {
         try {
-            Files.copy(remotePath, localPath, StandardCopyOption.REPLACE_EXISTING);
+            Files.copy(Path.of(remotePath), localPath, StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException e) {
             throw new RuntimeException("Failed to copy file locally (fetchFile): " + e.getMessage(), e);
         }

@@ -66,13 +66,13 @@ class LocalConnectionTest {
         Files.writeString(src, content);
 
         // putFile
-        connection.putFile(src, dest);
+        connection.putFile(src, dest.toString());
         assertTrue(Files.exists(dest));
         assertEquals(content, Files.readString(dest));
 
         // fetchFile
         Path fetched = tempDir.resolve("fetched.txt");
-        connection.fetchFile(dest, fetched);
+        connection.fetchFile(dest.toString(), fetched);
         assertTrue(Files.exists(fetched));
         assertEquals(content, Files.readString(fetched));
     }

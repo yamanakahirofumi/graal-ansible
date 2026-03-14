@@ -81,22 +81,22 @@ public class SshConnection implements Connection {
     }
 
     @Override
-    public void putFile(Path localPath, Path remotePath) {
+    public void putFile(Path localPath, String remotePath) {
         try {
             ScpClientCreator creator = ScpClientCreator.instance();
             ScpClient scpClient = creator.createScpClient(session);
-            scpClient.upload(localPath, remotePath.toString(), ScpClient.Option.PreserveAttributes);
+            scpClient.upload(localPath, remotePath, ScpClient.Option.PreserveAttributes);
         } catch (IOException e) {
             throw new RuntimeException("Failed to upload file " + localPath + " to " + remotePath, e);
         }
     }
 
     @Override
-    public void fetchFile(Path remotePath, Path localPath) {
+    public void fetchFile(String remotePath, Path localPath) {
         try {
             ScpClientCreator creator = ScpClientCreator.instance();
             ScpClient scpClient = creator.createScpClient(session);
-            scpClient.download(remotePath.toString(), localPath, ScpClient.Option.PreserveAttributes);
+            scpClient.download(remotePath, localPath, ScpClient.Option.PreserveAttributes);
         } catch (IOException e) {
             throw new RuntimeException("Failed to download file " + remotePath + " to " + localPath, e);
         }
