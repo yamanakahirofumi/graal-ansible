@@ -127,21 +127,25 @@ class ActualModuleIntegrationTest {
     void testActualCopyModule() throws IOException {
         taskExecutor.registerModule("copy", new PythonModule("copy"));
 
-        Path srcFile = tempDir.resolve("copy-src.txt");
+        Path localSrcFile = tempDir.resolve("copy-src.txt");
         String content = "Hello from Actual Copy Module (src)";
-        Files.writeString(srcFile, content);
+        Files.writeString(localSrcFile, content);
 
-        String remotePath = "/tmp/copy-test.txt";
+        String remoteSrcPath = "/tmp/copy-src.txt";
+        connection.putFile(localSrcFile, remoteSrcPath);
+
+        String remoteDestPath = "/tmp/copy-test.txt";
         Task task = new Task("test_copy", "copy", Map.of(
-                "src", srcFile.toString(),
-                "dest", remotePath
+                "src", remoteSrcPath,
+                "dest", remoteDestPath,
+                "remote_src", true
         ));
         TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection);
 
         assertTrue(result.success(), "Execution failed: " + result.message());
 
         // Verify state on target node using SSH
-        var execResult = connection.execCommand("cat " + remotePath, BecomeContext.empty());
+        var execResult = connection.execCommand("cat " + remoteDestPath, BecomeContext.empty());
         assertEquals(0, execResult.exitCode());
         assertEquals(content, execResult.stdout().trim());
     }
@@ -150,13 +154,16 @@ class ActualModuleIntegrationTest {
     void testActualTemplateModule() throws IOException {
         taskExecutor.registerModule("template", new PythonModule("template"));
 
-        Path srcFile = tempDir.resolve("template.j2");
-        String remotePath = "/tmp/template-out.txt";
-        Files.writeString(srcFile, "Hello {{ name }}!");
+        Path localSrcFile = tempDir.resolve("template.j2");
+        String remoteDestPath = "/tmp/template-out.txt";
+        Files.writeString(localSrcFile, "Hello {{ name }}!");
+
+        String remoteSrcPath = "/tmp/template.j2";
+        connection.putFile(localSrcFile, remoteSrcPath);
 
         Task task = new Task("test_template", "template", Map.of(
-                "src", srcFile.toString(),
-                "dest", remotePath,
+                "src", remoteSrcPath,
+                "dest", remoteDestPath,
                 "name", "World"
         ));
 
@@ -167,7 +174,7 @@ class ActualModuleIntegrationTest {
         // For simulation, we don't necessarily create the file, but we should return success
         // If we want to verify the file, we should only do it if the module actually created it.
         if (result.changed()) {
-            var execResult = connection.execCommand("ls " + remotePath, BecomeContext.empty());
+            var execResult = connection.execCommand("ls " + remoteDestPath, BecomeContext.empty());
             assertEquals(0, execResult.exitCode());
         }
     }
