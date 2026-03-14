@@ -83,12 +83,18 @@ class PythonModuleRemoteTest {
 
             // Verify script contains sys.path.insert
             boolean scriptHasSysPath = false;
+            boolean scriptHasMonkeyPatch = false;
             for (String content : capturedContents) {
                 if (content.contains("sys.path.insert(0, os.path.join(script_dir, 'ansible_lib.zip'))")) {
                     scriptHasSysPath = true;
                 }
+                if (content.contains("ansible.module_utils.basic._load_params = lambda: (complex_args, 'main')") &&
+                    content.contains("def mocked_load_params(self): self.params = complex_args")) {
+                    scriptHasMonkeyPatch = true;
+                }
             }
             assertTrue(scriptHasSysPath, "Wrapped script should include ansible_lib.zip in sys.path");
+            assertTrue(scriptHasMonkeyPatch, "Wrapped script should include monkeypatch for _load_params");
 
         } finally {
             System.clearProperty("ansible.site.packages");

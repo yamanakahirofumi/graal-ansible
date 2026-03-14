@@ -203,10 +203,10 @@ public class PythonModule implements Module {
             sb.append("sys.path.insert(0, os.path.join(script_dir, '").append(zipFileName).append("'))\n");
         }
         sb.append("complex_args = json.loads(base64.b64decode('").append(base64Args).append("').decode('utf-8'))\n");
-        sb.append("def mocked_load_params(*args, **kwargs): return (complex_args, 'main')\n");
         sb.append("try:\n");
         sb.append("    import ansible.module_utils.basic\n");
-        sb.append("    ansible.module_utils.basic._load_params = mocked_load_params\n");
+        sb.append("    ansible.module_utils.basic._load_params = lambda: (complex_args, 'main')\n");
+        sb.append("    def mocked_load_params(self): self.params = complex_args\n");
         sb.append("    ansible.module_utils.basic.AnsibleModule._load_params = mocked_load_params\n");
         sb.append("except Exception: pass\n");
         sb.append("module_code = base64.b64decode('").append(base64ModuleCode).append("').decode('utf-8')\n");
