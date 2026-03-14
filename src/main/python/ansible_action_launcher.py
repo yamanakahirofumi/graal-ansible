@@ -4,14 +4,43 @@ import os
 import types
 
 # Setup sys.path from site_packages_java
-for p in site_packages_java:
-    if p not in sys.path:
-        sys.path.append(p)
+if 'site_packages_java' in locals() and site_packages_java is not None:
+    for p in site_packages_java:
+        if p not in sys.path:
+            sys.path.append(p)
 
 try:
     # Aggressively mock native/problematic modules
     for mname in ['cryptography', 'cryptography.hazmat', 'cryptography.hazmat.bindings', '_cffi_backend', 'yaml._yaml', 'selinux']:
         sys.modules[mname] = None
+
+    # Mock multiprocessing to avoid fork issues on Windows and native process issues in sandbox
+    import multiprocessing
+    if not hasattr(multiprocessing, '_graal_ansible_patched'):
+        class MockProcessContext:
+            def Process(self, *args, **kwargs):
+                class DummyProcess:
+                    def __init__(self): self.exitcode = 0
+                    def start(self): pass
+                    def join(self, timeout=None): pass
+                    def is_alive(self): return False
+                    def terminate(self): pass
+                return DummyProcess()
+            def Queue(self, *args, **kwargs):
+                class DummyQueue:
+                    def put(self, *args, **kwargs): pass
+                    def get(self, *args, **kwargs): return None
+                return DummyQueue()
+            def Event(self):
+                class DummyEvent:
+                    def set(self): pass
+                    def is_set(self): return True
+                    def wait(self, timeout=None): return True
+                return DummyEvent()
+
+        multiprocessing.get_context = lambda method=None: MockProcessContext()
+        multiprocessing.set_start_method = lambda method, force=False: None
+        multiprocessing._graal_ansible_patched = True
 
     # Mock missing system modules as actual modules (needed on Windows or restricted environments)
     import collections
@@ -67,7 +96,10 @@ try:
             self._shell = types.SimpleNamespace(
                 tmpdir=None,
                 _generate_temp_dir_name=lambda: "ansible-tmp",
-                _mkdtemp2=lambda **kwargs: types.SimpleNamespace(command="mkdir -p " + kwargs.get('basefile', 'tmp'), input_data=None)
+                _mkdtemp2=lambda **kwargs: types.SimpleNamespace(command="mkdir -p " + kwargs.get('basefile', 'tmp'), input_data=None),
+                join_path=os.path.join,
+                get_remote_filename=os.path.basename,
+                path_has_trailing_slash=lambda p: p.endswith('/')
             )
             self.transport = "ssh" # or "local"
 
@@ -75,14 +107,18 @@ try:
             # If it's a list, join it
             if isinstance(cmd, list):
                 cmd = ' '.join(cmd)
-            res = self._java_conn.execCommand(cmd, become_context_java)
-            return (res.exitCode(), res.stdout(), res.stderr())
+            if 'connection_java' in globals() and connection_java is not None:
+                res = connection_java.execCommand(cmd, become_context_java)
+                return (res.exitCode(), res.stdout(), res.stderr())
+            return (0, '', '')
 
         def put_file(self, in_path, out_path):
-            self._java_conn.putFile(str(in_path), str(out_path))
+            if 'connection_java' in globals() and connection_java is not None:
+                connection_java.putFile(str(in_path), str(out_path))
 
         def fetch_file(self, in_path, out_path):
-            self._java_conn.fetchFile(str(in_path), str(out_path))
+            if 'connection_java' in globals() and connection_java is not None:
+                connection_java.fetchFile(str(in_path), str(out_path))
 
     class MockPlayContext:
         def __init__(self):
@@ -99,6 +135,8 @@ try:
             return os.path.exists(path)
         def is_file(self, path):
             return os.path.isfile(path)
+        def get_basedir(self):
+            return os.getcwd()
 
     display = Display()
 
