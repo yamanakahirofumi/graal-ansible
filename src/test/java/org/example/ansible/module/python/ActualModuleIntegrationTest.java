@@ -35,9 +35,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ActualModuleIntegrationTest {
 
     @Container
-    private GenericContainer<?> targetNode = new GenericContainer<>(DockerImageName.parse("linuxserver/openssh-server:latest"))
-            .withExposedPorts(2222)
-            .withEnv("USER_PASSWORD", "password")
+    private GenericContainer<?> targetNode = new GenericContainer<>(DockerImageName.parse("mokojarasi/test-python-sshd:latest"))
+            .withExposedPorts(22)
+            .withEnv("USER_PASSWORD", "testuser")
             .withEnv("USER_NAME", "testuser")
             .withEnv("PASSWORD_ACCESS", "true")
             .withEnv("SUDO_ACCESS", "true")
@@ -55,9 +55,9 @@ class ActualModuleIntegrationTest {
         taskExecutor = new TaskExecutor();
         connection = new SshConnection(
                 targetNode.getHost(),
-                targetNode.getMappedPort(2222),
+                targetNode.getMappedPort(22),
                 "testuser",
-                "password"
+                "testuser"
         );
         connection.connect();
     }
