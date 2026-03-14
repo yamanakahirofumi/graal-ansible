@@ -13,6 +13,25 @@ try:
     for mname in ['cryptography', 'cryptography.hazmat', 'cryptography.hazmat.bindings', '_cffi_backend', 'yaml._yaml', 'selinux']:
         sys.modules[mname] = None
 
+    # Mock missing system modules as actual modules (needed on Windows or restricted environments)
+    import collections
+    passwd = collections.namedtuple('passwd', ['pw_name', 'pw_passwd', 'pw_uid', 'pw_gid', 'pw_gecos', 'pw_dir', 'pw_shell'])
+    group = collections.namedtuple('group', ['gr_name', 'gr_passwd', 'gr_gid', 'gr_mem'])
+    if 'grp' not in sys.modules:
+        m = types.ModuleType('grp')
+        m.getgrnam = m.getgrgid = lambda x: group('root', 'x', 0, [])
+        sys.modules['grp'] = m
+    if 'pwd' not in sys.modules:
+        m = types.ModuleType('pwd')
+        m.getpwnam = m.getpwuid = lambda x: passwd('root', 'x', 0, 0, 'root', '/root', '/bin/bash')
+        sys.modules['pwd'] = m
+    if 'termios' not in sys.modules or sys.modules['termios'] is None:
+        m = types.ModuleType('termios')
+        m.TCSAFLUSH = 1
+        m.tcgetattr = lambda fd: [0,0,0,0, ' ', ' ', []]
+        m.tcsetattr = lambda fd, opt, mode: None
+        sys.modules['termios'] = m
+
     from ansible.plugins.loader import action_loader
     from ansible.utils.display import Display
     from ansible.template import Templar
