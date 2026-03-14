@@ -157,6 +157,7 @@ public class PlaybookExecutor {
         }
 
         Map<String, Object> allVars = variableManager.getAllVariables(play, host, task);
+        taskExecutor.setCurrentTaskVars(allVars);
         TaskResult result;
 
         if (task.loop() != null) {

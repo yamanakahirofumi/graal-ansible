@@ -149,4 +149,5 @@ class ActualModuleIntegrationTest {
         assertEquals(0, execResult.exitCode());
         assertEquals(content, execResult.stdout().trim());
     }
+
 }

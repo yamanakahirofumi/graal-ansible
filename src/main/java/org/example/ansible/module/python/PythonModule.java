@@ -83,6 +83,9 @@ public class PythonModule implements Module {
                 // Legacy/Mock mode
                 context.getBindings("python").putMember("module_code", scriptContent);
                 source = loadResource("ansible_mock_launcher.py");
+            } else if (isActionPlugin(moduleName, sitePackages)) {
+                // Action plugin mode
+                source = loadResource("ansible_action_launcher.py");
             } else {
                 // Actual module mode
                 source = loadResource("ansible_launcher.py");
@@ -286,6 +289,16 @@ public class PythonModule implements Module {
             }
         }
         return Optional.empty();
+    }
+
+    private boolean isActionPlugin(String moduleName, List<String> sitePackages) {
+        for (String p : sitePackages) {
+            Path actionPluginPath = Paths.get(p, "ansible", "plugins", "action", moduleName + ".py");
+            if (Files.exists(actionPluginPath)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private Source loadResource(String name) throws IOException {

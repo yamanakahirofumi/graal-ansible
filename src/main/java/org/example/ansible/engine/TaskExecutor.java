@@ -16,6 +16,8 @@ import java.util.HashMap;
 public class TaskExecutor implements ITaskExecutor {
 
     private static final ThreadLocal<Connection> currentConnection = new ThreadLocal<>();
+    private static final ThreadLocal<Map<String, Object>> currentTaskVars = new ThreadLocal<>();
+    private static final ThreadLocal<BecomeContext> currentBecomeContext = new ThreadLocal<>();
 
     /**
      * Sets the connection for the current thread.
@@ -89,15 +91,37 @@ public class TaskExecutor implements ITaskExecutor {
      * @return The execution result.
      */
     public TaskResult execute(Task task, BecomeContext becomeContext) {
-        Module module = modules.get(task.action());
+        currentBecomeContext.set(becomeContext);
+        try {
+            return executeModule(task.action(), task.args());
+        } finally {
+            currentBecomeContext.remove();
+        }
+    }
+
+    @Override
+    public TaskResult executeModule(String moduleName, Map<String, Object> moduleArgs) {
+        Module module = modules.get(moduleName);
         if (module == null) {
-            return TaskResult.failure("Module not found: " + task.action());
+            return TaskResult.failure("Module not found: " + moduleName);
         }
         try {
-            return module.execute(task.args(), becomeContext, context);
+            context.getBindings("python").putMember("task_executor_java", this);
+            context.getBindings("python").putMember("task_vars_java", getCurrentTaskVars());
+            return module.execute(moduleArgs, currentBecomeContext.get(), context);
         } catch (Exception e) {
             return TaskResult.failure("Execution failed: " + e.getMessage());
         }
+    }
+
+    @Override
+    public void setCurrentTaskVars(Map<String, Object> taskVars) {
+        currentTaskVars.set(taskVars);
+    }
+
+    @Override
+    public Map<String, Object> getCurrentTaskVars() {
+        return currentTaskVars.get() != null ? currentTaskVars.get() : Map.of();
     }
 
     /**
