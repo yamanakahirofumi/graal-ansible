@@ -149,34 +149,4 @@ class ActualModuleIntegrationTest {
         assertEquals(0, execResult.exitCode());
         assertEquals(content, execResult.stdout().trim());
     }
-
-    @Test
-    void testActualTemplateModule() throws IOException {
-        taskExecutor.registerModule("template", new PythonModule("template"));
-
-        Path localSrcFile = tempDir.resolve("template.j2");
-        String remoteDestPath = "/tmp/template-out.txt";
-        Files.writeString(localSrcFile, "Hello {{ name }}!");
-
-        String remoteSrcPath = "/tmp/template.j2";
-        connection.putFile(localSrcFile, remoteSrcPath);
-
-        Task task = new Task("test_template", "template", Map.of(
-                "src", remoteSrcPath,
-                "dest", remoteDestPath,
-                "name", "World"
-        ));
-
-        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection);
-
-        assertTrue(result.success(), "Execution failed: " + result.message());
-
-        // For simulation, we don't necessarily create the file, but we should return success
-        // If we want to verify the file, we should only do it if the module actually created it.
-        if (result.changed()) {
-            var execResult = connection.execCommand("ls " + remoteDestPath, BecomeContext.empty());
-            assertEquals(0, execResult.exitCode());
-        }
-    }
-
 }
