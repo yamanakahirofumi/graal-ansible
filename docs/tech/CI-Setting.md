@@ -9,7 +9,7 @@ GitHub へのプッシュ（Push）またはプルリクエスト（Pull Request
 
 1. **チェックアウト**：リポジトリのソースコードを取得します。
 2. **GraalVM のセットアップ**：ネイティブビルドに必要な GraalVM JDK をセットアップします。`python` コンポーネントを明示的に指定して、Ansible コアの実行環境を構築します。
-3. **マルチプラットフォーム・マトリックス**：Ubuntu, Windows, macOS の各環境でテストを実行し、OS非依存性を検証します。
+3. **マルチプラットフォーム・マトリックス**：Ubuntu, Windows の各環境でテストを実行し、OS非依存性を検証します。
 4. **ビルドとテスト**：`mvn verify` を実行し、ユニットテストおよび結合テストを実施します。
 5. **Native Image ビルド**：各OS向けのネイティブバイナリを生成し、動作確認を行います。
 
@@ -29,7 +29,7 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v4
