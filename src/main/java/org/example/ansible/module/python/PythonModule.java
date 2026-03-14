@@ -20,15 +20,24 @@ import java.util.Base64;
 import java.io.File;
 import java.io.InputStream;
 import java.io.IOException;
+import java.io.FileOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.FileVisitResult;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
+import java.util.concurrent.ConcurrentHashMap;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class PythonModule implements Module {
     private final String moduleName;
     private final String scriptContent; // Added back for mocking/legacy support
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private static final Map<String, Path> dependencyZipCache = new ConcurrentHashMap<>();
 
     public PythonModule(String moduleName) {
         this(moduleName, null);
@@ -119,15 +128,26 @@ public class PythonModule implements Module {
             return TaskResult.failure("Module source not found: " + moduleName);
         }
 
-        String remoteTmpDir = "/tmp/ansible." + UUID.randomUUID();
+        Path dependencyZip;
         try {
-            String wrappedScript = wrapModule(moduleFile, args);
+            dependencyZip = getOrCreateDependencyZip();
+        } catch (IOException e) {
+            return TaskResult.failure("Failed to create dependency ZIP: " + e.getMessage());
+        }
+
+        String remoteTmpDir = "/tmp/ansible." + UUID.randomUUID();
+        String remoteZipPath = remoteTmpDir + "/ansible_lib.zip";
+        try {
+            String wrappedScript = wrapModule(moduleFile, args, "ansible_lib.zip");
 
             // Create remote temp dir
             var mkdirRes = connection.execCommand("mkdir -p " + remoteTmpDir, becomeContext);
             if (mkdirRes.exitCode() != 0) {
                 return TaskResult.failure("Failed to create remote temp dir: " + mkdirRes.stderr());
             }
+
+            // Transfer dependency ZIP
+            connection.putFile(dependencyZip, remoteZipPath);
 
             // Transfer module
             String remoteModulePath = remoteTmpDir + "/" + moduleName + ".py";
@@ -169,7 +189,7 @@ public class PythonModule implements Module {
         }
     }
 
-    private String wrapModule(File moduleFile, Map<String, Object> args) throws IOException {
+    private String wrapModule(File moduleFile, Map<String, Object> args, String zipFileName) throws IOException {
         String moduleCode = Files.readString(moduleFile.toPath(), StandardCharsets.UTF_8);
         String jsonArgs = objectMapper.writeValueAsString(args);
 
@@ -177,22 +197,81 @@ public class PythonModule implements Module {
         String base64Args = Base64.getEncoder().encodeToString(jsonArgs.getBytes(StandardCharsets.UTF_8));
 
         StringBuilder sb = new StringBuilder();
-        sb.append("import json, sys, os, base64\n");
+        sb.append("import json, sys, os, base64, __main__\n");
+        sb.append("__main__._module_fqn = 'ansible.builtin.").append(moduleName).append("'\n");
+        if (zipFileName != null) {
+            sb.append("script_dir = os.path.dirname(os.path.abspath(__file__))\n");
+            sb.append("sys.path.insert(0, os.path.join(script_dir, '").append(zipFileName).append("'))\n");
+        }
         sb.append("complex_args = json.loads(base64.b64decode('").append(base64Args).append("').decode('utf-8'))\n");
-        sb.append("def mocked_load_params(*args, **kwargs): return (complex_args, 'main')\n");
         sb.append("try:\n");
         sb.append("    import ansible.module_utils.basic\n");
-        sb.append("    ansible.module_utils.basic._load_params = mocked_load_params\n");
+        sb.append("    ansible.module_utils.basic._load_params = lambda: (complex_args, 'main')\n");
+        sb.append("    ansible.module_utils.basic._ANSIBLE_PROFILE = 'modern'\n");
+        sb.append("    def mocked_load_params(self): self.params = complex_args\n");
         sb.append("    ansible.module_utils.basic.AnsibleModule._load_params = mocked_load_params\n");
         sb.append("except Exception: pass\n");
         sb.append("module_code = base64.b64decode('").append(base64ModuleCode).append("').decode('utf-8')\n");
         sb.append("if __name__ == '__main__':\n");
-        sb.append("    import __main__\n");
-        sb.append("    __main__._module_fqn = 'ansible.builtin.").append(moduleName).append("'\n");
         sb.append("    __main__.complex_args = complex_args\n");
         sb.append("    exec(compile(module_code, '").append(moduleName).append(".py', 'exec'), globals())\n");
 
         return sb.toString();
+    }
+
+    private static synchronized Path getOrCreateDependencyZip() throws IOException {
+        List<String> sitePackages = PythonEnv.getSitePackagesFromEnv();
+        String key = String.join(":", sitePackages);
+
+        if (dependencyZipCache.containsKey(key)) {
+            Path cached = dependencyZipCache.get(key);
+            if (Files.exists(cached)) {
+                return cached;
+            }
+        }
+
+        Path zipPath = Files.createTempFile("ansible_lib-", ".zip");
+        zipPath.toFile().deleteOnExit();
+
+        try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(zipPath.toFile()))) {
+            for (String sitePackage : sitePackages) {
+                Path ansibleBase = Paths.get(sitePackage, "ansible");
+                if (Files.exists(ansibleBase) && Files.isDirectory(ansibleBase)) {
+                    // Add __init__.py and release.py
+                    addFileToZip(zos, ansibleBase.resolve("__init__.py"), "ansible/__init__.py");
+                    addFileToZip(zos, ansibleBase.resolve("release.py"), "ansible/release.py");
+
+                    // Add core directories recursively
+                    String[] coreDirs = {"module_utils", "_vendor", "_internal", "compat"};
+                    for (String dirName : coreDirs) {
+                        Path dirPath = ansibleBase.resolve(dirName);
+                        if (Files.exists(dirPath) && Files.isDirectory(dirPath)) {
+                            Files.walkFileTree(dirPath, new SimpleFileVisitor<>() {
+                                @Override
+                                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                                    String relativePath = "ansible/" + dirName + "/" + dirPath.relativize(file).toString().replace(File.separatorChar, '/');
+                                    addFileToZip(zos, file, relativePath);
+                                    return FileVisitResult.CONTINUE;
+                                }
+                            });
+                        }
+                    }
+                    // For now, we only take from the first site-package that has 'ansible'
+                    break;
+                }
+            }
+        }
+
+        dependencyZipCache.put(key, zipPath);
+        return zipPath;
+    }
+
+    private static void addFileToZip(ZipOutputStream zos, Path file, String zipPath) throws IOException {
+        if (!Files.exists(file)) return;
+        ZipEntry zipEntry = new ZipEntry(zipPath);
+        zos.putNextEntry(zipEntry);
+        Files.copy(file, zos);
+        zos.closeEntry();
     }
 
     private Optional<File> findModuleFile() {
