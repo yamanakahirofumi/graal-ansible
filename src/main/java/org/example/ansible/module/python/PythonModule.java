@@ -77,6 +77,7 @@ public class PythonModule implements Module {
             context.getBindings("python").putMember("site_packages_java", sitePackages);
             context.getBindings("python").putMember("connection_java", connection);
             context.getBindings("python").putMember("become_context_java", becomeContext);
+            context.getBindings("python").putMember("environment_java", TaskExecutor.getCurrentEnvironment());
 
             Source source;
             if (scriptContent != null) {
@@ -141,7 +142,7 @@ public class PythonModule implements Module {
             String wrappedScript = wrapModule(moduleFile, args, "ansible_lib.zip");
 
             // Create remote temp dir
-            var mkdirRes = connection.execCommand("mkdir -p " + remoteTmpDir, becomeContext);
+            var mkdirRes = connection.execCommand("mkdir -p " + remoteTmpDir, becomeContext, null);
             if (mkdirRes.exitCode() != 0) {
                 return TaskResult.failure("Failed to create remote temp dir: " + mkdirRes.stderr());
             }
@@ -160,7 +161,7 @@ public class PythonModule implements Module {
             }
 
             // Execute remotely
-            var execRes = connection.execCommand("python3 " + remoteModulePath, becomeContext);
+            var execRes = connection.execCommand("python3 " + remoteModulePath, becomeContext, TaskExecutor.getCurrentEnvironment());
             String output = execRes.stdout();
 
             if (output == null || output.isBlank()) {
@@ -185,7 +186,7 @@ public class PythonModule implements Module {
             return TaskResult.failure("Failed to prepare module: " + e.getMessage());
         } finally {
             // Cleanup
-            connection.execCommand("rm -rf " + remoteTmpDir, becomeContext);
+            connection.execCommand("rm -rf " + remoteTmpDir, becomeContext, null);
         }
     }
 

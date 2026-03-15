@@ -155,7 +155,7 @@ public class PlaybookCli implements Callable<Integer> {
             org.example.ansible.connection.Connection connection = TaskExecutor.getCurrentConnection();
             if (connection == null) connection = new LocalConnection();
 
-            org.example.ansible.connection.ConnectionResult result = connection.execCommand(command, becomeContext);
+            org.example.ansible.connection.ConnectionResult result = connection.execCommand(command, becomeContext, TaskExecutor.getCurrentEnvironment());
             Map<String, Object> data = new HashMap<>();
             data.put("stdout", result.stdout());
             data.put("stderr", result.stderr());
@@ -176,7 +176,7 @@ public class PlaybookCli implements Callable<Integer> {
             org.example.ansible.connection.Connection connection = TaskExecutor.getCurrentConnection();
             if (connection == null) connection = new LocalConnection();
 
-            org.example.ansible.connection.ConnectionResult result = connection.execCommand(command, becomeContext);
+            org.example.ansible.connection.ConnectionResult result = connection.execCommand(command, becomeContext, TaskExecutor.getCurrentEnvironment());
             Map<String, Object> data = new HashMap<>();
             data.put("stdout", result.stdout());
             data.put("stderr", result.stderr());

@@ -15,7 +15,7 @@ class LocalConnectionTest {
 
     @Test
     void testExecCommandSuccess() {
-        ConnectionResult result = connection.execCommand("echo hello", BecomeContext.empty());
+        ConnectionResult result = connection.execCommand("echo hello", BecomeContext.empty(), null);
         assertEquals(0, result.exitCode());
         assertEquals("hello", result.stdout().trim());
         assertTrue(result.stderr().isEmpty());
@@ -23,13 +23,13 @@ class LocalConnectionTest {
 
     @Test
     void testExecCommandFailure() {
-        ConnectionResult result = connection.execCommand("exit 42", BecomeContext.empty());
+        ConnectionResult result = connection.execCommand("exit 42", BecomeContext.empty(), null);
         assertEquals(42, result.exitCode());
     }
 
     @Test
     void testExecCommandStderr() {
-        ConnectionResult result = connection.execCommand("echo error 1>&2", BecomeContext.empty());
+        ConnectionResult result = connection.execCommand("echo error 1>&2", BecomeContext.empty(), null);
         assertEquals(0, result.exitCode());
         assertTrue(result.stdout().trim().isEmpty());
         assertEquals("error", result.stderr().trim());
@@ -52,7 +52,7 @@ class LocalConnectionTest {
             command = "cat " + largeFile.toAbsolutePath();
         }
 
-        ConnectionResult result = connection.execCommand(command, BecomeContext.empty());
+        ConnectionResult result = connection.execCommand(command, BecomeContext.empty(), null);
         assertEquals(0, result.exitCode());
         assertTrue(result.stdout().length() > 65536, "Output should be larger than 64KB, but was " + result.stdout().length());
         assertEquals(content.trim(), result.stdout().trim());

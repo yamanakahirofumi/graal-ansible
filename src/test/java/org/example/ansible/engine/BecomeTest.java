@@ -29,15 +29,15 @@ class BecomeTest {
         public final List<BecomeContext> executedContexts = new java.util.ArrayList<>();
 
         @Override
-        public TaskResult execute(Task task, BecomeContext becomeContext) {
+        public TaskResult execute(Task task, BecomeContext becomeContext, java.util.Map<String, String> environment) {
             executedTasks.add(task);
             executedContexts.add(becomeContext);
             return TaskResult.success(Map.of());
         }
 
         @Override
-        public TaskResult execute(Task task, BecomeContext becomeContext, org.example.ansible.connection.Connection connection) {
-            return execute(task, becomeContext);
+        public TaskResult execute(Task task, BecomeContext becomeContext, org.example.ansible.connection.Connection connection, java.util.Map<String, String> environment) {
+            return execute(task, becomeContext, environment);
         }
 
         @Override

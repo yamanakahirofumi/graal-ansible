@@ -32,7 +32,7 @@ class PythonModuleRemoteTest {
     void testExecuteRemotelyTransfersZip() throws IOException {
         // Setup mock connection
         Connection connection = mock(Connection.class);
-        when(connection.execCommand(anyString(), any())).thenReturn(new ConnectionResult("{\"failed\": false, \"changed\": true}", "", 0));
+        when(connection.execCommand(anyString(), any(), any())).thenReturn(new ConnectionResult("{\"failed\": false, \"changed\": true}", "", 0));
         TaskExecutor.setCurrentConnection(connection);
 
         // Create a dummy ansible installation in tempDir to satisfy PythonEnv
