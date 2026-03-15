@@ -1,23 +1,16 @@
 import json
 import sys
-from io import StringIO
-
-# Setup sys.path from site_packages_java
-for p in site_packages_java:
-    if p not in sys.path:
-        sys.path.append(p)
+import ansible_bridge
 
 # Convert Java Map to native Python dict
 complex_args = dict(complex_args_java) if complex_args_java is not None else {}
 
-def run_module():
-    old_stdout = sys.stdout
-    sys.stdout = mystdout = StringIO()
-    try:
-        module_globals = {'complex_args': complex_args, 'ansible_module_results': {}}
-        exec(module_code, module_globals)
-        return mystdout.getvalue()
-    finally:
-        sys.stdout = old_stdout
+try:
+    ansible_bridge.setup_sys_path(site_packages_java)
+    # Mock launcher might not need all patches, but setup_sys_path and setup_env are useful.
+    ansible_bridge.setup_env(environment_java if 'environment_java' in globals() else None)
 
-result = run_module()
+    result = ansible_bridge.execute_module(module_name, complex_args, module_code)
+except Exception as e:
+    import traceback
+    result = json.dumps({'failed': True, 'msg': f'Mock launcher error: {str(e)}', 'traceback': traceback.format_exc()})
