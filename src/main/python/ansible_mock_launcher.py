@@ -4,11 +4,14 @@ import ansible_bridge
 
 # Convert Java Map to native Python dict
 complex_args = dict(complex_args_java) if complex_args_java is not None else {}
+env = environment_java if 'environment_java' in globals() else None
 
 try:
     ansible_bridge.setup_sys_path(site_packages_java)
-    # Mock launcher might not need all patches, but setup_sys_path and setup_env are useful.
-    ansible_bridge.setup_env(environment_java if 'environment_java' in globals() else None)
+    ansible_bridge.setup_env(env)
+
+    # Bind current task context
+    ansible_bridge.bind_task(complex_args, connection_java, become_context_java, env)
 
     result = ansible_bridge.execute_module(module_name, complex_args, module_code)
 except Exception as e:

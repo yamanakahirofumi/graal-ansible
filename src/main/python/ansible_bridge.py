@@ -4,6 +4,21 @@ import os
 import types
 from io import StringIO
 
+# Global context to hold current task state, used by monkeypatches
+_current_task_context = {
+    'complex_args': {},
+    'connection_java': None,
+    'become_context_java': None,
+    'environment_java': None
+}
+
+def bind_task(complex_args, connection_java, become_context_java, environment_java):
+    """Updates the current task context for the monkeypatches to use."""
+    _current_task_context['complex_args'] = complex_args
+    _current_task_context['connection_java'] = connection_java
+    _current_task_context['become_context_java'] = become_context_java
+    _current_task_context['environment_java'] = environment_java
+
 def setup_sys_path(site_packages):
     """Adds Java-provided site-packages to sys.path."""
     if not site_packages:
@@ -72,7 +87,7 @@ def mock_problematic_modules():
 
     sys._ansible_bridge_mocks_applied = True
 
-def patch_ansible(complex_args, connection_java, become_context_java, environment_java):
+def patch_ansible():
     """Applies monkeypatches to Ansible core classes and utilities."""
     if getattr(sys, '_ansible_bridge_patched', False):
         return
@@ -114,17 +129,18 @@ def patch_ansible(complex_args, connection_java, become_context_java, environmen
         json._graal_ansible_patched = True
 
     # AnsibleModule patching
-    ansible.module_utils.basic._load_params = lambda: (complex_args, 'main')
+    ansible.module_utils.basic._load_params = lambda: (_current_task_context['complex_args'], 'main')
     def mocked_load_params(self):
-        self.params = complex_args
+        self.params = _current_task_context['complex_args']
     ansible.module_utils.basic.AnsibleModule._load_params = mocked_load_params
     ansible.module_utils.basic.AnsibleModule._check_locale = lambda self: None
 
     def mocked_run_command(self, args, **kwargs):
-        if connection_java:
+        conn = _current_task_context['connection_java']
+        if conn:
             command = " ".join(args) if isinstance(args, list) else args
-            env = dict(environment_java) if environment_java is not None else None
-            res = connection_java.execCommand(command, become_context_java, env)
+            env = dict(_current_task_context['environment_java']) if _current_task_context['environment_java'] is not None else None
+            res = conn.execCommand(command, _current_task_context['become_context_java'], env)
             return (res.exitCode(), res.stdout(), res.stderr())
         return (0, '', '')
 
