@@ -16,9 +16,10 @@ public interface Connection extends AutoCloseable {
      *
      * @param command       The command to execute.
      * @param becomeContext The privilege escalation context.
+     * @param environment   The environment variables to set for the command.
      * @return The result of the command execution.
      */
-    ConnectionResult execCommand(String command, BecomeContext becomeContext);
+    ConnectionResult execCommand(String command, BecomeContext becomeContext, java.util.Map<String, String> environment);
 
     /**
      * Transfers a file to the target host.

@@ -35,7 +35,7 @@ public class LocalConnection implements Connection {
     }
 
     @Override
-    public ConnectionResult execCommand(String command, BecomeContext becomeContext) {
+    public ConnectionResult execCommand(String command, BecomeContext becomeContext, java.util.Map<String, String> environment) {
         List<String> commandList = new ArrayList<>();
 
         if (becomeContext != null && becomeContext.become() && osHandler.supportsSudo()) {
@@ -66,6 +66,9 @@ public class LocalConnection implements Connection {
         commandList.add(command);
 
         ProcessBuilder pb = new ProcessBuilder(commandList);
+        if (environment != null) {
+            pb.environment().putAll(environment);
+        }
         try {
             Process process = pb.start();
 

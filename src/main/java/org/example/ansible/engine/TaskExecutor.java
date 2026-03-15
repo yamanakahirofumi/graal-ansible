@@ -16,6 +16,7 @@ import java.util.HashMap;
 public class TaskExecutor implements ITaskExecutor {
 
     private static final ThreadLocal<Connection> currentConnection = new ThreadLocal<>();
+    private static final ThreadLocal<java.util.Map<String, String>> currentEnvironment = new ThreadLocal<>();
 
     /**
      * Sets the connection for the current thread.
@@ -38,6 +39,29 @@ public class TaskExecutor implements ITaskExecutor {
      */
     public static void clearCurrentConnection() {
         currentConnection.remove();
+    }
+
+    /**
+     * Sets the environment for the current thread.
+     * @param environment The environment to set.
+     */
+    public static void setCurrentEnvironment(java.util.Map<String, String> environment) {
+        currentEnvironment.set(environment);
+    }
+
+    /**
+     * Gets the environment for the current thread.
+     * @return The current environment.
+     */
+    public static java.util.Map<String, String> getCurrentEnvironment() {
+        return currentEnvironment.get();
+    }
+
+    /**
+     * Clears the environment for the current thread.
+     */
+    public static void clearCurrentEnvironment() {
+        currentEnvironment.remove();
     }
 
     private final Map<String, Module> modules = new HashMap<>();
@@ -86,9 +110,10 @@ public class TaskExecutor implements ITaskExecutor {
      *
      * @param task          The task to execute.
      * @param becomeContext The privilege escalation context.
+     * @param environment   The environment variables for the task.
      * @return The execution result.
      */
-    public TaskResult execute(Task task, BecomeContext becomeContext) {
+    public TaskResult execute(Task task, BecomeContext becomeContext, java.util.Map<String, String> environment) {
         Module module = modules.get(task.action());
         if (module == null) {
             return TaskResult.failure("Module not found: " + task.action());
@@ -106,14 +131,17 @@ public class TaskExecutor implements ITaskExecutor {
      * @param task          The task to execute.
      * @param becomeContext The privilege escalation context.
      * @param connection    The connection to the target host.
+     * @param environment   The environment variables for the task.
      * @return The execution result.
      */
-    public TaskResult execute(Task task, BecomeContext becomeContext, Connection connection) {
+    public TaskResult execute(Task task, BecomeContext becomeContext, Connection connection, java.util.Map<String, String> environment) {
         setCurrentConnection(connection);
+        setCurrentEnvironment(environment);
         try {
-            return execute(task, becomeContext);
+            return execute(task, becomeContext, environment);
         } finally {
             clearCurrentConnection();
+            clearCurrentEnvironment();
         }
     }
 

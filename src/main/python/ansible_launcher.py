@@ -10,6 +10,10 @@ for p in site_packages_java:
 
 # Convert Java Map to native Python dict
 complex_args = dict(complex_args_java) if complex_args_java is not None else {}
+# Environment variables from Java
+if 'environment_java' in globals() and environment_java is not None:
+    for k, v in dict(environment_java).items():
+        os.environ[str(k)] = str(v)
 
 try:
     # Aggressively mock native/problematic modules before any imports
@@ -106,7 +110,9 @@ try:
             else:
                 command = args
             # Execute via the provided connection (SSH or Local)
-            res = connection_java.execCommand(command, become_context_java)
+            # environment_java is passed from TaskExecutor ThreadLocal
+            env = dict(environment_java) if 'environment_java' in globals() and environment_java is not None else None
+            res = connection_java.execCommand(command, become_context_java, env)
             return (res.exitCode(), res.stdout(), res.stderr())
         return (0, '', '') # Fallback
 

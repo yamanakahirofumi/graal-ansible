@@ -73,7 +73,7 @@ class AllBuiltinModulesVerificationTest {
         for (String moduleName : modules) {
             taskExecutor.registerModule(moduleName, new PythonModule(moduleName));
             Task task = new Task("verify_" + moduleName, moduleName, Map.of());
-            TaskResult result = taskExecutor.execute(task, BecomeContext.empty());
+            TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), null);
 
             String msg = result.message() != null ? result.message() : "";
 
@@ -101,7 +101,7 @@ class AllBuiltinModulesVerificationTest {
             System.out.println("\nImport Errors:");
             failedWithImportError.forEach(m -> {
                 Task task = new Task("debug_import_" + m, m, Map.of());
-                TaskResult result = taskExecutor.execute(task, BecomeContext.empty());
+                TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), null);
                 System.out.println(" - " + m + ": " + result.message());
             });
         }
@@ -110,7 +110,7 @@ class AllBuiltinModulesVerificationTest {
             System.out.println("\nOther Errors:");
             failedWithOtherError.forEach(m -> {
                 Task task = new Task("debug_" + m, m, Map.of());
-                TaskResult result = taskExecutor.execute(task, BecomeContext.empty());
+                TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), null);
                 System.out.println(" - " + m + ": " + result.message());
             });
         }

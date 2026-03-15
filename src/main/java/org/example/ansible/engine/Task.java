@@ -32,6 +32,7 @@ import java.util.List;
  * @param becomeUser        The user to become.
  * @param becomeFlags       Additional flags for privilege escalation.
  * @param checkMode         Whether to run this task in check mode.
+ * @param environment       Environment variables for this task.
  */
 public record Task(
         String name,
@@ -59,17 +60,18 @@ public record Task(
         String becomeMethod,
         String becomeUser,
         String becomeFlags,
-        Object checkMode
+        Object checkMode,
+        Object environment
 ) {
     public Task(String name, String action, Map<String, Object> args) {
         this(name, action, args, Map.of(), null, null, null, List.of(), null, null, false,
                 null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
-                null, null, null, null, null);
+                null, null, null, null, null, null);
     }
 
     public Task(String name, String action, Map<String, Object> args, Map<String, Object> vars) {
         this(name, action, args, vars, null, null, null, List.of(), null, null, false,
                 null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
-                null, null, null, null, null);
+                null, null, null, null, null, null);
     }
 }

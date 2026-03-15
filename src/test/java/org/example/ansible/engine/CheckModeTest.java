@@ -20,11 +20,11 @@ class CheckModeTest {
         List<Task> capturedTasks = new ArrayList<>();
         ITaskExecutor taskExecutor = new ITaskExecutor() {
             @Override
-            public TaskResult execute(Task task, BecomeContext becomeContext) {
-                return execute(task, becomeContext, null);
+            public TaskResult execute(Task task, BecomeContext becomeContext, Map<String, String> environment) {
+                return execute(task, becomeContext, null, environment);
             }
             @Override
-            public TaskResult execute(Task task, BecomeContext becomeContext, Connection connection) {
+            public TaskResult execute(Task task, BecomeContext becomeContext, Connection connection, Map<String, String> environment) {
                 capturedTasks.add(task);
                 return TaskResult.success(Map.of());
             }
@@ -49,7 +49,7 @@ class CheckModeTest {
 
         // 2. Play level overrides global (true)
         Task task2 = new Task("task2", "debug", Map.of());
-        Play play2 = new Play("play2", "all", List.of(task2), Map.of(), List.of(), List.of(), null, null, null, null, true);
+        Play play2 = new Play("play2", "all", List.of(task2), Map.of(), List.of(), List.of(), null, null, null, null, true, null);
         Playbook playbook2 = new Playbook(List.of(play2));
 
         executor.execute(playbook2, inventory, Map.of(), null, false);
@@ -60,7 +60,7 @@ class CheckModeTest {
         // 3. Task level overrides global (false)
         Task task3 = new Task("task3", "debug", Map.of(), Map.of(), null, null, null, List.of(), null, null, false,
                 null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
-                null, null, null, null, false);
+                null, null, null, null, false, null);
         Play play3 = new Play("play3", "all", List.of(task3));
         Playbook playbook3 = new Playbook(List.of(play3));
 
@@ -72,8 +72,8 @@ class CheckModeTest {
         // 4. Task level overrides play level (false)
         Task task4 = new Task("task4", "debug", Map.of(), Map.of(), null, null, null, List.of(), null, null, false,
                 null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
-                null, null, null, null, false);
-        Play play4 = new Play("play4", "all", List.of(task4), Map.of(), List.of(), List.of(), null, null, null, null, true);
+                null, null, null, null, false, null);
+        Play play4 = new Play("play4", "all", List.of(task4), Map.of(), List.of(), List.of(), null, null, null, null, true, null);
         Playbook playbook4 = new Playbook(List.of(play4));
 
         executor.execute(playbook4, inventory, Map.of(), null, false);
@@ -85,8 +85,8 @@ class CheckModeTest {
         Task task5 = new Task("task5", "debug", Map.of());
         Task block5 = new Task("block5", null, Map.of(), Map.of(), null, null, null, List.of(), null, null, false,
                 null, 3, 5, null, false, false, false, List.of(task5), List.of(), List.of(),
-                null, null, null, null, true);
-        Play play5 = new Play("play5", "all", List.of(block5), Map.of(), List.of(), List.of(), null, null, null, null, false);
+                null, null, null, null, true, null);
+        Play play5 = new Play("play5", "all", List.of(block5), Map.of(), List.of(), List.of(), null, null, null, null, false, null);
         Playbook playbook5 = new Playbook(List.of(play5));
 
         executor.execute(playbook5, inventory, Map.of(), null, false);
@@ -97,10 +97,10 @@ class CheckModeTest {
         // 6. Task level overrides block level
         Task task6 = new Task("task6", "debug", Map.of(), Map.of(), null, null, null, List.of(), null, null, false,
                 null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
-                null, null, null, null, false);
+                null, null, null, null, false, null);
         Task block6 = new Task("block6", null, Map.of(), Map.of(), null, null, null, List.of(), null, null, false,
                 null, 3, 5, null, false, false, false, List.of(task6), List.of(), List.of(),
-                null, null, null, null, true);
+                null, null, null, null, true, null);
         Play play6 = new Play("play6", "all", List.of(block6));
         Playbook playbook6 = new Playbook(List.of(play6));
 
@@ -111,7 +111,7 @@ class CheckModeTest {
 
         // 7. Play level templating
         Task task7 = new Task("task7", "debug", Map.of());
-        Play play7 = new Play("play7", "all", List.of(task7), Map.of("should_check", true), List.of(), List.of(), null, null, null, null, "{{ should_check }}");
+        Play play7 = new Play("play7", "all", List.of(task7), Map.of("should_check", true), List.of(), List.of(), null, null, null, null, "{{ should_check }}", null);
         Playbook playbook7 = new Playbook(List.of(play7));
 
         executor.execute(playbook7, inventory, Map.of(), null, false);

@@ -36,7 +36,7 @@ class TaskExecutorTest {
         Task task = new Task("test debug", "debug", Map.of("msg", "hello world"));
 
         // Act (実行)
-        TaskResult result = executor.execute(task, BecomeContext.empty());
+        TaskResult result = executor.execute(task, BecomeContext.empty(), null);
 
         // Assert (検証)
         assertTrue(result.success());
@@ -50,7 +50,7 @@ class TaskExecutorTest {
         Task task = new Task("test unknown", "unknown", Map.of());
 
         // Act (実行)
-        TaskResult result = executor.execute(task, BecomeContext.empty());
+        TaskResult result = executor.execute(task, BecomeContext.empty(), null);
 
         // Assert (検証)
         assertFalse(result.success());

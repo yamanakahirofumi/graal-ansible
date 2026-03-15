@@ -151,8 +151,12 @@ public class PlaybookExecutor {
     }
 
     private void executeTaskOnHost(Play play, Host host, Task task, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode) {
+        executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, null);
+    }
+
+    private void executeTaskOnHost(Play play, Host host, Task task, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode, Object inheritedEnvironment) {
         if (!task.block().isEmpty()) {
-            executeBlock(play, host, task, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode);
+            executeBlock(play, host, task, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, inheritedEnvironment);
             return;
         }
 
@@ -160,9 +164,9 @@ public class PlaybookExecutor {
         TaskResult result;
 
         if (task.loop() != null) {
-            result = executeLoopTask(play, host, task, variableManager, allVars, inheritedCheckMode);
+            result = executeLoopTask(play, host, task, variableManager, allVars, inheritedCheckMode, inheritedEnvironment);
         } else {
-            result = executeSingleTask(play, host, task, allVars, variableManager, inheritedCheckMode);
+            result = executeSingleTask(play, host, task, allVars, variableManager, inheritedCheckMode, inheritedEnvironment);
         }
 
         if (result != null) {
@@ -193,7 +197,7 @@ public class PlaybookExecutor {
         }
     }
 
-    private void executeBlock(Play play, Host host, Task blockTask, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode) {
+    private void executeBlock(Play play, Host host, Task blockTask, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode, Object inheritedEnvironment) {
         // Evaluate 'when' for the block itself
         Map<String, Object> blockVars = variableManager.getAllVariables(play, host, blockTask);
 
@@ -230,12 +234,14 @@ public class PlaybookExecutor {
         boolean blockFailed = false;
         Set<String> blockFailedHosts = new HashSet<>();
 
+        Object effectiveBlockEnv = blockTask.environment() != null ? blockTask.environment() : inheritedEnvironment;
+
         for (Task task : blockTask.block()) {
             if (blockFailedHosts.contains(host.name())) {
                 blockFailed = true;
                 break;
             }
-            executeTaskOnHost(play, host, task, variableManager, results, blockFailedHosts, hostNotifications, blockCheckMode);
+            executeTaskOnHost(play, host, task, variableManager, results, blockFailedHosts, hostNotifications, blockCheckMode, effectiveBlockEnv);
         }
 
         if (blockFailedHosts.contains(host.name())) {
@@ -245,12 +251,12 @@ public class PlaybookExecutor {
         if (blockFailed) {
             for (Task task : blockTask.rescue()) {
                 // rescue tasks run even if block failed
-                executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications, blockCheckMode);
+                executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications, blockCheckMode, effectiveBlockEnv);
             }
         }
 
         for (Task task : blockTask.always()) {
-            executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications, blockCheckMode);
+            executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications, blockCheckMode, effectiveBlockEnv);
         }
 
         if (blockFailed && blockTask.rescue().isEmpty()) {
@@ -320,7 +326,7 @@ public class PlaybookExecutor {
         return expression.toString();
     }
 
-    private TaskResult executeSingleTask(Play play, Host host, Task task, Map<String, Object> variables, VariableManager variableManager, boolean inheritedCheckMode) {
+    private TaskResult executeSingleTask(Play play, Host host, Task task, Map<String, Object> variables, VariableManager variableManager, boolean inheritedCheckMode, Object inheritedEnvironment) {
         // Evaluate 'when' condition
         if (task.when() != null) {
             List<String> conditions;
@@ -367,7 +373,7 @@ public class PlaybookExecutor {
 
         Task resolvedTask = new Task(task.name(), task.action(), resolvedArgs, task.vars(), task.when(), task.register(), task.loop(), task.notifications(), task.failedWhen(), task.changedWhen(), task.ignoreErrors(),
                 task.until(), task.retries(), task.delay(), resolvedDelegateTo, task.delegateFacts(), task.runOnce(), task.ignoreUnreachable(), task.block(), task.rescue(), task.always(),
-                task.become(), task.becomeMethod(), task.becomeUser(), task.becomeFlags(), task.checkMode());
+                task.become(), task.becomeMethod(), task.becomeUser(), task.becomeFlags(), task.checkMode(), task.environment());
 
         if ("meta".equals(resolvedTask.action())) {
             return TaskResult.success(false, Map.of("meta", resolvedTask.args().getOrDefault("_raw_params", ""), "changed", false));
@@ -375,14 +381,16 @@ public class PlaybookExecutor {
 
         BecomeContext becomeContext = resolveBecomeContext(play, resolvedTask, variables);
 
+        Map<String, String> resolvedEnvironment = resolveEnvironment(play, task, variables, inheritedEnvironment);
+
         if (task.until() == null) {
-            return taskExecutor.execute(resolvedTask, becomeContext, new LocalConnection());
+            return taskExecutor.execute(resolvedTask, becomeContext, new LocalConnection(), resolvedEnvironment);
         }
 
         // Retry logic
         TaskResult lastResult = null;
         for (int i = 0; i < task.retries(); i++) {
-            lastResult = taskExecutor.execute(resolvedTask, becomeContext, new LocalConnection());
+            lastResult = taskExecutor.execute(resolvedTask, becomeContext, new LocalConnection(), resolvedEnvironment);
 
             if (task.register() != null && variableManager != null) {
                 variableManager.registerVariable(host.name(), task.register(), lastResult.data());
@@ -416,7 +424,7 @@ public class PlaybookExecutor {
         return lastResult;
     }
 
-    private TaskResult executeLoopTask(Play play, Host host, Task task, VariableManager variableManager, Map<String, Object> allVars, boolean inheritedCheckMode) {
+    private TaskResult executeLoopTask(Play play, Host host, Task task, VariableManager variableManager, Map<String, Object> allVars, boolean inheritedCheckMode, Object inheritedEnvironment) {
         Object loopValue = task.loop();
         if (loopValue instanceof String str && str.contains("{{")) {
             loopValue = variableResolver.resolveValue(str, allVars);
@@ -440,7 +448,7 @@ public class PlaybookExecutor {
             Map<String, Object> iterationVars = new HashMap<>(allVars);
             iterationVars.put("item", item);
 
-            TaskResult result = executeSingleTask(play, host, task, iterationVars, variableManager, inheritedCheckMode);
+            TaskResult result = executeSingleTask(play, host, task, iterationVars, variableManager, inheritedCheckMode, inheritedEnvironment);
 
             Map<String, Object> resultData = new HashMap<>(result.data());
             resultData.put("item", item);
@@ -512,6 +520,53 @@ public class PlaybookExecutor {
         }
 
         return new BecomeContext(become, method, user, flags);
+    }
+
+    private Map<String, String> resolveEnvironment(Play play, Task task, Map<String, Object> variables, Object inheritedEnvironment) {
+        Map<String, Object> mergedEnv = new HashMap<>();
+
+        // Merge Play level
+        if (play.environment() != null) {
+            Object resolved = play.environment();
+            if (resolved instanceof String s && s.contains("{{")) {
+                resolved = variableResolver.resolveValue(s, variables);
+            }
+            if (resolved instanceof Map<?, ?> map) {
+                mergedEnv.putAll((Map<String, Object>) map);
+            }
+        }
+
+        // Merge Block level
+        if (inheritedEnvironment != null) {
+            Object resolved = inheritedEnvironment;
+            if (resolved instanceof String s && s.contains("{{")) {
+                resolved = variableResolver.resolveValue(s, variables);
+            }
+            if (resolved instanceof Map<?, ?> map) {
+                mergedEnv.putAll((Map<String, Object>) map);
+            }
+        }
+
+        // Merge Task level
+        if (task.environment() != null) {
+            Object resolved = task.environment();
+            if (resolved instanceof String s && s.contains("{{")) {
+                resolved = variableResolver.resolveValue(s, variables);
+            }
+            if (resolved instanceof Map<?, ?> map) {
+                mergedEnv.putAll((Map<String, Object>) map);
+            }
+        }
+
+        Map<String, String> result = new HashMap<>();
+        for (Map.Entry<String, Object> entry : mergedEnv.entrySet()) {
+            Object value = entry.getValue();
+            if (value instanceof String s && s.contains("{{")) {
+                value = variableResolver.resolveValue(s, variables);
+            }
+            result.put(entry.getKey(), value != null ? value.toString() : "");
+        }
+        return result;
     }
 
     private List<Host> getTargetHosts(String pattern, Inventory inventory) {

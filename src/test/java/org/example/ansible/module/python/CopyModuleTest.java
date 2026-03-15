@@ -65,7 +65,7 @@ public class CopyModuleTest {
         );
 
         Task task = new Task("test", "copy", args);
-        TaskResult result = taskExecutor.execute(task, BecomeContext.empty());
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), null);
 
         assertTrue(result.success(), "Module execution should be successful: " + result.message());
         assertTrue(result.changed(), "Module should have changed the state");
@@ -100,7 +100,7 @@ public class CopyModuleTest {
         );
 
         Task task = new Task("test", "copy", args);
-        TaskResult result = taskExecutor.execute(task, BecomeContext.empty());
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), null);
 
         assertTrue(result.success(), "Module execution should be successful: " + result.message());
         assertTrue(result.changed(), "Module should have changed the state");

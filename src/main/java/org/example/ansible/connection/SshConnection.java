@@ -50,7 +50,7 @@ public class SshConnection implements Connection {
     }
 
     @Override
-    public ConnectionResult execCommand(String command, BecomeContext becomeContext) {
+    public ConnectionResult execCommand(String command, BecomeContext becomeContext, java.util.Map<String, String> environment) {
         // Simple sudo implementation for now if needed, but ActualModuleIntegrationTest 
         // usually doesn't need become for basic modules if running as root in container.
         if (becomeContext != null && becomeContext.become()) {
@@ -62,6 +62,11 @@ public class SshConnection implements Connection {
              ByteArrayOutputStream err = new ByteArrayOutputStream();
              ChannelExec channel = session.createExecChannel(command)) {
             
+            if (environment != null) {
+                for (java.util.Map.Entry<String, String> entry : environment.entrySet()) {
+                    channel.setEnv(entry.getKey(), entry.getValue());
+                }
+            }
             channel.setOut(out);
             channel.setErr(err);
             channel.open().verify(timeout);

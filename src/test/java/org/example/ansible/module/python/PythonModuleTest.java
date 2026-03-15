@@ -47,7 +47,7 @@ class PythonModuleTest {
         taskExecutor.registerModule("test_module", new PythonModule("test_module", script));
         Task task = new Task("test", "test_module", Map.of("foo", "bar"));
 
-        TaskResult result = taskExecutor.execute(task, BecomeContext.empty());
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), null);
 
         assertTrue(result.success(), "Execution failed: " + result.message());
         assertTrue(result.changed());
@@ -72,7 +72,7 @@ class PythonModuleTest {
 
         taskExecutor.registerModule("fail_module", new PythonModule("fail_module", script));
         Task task = new Task("test", "fail_module", Map.of());
-        TaskResult result = taskExecutor.execute(task, BecomeContext.empty());
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), null);
 
         assertFalse(result.success());
         assertFalse(result.changed());

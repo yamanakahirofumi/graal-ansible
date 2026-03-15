@@ -77,7 +77,7 @@ class ActualModuleIntegrationTest {
         taskExecutor.registerModule("ping", new PythonModule("ping"));
 
         Task task = new Task("test_ping", "ping", Map.of());
-        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection);
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
 
         assertTrue(result.success(), "Execution failed: " + result.message());
         assertEquals("pong", result.data().get("ping"));
@@ -94,13 +94,13 @@ class ActualModuleIntegrationTest {
         ));
 
         // Now we use the actual SSH connection to execute the task on targetNode.
-        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection);
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
 
         assertTrue(result.success(), "Execution failed: " + result.message());
         assertTrue(result.changed(), "File should have been created (changed=true)");
 
         // Verify state on target node using SSH
-        var execResult = connection.execCommand("ls " + remotePath, BecomeContext.empty());
+        var execResult = connection.execCommand("ls " + remotePath, BecomeContext.empty(), null);
         assertEquals(0, execResult.exitCode(), "File should be created in container: " + execResult.stderr());
     }
 
@@ -110,12 +110,12 @@ class ActualModuleIntegrationTest {
 
         String remotePath = "/tmp/stat-test.txt";
         // Setup state using SSH
-        connection.execCommand("sh -c \"echo 'test data' > " + remotePath + "\"", BecomeContext.empty());
+        connection.execCommand("sh -c \"echo 'test data' > " + remotePath + "\"", BecomeContext.empty(), null);
 
         Task task = new Task("test_stat", "stat", Map.of(
                 "path", remotePath
         ));
-        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection);
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
 
         assertTrue(result.success(), "Execution failed: " + result.message());
         Map<String, Object> stat = (Map<String, Object>) result.data().get("stat");
@@ -140,12 +140,12 @@ class ActualModuleIntegrationTest {
                 "dest", remoteDestPath,
                 "remote_src", true
         ));
-        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection);
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
 
         assertTrue(result.success(), "Execution failed: " + result.message());
 
         // Verify state on target node using SSH
-        var execResult = connection.execCommand("cat " + remoteDestPath, BecomeContext.empty());
+        var execResult = connection.execCommand("cat " + remoteDestPath, BecomeContext.empty(), null);
         assertEquals(0, execResult.exitCode());
         assertEquals(content, execResult.stdout().trim());
     }
