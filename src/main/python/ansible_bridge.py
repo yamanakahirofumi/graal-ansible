@@ -68,21 +68,60 @@ def mock_problematic_modules():
 
     if 'grp' not in sys.modules:
         m = types.ModuleType('grp')
-        m.getgrnam = m.getgrgid = lambda x: group('root', 'x', 0, [])
+        def mocked_grp_call(*args, **kwargs): return group('root', 'x', 0, [])
+        m.getgrnam = m.getgrgid = mocked_grp_call
         sys.modules['grp'] = m
     if 'pwd' not in sys.modules:
         m = types.ModuleType('pwd')
-        m.getpwnam = m.getpwuid = lambda x: passwd('root', 'x', 0, 0, 'root', '/root', '/bin/bash')
+        def mocked_pwd_call(*args, **kwargs): return passwd('root', 'x', 0, 0, 'root', '/root', '/bin/bash')
+        m.getpwnam = m.getpwuid = mocked_pwd_call
         sys.modules['pwd'] = m
     if 'termios' not in sys.modules or sys.modules['termios'] is None:
         m = types.ModuleType('termios')
         m.TCSAFLUSH = 1
-        m.tcgetattr = lambda fd: [0,0,0,0, ' ', ' ', []]
-        m.tcsetattr = lambda fd, opt, mode: None
+        def mocked_tcgetattr(fd, *args, **kwargs): return [0,0,0,0, ' ', ' ', []]
+        def mocked_tcsetattr(fd, opt, mode, *args, **kwargs): return None
+        m.tcgetattr = mocked_tcgetattr
+        m.tcsetattr = mocked_tcsetattr
         sys.modules['termios'] = m
     if 'syslog' not in sys.modules:
         m = types.ModuleType('syslog')
-        m.openlog = m.syslog = m.closelog = m.setlogmask = lambda *args, **kwargs: None
+        def mocked_syslog_call(*args, **kwargs): return None
+        m.openlog = m.syslog = m.closelog = m.setlogmask = mocked_syslog_call
+        # Add common syslog constants
+        m.LOG_PID = 0x01
+        m.LOG_CONS = 0x02
+        m.LOG_NDELAY = 0x08
+        m.LOG_NOWAIT = 0x10
+        m.LOG_PERROR = 0x20
+        m.LOG_KERN = 0
+        m.LOG_USER = 1 << 3
+        m.LOG_MAIL = 2 << 3
+        m.LOG_DAEMON = 3 << 3
+        m.LOG_AUTH = 4 << 3
+        m.LOG_SYSLOG = 5 << 3
+        m.LOG_LPR = 6 << 3
+        m.LOG_NEWS = 7 << 3
+        m.LOG_UUCP = 8 << 3
+        m.LOG_CRON = 9 << 3
+        m.LOG_AUTHPRIV = 10 << 3
+        m.LOG_FTP = 11 << 3
+        m.LOG_LOCAL0 = 16 << 3
+        m.LOG_LOCAL1 = 17 << 3
+        m.LOG_LOCAL2 = 18 << 3
+        m.LOG_LOCAL3 = 19 << 3
+        m.LOG_LOCAL4 = 20 << 3
+        m.LOG_LOCAL5 = 21 << 3
+        m.LOG_LOCAL6 = 22 << 3
+        m.LOG_LOCAL7 = 23 << 3
+        m.LOG_EMERG = 0
+        m.LOG_ALERT = 1
+        m.LOG_CRIT = 2
+        m.LOG_ERR = 3
+        m.LOG_WARNING = 4
+        m.LOG_NOTICE = 5
+        m.LOG_INFO = 6
+        m.LOG_DEBUG = 7
         sys.modules['syslog'] = m
 
     sys._ansible_bridge_mocks_applied = True
@@ -106,8 +145,10 @@ def patch_ansible():
     import ansible.module_utils.common.process
 
     # distro info
-    ansible.module_utils.distro.id = lambda: 'debian'
-    ansible.module_utils.distro.version = lambda: '12'
+    def mocked_distro_id(*args, **kwargs): return 'debian'
+    def mocked_distro_version(*args, **kwargs): return '12'
+    ansible.module_utils.distro.id = mocked_distro_id
+    ansible.module_utils.distro.version = mocked_distro_version
     def mocked_get_bin_path(arg=None, *args, **kwargs):
         return '/usr/bin/' + arg if arg else None
     ansible.module_utils.common.process.get_bin_path = mocked_get_bin_path
@@ -129,11 +170,16 @@ def patch_ansible():
         json._graal_ansible_patched = True
 
     # AnsibleModule patching
-    ansible.module_utils.basic._load_params = lambda: (_current_task_context['complex_args'], 'main')
-    def mocked_load_params(self):
+    def mocked_basic_load_params(*args, **kwargs):
+        return (_current_task_context['complex_args'], 'main')
+    ansible.module_utils.basic._load_params = mocked_basic_load_params
+
+    def mocked_load_params(self, *args, **kwargs):
         self.params = _current_task_context['complex_args']
     ansible.module_utils.basic.AnsibleModule._load_params = mocked_load_params
-    ansible.module_utils.basic.AnsibleModule._check_locale = lambda self: None
+
+    def mocked_check_locale(self, *args, **kwargs): return None
+    ansible.module_utils.basic.AnsibleModule._check_locale = mocked_check_locale
 
     def mocked_run_command(self, args, **kwargs):
         conn = _current_task_context['connection_java']
@@ -148,7 +194,10 @@ def patch_ansible():
     def mocked_mod_get_bin_path(self, arg=None, *args, **kwargs):
         return '/usr/bin/' + arg if arg else None
     ansible.module_utils.basic.AnsibleModule.get_bin_path = mocked_mod_get_bin_path
-    ansible.module_utils.basic.AnsibleModule._record_module_result = lambda self, o: print(json.dumps(o))
+
+    def mocked_record_module_result(self, o, *args, **kwargs):
+        print(json.dumps(o))
+    ansible.module_utils.basic.AnsibleModule._record_module_result = mocked_record_module_result
 
     sys._ansible_bridge_patched = True
 
