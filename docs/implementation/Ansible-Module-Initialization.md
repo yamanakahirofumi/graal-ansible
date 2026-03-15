@@ -18,14 +18,18 @@ Ansible モジュールは通常、標準入力経由で引数（JSON または 
 | `connection_java` | `Connection` | 現在のターゲットへの接続オブジェクト。 |
 | `become_context_java`| `BecomeContext` | 権限昇格の設定。 |
 
-## 3. `ansible_launcher.py` による初期化フロー
+## 3. 初期化フローと `ansible_bridge.py`
 
-モジュール本体を実行する前に、`ansible_launcher.py` が実行環境の動的な構築（モンキーパッチ）を行います。
+`PythonModule.java` はモジュール本体を実行する前に、`ansible_bridge.py` をロードして評価します。このブリッジスクリプトは、GraalPy 環境における共通の初期化ロジック、モジュールモック、および Ansible へのパッチ提供を担います。
 
-1.  **`sys.path` の設定**: `site_packages_java` を `sys.path` に追加し、Ansible ライブラリをロード可能にします。
-2.  **引数の変換**: `complex_args_java` を Python の辞書型 `complex_args` に変換します。
-3.  **システムモジュールのモック**: GraalPy 環境で問題となるモジュールや、Java 側で処理を代替したいモジュールをモック化します。
-4.  **`AnsibleModule` のパッチ**: `ansible.module_utils.basic.AnsibleModule` クラスのメソッドを上書きし、本プロジェクト独自の実行モデルに適合させます。
+各ランチャー（`ansible_launcher.py` または `ansible_mock_launcher.py`）は、このブリッジ内の関数を呼び出すことで実行環境を整えます。
+
+### 3.1 ブリッジが提供する主要機能
+- **`setup_sys_path(site_packages)`**: `site_packages_java` を `sys.path` に追加し、Ansible ライブラリをロード可能にします。
+- **`setup_env(env_vars)`**: Java 側から渡された環境変数を `os.environ` に注入します。
+- **`mock_problematic_modules()`**: `cryptography`, `selinux` などのネイティブ依存モジュールのモック化、および `grp`, `pwd`, `termios`, `syslog` などのシステムモジュールのスタブ化を行います。
+- **`patch_ansible(...)`**: `AnsibleModule` の `run_command` や `_load_params` をパッチし、Java 側の `Connection` オブジェクトを介した実行を可能にします。
+- **`execute_module(...)`**: `__main__` スコープの設定を行い、モジュールコードを安全に実行します。
 
 ## 4. グローバルスコープ (`__main__`) への属性注入
 

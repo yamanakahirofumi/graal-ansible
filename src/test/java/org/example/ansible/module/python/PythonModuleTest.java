@@ -78,4 +78,44 @@ class PythonModuleTest {
         assertFalse(result.changed());
         assertEquals("Something went wrong", result.message());
     }
+
+    @Test
+    void testSequentialModulesWithSharedContext() {
+        // First module execution
+        String script1 = """
+            import json
+            import sys
+            result = {
+                "changed": True,
+                "msg": "First module",
+                "foo": complex_args.get("foo")
+            }
+            sys.stdout.write(json.dumps(result))
+            """;
+        taskExecutor.registerModule("mod1", new PythonModule("mod1", script1));
+        Task task1 = new Task("test1", "mod1", Map.of("foo", "bar1"));
+        TaskResult res1 = taskExecutor.execute(task1, BecomeContext.empty(), null);
+
+        assertTrue(res1.success());
+        assertEquals("bar1", res1.data().get("foo"));
+
+        // Second module execution on the same TaskExecutor (shared GraalVM Context)
+        String script2 = """
+            import json
+            import sys
+            result = {
+                "changed": True,
+                "msg": "Second module",
+                "foo": complex_args.get("foo")
+            }
+            sys.stdout.write(json.dumps(result))
+            """;
+        taskExecutor.registerModule("mod2", new PythonModule("mod2", script2));
+        Task task2 = new Task("test2", "mod2", Map.of("foo", "bar2"));
+        TaskResult res2 = taskExecutor.execute(task2, BecomeContext.empty(), null);
+
+        assertTrue(res2.success());
+        // If the context isn't correctly updated via bind_task, this would still be "bar1"
+        assertEquals("bar2", res2.data().get("foo"), "Second module should see updated complex_args");
+    }
 }
