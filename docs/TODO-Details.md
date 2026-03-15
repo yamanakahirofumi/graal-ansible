@@ -116,3 +116,13 @@
 - **完了日**: 2026-03-05
 - **概要**: docs/implementation/Task-Control.md で予約されていたが未実装だったキーワードの追加。
 - **解決策**: `Task` レコードに `ignore_unreachable`, `delegate_facts` を追加し、`YamlParser` での解析をサポート。
+
+## 5. 今後のリファクタリング検討事項 (Future Refactoring Items)
+
+### [ ] PlaybookExecutor のさらなる整理
+- **概要**: `PlaybookExecutor` 内に依然として存在する重複コードや複雑なロジックの改善。
+- **検討内容**:
+    - `when` 条件の評価ロジックの集約（`executeBlock` と `executeSingleTask` に重複あり）。
+    - `environment` および `become` の解決ロジックの簡略化と集約。
+    - `executeLoopTask` のリファクタリング（ループの反復処理とタスク実行ロジックの分離）。
+    - ホストへの接続選択ロジックの抽象化（現在は `LocalConnection` がハードコードされている箇所の改善）。

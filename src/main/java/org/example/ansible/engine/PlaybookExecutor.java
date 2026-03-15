@@ -102,15 +102,8 @@ public class PlaybookExecutor {
                 }
 
                 // Resolve Play level check_mode per host/task context
-                boolean playCheckMode = globalCheckMode;
-                if (play.checkMode() != null) {
-                    Map<String, Object> vars = variableManager.getAllVariables(play, host, task);
-                    Object resolved = play.checkMode();
-                    if (resolved instanceof String s && s.contains("{{")) {
-                        resolved = variableResolver.resolveValue(s, vars);
-                    }
-                    playCheckMode = Truthiness.isTrue(resolved);
-                }
+                Map<String, Object> vars = variableManager.getAllVariables(play, host, task);
+                boolean playCheckMode = resolveCheckMode(play.checkMode(), vars, globalCheckMode);
 
                 executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications, playCheckMode);
                 executedOnce = true;
@@ -120,15 +113,8 @@ public class PlaybookExecutor {
         // Execute handlers at the end of the play
         for (Host host : targetHosts) {
             // Resolve Play level check_mode per host context for handlers
-            boolean playCheckMode = globalCheckMode;
-            if (play.checkMode() != null) {
-                Map<String, Object> vars = variableManager.getAllVariables(play, host, null);
-                Object resolved = play.checkMode();
-                if (resolved instanceof String s && s.contains("{{")) {
-                    resolved = variableResolver.resolveValue(s, vars);
-                }
-                playCheckMode = Truthiness.isTrue(resolved);
-            }
+            Map<String, Object> vars = variableManager.getAllVariables(play, host, null);
+            boolean playCheckMode = resolveCheckMode(play.checkMode(), vars, globalCheckMode);
             flushHandlersForHost(play, host, variableManager, results, failedHosts, hostNotifications, playCheckMode);
         }
     }
@@ -200,15 +186,7 @@ public class PlaybookExecutor {
     private void executeBlock(Play play, Host host, Task blockTask, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode, Object inheritedEnvironment) {
         // Evaluate 'when' for the block itself
         Map<String, Object> blockVars = variableManager.getAllVariables(play, host, blockTask);
-
-        boolean blockCheckMode = inheritedCheckMode;
-        if (blockTask.checkMode() != null) {
-            Object resolved = blockTask.checkMode();
-            if (resolved instanceof String s && s.contains("{{")) {
-                resolved = variableResolver.resolveValue(s, blockVars);
-            }
-            blockCheckMode = Truthiness.isTrue(resolved);
-        }
+        boolean blockCheckMode = resolveCheckMode(blockTask.checkMode(), blockVars, inheritedCheckMode);
 
         if (blockTask.when() != null) {
             List<String> conditions;
@@ -350,16 +328,7 @@ public class PlaybookExecutor {
         Map<String, Object> resolvedArgs = new HashMap<>(variableResolver.resolve(task.args(), variables));
 
         // Determine effective check mode
-        boolean effectiveCheckMode = inheritedCheckMode;
-
-        // Task level check_mode
-        if (task.checkMode() != null) {
-            Object resolved = task.checkMode();
-            if (resolved instanceof String s && s.contains("{{")) {
-                resolved = variableResolver.resolveValue(s, variables);
-            }
-            effectiveCheckMode = Truthiness.isTrue(resolved);
-        }
+        boolean effectiveCheckMode = resolveCheckMode(task.checkMode(), variables, inheritedCheckMode);
 
         if (effectiveCheckMode) {
             resolvedArgs.put("_ansible_check_mode", true);
@@ -422,6 +391,14 @@ public class PlaybookExecutor {
         }
 
         return lastResult;
+    }
+
+    private boolean resolveCheckMode(Object checkMode, Map<String, Object> variables, boolean inheritedValue) {
+        if (checkMode == null) {
+            return inheritedValue;
+        }
+        Object resolved = variableResolver.resolveValue(checkMode, variables);
+        return Truthiness.isTrue(resolved);
     }
 
     private TaskResult executeLoopTask(Play play, Host host, Task task, VariableManager variableManager, Map<String, Object> allVars, boolean inheritedCheckMode, Object inheritedEnvironment) {
