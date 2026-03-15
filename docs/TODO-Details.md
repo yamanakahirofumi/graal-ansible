@@ -27,11 +27,6 @@
 - **注意**: `python.IsolateNativeModules` と `python.PosixModuleBackend` はフェーズ 1 では変更しない。
 - **備考**: 検証には必要に応じて **Testcontainers** を**ターゲットノード**として活用する。
 
-### [ ] タスク制御キーワードの拡充 (environment)
-- **概要**: [タスク制御の実装詳細](implementation/Task-Control.md) に基づき、`environment` のサポートを追加。
-- **検討内容**:
-    - `environment` 変数のテンプレート展開とコネクションプラグインへの伝播。
-
 ### [ ] ハイブリッド実装による Windows サポート (フェーズ2)
 - **概要**: ハイブリッド実装（モンキーパッチ等）による Windows サポート。
 - **詳細は [Module-Support-Status.md](features/Module-Support-Status.md) を参照。**
@@ -101,6 +96,13 @@
 - **解決策**:
     - [タスク制御の実装詳細](implementation/Task-Control.md) に基づき、`PlaybookExecutor` および `TaskExecutor` へ全機能を組み込み済み。
     - `when`, `loop` (`with_items`), `register`, `handlers` (`notify`), `block/rescue/always`, `until/retries/delay`, `failed_when/changed_when`, `delegate_to`, `run_once`, `ignore_errors`, `check_mode` をサポート。
+
+### [✓] タスク制御キーワードの拡充 (environment)
+- **完了日**: 2026-03-05
+- **概要**: [タスク制御の実装詳細](implementation/Task-Control.md) に基づき、`environment` のサポートを追加。
+- **解決策**:
+    - `environment` 変数のテンプレート展開と、`LocalConnection` / `SshConnection` への伝播を実装済み。
+    - Play, Block, Task の各レベルでのマージと、タスク実行直前の遅延評価をサポート。
 
 ### [✓] Ansible 互換性の維持レベル
 - **決定事項**: **Ansible 13** で動くコレクションが動作することを目標とする。

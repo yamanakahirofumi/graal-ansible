@@ -95,7 +95,7 @@
 
 ## 9. 環境変数 (`environment`)
 
-タスク実行時の環境変数を定義します。 **(Planned: フェーズ 1 以降で実装予定)**
+タスク実行時の環境変数を定義します。
 
 - **実装方針**:
     - **マージルール**: `environment` は Play, Block, Task の各レベルで定義可能です。
@@ -108,8 +108,8 @@
     - **伝播**:
         - 評価結果の Map は、`TaskExecutor` を経由してコネクションプラグインの `execCommand` メソッドに渡されます。
         - コネクションプラグインは、この Map を実際のプロセス実行環境（`ProcessBuilder` の `environment()` や SSH の環境変数設定）に反映します。
-- **データ構造 (予定)**:
-    - `Play`, `Task` レコードに `Object environment` フィールドを保持する予定です。
+- **データ構造**:
+    - `Play`, `Task` レコードに `Object environment` フィールドを保持します。
     - 評価後のデータ型は `Map<String, String>` となります。
 
 ## 10. チェックモード (`check_mode`)
