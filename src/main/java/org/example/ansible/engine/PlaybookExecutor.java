@@ -188,25 +188,11 @@ public class PlaybookExecutor {
         Map<String, Object> blockVars = variableManager.getAllVariables(play, host, blockTask);
         boolean blockCheckMode = resolveCheckMode(blockTask.checkMode(), blockVars, inheritedCheckMode);
 
-        if (blockTask.when() != null) {
-            List<String> conditions;
-            if (blockTask.when() instanceof List<?> list) {
-                conditions = list.stream().filter(String.class::isInstance).map(String.class::cast).collect(Collectors.toList());
-            } else if (blockTask.when() instanceof String s) {
-                conditions = List.of(s);
-            } else {
-                conditions = List.of(blockTask.when().toString());
-            }
-
-            for (String condition : conditions) {
-                Object conditionResult = variableResolver.resolveValue(wrapInJinja(condition), blockVars);
-                if (!Truthiness.isTrue(conditionResult)) {
-                    // Block skipped
-                    results.computeIfAbsent(host.name(), k -> new ArrayList<>())
-                           .add(new TaskResult(true, false, "Skipped due to block when condition", Map.of("skipped", true)));
-                    return;
-                }
-            }
+        if (!isWhenConditionMet(blockTask.when(), blockVars)) {
+            // Block skipped
+            results.computeIfAbsent(host.name(), k -> new ArrayList<>())
+                   .add(new TaskResult(true, false, "Skipped due to block when condition", Map.of("skipped", true)));
+            return;
         }
 
         boolean blockFailed = false;
@@ -306,22 +292,8 @@ public class PlaybookExecutor {
 
     private TaskResult executeSingleTask(Play play, Host host, Task task, Map<String, Object> variables, VariableManager variableManager, boolean inheritedCheckMode, Object inheritedEnvironment) {
         // Evaluate 'when' condition
-        if (task.when() != null) {
-            List<String> conditions;
-            if (task.when() instanceof List<?> list) {
-                conditions = list.stream().filter(String.class::isInstance).map(String.class::cast).collect(Collectors.toList());
-            } else if (task.when() instanceof String s) {
-                conditions = List.of(s);
-            } else {
-                conditions = List.of(task.when().toString());
-            }
-
-            for (String condition : conditions) {
-                Object conditionResult = variableResolver.resolveValue(wrapInJinja(condition), variables);
-                if (!Truthiness.isTrue(conditionResult)) {
-                    return new TaskResult(true, false, "Skipped due to when condition", Map.of("skipped", true));
-                }
-            }
+        if (!isWhenConditionMet(task.when(), variables)) {
+            return new TaskResult(true, false, "Skipped due to when condition", Map.of("skipped", true));
         }
 
         // Variable resolution for task arguments
@@ -401,6 +373,29 @@ public class PlaybookExecutor {
         return Truthiness.isTrue(resolved);
     }
 
+    private boolean isWhenConditionMet(Object when, Map<String, Object> variables) {
+        if (when == null) {
+            return true;
+        }
+
+        List<String> conditions;
+        if (when instanceof List<?> list) {
+            conditions = list.stream().filter(String.class::isInstance).map(String.class::cast).collect(Collectors.toList());
+        } else if (when instanceof String s) {
+            conditions = List.of(s);
+        } else {
+            conditions = List.of(when.toString());
+        }
+
+        for (String condition : conditions) {
+            Object conditionResult = variableResolver.resolveValue(wrapInJinja(condition), variables);
+            if (!Truthiness.isTrue(conditionResult)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private TaskResult executeLoopTask(Play play, Host host, Task task, VariableManager variableManager, Map<String, Object> allVars, boolean inheritedCheckMode, Object inheritedEnvironment) {
         Object loopValue = task.loop();
         if (loopValue instanceof String str && str.contains("{{")) {
@@ -458,78 +453,38 @@ public class PlaybookExecutor {
     }
 
     private BecomeContext resolveBecomeContext(Play play, Task task, Map<String, Object> variables) {
-        // Task level takes precedence, then Play level
-        Object becomeObj = task.become();
-        if (becomeObj == null) becomeObj = play.become();
+        Object becomeObj = task.become() != null ? task.become() : play.become();
+        boolean become = Truthiness.isTrue(variableResolver.resolveValue(becomeObj, variables));
 
-        boolean become = false;
-        if (becomeObj != null) {
-            if (becomeObj instanceof String s && s.contains("{{")) {
-                becomeObj = variableResolver.resolveValue(s, variables);
-            }
-            become = Truthiness.isTrue(becomeObj);
-        }
+        String method = task.becomeMethod() != null ? task.becomeMethod() : play.becomeMethod();
+        Object resolvedMethod = variableResolver.resolveValue(method != null ? method : "sudo", variables);
 
-        String method = task.becomeMethod();
-        if (method == null) method = play.becomeMethod();
-        if (method == null) method = "sudo";
+        String user = task.becomeUser() != null ? task.becomeUser() : play.becomeUser();
+        Object resolvedUser = variableResolver.resolveValue(user != null ? user : "root", variables);
 
-        String user = task.becomeUser();
-        if (user == null) user = play.becomeUser();
-        if (user == null) user = "root";
+        String flags = task.becomeFlags() != null ? task.becomeFlags() : play.becomeFlags();
+        Object resolvedFlags = variableResolver.resolveValue(flags != null ? flags : "", variables);
 
-        String flags = task.becomeFlags();
-        if (flags == null) flags = play.becomeFlags();
-        if (flags == null) flags = "";
-
-        // Resolve variables in strings
-        if (method != null && method.contains("{{")) {
-            Object resolved = variableResolver.resolveValue(method, variables);
-            method = resolved != null ? resolved.toString() : null;
-        }
-        if (user != null && user.contains("{{")) {
-            Object resolved = variableResolver.resolveValue(user, variables);
-            user = resolved != null ? resolved.toString() : null;
-        }
-        if (flags != null && flags.contains("{{")) {
-            Object resolved = variableResolver.resolveValue(flags, variables);
-            flags = resolved != null ? resolved.toString() : null;
-        }
-
-        return new BecomeContext(become, method, user, flags);
+        return new BecomeContext(
+                become,
+                resolvedMethod != null ? resolvedMethod.toString() : "sudo",
+                resolvedUser != null ? resolvedUser.toString() : "root",
+                resolvedFlags != null ? resolvedFlags.toString() : ""
+        );
     }
 
     private Map<String, String> resolveEnvironment(Play play, Task task, Map<String, Object> variables, Object inheritedEnvironment) {
         Map<String, Object> mergedEnv = new HashMap<>();
 
-        // Merge Play level
-        if (play.environment() != null) {
-            Object resolved = play.environment();
-            if (resolved instanceof String s && s.contains("{{")) {
-                resolved = variableResolver.resolveValue(s, variables);
-            }
-            if (resolved instanceof Map<?, ?> map) {
-                mergedEnv.putAll((Map<String, Object>) map);
-            }
-        }
+        Object[] envSources = {
+                play.environment(),
+                inheritedEnvironment,
+                task.environment()
+        };
 
-        // Merge Block level
-        if (inheritedEnvironment != null) {
-            Object resolved = inheritedEnvironment;
-            if (resolved instanceof String s && s.contains("{{")) {
-                resolved = variableResolver.resolveValue(s, variables);
-            }
-            if (resolved instanceof Map<?, ?> map) {
-                mergedEnv.putAll((Map<String, Object>) map);
-            }
-        }
-
-        // Merge Task level
-        if (task.environment() != null) {
-            Object resolved = task.environment();
-            if (resolved instanceof String s && s.contains("{{")) {
-                resolved = variableResolver.resolveValue(s, variables);
-            }
+        for (Object source : envSources) {
+            if (source == null) continue;
+            Object resolved = variableResolver.resolveValue(source, variables);
             if (resolved instanceof Map<?, ?> map) {
                 mergedEnv.putAll((Map<String, Object>) map);
             }
@@ -537,10 +492,7 @@ public class PlaybookExecutor {
 
         Map<String, String> result = new HashMap<>();
         for (Map.Entry<String, Object> entry : mergedEnv.entrySet()) {
-            Object value = entry.getValue();
-            if (value instanceof String s && s.contains("{{")) {
-                value = variableResolver.resolveValue(s, variables);
-            }
+            Object value = variableResolver.resolveValue(entry.getValue(), variables);
             result.put(entry.getKey(), value != null ? value.toString() : "");
         }
         return result;
