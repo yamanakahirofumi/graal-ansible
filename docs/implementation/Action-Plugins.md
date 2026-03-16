@@ -7,13 +7,13 @@
 Ansible のタスク実行には、大きく分けて以下の 2 種類があります。
 
 1.  **Module (通常モジュール)**: ターゲットノードに転送され、そこで実行される（例: `command`, `apt`, `yum`）。
-2.  **Action Plugin**: 制御ノード（管理ホスト）上で実行され、必要に応じてターゲットノードに対して 1 回以上のモジュール実行を指示する（例: `template`, `copy`, `debug`）。
+2.  **Action Plugin**: 管理ノード（制御ノード）上で実行され、必要に応じてターゲットノードに対して 1 回以上のモジュール実行を指示する（例: `template`, `copy`, `debug`）。
 
-`graal-ansible` では、本家 Ansible の Python 実装の Action Plugin を GraalPy 上でそのまま動作させることで、高い互換性を維持します。
+`graal-ansible` では、本家 Ansible の Python 実装の Action Plugin を管理ノード側の GraalPy 上でそのまま動作させることで、高い互換性を維持します。
 
 ## 2. 検知ロジック
 
-`TaskExecutor` は、タスクの `action` 名に基づき、それが Action Plugin であるかどうかを以下の手順で判定します。
+Worker Process (`TaskExecutor`) は、タスクの `action` 名に基づき、それが Action Plugin であるかどうかを以下の手順で判定します。
 
 1.  **プラグイン検索**: `ansible-core` のコレクション（`ansible.builtin` 等）内の `plugins/action/` ディレクトリから、アクション名に一致する Python スクリプト（例: `template.py`）を検索します。
 2.  **優先判定**: アクション名に一致する Action Plugin が存在する場合、通常のモジュール実行（`ansible/modules/` 配下）よりも優先して Action Plugin として実行します。
@@ -22,7 +22,7 @@ Ansible のタスク実行には、大きく分けて以下の 2 種類があり
 
 Action Plugin の実行は、以下のプロセスで行われます。
 
-### 3.1 Java 側 (TaskExecutor / PythonModule)
+### 3.1 Java 側 (Worker / PythonModule)
 1.  **判別**: `isActionPlugin` ロジックにより Action Plugin であることを確認します。
 2.  **コンテキスト準備**:
     - 現在のタスク変数（`task_vars`）を Python コンテキストにバインドします。
@@ -38,8 +38,8 @@ Action Plugin の実行は、以下のプロセスで行われます。
 
 Action Plugin の最大の特徴は、自身の内部から別のモジュールを実行できる点です。
 
-- **仕組み**: モック化された `ActionBase._execute_module` メソッドが呼び出されると、Python 側は引数（モジュール名、引数等）を Java 側の `TaskExecutor.executeModule` メソッドへブリッジします。
-- **再帰的実行**: Java 側は受け取ったリクエストに基づき、通常のモジュール実行フロー（ターゲットへの転送・実行）を開始します。
+- **仕組み**: モック化された `ActionBase._execute_module` メソッドが呼び出されると、Python 側は引数（モジュール名、引数等）を Java 側のブリッジメソッドへルーティングします。
+- **再帰的実行**: Java 側は受け取ったリクエストに基づき、[処理フロー](../features/Process-Flow.md)に従って通常のモジュール実行フロー（ターゲットへの転送・実行）を開始します。
 - **結果の還元**: モジュールの実行結果は Java から Python へ返され、Action Plugin はその結果を元に後続の処理を継続します。
 
 ## 5. モック化が必要なコンポーネント

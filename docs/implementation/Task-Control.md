@@ -87,11 +87,11 @@
 
 ## 8. 委譲と実行制御 (`delegate_to`, `run_once`, `ignore_errors`, `ignore_unreachable`, `delegate_facts`)
 
-- **delegate_to**: タスクを指定された別のホスト（例: localhost）で実行します。
-- **delegate_facts**: `delegate_to` 使用時に、収集されたファクトを委譲先ではなく元のホストに割り当てるかを制御します（実装済み）。
-- **run_once**: 複数のターゲットホストがある場合でも、1つのホストで1回だけ実行します。
-- **ignore_errors**: タスクが失敗しても、そのホストでのプレイ実行を継続します。
-- **ignore_unreachable**: ホストが到達不能（unreachable）な場合にエラーを無視します（実装済み）。
+- **delegate_to**: タスクを指定された別のターゲットノード（例: localhost）で実行します。
+- **delegate_facts**: `delegate_to` 使用時に、収集されたファクトを委譲先ではなく元のターゲットノードに割り当てるかを制御します（実装済み）。
+- **run_once**: 複数のターゲットノードがある場合でも、1つのターゲットノードで1回だけ実行します。
+- **ignore_errors**: タスクが失敗しても、そのターゲットノードでのプレイ実行を継続します。
+- **ignore_unreachable**: ターゲットノードが到達不能（unreachable）な場合にエラーを無視します（実装済み）。
 
 ## 9. 環境変数 (`environment`)
 
@@ -137,4 +137,4 @@
 8.  **結果のカスタマイズ**: `failed_when`, `changed_when` を評価し、結果を補正します。
 9.  **結果登録**: `register` がある場合、結果を保存します。
 10. **通知**: `changed=true` かつ `notify` がある場合、ハンドラーをマークします。
-11. **エラーハンドリング**: 失敗時に `ignore_errors` が `false` ならばそのホストの実行を停止し、必要に応じて `rescue` ブロックへ遷移します。
+11. **エラーハンドリング**: 失敗時に `ignore_errors` が `false` ならばそのターゲットノードの実行を停止し、必要に応じて `rescue` ブロックへ遷移します。
