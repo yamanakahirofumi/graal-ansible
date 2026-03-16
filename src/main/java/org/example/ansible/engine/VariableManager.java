@@ -13,7 +13,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Manages variable resolution and priority.
+ * Manages variable resolution and priority on the Control Node (管理ノード).
  */
 public class VariableManager {
     private final Inventory inventory;

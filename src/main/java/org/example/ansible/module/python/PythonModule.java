@@ -33,6 +33,11 @@ import java.util.zip.ZipOutputStream;
 import java.util.concurrent.ConcurrentHashMap;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+/**
+ * PythonModule handles the execution of Ansible Python modules.
+ * It coordinates local execution via GraalPy on the Control Node (管理ノード)
+ * or remote execution on the Target Node (ターゲットノード).
+ */
 public class PythonModule implements Module {
     private final String moduleName;
     private final String scriptContent; // Added back for mocking/legacy support
