@@ -11,6 +11,7 @@ import java.util.stream.Collectors;
 
 /**
  * Variable resolver using Jinjava for Jinja2 compatibility.
+ * It operates on the Control Node (管理ノード).
  */
 public class VariableResolver {
     private final Jinjava jinjava;

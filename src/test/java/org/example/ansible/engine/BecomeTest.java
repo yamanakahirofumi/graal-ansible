@@ -1,14 +1,12 @@
 package org.example.ansible.engine;
 
 import org.example.ansible.connection.BecomeContext;
-import org.example.ansible.connection.ConnectionResult;
-import org.example.ansible.connection.LocalConnection;
+import org.example.ansible.connection.Connection;
 import org.example.ansible.inventory.Inventory;
+import org.example.ansible.inventory.Host;
 import org.example.ansible.parser.YamlParser;
 import org.example.ansible.util.OSHandler;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Mockito;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
@@ -16,10 +14,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
 
 class BecomeTest {
 
@@ -29,15 +24,26 @@ class BecomeTest {
         public final List<BecomeContext> executedContexts = new java.util.ArrayList<>();
 
         @Override
-        public TaskResult execute(Task task, BecomeContext becomeContext, java.util.Map<String, String> environment) {
-            executedTasks.add(task);
-            executedContexts.add(becomeContext);
+        public TaskResult execute(Play play, Host host, Task task, VariableManager variableManager, boolean inheritedCheckMode, Object inheritedEnvironment) {
+            TaskExecutor realExecutor = new TaskExecutor() {
+                @Override
+                public TaskResult execute(Task t, BecomeContext bc, Map<String, String> env) {
+                    executedTasks.add(t);
+                    executedContexts.add(bc);
+                    return TaskResult.success(Map.of());
+                }
+            };
+            return realExecutor.execute(play, host, task, variableManager, inheritedCheckMode, inheritedEnvironment);
+        }
+
+        @Override
+        public TaskResult execute(Task task, BecomeContext becomeContext, Map<String, String> environment) {
             return TaskResult.success(Map.of());
         }
 
         @Override
-        public TaskResult execute(Task task, BecomeContext becomeContext, org.example.ansible.connection.Connection connection, java.util.Map<String, String> environment) {
-            return execute(task, becomeContext, environment);
+        public TaskResult execute(Task task, BecomeContext becomeContext, Connection connection, Map<String, String> environment) {
+            return TaskResult.success(Map.of());
         }
 
         @Override

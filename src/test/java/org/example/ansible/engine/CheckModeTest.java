@@ -20,14 +20,28 @@ class CheckModeTest {
         List<Task> capturedTasks = new ArrayList<>();
         ITaskExecutor taskExecutor = new ITaskExecutor() {
             @Override
-            public TaskResult execute(Task task, BecomeContext becomeContext, Map<String, String> environment) {
-                return execute(task, becomeContext, null, environment);
+            public TaskResult execute(Play play, Host host, Task task, VariableManager variableManager, boolean inheritedCheckMode, Object inheritedEnvironment) {
+                // We use TaskExecutor's real logic to resolve check mode, but mock the final execution
+                TaskExecutor realExecutor = new TaskExecutor() {
+                    @Override
+                    public TaskResult execute(Task t, BecomeContext bc, Map<String, String> env) {
+                        capturedTasks.add(t);
+                        return TaskResult.success(Map.of());
+                    }
+                };
+                return realExecutor.execute(play, host, task, variableManager, inheritedCheckMode, inheritedEnvironment);
             }
+
             @Override
-            public TaskResult execute(Task task, BecomeContext becomeContext, Connection connection, Map<String, String> environment) {
-                capturedTasks.add(task);
+            public TaskResult execute(Task task, BecomeContext becomeContext, Map<String, String> environment) {
                 return TaskResult.success(Map.of());
             }
+
+            @Override
+            public TaskResult execute(Task task, BecomeContext becomeContext, Connection connection, Map<String, String> environment) {
+                return TaskResult.success(Map.of());
+            }
+
             @Override
             public org.example.ansible.util.OSHandler getOsHandler() { return null; }
             @Override

@@ -2,12 +2,26 @@ package org.example.ansible.engine;
 
 import org.example.ansible.connection.BecomeContext;
 import org.example.ansible.connection.Connection;
+import org.example.ansible.inventory.Host;
 import org.example.ansible.util.OSHandler;
 
 /**
  * Interface for executing tasks.
  */
 public interface ITaskExecutor extends AutoCloseable {
+    /**
+     * Executes the given task.
+     *
+     * @param play             The play context.
+     * @param host             The target host.
+     * @param task             The task to execute.
+     * @param variableManager  The variable manager.
+     * @param inheritedCheckMode Inherited check mode.
+     * @param inheritedEnvironment Inherited environment.
+     * @return The execution result.
+     */
+    TaskResult execute(Play play, Host host, Task task, VariableManager variableManager, boolean inheritedCheckMode, Object inheritedEnvironment);
+
     /**
      * Executes the given task.
      *
