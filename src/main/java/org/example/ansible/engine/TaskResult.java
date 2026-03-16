@@ -43,4 +43,23 @@ public record TaskResult(boolean success, boolean changed, String message, Map<S
         final boolean changed = Boolean.TRUE.equals(data.get("changed"));
         return new TaskResult(true, changed, "OK", data);
     }
+
+    /**
+     * Creates a skipped task result.
+     *
+     * @param message The skip message.
+     * @return A skipped TaskResult.
+     */
+    public static TaskResult skipped(String message) {
+        return new TaskResult(true, false, message, Map.of("skipped", true, "changed", false));
+    }
+
+    /**
+     * Checks if the result indicates the task was skipped.
+     *
+     * @return true if skipped.
+     */
+    public boolean isSkipped() {
+        return data != null && Boolean.TRUE.equals(data.get("skipped"));
+    }
 }

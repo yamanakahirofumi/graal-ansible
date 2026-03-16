@@ -5,7 +5,12 @@ import org.example.ansible.module.Module;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.lang.reflect.Method;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -55,5 +60,32 @@ class TaskExecutorTest {
         // Assert (検証)
         assertFalse(result.success());
         assertTrue(result.message().contains("Module not found"));
+    }
+
+    @Test
+    void testIsActionPluginWithBuiltin(@TempDir Path tempDir) throws Exception {
+        // Mock site-packages by setting system property
+        Path sitePackages = tempDir.resolve("python-packages");
+        Path actionPluginsDir = sitePackages.resolve("ansible/plugins/action");
+        Files.createDirectories(actionPluginsDir);
+        Files.createFile(actionPluginsDir.resolve("template.py"));
+
+        String oldProp = System.getProperty("ansible.site.packages");
+        System.setProperty("ansible.site.packages", sitePackages.toAbsolutePath().toString());
+
+        try {
+            // Use reflection to call private isActionPlugin
+            Method method = TaskExecutor.class.getDeclaredMethod("isActionPlugin", String.class);
+            method.setAccessible(true);
+
+            assertTrue((Boolean) method.invoke(executor, "template"));
+            assertFalse((Boolean) method.invoke(executor, "unknown_plugin"));
+        } finally {
+            if (oldProp != null) {
+                System.setProperty("ansible.site.packages", oldProp);
+            } else {
+                System.getProperties().remove("ansible.site.packages");
+            }
+        }
     }
 }
