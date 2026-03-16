@@ -80,10 +80,6 @@ public class TaskExecutor implements ITaskExecutor {
 
     @Override
     public TaskResult execute(Play play, Host host, Task task, VariableManager variableManager, boolean inheritedCheckMode, Object inheritedEnvironment) {
-        if (!task.block().isEmpty()) {
-            return executeBlock(play, host, task, variableManager, inheritedCheckMode, inheritedEnvironment);
-        }
-
         Map<String, Object> allVars = variableManager.getAllVariables(play, host, task);
 
         if (task.loop() != null) {
@@ -97,52 +93,13 @@ public class TaskExecutor implements ITaskExecutor {
         }
     }
 
-    private TaskResult executeBlock(Play play, Host host, Task blockTask, VariableManager variableManager, boolean inheritedCheckMode, Object inheritedEnvironment) {
-        Map<String, Object> blockVars = variableManager.getAllVariables(play, host, blockTask);
-        boolean blockCheckMode = resolveCheckMode(blockTask.checkMode(), blockVars, inheritedCheckMode);
-
-        if (!isWhenConditionMet(blockTask.when(), blockVars)) {
-            return new TaskResult(true, false, "Skipped due to block when condition", Map.of("skipped", true));
-        }
-
-        boolean blockFailed = false;
-        Object effectiveBlockEnv = blockTask.environment() != null ? blockTask.environment() : inheritedEnvironment;
-
-        TaskResult lastResult = null;
-        for (Task task : blockTask.block()) {
-            lastResult = execute(play, host, task, variableManager, blockCheckMode, effectiveBlockEnv);
-            if (lastResult != null && !lastResult.success() && !isSkipped(lastResult)) {
-                blockFailed = true;
-                break;
-            }
-        }
-
-        if (blockFailed) {
-            for (Task task : blockTask.rescue()) {
-                execute(play, host, task, variableManager, blockCheckMode, effectiveBlockEnv);
-            }
-        }
-
-        for (Task task : blockTask.always()) {
-            execute(play, host, task, variableManager, blockCheckMode, effectiveBlockEnv);
-        }
-
-        if (blockFailed && blockTask.rescue().isEmpty()) {
-            return lastResult; // Return the failing result
-        } else if (blockFailed) {
-            return new TaskResult(true, false, "Block failed but rescued", Map.of("changed", false));
-        }
-
-        return lastResult != null ? lastResult : new TaskResult(true, false, "Empty block executed", Map.of());
-    }
-
     private TaskResult executeSingleTask(Play play, Host host, Task task, Map<String, Object> variables, VariableManager variableManager, boolean inheritedCheckMode, Object inheritedEnvironment) {
-        if (!isWhenConditionMet(task.when(), variables)) {
+        if (!variableResolver.isWhenConditionMet(task.when(), variables)) {
             return new TaskResult(true, false, "Skipped due to when condition", Map.of("skipped", true));
         }
 
         Map<String, Object> resolvedArgs = new HashMap<>(variableResolver.resolve(task.args(), variables));
-        boolean effectiveCheckMode = resolveCheckMode(task.checkMode(), variables, inheritedCheckMode);
+        boolean effectiveCheckMode = variableResolver.resolveCheckMode(task.checkMode(), variables, inheritedCheckMode);
 
         if (effectiveCheckMode) {
             resolvedArgs.put("_ansible_check_mode", true);
@@ -150,7 +107,7 @@ public class TaskExecutor implements ITaskExecutor {
 
         String resolvedDelegateTo = null;
         if (task.delegateTo() != null) {
-            Object resolved = variableResolver.resolveValue(wrapInJinja(task.delegateTo()), variables);
+            Object resolved = variableResolver.resolveValue(variableResolver.wrapInJinja(task.delegateTo()), variables);
             resolvedDelegateTo = resolved != null ? resolved.toString() : null;
         }
 
@@ -167,8 +124,8 @@ public class TaskExecutor implements ITaskExecutor {
             // In the future, this would call Action Plugin launcher on Control Node
         }
 
-        BecomeContext becomeContext = resolveBecomeContext(play, resolvedTask, variables);
-        Map<String, String> resolvedEnvironment = resolveEnvironment(play, task, variables, inheritedEnvironment);
+        BecomeContext becomeContext = variableResolver.resolveBecomeContext(play, resolvedTask, variables);
+        Map<String, String> resolvedEnvironment = variableResolver.resolveEnvironment(play, task, variables, inheritedEnvironment);
 
         if (task.until() == null) {
             return execute(resolvedTask, becomeContext, new org.example.ansible.connection.LocalConnection(), resolvedEnvironment);
@@ -186,7 +143,7 @@ public class TaskExecutor implements ITaskExecutor {
 
             Map<String, Object> evalVars = new HashMap<>(variables);
             evalVars.putAll(lastResult.data());
-            Object untilResult = variableResolver.resolveValue(wrapInJinja(task.until()), evalVars);
+            Object untilResult = variableResolver.resolveValue(variableResolver.wrapInJinja(task.until()), evalVars);
 
             if (Truthiness.isTrue(untilResult)) {
                 return lastResult;
@@ -215,15 +172,9 @@ public class TaskExecutor implements ITaskExecutor {
     }
 
     private TaskResult executeLoopTask(Play play, Host host, Task task, VariableManager variableManager, Map<String, Object> allVars, boolean inheritedCheckMode, Object inheritedEnvironment) {
-        Object loopValue = task.loop();
-        if (loopValue instanceof String str && str.contains("{{")) {
-            loopValue = variableResolver.resolveValue(str, allVars);
-        } else if (loopValue instanceof String str) {
-            loopValue = variableResolver.resolveValue("{{ " + str + " }}", allVars);
-        }
-
-        if (!(loopValue instanceof List<?> items)) {
-            return TaskResult.failure("loop must be a list");
+        List<?> items = resolveLoopItems(task.loop(), allVars);
+        if (items == null) {
+            return TaskResult.failure("loop must be a list or a template that resolves to a list");
         }
 
         List<Map<String, Object>> loopResults = new ArrayList<>();
@@ -232,30 +183,54 @@ public class TaskExecutor implements ITaskExecutor {
         boolean allSkipped = true;
 
         for (Object item : items) {
-            Map<String, Object> iterationVars = new HashMap<>(allVars);
-            iterationVars.put("item", item);
+            TaskResult result = executeLoopIteration(play, host, task, item, allVars, variableManager, inheritedCheckMode, inheritedEnvironment);
 
-            TaskResult result = executeSingleTask(play, host, task, iterationVars, variableManager, inheritedCheckMode, inheritedEnvironment);
-            if (result != null) {
-                result = evaluateResultCustomization(task, result, iterationVars);
-            }
-
-            Map<String, Object> resultData = new HashMap<>(result.data());
-            resultData.put("item", item);
-            resultData.put("changed", result.changed());
-            resultData.put("failed", !result.success());
-            if (isSkipped(result)) {
-                resultData.put("skipped", true);
-            } else {
-                allSkipped = false;
-            }
-
+            Map<String, Object> resultData = buildIterationResultData(result, item);
             loopResults.add(resultData);
 
             if (!result.success() && !isSkipped(result)) anyFailed = true;
             if (result.changed()) anyChanged = true;
+            if (!isSkipped(result)) allSkipped = false;
         }
 
+        return buildFinalLoopResult(loopResults, anyFailed, anyChanged, allSkipped);
+    }
+
+    private List<?> resolveLoopItems(Object loop, Map<String, Object> variables) {
+        Object resolved = loop;
+        if (loop instanceof String str) {
+            resolved = variableResolver.resolveValue(variableResolver.wrapInJinja(str), variables);
+        }
+
+        if (resolved instanceof List<?> items) {
+            return items;
+        }
+        return null;
+    }
+
+    private TaskResult executeLoopIteration(Play play, Host host, Task task, Object item, Map<String, Object> allVars, VariableManager variableManager, boolean inheritedCheckMode, Object inheritedEnvironment) {
+        Map<String, Object> iterationVars = new HashMap<>(allVars);
+        iterationVars.put("item", item);
+
+        TaskResult result = executeSingleTask(play, host, task, iterationVars, variableManager, inheritedCheckMode, inheritedEnvironment);
+        if (result != null) {
+            result = evaluateResultCustomization(task, result, iterationVars);
+        }
+        return result;
+    }
+
+    private Map<String, Object> buildIterationResultData(TaskResult result, Object item) {
+        Map<String, Object> resultData = new HashMap<>(result.data());
+        resultData.put("item", item);
+        resultData.put("changed", result.changed());
+        resultData.put("failed", !result.success());
+        if (isSkipped(result)) {
+            resultData.put("skipped", true);
+        }
+        return resultData;
+    }
+
+    private TaskResult buildFinalLoopResult(List<Map<String, Object>> loopResults, boolean anyFailed, boolean anyChanged, boolean allSkipped) {
         Map<String, Object> finalData = new HashMap<>();
         finalData.put("results", loopResults);
         finalData.put("changed", anyChanged);
@@ -284,7 +259,7 @@ public class TaskExecutor implements ITaskExecutor {
             }
 
             for (Object condition : conditions) {
-                Object conditionResult = variableResolver.resolveValue(wrapInJinja(condition), evalVars);
+                Object conditionResult = variableResolver.resolveValue(variableResolver.wrapInJinja(condition), evalVars);
                 if (Truthiness.isTrue(conditionResult)) {
                     success = false;
                     break;
@@ -302,7 +277,7 @@ public class TaskExecutor implements ITaskExecutor {
 
             boolean allChanged = true;
             for (Object condition : conditions) {
-                Object conditionResult = variableResolver.resolveValue(wrapInJinja(condition), evalVars);
+                Object conditionResult = variableResolver.resolveValue(variableResolver.wrapInJinja(condition), evalVars);
                 if (!Truthiness.isTrue(conditionResult)) {
                     allChanged = false;
                     break;
@@ -345,90 +320,6 @@ public class TaskExecutor implements ITaskExecutor {
         }
     }
 
-    private boolean resolveCheckMode(Object checkMode, Map<String, Object> variables, boolean inheritedValue) {
-        if (checkMode == null) {
-            return inheritedValue;
-        }
-        Object resolved = variableResolver.resolveValue(checkMode, variables);
-        return Truthiness.isTrue(resolved);
-    }
-
-    private boolean isWhenConditionMet(Object when, Map<String, Object> variables) {
-        if (when == null) {
-            return true;
-        }
-
-        List<String> conditions;
-        if (when instanceof List<?> list) {
-            conditions = list.stream().filter(String.class::isInstance).map(String.class::cast).toList();
-        } else if (when instanceof String s) {
-            conditions = List.of(s);
-        } else {
-            conditions = List.of(when.toString());
-        }
-
-        for (String condition : conditions) {
-            Object conditionResult = variableResolver.resolveValue(wrapInJinja(condition), variables);
-            if (!Truthiness.isTrue(conditionResult)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private String wrapInJinja(Object expression) {
-        if (expression instanceof String s) {
-            if (s.contains("{{")) return s;
-            return "{{ " + s + " }}";
-        }
-        return expression.toString();
-    }
-
-    private BecomeContext resolveBecomeContext(Play play, Task task, Map<String, Object> variables) {
-        Object becomeObj = task.become() != null ? task.become() : play.become();
-        boolean become = Truthiness.isTrue(variableResolver.resolveValue(becomeObj, variables));
-
-        String method = task.becomeMethod() != null ? task.becomeMethod() : play.becomeMethod();
-        Object resolvedMethod = variableResolver.resolveValue(method != null ? method : "sudo", variables);
-
-        String user = task.becomeUser() != null ? task.becomeUser() : play.becomeUser();
-        Object resolvedUser = variableResolver.resolveValue(user != null ? user : "root", variables);
-
-        String flags = task.becomeFlags() != null ? task.becomeFlags() : play.becomeFlags();
-        Object resolvedFlags = variableResolver.resolveValue(flags != null ? flags : "", variables);
-
-        return new BecomeContext(
-                become,
-                resolvedMethod != null ? resolvedMethod.toString() : "sudo",
-                resolvedUser != null ? resolvedUser.toString() : "root",
-                resolvedFlags != null ? resolvedFlags.toString() : ""
-        );
-    }
-
-    private Map<String, String> resolveEnvironment(Play play, Task task, Map<String, Object> variables, Object inheritedEnvironment) {
-        Map<String, Object> mergedEnv = new HashMap<>();
-
-        Object[] envSources = {
-                play.environment(),
-                inheritedEnvironment,
-                task.environment()
-        };
-
-        for (Object source : envSources) {
-            if (source == null) continue;
-            Object resolved = variableResolver.resolveValue(source, variables);
-            if (resolved instanceof Map<?, ?> map) {
-                mergedEnv.putAll((Map<String, Object>) map);
-            }
-        }
-
-        Map<String, String> result = new HashMap<>();
-        for (Map.Entry<String, Object> entry : mergedEnv.entrySet()) {
-            Object value = variableResolver.resolveValue(entry.getValue(), variables);
-            result.put(entry.getKey(), value != null ? value.toString() : "");
-        }
-        return result;
-    }
 
     private boolean isSkipped(TaskResult result) {
         return result != null && Boolean.TRUE.equals(result.data().get("skipped"));

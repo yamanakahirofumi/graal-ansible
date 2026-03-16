@@ -53,7 +53,7 @@ public class TaskQueueManager {
 
                 // Initial inherited check mode from Play level
                 Map<String, Object> vars = variableManager.getAllVariables(play, host, task);
-                boolean playCheckMode = resolveCheckMode(play.checkMode(), vars, globalCheckMode);
+                boolean playCheckMode = variableResolver.resolveCheckMode(play.checkMode(), vars, globalCheckMode);
 
                 executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications, playCheckMode, null);
                 executedOnce = true;
@@ -63,7 +63,7 @@ public class TaskQueueManager {
         // Execute handlers at the end of the play
         for (Host host : targetHosts) {
             Map<String, Object> vars = variableManager.getAllVariables(play, host, null);
-            boolean playCheckMode = resolveCheckMode(play.checkMode(), vars, globalCheckMode);
+            boolean playCheckMode = variableResolver.resolveCheckMode(play.checkMode(), vars, globalCheckMode);
             flushHandlersForHost(play, host, variableManager, results, failedHosts, hostNotifications, playCheckMode);
         }
     }
@@ -118,9 +118,9 @@ public class TaskQueueManager {
 
     private void executeBlock(Play play, Host host, Task blockTask, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode, Object inheritedEnvironment) {
         Map<String, Object> blockVars = variableManager.getAllVariables(play, host, blockTask);
-        boolean blockCheckMode = resolveCheckMode(blockTask.checkMode(), blockVars, inheritedCheckMode);
+        boolean blockCheckMode = variableResolver.resolveCheckMode(blockTask.checkMode(), blockVars, inheritedCheckMode);
 
-        if (!isWhenConditionMet(blockTask.when(), blockVars)) {
+        if (!variableResolver.isWhenConditionMet(blockTask.when(), blockVars)) {
             results.computeIfAbsent(host.name(), k -> new ArrayList<>())
                     .add(new TaskResult(true, false, "Skipped due to block when condition", Map.of("skipped", true)));
             return;
@@ -157,44 +157,6 @@ public class TaskQueueManager {
         }
     }
 
-    private boolean isWhenConditionMet(Object when, Map<String, Object> variables) {
-        if (when == null) {
-            return true;
-        }
-
-        List<String> conditions;
-        if (when instanceof List<?> list) {
-            conditions = list.stream().filter(String.class::isInstance).map(String.class::cast).toList();
-        } else if (when instanceof String s) {
-            conditions = List.of(s);
-        } else {
-            conditions = List.of(when.toString());
-        }
-
-        for (String condition : conditions) {
-            Object conditionResult = variableResolver.resolveValue(wrapInJinja(condition), variables);
-            if (!Truthiness.isTrue(conditionResult)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private String wrapInJinja(Object expression) {
-        if (expression instanceof String s) {
-            if (s.contains("{{")) return s;
-            return "{{ " + s + " }}";
-        }
-        return expression.toString();
-    }
-
-    private boolean resolveCheckMode(Object checkMode, Map<String, Object> variables, boolean inheritedValue) {
-        if (checkMode == null) {
-            return inheritedValue;
-        }
-        Object resolved = variableResolver.resolveValue(checkMode, variables);
-        return Truthiness.isTrue(resolved);
-    }
 
     private boolean isSkipped(TaskResult result) {
         return Boolean.TRUE.equals(result.data().get("skipped"));

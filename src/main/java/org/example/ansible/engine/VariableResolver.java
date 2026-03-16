@@ -2,8 +2,11 @@ package org.example.ansible.engine;
 
 import com.hubspot.jinjava.Jinjava;
 import com.hubspot.jinjava.interpret.JinjavaInterpreter;
+import org.example.ansible.connection.BecomeContext;
 import org.example.ansible.engine.filter.*;
+import org.example.ansible.util.Truthiness;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -105,5 +108,129 @@ public class VariableResolver {
             if ("false".equals(s)) return false;
         }
         return rendered;
+    }
+
+    /**
+     * Evaluates a 'when' condition.
+     *
+     * @param when      The condition object (String or List).
+     * @param variables The variable map.
+     * @return true if conditions are met, false otherwise.
+     */
+    public boolean isWhenConditionMet(Object when, Map<String, Object> variables) {
+        if (when == null) {
+            return true;
+        }
+
+        List<String> conditions;
+        if (when instanceof List<?> list) {
+            conditions = list.stream().filter(String.class::isInstance).map(String.class::cast).toList();
+        } else if (when instanceof String s) {
+            conditions = List.of(s);
+        } else {
+            conditions = List.of(when.toString());
+        }
+
+        for (String condition : conditions) {
+            Object conditionResult = resolveValue(wrapInJinja(condition), variables);
+            if (!Truthiness.isTrue(conditionResult)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Resolves check mode status.
+     *
+     * @param checkMode      The check_mode setting.
+     * @param variables      The variable map.
+     * @param inheritedValue The value inherited from parent context.
+     * @return Resolved check mode status.
+     */
+    public boolean resolveCheckMode(Object checkMode, Map<String, Object> variables, boolean inheritedValue) {
+        if (checkMode == null) {
+            return inheritedValue;
+        }
+        Object resolved = resolveValue(checkMode, variables);
+        return Truthiness.isTrue(resolved);
+    }
+
+    /**
+     * Resolves the become context for a task.
+     *
+     * @param play      The play context.
+     * @param task      The task.
+     * @param variables The variable map.
+     * @return The resolved become context.
+     */
+    public BecomeContext resolveBecomeContext(Play play, Task task, Map<String, Object> variables) {
+        Object becomeObj = task.become() != null ? task.become() : play.become();
+        boolean become = Truthiness.isTrue(resolveValue(becomeObj, variables));
+
+        String method = task.becomeMethod() != null ? task.becomeMethod() : play.becomeMethod();
+        Object resolvedMethod = resolveValue(method != null ? method : "sudo", variables);
+
+        String user = task.becomeUser() != null ? task.becomeUser() : play.becomeUser();
+        Object resolvedUser = resolveValue(user != null ? user : "root", variables);
+
+        String flags = task.becomeFlags() != null ? task.becomeFlags() : play.becomeFlags();
+        Object resolvedFlags = resolveValue(flags != null ? flags : "", variables);
+
+        return new BecomeContext(
+                become,
+                resolvedMethod != null ? resolvedMethod.toString() : "sudo",
+                resolvedUser != null ? resolvedUser.toString() : "root",
+                resolvedFlags != null ? resolvedFlags.toString() : ""
+        );
+    }
+
+    /**
+     * Resolves environment variables for a task.
+     *
+     * @param play                 The play context.
+     * @param task                 The task.
+     * @param variables            The variable map.
+     * @param inheritedEnvironment Inherited environment.
+     * @return The resolved environment map.
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, String> resolveEnvironment(Play play, Task task, Map<String, Object> variables, Object inheritedEnvironment) {
+        Map<String, Object> mergedEnv = new HashMap<>();
+
+        Object[] envSources = {
+                play.environment(),
+                inheritedEnvironment,
+                task.environment()
+        };
+
+        for (Object source : envSources) {
+            if (source == null) continue;
+            Object resolved = resolveValue(source, variables);
+            if (resolved instanceof Map<?, ?> map) {
+                mergedEnv.putAll((Map<String, Object>) map);
+            }
+        }
+
+        Map<String, String> result = new HashMap<>();
+        for (Map.Entry<String, Object> entry : mergedEnv.entrySet()) {
+            Object value = resolveValue(entry.getValue(), variables);
+            result.put(entry.getKey(), value != null ? value.toString() : "");
+        }
+        return result;
+    }
+
+    /**
+     * Wraps an expression in Jinja2 delimiters if not already wrapped.
+     *
+     * @param expression The expression to wrap.
+     * @return The wrapped expression.
+     */
+    public String wrapInJinja(Object expression) {
+        if (expression instanceof String s) {
+            if (s.contains("{{")) return s;
+            return "{{ " + s + " }}";
+        }
+        return expression != null ? expression.toString() : "";
     }
 }
