@@ -27,6 +27,7 @@
 
 ## 3. 機能・仕様 (`docs/features/`)
 - [CLI仕様](features/CLI-Specification.md)：ansible-playbook互換のコマンドライン引数
+- [処理フロー](features/Process-Flow.md)：Playbook読み込みから実行までの全体フロー
 - [動作環境](features/System-Requirements.md)：Java/GraalVMの実行環境とOS互換性
 - [インベントリ管理](features/Inventory-System.md)：静的・動的インベントリのサポート範囲
 - [コレクションの管理と取得方法](features/Collection-Management.md)：実際のコレクションを取得・利用する手順
