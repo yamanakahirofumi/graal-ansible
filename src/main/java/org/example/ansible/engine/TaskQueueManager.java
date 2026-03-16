@@ -96,7 +96,7 @@ public class TaskQueueManager {
         if (result != null) {
             results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(result);
 
-            if (result.success() && !isSkipped(result) && "meta".equals(task.action()) && "flush_handlers".equals(task.args().get("_raw_params"))) {
+            if (result.success() && !result.isSkipped() && "meta".equals(task.action()) && "flush_handlers".equals(task.args().get("_raw_params"))) {
                 flushHandlersForHost(play, host, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode);
             }
 
@@ -108,7 +108,7 @@ public class TaskQueueManager {
                 hostNotifications.computeIfAbsent(host.name(), k -> new HashSet<>()).addAll(task.notifications());
             }
 
-            if (!result.success() && !isSkipped(result)) {
+            if (!result.success() && !result.isSkipped()) {
                 if (!task.ignoreErrors()) {
                     failedHosts.add(host.name());
                 }
@@ -122,7 +122,7 @@ public class TaskQueueManager {
 
         if (!variableResolver.isWhenConditionMet(blockTask.when(), blockVars)) {
             results.computeIfAbsent(host.name(), k -> new ArrayList<>())
-                    .add(new TaskResult(true, false, "Skipped due to block when condition", Map.of("skipped", true)));
+                    .add(TaskResult.skipped("Skipped due to block when condition"));
             return;
         }
 
@@ -157,10 +157,6 @@ public class TaskQueueManager {
         }
     }
 
-
-    private boolean isSkipped(TaskResult result) {
-        return Boolean.TRUE.equals(result.data().get("skipped"));
-    }
 
     private List<Host> getTargetHosts(String pattern, Inventory inventory) {
         if ("all".equals(pattern)) {

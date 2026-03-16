@@ -8,10 +8,14 @@ import org.example.ansible.util.OSHandlerFactory;
 import org.example.ansible.util.Truthiness;
 import org.graalvm.polyglot.Context;
 
+import org.example.ansible.util.PythonEnv;
+
+import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * TaskExecutor represents a Worker Process that executes individual tasks.
@@ -48,6 +52,7 @@ public class TaskExecutor implements ITaskExecutor {
     }
 
     private final Map<String, org.example.ansible.module.Module> modules = new HashMap<>();
+    private final Map<String, Boolean> actionPluginCache = new ConcurrentHashMap<>();
     private final OSHandler osHandler;
     private final Context context;
     private final VariableResolver variableResolver = new VariableResolver();
@@ -95,7 +100,7 @@ public class TaskExecutor implements ITaskExecutor {
 
     private TaskResult executeSingleTask(Play play, Host host, Task task, Map<String, Object> variables, VariableManager variableManager, boolean inheritedCheckMode, Object inheritedEnvironment) {
         if (!variableResolver.isWhenConditionMet(task.when(), variables)) {
-            return new TaskResult(true, false, "Skipped due to when condition", Map.of("skipped", true));
+            return TaskResult.skipped("Skipped due to when condition");
         }
 
         Map<String, Object> resolvedArgs = new HashMap<>(variableResolver.resolve(task.args(), variables));
@@ -167,8 +172,20 @@ public class TaskExecutor implements ITaskExecutor {
     }
 
     private boolean isActionPlugin(String action) {
-        // Simple skeleton for future Action Plugin detection
-        return List.of("copy", "template", "debug").contains(action);
+        if (action == null) return false;
+        return actionPluginCache.computeIfAbsent(action, a -> {
+            List<String> sitePackages = PythonEnv.getSitePackagesFromEnv();
+            for (String path : sitePackages) {
+                File actionDir = new File(path, "ansible/plugins/action");
+                if (actionDir.exists() && actionDir.isDirectory()) {
+                    File actionFile = new File(actionDir, a + ".py");
+                    if (actionFile.exists()) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        });
     }
 
     private TaskResult executeLoopTask(Play play, Host host, Task task, VariableManager variableManager, Map<String, Object> allVars, boolean inheritedCheckMode, Object inheritedEnvironment) {
@@ -188,9 +205,9 @@ public class TaskExecutor implements ITaskExecutor {
             Map<String, Object> resultData = buildIterationResultData(result, item);
             loopResults.add(resultData);
 
-            if (!result.success() && !isSkipped(result)) anyFailed = true;
+            if (!result.success() && !result.isSkipped()) anyFailed = true;
             if (result.changed()) anyChanged = true;
-            if (!isSkipped(result)) allSkipped = false;
+            if (!result.isSkipped()) allSkipped = false;
         }
 
         return buildFinalLoopResult(loopResults, anyFailed, anyChanged, allSkipped);
@@ -224,7 +241,7 @@ public class TaskExecutor implements ITaskExecutor {
         resultData.put("item", item);
         resultData.put("changed", result.changed());
         resultData.put("failed", !result.success());
-        if (isSkipped(result)) {
+        if (result.isSkipped()) {
             resultData.put("skipped", true);
         }
         return resultData;
@@ -242,7 +259,7 @@ public class TaskExecutor implements ITaskExecutor {
     }
 
     private TaskResult evaluateResultCustomization(Task task, TaskResult result, Map<String, Object> variables) {
-        if (isSkipped(result)) return result;
+        if (result.isSkipped()) return result;
 
         boolean success = result.success();
         boolean changed = result.changed();
@@ -321,9 +338,6 @@ public class TaskExecutor implements ITaskExecutor {
     }
 
 
-    private boolean isSkipped(TaskResult result) {
-        return result != null && Boolean.TRUE.equals(result.data().get("skipped"));
-    }
 
     @Override
     public void close() {
