@@ -128,5 +128,5 @@
     - `executeLoopTask` のリファクタリング（ループの反復処理とタスク実行ロジックの分離）。
     - **コネクション解決の抽象化**: `ansible_connection` 等の変数に基づき、動的に `Connection` インスタンスを生成・取得する仕組みの導入。
     - **委譲 (delegate_to) の完全実装**: コネクションの動的な切り替えと、`delegate_facts` のサポート。
-    - **Action Plugin の実行実装**: 管理ノード側での Action Plugin 実行ブリッジ（`ansible_action_launcher.py` 等）の実装。
+    - **Action Plugin の実行実装**: 管理ノード側での Action Plugin 実行ブリッジ（`ansible_action_launcher.py` 等）の実装。設計仕様は [Action-Plugins.md](implementation/Action-Plugins.md) に策定済み。
     - **Unreachable ハンドリング**: コネクションエラー発生時の `ignore_unreachable` に基づく制御。
