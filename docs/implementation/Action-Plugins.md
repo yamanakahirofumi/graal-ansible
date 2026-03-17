@@ -1,6 +1,9 @@
-# Action Plugin 実装仕様 (将来の設計指針)
+# Action Plugin 実装仕様
 
-本ドキュメントでは、`graal-ansible` における Ansible Action Plugin の実行メカニズムの設計方針について詳述します。 **(注意: 本ドキュメントは将来の実装に向けた設計仕様であり、現時点では未実装です)**
+本ドキュメントでは、`graal-ansible` における Ansible Action Plugin の実行メカニズムの設計方針について詳述します。
+
+> [!NOTE]
+> **現在のステータス**: Action Plugin の**検知ロジック**（`ansible/plugins/action` からの検索）は `TaskExecutor` に実装済みですが、プラグインの**実行ブリッジ**（ランチャーを介した Python コードの呼び出し）は将来の実装課題です。
 
 ## 1. Action Plugin の概要
 

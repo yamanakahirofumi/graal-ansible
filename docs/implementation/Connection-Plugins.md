@@ -61,3 +61,21 @@ GraalVM Native Image との相性を考慮し、純粋な Java 実装である *
 - **タイムアウト管理**: 接続およびコマンド実行に対して、Ansible 互換のタイムアウト設定を適用可能にします。
 - **リソース解放**: 実行完了後（またはエラー発生時）に確実に接続をクローズする仕組み（Try-with-resources 等）を徹底します。
 - **Native Image 対応**: SSH ライブラリが使用する暗号化アルゴリズムのリフレクション/JNI設定を `reflect-config.json` 等に含める必要があります。
+
+## 8. コネクションの解決ロジック (将来の設計)
+
+現在は `LocalConnection` または `SshConnection` がコード内で明示的に選択されていますが、将来的にはインベントリ変数に基づいて動的に解決する仕組みを導入します。
+
+### 解決に使用する主要な変数
+- `ansible_connection`: 使用するプラグイン名（`local`, `ssh`, `smart` 等）。
+- `ansible_host`: 実際の接続先ホスト名または IP アドレス（未指定の場合はインベントリのホスト名を使用）。
+- `ansible_port`: 接続ポート番号。
+- `ansible_user`: 接続ユーザー名。
+- `ansible_password` / `ansible_ssh_pass`: 接続パスワード。
+- `ansible_ssh_private_key_file`: 認証用秘密鍵パス。
+
+### 解決フロー (設計案)
+1. **変数の取得**: `VariableManager` を用いて、対象ホストの `ansible_connection` 等の変数を解決します。
+2. **ファクトリによる生成**: `ConnectionFactory`（仮称）を介して、プラグイン名に対応するクラスをインスタンス化します。
+3. **パラメータ設定**: 解決された接続情報をコンストラクタまたはセッター経由で注入します。
+4. **キャッシュ**: 同一ホスト・同一パラメータのコネクションは `TaskQueueManager` または `PlaybookExecutor` レベルで保持し、タスクごとに再利用します。
