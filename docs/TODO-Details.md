@@ -121,10 +121,12 @@
 
 ## 5. 今後のリファクタリング検討事項 (Future Refactoring Items)
 
-### [ ] PlaybookExecutor のさらなる整理
-- **概要**: `PlaybookExecutor` 内に依然として存在する重複コードや複雑なロジックの改善。
+### [ ] PlaybookExecutor および実行エンジンのさらなる整理
+- **概要**: `PlaybookExecutor` および `TaskQueueManager`, `TaskExecutor` 内に存在する課題の改善。
 - **検討内容**:
-    - `when` 条件の評価ロジックの集約（`executeBlock` と `executeSingleTask` に重複あり）。
-    - `environment` および `become` の解決ロジックの簡略化と集約。
+    - `when` 条件の評価ロジックの集約（`VariableResolver` への集約は進んでいるが、呼び出し側の整理が必要）。
     - `executeLoopTask` のリファクタリング（ループの反復処理とタスク実行ロジックの分離）。
-    - ホストへの接続選択ロジックの抽象化（現在は `LocalConnection` がハードコードされている箇所の改善）。
+    - **コネクション解決の抽象化**: `ansible_connection` 等の変数に基づき、動的に `Connection` インスタンスを生成・取得する仕組みの導入。
+    - **委譲 (delegate_to) の完全実装**: コネクションの動的な切り替えと、`delegate_facts` のサポート。
+    - **Action Plugin の実行実装**: 管理ノード側での Action Plugin 実行ブリッジ（`ansible_action_launcher.py` 等）の実装。
+    - **Unreachable ハンドリング**: コネクションエラー発生時の `ignore_unreachable` に基づく制御。
