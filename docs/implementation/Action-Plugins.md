@@ -29,13 +29,34 @@ Action Plugin の実行は、以下のプロセスで行われます。
 1.  **判別**: `isActionPlugin` ロジックにより Action Plugin であることを確認します。
 2.  **コンテキスト準備**:
     - 現在のタスク変数（`task_vars`）を Python コンテキストにバインドします。
-    - Java の `ITaskExecutor` および `Connection` オブジェクトへのブリッジ（`connection_java` 等）を用意します。
+    - Java の `ITaskExecutor` および `Connection` オブジェクトへのブリッジ（`connection_java`, `task_executor_java`）を用意します。
 3.  **ランチャー起動**: `ansible_action_launcher.py` を使用して、対象の Action Plugin クラスをインスタンス化し、`run()` メソッドを呼び出します。
 
 ### 3.2 Python 側 (ansible_action_launcher.py)
 1.  **Ansible コアクラスのモック**: Action Plugin が依存する `Task`, `Connection`, `PlayContext`, `DataLoader`, `Templar` 等のコアクラスを、Java ブリッジを利用するようにモック化します。
 2.  **プラグインのロード**: 指定された Action Plugin モジュールをインポートし、プラグインクラス（例: `ActionModule`）を生成します。
 3.  **実行**: プラグインの `run(task_vars)` メソッドを実行します。
+
+### 3.3 Python ランチャー (実行ブリッジ) の詳細仕様
+Action Plugin を実行するための `ansible_action_launcher.py` は、以下のバインディングとインターフェースを期待します。
+
+| バインディング名 | Java 型 | 用途 |
+| :--- | :--- | :--- |
+| `connection_java` | `Connection` | ターゲットノードへのファイル転送やコマンド実行の委譲。 |
+| `task_executor_java` | `ITaskExecutor` | `_execute_module` 呼び出し時のタスク再帰実行。 |
+| `task_vars_java` | `Map<String, Object>` | 実行コンテキストにおける変数セット。 |
+| `action_name` | `String` | 実行対象のアクション名 (例: `copy`, `template`)。 |
+
+#### 実行インターフェースのパッチ
+Python 側の `ansible.plugins.action.ActionBase._execute_module` を以下の形式でモンキーパッチします：
+
+```python
+def mocked_execute_module(self, module_name=None, module_args=None, tmp=None, task_vars=None, *args, **kwargs):
+    # Java の ITaskExecutor.execute を呼び出してモジュールを実行
+    # 戻り値を Python の辞書形式に変換して返却
+    result = task_executor_java.execute_from_python(module_name, module_args, task_vars)
+    return result
+```
 
 ## 4. GraalPy-Java ブリッジ (`_execute_module`)
 

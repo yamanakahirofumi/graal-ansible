@@ -37,22 +37,22 @@
 
 ## 3. 完了済みの項目 (Completed)
 
-### [x] Native Image 時のリフレクション設定
+### [✓] Native Image 時のリフレクション設定
 - **完了日**: 2026-03-05
 - **概要**: YAML 解析や動的クラスロードに伴うリフレクション定義の生成。
 - **解決策**:
     - `src/main/resources/META-INF/native-image/` 配下に `reflect-config.json`, `resource-config.json`, `native-image.properties` を作成済み。
     - SnakeYAML, Jackson, Picocli, および主要な Record クラスのリフレクション設定を包含。
 
-### [x] 権限昇格 (become) の実装
+### [✓] 権限昇格 (become) の実装
 - **完了日**: 2026-03-05
 - **概要**: [権限昇格 (become)](implementation/Privilege-Escalation.md) に基づく sudo/su 等の実行サポート。
 - **解決策**:
     - `BecomeContext` レコードを定義し、`Connection` インターフェースの `execCommand` メソッドへ統合。
     - `LocalConnection` において、`sudo` および `su` によるコマンドのラップ処理を実装.
-    - `PlaybookExecutor` にて Play レベルおよび Task レベルの `become` 設定の解決ロジックを実装済み。
+    - `PlaybookExecutor` にて Playレベルおよび Taskレベルの `become` 設定の解決ロジックを実装済み。
 
-### [x] OS 抽象化レイヤー (OSHandler) の実装
+### [✓] OS 抽象化レイヤー (OSHandler) の実装
 - **完了日**: 2026-03-05
 - **概要**: [OS 抽象化レイヤー](implementation/OS-Abstraction.md) に基づき、ターゲット OS ごとの差異を吸収。
 - **解決策**:
@@ -61,36 +61,36 @@
     - `OSHandlerFactory` による実行環境に応じた動的なハンドラ切り替えを実装済み。
 
 
-### [x] GraalPy と Java のシームレスな統合
+### [✓] GraalPy と Java のシームレスな統合
 - **完了日**: 2026-03-04
 - **概要**: Java コードから既存の Ansible Python モジュールを効率的に呼び出すためのブリッジ設計。
 - **解決策**: `PythonModule` クラスにて Polyglot API を使用し、`complex_args` を介した引数受け渡しと標準出力キャプチャによる結果取得を実装済み。
 
-### [x] SnakeYAML 2.x による Playbook 解析の実装
+### [✓] SnakeYAML 2.x による Playbook 解析の実装
 - **完了日**: 2026-03-04
 - **概要**: YAML 形式の Playbook を Java オブジェクト（Record）へマッピング。
 - **解決策**: `YamlParser` にて予約語（`when`, `loop` 等）とモジュール引数の分離、および `block/rescue/always` の再帰的パースを実装済み。
 
-### [x] インベントリ管理の基本機能
+### [✓] インベントリ管理の基本機能
 - **完了日**: 2026-02-22
 - **概要**: ターゲットホストの静的ファイル（INI/YAML）からの読み込みと優先順位解決。
 - **解決策**:
     - INI/YAML 形式のインベントリサポート済み。
     - [インベントリシステム実装](implementation/Inventory-System.md) に基づき、`Inventory` クラスにて階層化されたグループ変数の優先順位解決（all < parent < child < host）を実装済み。
 
-### [x] 実行エンジンの基本設計
+### [✓] 実行エンジンの基本設計
 - **完了日**: 2026-02-22
 - **概要**: 複数タスクの順次実行とエラーハンドリングの基本方針。
 - **解決策**: [タスク実行エンジン](implementation/Task-Executor.md) にて、`linear` 戦略の採用を策定・実装済み。
 
-### [x] Jinjava による変数テンプレートの実装
+### [✓] Jinjava による変数テンプレートの実装
 - **完了日**: 2026-03-04
 - **概要**: Playbook や変数ファイル内の Jinja2 テンプレートを展開する仕組み。
 - **解決策**:
     - `VariableResolver` にて Jinjava を統合し、動的な変数展開を実装済み。
     - 主要なフィルター（`bool`, `combine`, `default`, `dict2items`, `ipaddr`, `to_json`, `to_yaml`）を Java で実装し登録済み。
 
-### [x] タスク制御機能（when, register, loop, handlers, block, retry, check_mode 等）の実装
+### [✓] タスク制御機能（when, register, loop, handlers, block, retry, check_mode 等）の実装
 - **完了日**: 2026-03-05
 - **概要**: 実行の動的制御や変数の再利用、繰り返し処理、エラーハンドリング、およびドライランのサポート。
 - **解決策**:
@@ -109,12 +109,12 @@
 
 ## 4. 整理・調整済み (Refactored/Adjusted)
 
-### [x] GitHub Actions CI ワークフローの構築
+### [✓] GitHub Actions CI ワークフローの構築
 - **完了日**: 2026-03-05
 - **概要**: docs/tech/CI-Setting.md に記載されていたが未実装だった CI 環境を構築。
 - **解決策**: `.github/workflows/build.yml` を作成し、マルチプラットフォームでのビルドとテストを自動化。
 
-### [x] Task Record および YamlParser の同期
+### [✓] Task Record および YamlParser の同期
 - **完了日**: 2026-03-05
 - **概要**: docs/implementation/Task-Control.md で予約されていたが未実装だったキーワードの追加。
 - **解決策**: `Task` レコードに `ignore_unreachable`, `delegate_facts` を追加し、`YamlParser` での解析をサポート。

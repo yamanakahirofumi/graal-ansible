@@ -62,20 +62,40 @@ GraalVM Native Image との相性を考慮し、純粋な Java 実装である *
 - **リソース解放**: 実行完了後（またはエラー発生時）に確実に接続をクローズする仕組み（Try-with-resources 等）を徹底します。
 - **Native Image 対応**: SSH ライブラリが使用する暗号化アルゴリズムのリフレクション/JNI設定を `reflect-config.json` 等に含める必要があります。
 
-## 8. コネクションの解決ロジック (将来の設計)
+## 8. コネクションファクトリと解決ロジック
 
-現在は `LocalConnection` または `SshConnection` がコード内で明示的に選択されていますが、将来的にはインベントリ変数に基づいて動的に解決する仕組みを導入します。
+現在は `LocalConnection` または `SshConnection` がコード内で明示的に選択されていますが、インベントリ変数に基づき動的に `Connection` インスタンスを生成する `ConnectionFactory` を導入します。
 
-### 解決に使用する主要な変数
-- `ansible_connection`: 使用するプラグイン名（`local`, `ssh`, `smart` 等）。
-- `ansible_host`: 実際の接続先ホスト名または IP アドレス（未指定の場合はインベントリのホスト名を使用）。
-- `ansible_port`: 接続ポート番号。
-- `ansible_user`: 接続ユーザー名。
-- `ansible_password` / `ansible_ssh_pass`: 接続パスワード。
-- `ansible_ssh_private_key_file`: 認証用秘密鍵パス。
+### 8.1 ConnectionFactory インターフェース
 
-### 解決フロー (設計案)
-1. **変数の取得**: `VariableManager` を用いて、対象ホストの `ansible_connection` 等の変数を解決します。
-2. **ファクトリによる生成**: `ConnectionFactory`（仮称）を介して、プラグイン名に対応するクラスをインスタンス化します。
-3. **パラメータ設定**: 解決された接続情報をコンストラクタまたはセッター経由で注入します。
-4. **キャッシュ**: 同一ホスト・同一パラメータのコネクションは `TaskQueueManager` または `PlaybookExecutor` レベルで保持し、タスクごとに再利用します。
+```java
+public interface ConnectionFactory {
+    /**
+     * ホストと変数セットに基づき、適切な Connection インスタンスを生成または取得します。
+     * @param host ターゲットホスト
+     * @param variables 解決済みの変数マップ (ansible_connection 等を含む)
+     * @return Connection インターフェースの実装体
+     */
+    Connection createConnection(Host host, Map<String, Object> variables);
+}
+```
+
+### 8.2 解決に使用する主要な変数
+
+コネクションの決定には、以下の変数の優先順位（Host Vars > Group Vars > All Vars）を考慮して解決された値を使用します。
+
+| 変数名 | 用途 | デフォルト値 |
+| :--- | :--- | :--- |
+| `ansible_connection` | 使用するプラグイン名 (`local`, `ssh`, `smart` 等) | `smart` (または `ssh`) |
+| `ansible_host` | 実際の接続先ホスト名または IP アドレス | (インベントリのホスト名) |
+| `ansible_port` | 接続ポート番号 | `22` (ssh の場合) |
+| `ansible_user` | 接続ユーザー名 | (現在の実行ユーザー) |
+| `ansible_password` | 接続パスワード | なし |
+| `ansible_ssh_private_key_file`| 認証用秘密鍵パス | なし |
+
+### 8.3 解決フロー
+
+1. **変数の集約**: `VariableManager` を用いて、対象ホストの `ansible_connection` 等の変数を解決します。
+2. **プラグインの特定**: `ansible_connection` の値に基づき、対応する `Connection` 実装クラス（`LocalConnection`, `SshConnection` 等）を選択します。
+3. **インスタンス化とパラメータ注入**: 解決された接続情報（ホスト、ポート、ユーザー等）をインスタンスに注入します。
+4. **接続のキャッシュ**: 同一ホスト・同一パラメータのコネクションは `TaskQueueManager` レベルで保持（Map等）し、プレイ内のタスク間で再利用することでオーバーヘッドを削減します。
