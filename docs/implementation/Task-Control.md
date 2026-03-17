@@ -90,15 +90,15 @@
 これらのキーワードは `Task` レコードおよび `YamlParser` に定義されており、パース可能です。ただし、実行エンジンにおける詳細な振る舞いの実装状況は以下の通りです。
 
 - **delegate_to**:
-    - **ステータス**: 変数解決のみ実装済み。
-    - **今後の課題**: 指定されたホスト（例: localhost）へのコネクションの動的な切り替えロジック。
+    - **ステータス**: `TaskExecutor.executeSingleTask` にて、変数解決（Jinja2 展開）のみ実装済み。
+    - **今後の課題**: 指定されたホスト（例: localhost）へのコネクションの動的な切り替えロジック。現在は `LocalConnection` が使用されています。
 - **delegate_facts**:
     - **ステータス**: `Task` レコードのフィールドとして保持。
     - **今後の課題**: 収集されたファクトを委譲先ではなく元のホストに紐づけるロジック。
 - **run_once**:
-    - **ステータス**: `TaskQueueManager` にて、1つのホストで実行されたら以降のホストをスキップする基本ロジックが実装済み。
+    - **ステータス**: `TaskQueueManager.executePlay` にて、1つのホストで実行されたら以降のホストをスキップする基本ロジックが実装済み。
 - **ignore_errors**:
-    - **ステータス**: `TaskQueueManager` にて、失敗しても `failedHosts` に追加しないロジックが実装済み。
+    - **ステータス**: `TaskQueueManager.executeTaskOnHost` にて、失敗しても `failedHosts` に追加しないロジックが実装済み。
 - **ignore_unreachable**:
     - **ステータス**: `Task` レコードのフィールドとして保持。
     - **今後の課題**: コネクションエラー（Unreachable）発生時の例外ハンドリング。

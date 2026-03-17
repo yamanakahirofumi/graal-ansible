@@ -64,4 +64,16 @@ SSH を介した接続（`SshConnection` 等）をテストする場合は、**T
           // sshd コンテナの情報を利用して SshConnection を構築しテスト
       }
   }
+
+## 6. 効率的なテスト実行 (Efficient Test Execution)
+本プロジェクトでは、一部のテスト（実際のコレクションを用いたテスト等）に時間がかかる場合や、特定の環境でタイムアウトが発生する場合があります。開発効率を向上させるため、必要に応じて以下の方法で特定のテストクラスのみをターゲットにして実行してください。
+
+- **実行コマンド例**:
+  ```bash
+  mvn test -Dtest=CheckModeTest,PlaybookExecutorTest,TaskControlTest,EnvironmentTest,BecomeTest,VariableManagerTest,VariableResolverTest,TaskExecutorTest,TaskQueueManagerTest
   ```
+
+- **メリット**:
+  - 実行時間の短縮。
+  - 特定の機能（タスク制御、変数解決等）に集中した検証が可能。
+  - CI環境等でのリソース制約による不安定な失敗の回避。
