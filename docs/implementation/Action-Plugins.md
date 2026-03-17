@@ -52,19 +52,48 @@ Python 側の `ansible.plugins.action.ActionBase._execute_module` を以下の�
 
 ```python
 def mocked_execute_module(self, module_name=None, module_args=None, tmp=None, task_vars=None, *args, **kwargs):
-    # Java の ITaskExecutor.execute を呼び出してモジュールを実行
+    # Java の ITaskExecutor.execute_from_python を呼び出してモジュールを実行
     # 戻り値を Python の辞書形式に変換して返却
     result = task_executor_java.execute_from_python(module_name, module_args, task_vars)
     return result
 ```
 
-## 4. GraalPy-Java ブリッジ (`_execute_module`)
+## 4. GraalPy-Java ブリッジ仕様
 
-Action Plugin の最大の特徴は、自身の内部から別のモジュールを実行できる点です。
+Action Plugin の最大の特徴は、自身の内部から別のモジュールを実行できる点です。この再帰的な呼び出しを実現するため、Java 側は Python からの呼び出し専用のインターフェースを提供します。
 
-- **仕組み**: モック化された `ActionBase._execute_module` メソッドが呼び出されると、Python 側は引数（モジュール名、引数等）を Java 側のブリッジメソッドへルーティングします。
-- **再帰的実行**: Java 側は受け取ったリクエストに基づき、[処理フロー](../features/Process-Flow.md)に従って通常のモジュール実行フロー（ターゲットへの転送・実行）を開始します。
-- **結果の還元**: モジュールの実行結果は Java から Python へ返され、Action Plugin はその結果を元に後続の処理を継続します。
+### 4.1 ITaskExecutor の拡張メソッド
+
+`ITaskExecutor` は Python 側からのリクエストを受け取るため、以下のメソッドを実装する必要があります。
+
+```java
+public interface ITaskExecutor {
+    /**
+     * Python (Action Plugin) から呼び出され、指定されたモジュールを実行します。
+     * @param moduleName モジュール名 (例: "copy", "apt")
+     * @param moduleArgs モジュール引数 (Map形式)
+     * @param taskVars 現在のタスク変数
+     * @return 実行結果 (Map形式、Ansible互換の辞書)
+     */
+    Map<String, Object> execute_from_python(String moduleName, Map<String, Object> moduleArgs, Map<String, Object> taskVars);
+}
+```
+
+### 4.2 データマッピングとシリアライズ
+
+GraalPy の Polyglot API を介したデータ交換では、以下のルールを適用します。
+
+- **Python -> Java**: Python の `dict` は Java の `Map<String, Object>` として、`list` は `List<Object>` として透過的にアクセス可能です。
+- **Java -> Python**: Java の `Map` や `List` を Python 側へ返す際、Ansible モジュールが期待する純粋な Python オブジェクト（辞書、リスト）として扱えるよう、必要に応じて変換（`host_to_guest` 等）を行います。
+- **型変換**: 数値、文字列、真偽値は Polyglot 共通型として相互に自動変換されます。
+
+### 4.3 実行コンテキストの同期
+
+`execute_from_python` が呼び出された際、Java 側は以下の状態を維持したままモジュールを実行する必要があります。
+
+1.  **接続の維持**: `ActionBase` が保持している `connection_java` (SSH/Local) をそのまま使用します。
+2.  **変数の同期**: Python 側で変更された `task_vars` がある場合、それを Java 側の実行コンテキスト（`VariableManager`）へ反映させる仕組みを検討します。
+3.  **チェックモード/Become**: Action Plugin 起動時の設定（`check_mode`, `become` 等）を、再帰的に呼び出されるモジュール実行にも伝播させます。
 
 ## 5. モック化が必要なコンポーネント
 
