@@ -29,7 +29,7 @@ class VariablePriorityTest {
     @BeforeEach
     void setUp() {
         taskExecutor = new TaskExecutor();
-        playbookExecutor = new PlaybookExecutor(taskExecutor);
+        playbookExecutor = new PlaybookExecutor(taskExecutor, (host, vars) -> new org.example.ansible.connection.LocalConnection());
         taskExecutor.registerModule("debug", (args, become, context) -> {
             Object msg = args.get("msg");
             return TaskResult.success(false, Map.of("msg", msg));
