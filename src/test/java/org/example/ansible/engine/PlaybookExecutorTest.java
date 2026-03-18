@@ -22,7 +22,7 @@ class PlaybookExecutorTest {
     @BeforeEach
     void setUp() {
         taskExecutor = new TaskExecutor();
-        playbookExecutor = new PlaybookExecutor(taskExecutor);
+        playbookExecutor = new PlaybookExecutor(taskExecutor, (host, vars) -> new org.example.ansible.connection.LocalConnection());
     }
 
     @AfterEach

@@ -44,6 +44,16 @@ public class VariableManager {
     }
 
     /**
+     * Resolves all variables for a given host without play or task context.
+     *
+     * @param hostName The host name.
+     * @return A merged map of variables for the host.
+     */
+    public Map<String, Object> getVariablesForHost(String hostName) {
+        return getAllVariables(null, new Host(hostName), null);
+    }
+
+    /**
      * Resolves all variables for a given context (play, host, task).
      * Follows the priority defined in Variables-Templating.md.
      *

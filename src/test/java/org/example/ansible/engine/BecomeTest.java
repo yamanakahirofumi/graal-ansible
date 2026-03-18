@@ -2,6 +2,7 @@ package org.example.ansible.engine;
 
 import org.example.ansible.connection.BecomeContext;
 import org.example.ansible.connection.Connection;
+import org.example.ansible.connection.ConnectionFactory;
 import org.example.ansible.inventory.Inventory;
 import org.example.ansible.inventory.Host;
 import org.example.ansible.parser.YamlParser;
@@ -24,7 +25,7 @@ class BecomeTest {
         public final List<BecomeContext> executedContexts = new java.util.ArrayList<>();
 
         @Override
-        public TaskResult execute(Play play, Host host, Task task, VariableManager variableManager, boolean inheritedCheckMode, Object inheritedEnvironment) {
+        public TaskResult execute(Play play, Host host, Task task, VariableManager variableManager, boolean inheritedCheckMode, Object inheritedEnvironment, Connection connection, ConnectionFactory connectionFactory) {
             TaskExecutor realExecutor = new TaskExecutor() {
                 @Override
                 public TaskResult execute(Task t, BecomeContext bc, Map<String, String> env) {
@@ -33,7 +34,7 @@ class BecomeTest {
                     return TaskResult.success(Map.of());
                 }
             };
-            return realExecutor.execute(play, host, task, variableManager, inheritedCheckMode, inheritedEnvironment);
+            return realExecutor.execute(play, host, task, variableManager, inheritedCheckMode, inheritedEnvironment, connection, connectionFactory);
         }
 
         @Override
@@ -82,7 +83,7 @@ class BecomeTest {
         MockTaskExecutor taskExecutor = new MockTaskExecutor();
         PlaybookExecutor playbookExecutor = new PlaybookExecutor(taskExecutor);
 
-        org.example.ansible.inventory.Group allGroup = new org.example.ansible.inventory.Group("all", List.of(new org.example.ansible.inventory.Host("localhost")), List.of(), Map.of());
+        org.example.ansible.inventory.Group allGroup = new org.example.ansible.inventory.Group("all", List.of(new org.example.ansible.inventory.Host("localhost")), List.of(), Map.of("ansible_connection", "local"));
         Inventory inventory = new Inventory(allGroup);
 
         playbookExecutor.execute(playbook, inventory);

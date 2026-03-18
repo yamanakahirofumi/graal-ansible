@@ -59,7 +59,7 @@ class EnvironmentTest {
         MockTaskExecutor taskExecutor = new MockTaskExecutor();
         PlaybookExecutor playbookExecutor = new PlaybookExecutor(taskExecutor);
 
-        org.example.ansible.inventory.Group allGroup = new org.example.ansible.inventory.Group("all", List.of(new org.example.ansible.inventory.Host("localhost")), List.of(), Map.of());
+        org.example.ansible.inventory.Group allGroup = new org.example.ansible.inventory.Group("all", List.of(new org.example.ansible.inventory.Host("localhost")), List.of(), Map.of("ansible_connection", "local"));
         Inventory inventory = new Inventory(allGroup);
 
         playbookExecutor.execute(playbook, inventory);
@@ -99,7 +99,7 @@ class EnvironmentTest {
         MockTaskExecutor taskExecutor = new MockTaskExecutor();
         PlaybookExecutor playbookExecutor = new PlaybookExecutor(taskExecutor);
 
-        org.example.ansible.inventory.Group allGroup = new org.example.ansible.inventory.Group("all", List.of(new org.example.ansible.inventory.Host("localhost")), List.of(), Map.of());
+        org.example.ansible.inventory.Group allGroup = new org.example.ansible.inventory.Group("all", List.of(new org.example.ansible.inventory.Host("localhost")), List.of(), Map.of("ansible_connection", "local"));
         Inventory inventory = new Inventory(allGroup);
 
         playbookExecutor.execute(playbook, inventory);

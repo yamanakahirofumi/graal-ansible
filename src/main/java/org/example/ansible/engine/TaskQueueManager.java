@@ -1,5 +1,8 @@
 package org.example.ansible.engine;
 
+import org.example.ansible.connection.Connection;
+import org.example.ansible.connection.ConnectionFactory;
+import org.example.ansible.connection.DefaultConnectionFactory;
 import org.example.ansible.inventory.Group;
 import org.example.ansible.inventory.Host;
 import org.example.ansible.inventory.Inventory;
@@ -22,9 +25,16 @@ public class TaskQueueManager {
 
     private final ITaskExecutor taskExecutor;
     private final VariableResolver variableResolver = new VariableResolver();
+    private final ConnectionFactory connectionFactory;
+    private final Map<String, Connection> connectionCache = new HashMap<>();
 
     public TaskQueueManager(ITaskExecutor taskExecutor) {
+        this(taskExecutor, new DefaultConnectionFactory());
+    }
+
+    public TaskQueueManager(ITaskExecutor taskExecutor, ConnectionFactory connectionFactory) {
         this.taskExecutor = taskExecutor;
+        this.connectionFactory = connectionFactory;
     }
 
     /**
@@ -41,63 +51,97 @@ public class TaskQueueManager {
         Set<String> failedHosts = new HashSet<>();
         Map<String, Set<String>> hostNotifications = new HashMap<>();
 
-        for (Task task : play.tasks()) {
-            boolean executedOnce = false;
+        try {
+            for (Task task : play.tasks()) {
+                boolean executedOnce = false;
+                for (Host host : targetHosts) {
+                    if (failedHosts.contains(host.name())) {
+                        continue;
+                    }
+                    if (task.runOnce() && executedOnce) {
+                        continue;
+                    }
+
+                    // Initial inherited check mode from Play level
+                    Map<String, Object> vars = variableManager.getAllVariables(play, host, task);
+                    boolean playCheckMode = variableResolver.resolveCheckMode(play.checkMode(), vars, globalCheckMode);
+
+                    Connection connection = getOrCreateConnection(host, vars);
+                    executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications, playCheckMode, null, connection);
+                    executedOnce = true;
+                }
+            }
+
+            // Execute handlers at the end of the play
             for (Host host : targetHosts) {
                 if (failedHosts.contains(host.name())) {
                     continue;
                 }
-                if (task.runOnce() && executedOnce) {
-                    continue;
-                }
-
-                // Initial inherited check mode from Play level
-                Map<String, Object> vars = variableManager.getAllVariables(play, host, task);
+                Map<String, Object> vars = variableManager.getAllVariables(play, host, null);
                 boolean playCheckMode = variableResolver.resolveCheckMode(play.checkMode(), vars, globalCheckMode);
-
-                executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications, playCheckMode, null);
-                executedOnce = true;
+                Connection connection = getOrCreateConnection(host, vars);
+                flushHandlersForHost(play, host, variableManager, results, failedHosts, hostNotifications, playCheckMode, connection);
             }
-        }
-
-        // Execute handlers at the end of the play
-        for (Host host : targetHosts) {
-            Map<String, Object> vars = variableManager.getAllVariables(play, host, null);
-            boolean playCheckMode = variableResolver.resolveCheckMode(play.checkMode(), vars, globalCheckMode);
-            flushHandlersForHost(play, host, variableManager, results, failedHosts, hostNotifications, playCheckMode);
+        } finally {
+            closeAllConnections();
         }
     }
 
-    private void flushHandlersForHost(Play play, Host host, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode) {
-        boolean anyNotified;
+    private Connection getOrCreateConnection(Host host, Map<String, Object> variables) {
+        return connectionCache.computeIfAbsent(host.name(), k -> {
+            Connection conn = connectionFactory.createConnection(host, variables);
+            conn.connect();
+            return conn;
+        });
+    }
+
+    private void closeAllConnections() {
+        for (Connection conn : connectionCache.values()) {
+            try {
+                conn.close();
+            } catch (Exception e) {
+                // Ignore close errors
+            }
+        }
+        connectionCache.clear();
+    }
+
+    private void flushHandlersForHost(Play play, Host host, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode, Connection connection) {
+        Set<String> allNotifiedHandlers = new HashSet<>();
+        boolean anyNewNotified;
         do {
-            anyNotified = false;
-            Set<String> notifiedHandlers = hostNotifications.remove(host.name());
-            if (notifiedHandlers != null && !notifiedHandlers.isEmpty()) {
-                anyNotified = true;
-                for (Task handler : play.handlers()) {
-                    if (notifiedHandlers.contains(handler.name())) {
-                        if (failedHosts.contains(host.name())) continue;
-                        executeTaskOnHost(play, host, handler, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, null);
+            anyNewNotified = false;
+            Set<String> notifiedInThisCycle = hostNotifications.remove(host.name());
+            if (notifiedInThisCycle != null && !notifiedInThisCycle.isEmpty()) {
+                for (String handlerName : notifiedInThisCycle) {
+                    if (allNotifiedHandlers.add(handlerName)) {
+                        for (Task handler : play.handlers()) {
+                            if (handlerName.equals(handler.name())) {
+                                if (failedHosts.contains(host.name())) continue;
+                                executeTaskOnHost(play, host, handler, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, null, connection);
+                                anyNewNotified = true;
+                                break;
+                            }
+                        }
                     }
                 }
             }
-        } while (anyNotified);
+        } while (anyNewNotified);
     }
 
-    private void executeTaskOnHost(Play play, Host host, Task task, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode, Object inheritedEnvironment) {
+    private void executeTaskOnHost(Play play, Host host, Task task, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode, Object inheritedEnvironment, Connection connection) {
         if (!task.block().isEmpty()) {
-            executeBlock(play, host, task, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, inheritedEnvironment);
+            executeBlock(play, host, task, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, inheritedEnvironment, connection);
             return;
         }
 
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, inheritedCheckMode, inheritedEnvironment);
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, inheritedCheckMode, inheritedEnvironment, connection, connectionFactory);
 
         if (result != null) {
             results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(result);
 
             if (result.success() && !result.isSkipped() && "meta".equals(task.action()) && "flush_handlers".equals(task.args().get("_raw_params"))) {
-                flushHandlersForHost(play, host, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode);
+                flushHandlersForHost(play, host, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, connection);
             }
 
             if (task.register() != null) {
@@ -116,7 +160,7 @@ public class TaskQueueManager {
         }
     }
 
-    private void executeBlock(Play play, Host host, Task blockTask, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode, Object inheritedEnvironment) {
+    private void executeBlock(Play play, Host host, Task blockTask, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode, Object inheritedEnvironment, Connection connection) {
         Map<String, Object> blockVars = variableManager.getAllVariables(play, host, blockTask);
         boolean blockCheckMode = variableResolver.resolveCheckMode(blockTask.checkMode(), blockVars, inheritedCheckMode);
 
@@ -135,7 +179,7 @@ public class TaskQueueManager {
                 blockFailed = true;
                 break;
             }
-            executeTaskOnHost(play, host, task, variableManager, results, blockFailedHosts, hostNotifications, blockCheckMode, effectiveBlockEnv);
+            executeTaskOnHost(play, host, task, variableManager, results, blockFailedHosts, hostNotifications, blockCheckMode, effectiveBlockEnv, connection);
         }
 
         if (blockFailedHosts.contains(host.name())) {
@@ -144,12 +188,12 @@ public class TaskQueueManager {
 
         if (blockFailed) {
             for (Task task : blockTask.rescue()) {
-                executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications, blockCheckMode, effectiveBlockEnv);
+                executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications, blockCheckMode, effectiveBlockEnv, connection);
             }
         }
 
         for (Task task : blockTask.always()) {
-            executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications, blockCheckMode, effectiveBlockEnv);
+            executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications, blockCheckMode, effectiveBlockEnv, connection);
         }
 
         if (blockFailed && blockTask.rescue().isEmpty()) {
