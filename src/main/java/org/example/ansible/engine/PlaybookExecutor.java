@@ -1,5 +1,7 @@
 package org.example.ansible.engine;
 
+import org.example.ansible.connection.ConnectionFactory;
+import org.example.ansible.connection.DefaultConnectionFactory;
 import org.example.ansible.inventory.Inventory;
 
 import java.nio.file.Path;
@@ -15,9 +17,15 @@ import java.util.Map;
 public class PlaybookExecutor {
 
     private final ITaskExecutor taskExecutor;
+    private final ConnectionFactory connectionFactory;
 
     public PlaybookExecutor(ITaskExecutor taskExecutor) {
+        this(taskExecutor, new DefaultConnectionFactory());
+    }
+
+    public PlaybookExecutor(ITaskExecutor taskExecutor, ConnectionFactory connectionFactory) {
         this.taskExecutor = taskExecutor;
+        this.connectionFactory = connectionFactory;
     }
 
     /**
@@ -69,7 +77,12 @@ public class PlaybookExecutor {
     public Map<String, List<TaskResult>> execute(Playbook playbook, Inventory inventory, Map<String, Object> extraVars, Path baseDir, boolean globalCheckMode) {
         Map<String, List<TaskResult>> results = new HashMap<>();
         VariableManager variableManager = new VariableManager(inventory, extraVars, baseDir);
-        TaskQueueManager tqm = new TaskQueueManager(taskExecutor);
+
+        // Re-instantiate TaskExecutor with the connectionFactory if it's the default one
+        // or if it doesn't have it. Actually, it's better to ensure taskExecutor has the factory.
+        // But taskExecutor is final and passed in constructor.
+
+        TaskQueueManager tqm = new TaskQueueManager(taskExecutor, connectionFactory);
 
         for (Play play : playbook.plays()) {
             tqm.executePlay(play, inventory, variableManager, results, globalCheckMode);

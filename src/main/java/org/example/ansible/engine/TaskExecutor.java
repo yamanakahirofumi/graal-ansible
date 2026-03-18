@@ -2,6 +2,8 @@ package org.example.ansible.engine;
 
 import org.example.ansible.connection.BecomeContext;
 import org.example.ansible.connection.Connection;
+import org.example.ansible.connection.ConnectionFactory;
+import org.example.ansible.connection.DefaultConnectionFactory;
 import org.example.ansible.inventory.Host;
 import org.example.ansible.util.OSHandler;
 import org.example.ansible.util.OSHandlerFactory;
@@ -56,13 +58,19 @@ public class TaskExecutor implements ITaskExecutor {
     private final OSHandler osHandler;
     private final Context context;
     private final VariableResolver variableResolver = new VariableResolver();
+    private final ConnectionFactory connectionFactory;
 
     public TaskExecutor() {
         this(OSHandlerFactory.getHandler());
     }
 
     public TaskExecutor(OSHandler osHandler) {
+        this(osHandler, new DefaultConnectionFactory());
+    }
+
+    public TaskExecutor(OSHandler osHandler, ConnectionFactory connectionFactory) {
         this.osHandler = osHandler;
+        this.connectionFactory = connectionFactory;
         Context.Builder builder = Context.newBuilder("python")
                 .allowAllAccess(true);
 
@@ -84,13 +92,13 @@ public class TaskExecutor implements ITaskExecutor {
     }
 
     @Override
-    public TaskResult execute(Play play, Host host, Task task, VariableManager variableManager, boolean inheritedCheckMode, Object inheritedEnvironment) {
+    public TaskResult execute(Play play, Host host, Task task, VariableManager variableManager, boolean inheritedCheckMode, Object inheritedEnvironment, Connection connection, ConnectionFactory connectionFactory) {
         Map<String, Object> allVars = variableManager.getAllVariables(play, host, task);
 
         if (task.loop() != null) {
-            return executeLoopTask(play, host, task, variableManager, allVars, inheritedCheckMode, inheritedEnvironment);
+            return executeLoopTask(play, host, task, variableManager, allVars, inheritedCheckMode, inheritedEnvironment, connection, connectionFactory);
         } else {
-            TaskResult result = executeSingleTask(play, host, task, allVars, variableManager, inheritedCheckMode, inheritedEnvironment);
+            TaskResult result = executeSingleTask(play, host, task, allVars, variableManager, inheritedCheckMode, inheritedEnvironment, connection, connectionFactory);
             if (result != null) {
                 return evaluateResultCustomization(task, result, allVars);
             }
@@ -98,7 +106,7 @@ public class TaskExecutor implements ITaskExecutor {
         }
     }
 
-    private TaskResult executeSingleTask(Play play, Host host, Task task, Map<String, Object> variables, VariableManager variableManager, boolean inheritedCheckMode, Object inheritedEnvironment) {
+    private TaskResult executeSingleTask(Play play, Host host, Task task, Map<String, Object> variables, VariableManager variableManager, boolean inheritedCheckMode, Object inheritedEnvironment, Connection connection, ConnectionFactory connectionFactory) {
         if (!variableResolver.isWhenConditionMet(task.when(), variables)) {
             return TaskResult.skipped("Skipped due to when condition");
         }
@@ -111,37 +119,50 @@ public class TaskExecutor implements ITaskExecutor {
         }
 
         String resolvedDelegateTo = null;
+        Connection effectiveConnection = connection;
+        boolean closeDelegatedConnection = false;
+
         if (task.delegateTo() != null) {
             Object resolved = variableResolver.resolveValue(variableResolver.wrapInJinja(task.delegateTo()), variables);
             resolvedDelegateTo = resolved != null ? resolved.toString() : null;
+            if (resolvedDelegateTo != null) {
+                // We resolve variables for the delegated host if possible
+                Map<String, Object> delegatedVars = variableManager != null ? variableManager.getVariablesForHost(resolvedDelegateTo) : variables;
+                Host delegatedHost = new Host(resolvedDelegateTo);
+                ConnectionFactory factoryToUse = connectionFactory != null ? connectionFactory : this.connectionFactory;
+                effectiveConnection = factoryToUse.createConnection(delegatedHost, delegatedVars);
+                effectiveConnection.connect();
+                closeDelegatedConnection = true;
+            }
         }
 
         Task resolvedTask = new Task(task.name(), task.action(), resolvedArgs, task.vars(), task.when(), task.register(), task.loop(), task.notifications(), task.failedWhen(), task.changedWhen(), task.ignoreErrors(),
                 task.until(), task.retries(), task.delay(), resolvedDelegateTo, task.delegateFacts(), task.runOnce(), task.ignoreUnreachable(), task.block(), task.rescue(), task.always(),
                 task.become(), task.becomeMethod(), task.becomeUser(), task.becomeFlags(), task.checkMode(), task.environment());
 
-        if ("meta".equals(resolvedTask.action())) {
-            return TaskResult.success(false, Map.of("meta", resolvedTask.args().getOrDefault("_raw_params", ""), "changed", false));
-        }
+        try {
+            if ("meta".equals(resolvedTask.action())) {
+                return TaskResult.success(false, Map.of("meta", resolvedTask.args().getOrDefault("_raw_params", ""), "changed", false));
+            }
 
-        // Action Plugin detection (simplified skeleton)
-        if (isActionPlugin(resolvedTask.action())) {
-            // In the future, this would call Action Plugin launcher on Control Node
-        }
+            // Action Plugin detection (simplified skeleton)
+            if (isActionPlugin(resolvedTask.action())) {
+                // In the future, this would call Action Plugin launcher on Control Node
+            }
 
-        BecomeContext becomeContext = variableResolver.resolveBecomeContext(play, resolvedTask, variables);
-        Map<String, String> resolvedEnvironment = variableResolver.resolveEnvironment(play, task, variables, inheritedEnvironment);
+            BecomeContext becomeContext = variableResolver.resolveBecomeContext(play, resolvedTask, variables);
+            Map<String, String> resolvedEnvironment = variableResolver.resolveEnvironment(play, task, variables, inheritedEnvironment);
 
-        if (task.until() == null) {
-            return execute(resolvedTask, becomeContext, new org.example.ansible.connection.LocalConnection(), resolvedEnvironment);
-        }
+            if (task.until() == null) {
+                return execute(resolvedTask, becomeContext, effectiveConnection, resolvedEnvironment);
+            }
 
-        // Retry logic
-        TaskResult lastResult = null;
-        for (int i = 0; i < task.retries(); i++) {
-            lastResult = execute(resolvedTask, becomeContext, new org.example.ansible.connection.LocalConnection(), resolvedEnvironment);
+            // Retry logic
+            TaskResult lastResult = null;
+            for (int i = 0; i < task.retries(); i++) {
+                lastResult = execute(resolvedTask, becomeContext, effectiveConnection, resolvedEnvironment);
 
-            if (task.register() != null && variableManager != null) {
+                if (task.register() != null && variableManager != null) {
                 variableManager.registerVariable(host.name(), task.register(), lastResult.data());
                 variables = variableManager.getAllVariables(play, host, task);
             }
@@ -154,21 +175,30 @@ public class TaskExecutor implements ITaskExecutor {
                 return lastResult;
             }
 
-            if (i < task.retries() - 1) {
+                if (i < task.retries() - 1) {
+                    try {
+                        Thread.sleep(task.delay() * 1000L);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
+            }
+
+            if (lastResult != null && lastResult.success()) {
+                return new TaskResult(false, lastResult.changed(), "Until condition not met after " + task.retries() + " retries", lastResult.data());
+            }
+
+            return lastResult;
+        } finally {
+            if (closeDelegatedConnection && effectiveConnection != null) {
                 try {
-                    Thread.sleep(task.delay() * 1000L);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    break;
+                    effectiveConnection.close();
+                } catch (Exception e) {
+                    // Ignore close errors
                 }
             }
         }
-
-        if (lastResult != null && lastResult.success()) {
-            return new TaskResult(false, lastResult.changed(), "Until condition not met after " + task.retries() + " retries", lastResult.data());
-        }
-
-        return lastResult;
     }
 
     private boolean isActionPlugin(String action) {
@@ -188,7 +218,7 @@ public class TaskExecutor implements ITaskExecutor {
         });
     }
 
-    private TaskResult executeLoopTask(Play play, Host host, Task task, VariableManager variableManager, Map<String, Object> allVars, boolean inheritedCheckMode, Object inheritedEnvironment) {
+    private TaskResult executeLoopTask(Play play, Host host, Task task, VariableManager variableManager, Map<String, Object> allVars, boolean inheritedCheckMode, Object inheritedEnvironment, Connection connection, ConnectionFactory connectionFactory) {
         List<?> items = resolveLoopItems(task.loop(), allVars);
         if (items == null) {
             return TaskResult.failure("loop must be a list or a template that resolves to a list");
@@ -200,7 +230,7 @@ public class TaskExecutor implements ITaskExecutor {
         boolean allSkipped = true;
 
         for (Object item : items) {
-            TaskResult result = executeLoopIteration(play, host, task, item, allVars, variableManager, inheritedCheckMode, inheritedEnvironment);
+            TaskResult result = executeLoopIteration(play, host, task, item, allVars, variableManager, inheritedCheckMode, inheritedEnvironment, connection, connectionFactory);
 
             Map<String, Object> resultData = buildIterationResultData(result, item);
             loopResults.add(resultData);
@@ -225,11 +255,11 @@ public class TaskExecutor implements ITaskExecutor {
         return null;
     }
 
-    private TaskResult executeLoopIteration(Play play, Host host, Task task, Object item, Map<String, Object> allVars, VariableManager variableManager, boolean inheritedCheckMode, Object inheritedEnvironment) {
+    private TaskResult executeLoopIteration(Play play, Host host, Task task, Object item, Map<String, Object> allVars, VariableManager variableManager, boolean inheritedCheckMode, Object inheritedEnvironment, Connection connection, ConnectionFactory connectionFactory) {
         Map<String, Object> iterationVars = new HashMap<>(allVars);
         iterationVars.put("item", item);
 
-        TaskResult result = executeSingleTask(play, host, task, iterationVars, variableManager, inheritedCheckMode, inheritedEnvironment);
+        TaskResult result = executeSingleTask(play, host, task, iterationVars, variableManager, inheritedCheckMode, inheritedEnvironment, connection, connectionFactory);
         if (result != null) {
             result = evaluateResultCustomization(task, result, iterationVars);
         }

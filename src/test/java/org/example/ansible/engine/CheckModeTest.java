@@ -2,6 +2,7 @@ package org.example.ansible.engine;
 
 import org.example.ansible.connection.BecomeContext;
 import org.example.ansible.connection.Connection;
+import org.example.ansible.connection.ConnectionFactory;
 import org.example.ansible.inventory.Inventory;
 import org.example.ansible.inventory.Host;
 import org.example.ansible.inventory.Group;
@@ -20,7 +21,7 @@ class CheckModeTest {
         List<Task> capturedTasks = new ArrayList<>();
         ITaskExecutor taskExecutor = new ITaskExecutor() {
             @Override
-            public TaskResult execute(Play play, Host host, Task task, VariableManager variableManager, boolean inheritedCheckMode, Object inheritedEnvironment) {
+            public TaskResult execute(Play play, Host host, Task task, VariableManager variableManager, boolean inheritedCheckMode, Object inheritedEnvironment, Connection connection, ConnectionFactory connectionFactory) {
                 // We use TaskExecutor's real logic to resolve check mode, but mock the final execution
                 TaskExecutor realExecutor = new TaskExecutor() {
                     @Override
@@ -29,7 +30,7 @@ class CheckModeTest {
                         return TaskResult.success(Map.of());
                     }
                 };
-                return realExecutor.execute(play, host, task, variableManager, inheritedCheckMode, inheritedEnvironment);
+                return realExecutor.execute(play, host, task, variableManager, inheritedCheckMode, inheritedEnvironment, connection, connectionFactory);
             }
 
             @Override
