@@ -101,7 +101,17 @@
     - **ステータス**: `TaskQueueManager.executeTaskOnHost` にて、失敗しても `failedHosts` に追加しないロジックが実装済み。
 - **ignore_unreachable**:
     - **ステータス**: `Task` レコードのフィールドとして保持。
-    - **今後の課題**: コネクションエラー（Unreachable）発生時の例外ハンドリング。
+    - **実装方針**:
+        - コネクション確立時（`Connection.connect()`）やコマンド実行時に接続不可（Unreachable）エラーが発生した場合、通常は該当ホストをプレイから除外しますが、このフラグが `true` の場合はエラーを無視して継続します。
+        - 接続失敗時は、タスク結果を `unreachable: true`, `skipped: true` としてマークし、以降のタスクからは通常通り（接続不可が続く限りスキップされる状態で）進行します。
+        - 実装箇所: `TaskQueueManager.executeTaskOnHost` における例外キャッチおよび `failedHosts` への追加判定ロジック。
+- **delegate_facts**:
+    - **ステータス**: `Task` レコードのフィールドとして保持。
+    - **実装方針**:
+        - `delegate_to` と併用された際、収集されたファクト（`ansible_facts`）の保存先を制御します。
+        - `true` の場合、モジュール実行結果に含まれるファクトを、委譲先ホストではなく、**元のホスト**（`inventory_hostname`）に紐付けて `VariableManager` に登録します。
+        - `false` (デフォルト) の場合は、委譲先ホストのファクトとして扱われます。
+        - 実装箇所: `TaskExecutor.executeSingleTask` または `TaskQueueManager` における実行結果の変数登録プロセス。
 
 ## 9. 環境変数 (`environment`)
 
