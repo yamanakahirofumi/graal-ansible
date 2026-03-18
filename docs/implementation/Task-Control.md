@@ -90,8 +90,8 @@
 これらのキーワードは `Task` レコードおよび `YamlParser` に定義されており、パース可能です。ただし、実行エンジンにおける詳細な振る舞いの実装状況は以下の通りです。
 
 - **delegate_to**:
-    - **ステータス**: `TaskExecutor.executeSingleTask` にて、変数解決（Jinja2 展開）のみ実装済み。
-    - **今後の課題**: 指定されたホスト（例: localhost）へのコネクションの動的な切り替えロジック。現在は `LocalConnection` が使用されています。
+    - **ステータス**: `TaskExecutor.executeSingleTask` にて、変数解決（Jinja2 展開）およびコネクションの動的な切り替えを実装済み。
+    - **今後の課題**: 委譲先ホストの変数の完全な解決（現在は `VariableManager.getVariablesForHost` による基本解決のみ）。
 - **delegate_facts**:
     - **ステータス**: `Task` レコードのフィールドとして保持。
     - **今後の課題**: 収集されたファクトを委譲先ではなく元のホストに紐づけるロジック。
