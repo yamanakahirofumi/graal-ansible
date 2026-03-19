@@ -435,7 +435,7 @@ public class TaskExecutor implements ITaskExecutor {
         }
     }
 
-    private TaskResult executeActionPlugin(Task task, BecomeContext becomeContext, Connection connection, Map<String, String> environment, Map<String, Object> taskVars) {
+    protected TaskResult executeActionPlugin(Task task, BecomeContext becomeContext, Connection connection, Map<String, String> environment, Map<String, Object> taskVars) {
         ActionPlugin builtInPlugin = builtInActionPlugins.get(task.action());
         if (builtInPlugin != null) {
             try {

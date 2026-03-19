@@ -29,6 +29,12 @@ class CheckModeTest {
                         capturedTasks.add(t);
                         return TaskResult.success(Map.of());
                     }
+
+                    @Override
+                    protected TaskResult executeActionPlugin(Task t, BecomeContext bc, Connection conn, Map<String, String> env, Map<String, Object> vars) {
+                        capturedTasks.add(t);
+                        return TaskResult.success(Map.of());
+                    }
                 };
                 return realExecutor.execute(play, host, task, variableManager, inheritedCheckMode, inheritedEnvironment, connection, connectionFactory);
             }
