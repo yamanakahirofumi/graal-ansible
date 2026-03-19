@@ -10,10 +10,14 @@ import org.example.ansible.util.OSHandler;
 import org.example.ansible.util.OSHandlerFactory;
 import org.example.ansible.util.Truthiness;
 import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.Source;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.example.ansible.util.PythonEnv;
 
 import java.io.File;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -29,6 +33,7 @@ public class TaskExecutor implements ITaskExecutor {
 
     private static final ThreadLocal<Connection> currentConnection = new ThreadLocal<>();
     private static final ThreadLocal<Map<String, String>> currentEnvironment = new ThreadLocal<>();
+    private static final ThreadLocal<BecomeContext> currentBecomeContext = new ThreadLocal<>();
 
     public static void setCurrentConnection(Connection connection) {
         currentConnection.set(connection);
@@ -54,8 +59,21 @@ public class TaskExecutor implements ITaskExecutor {
         currentEnvironment.remove();
     }
 
+    public static void setCurrentBecomeContext(BecomeContext becomeContext) {
+        currentBecomeContext.set(becomeContext);
+    }
+
+    public static BecomeContext getCurrentBecomeContext() {
+        return currentBecomeContext.get();
+    }
+
+    public static void clearCurrentBecomeContext() {
+        currentBecomeContext.remove();
+    }
+
     private final Map<String, org.example.ansible.module.Module> modules = new HashMap<>();
     private final Map<String, Boolean> actionPluginCache = new ConcurrentHashMap<>();
+    private final ObjectMapper objectMapper = new ObjectMapper();
     private final OSHandler osHandler;
     private final Context context;
     private final VariableResolver variableResolver = new VariableResolver();
@@ -158,13 +176,19 @@ public class TaskExecutor implements ITaskExecutor {
                 return metaResult;
             }
 
-            // Action Plugin detection (simplified skeleton)
-            if (isActionPlugin(resolvedTask.action())) {
-                // In the future, this would call Action Plugin launcher on Control Node
-            }
-
             BecomeContext becomeContext = variableResolver.resolveBecomeContext(play, resolvedTask, variables);
             Map<String, String> resolvedEnvironment = variableResolver.resolveEnvironment(play, task, variables, inheritedEnvironment);
+
+            // Action Plugin detection
+            if (isActionPlugin(resolvedTask.action())) {
+                TaskResult actionResult = executeActionPlugin(resolvedTask, becomeContext, effectiveConnection, resolvedEnvironment, variables);
+                if (resolvedDelegateTo != null) {
+                    Map<String, Object> dataWithDelegate = new HashMap<>(actionResult.data());
+                    dataWithDelegate.put("_ansible_delegated_host", resolvedDelegateTo);
+                    actionResult = new TaskResult(actionResult.success(), actionResult.changed(), actionResult.message(), dataWithDelegate);
+                }
+                return actionResult;
+            }
 
             if (task.until() == null) {
                 TaskResult result = execute(resolvedTask, becomeContext, effectiveConnection, resolvedEnvironment);
@@ -227,6 +251,9 @@ public class TaskExecutor implements ITaskExecutor {
 
     private boolean isActionPlugin(String action) {
         if (action == null) return false;
+        if (!Boolean.parseBoolean(System.getProperty("ansible.action_plugins.enabled", "false"))) {
+            return false;
+        }
         return actionPluginCache.computeIfAbsent(action, a -> {
             List<String> sitePackages = PythonEnv.getSitePackagesFromEnv();
             for (String path : sitePackages) {
@@ -383,15 +410,86 @@ public class TaskExecutor implements ITaskExecutor {
     public TaskResult execute(Task task, BecomeContext becomeContext, Connection connection, Map<String, String> environment) {
         setCurrentConnection(connection);
         setCurrentEnvironment(environment);
+        setCurrentBecomeContext(becomeContext);
         try {
             return execute(task, becomeContext, environment);
         } finally {
             clearCurrentConnection();
             clearCurrentEnvironment();
+            clearCurrentBecomeContext();
         }
     }
 
+    private TaskResult executeActionPlugin(Task task, BecomeContext becomeContext, Connection connection, Map<String, String> environment, Map<String, Object> taskVars) {
+        setCurrentConnection(connection);
+        setCurrentEnvironment(environment);
+        setCurrentBecomeContext(becomeContext);
+        try {
+            List<String> sitePackages = PythonEnv.getSitePackagesFromEnv();
 
+            context.getBindings("python").putMember("task_executor_java", this);
+            context.getBindings("python").putMember("connection_java", connection);
+            context.getBindings("python").putMember("become_context_java", becomeContext);
+            context.getBindings("python").putMember("environment_java", environment);
+            context.getBindings("python").putMember("task_vars_java", taskVars);
+            context.getBindings("python").putMember("action_name", task.action());
+            context.getBindings("python").putMember("module_args_java", task.args());
+            context.getBindings("python").putMember("site_packages_java", sitePackages);
+
+            context.eval(loadResource("ansible_bridge.py"));
+            context.eval(loadResource("ansible_action_launcher.py"));
+
+            org.graalvm.polyglot.Value pythonResult = context.getBindings("python").getMember("result");
+
+            if (pythonResult == null || !pythonResult.isString()) {
+                return TaskResult.failure("Action Plugin produced no valid output");
+            }
+
+            String output = pythonResult.asString();
+            @SuppressWarnings("unchecked")
+            Map<String, Object> resultMap = objectMapper.readValue(output, Map.class);
+            return TaskResult.success(resultMap);
+
+        } catch (Throwable t) {
+            return TaskResult.failure("Action Plugin execution failed: " + t.getMessage());
+        } finally {
+            clearCurrentConnection();
+            clearCurrentEnvironment();
+            clearCurrentBecomeContext();
+        }
+    }
+
+    @Override
+    public Map<String, Object> execute_from_python(String moduleName, Map<String, Object> moduleArgs, Map<String, Object> taskVars) {
+        // Create a temporary task for the module execution
+        Task subTask = new Task(
+                "execute_from_python",
+                moduleName,
+                moduleArgs,
+                null, null, null, null, null, null, null, false,
+                null, 0, 0, null, false, false, false, null, null, null,
+                null, null, null, null, null, null
+        );
+
+        // Execute as a normal module, using the current connection and environment
+        TaskResult result = execute(subTask, getCurrentBecomeContext(), getCurrentConnection(), getCurrentEnvironment());
+        return result.data();
+    }
+
+    private Source loadResource(String name) throws java.io.IOException {
+        try (InputStream is = getClass().getClassLoader().getResourceAsStream(name)) {
+            if (is == null) {
+                // Try to find in filesystem if not in classpath (for development)
+                File file = new File("src/main/python", name);
+                if (file.exists()) {
+                    return Source.newBuilder("python", file).build();
+                }
+                throw new java.io.IOException("Resource not found: " + name);
+            }
+            String content = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+            return Source.newBuilder("python", content, name).build();
+        }
+    }
 
     @Override
     public void close() {

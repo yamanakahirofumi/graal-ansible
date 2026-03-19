@@ -44,6 +44,11 @@ class CheckModeTest {
             }
 
             @Override
+            public Map<String, Object> execute_from_python(String moduleName, Map<String, Object> moduleArgs, Map<String, Object> taskVars) {
+                return Map.of();
+            }
+
+            @Override
             public org.example.ansible.util.OSHandler getOsHandler() { return null; }
             @Override
             public void close() {}

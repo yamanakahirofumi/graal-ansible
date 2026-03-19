@@ -72,6 +72,7 @@ class TaskExecutorTest {
 
         String oldProp = System.getProperty("ansible.site.packages");
         System.setProperty("ansible.site.packages", sitePackages.toAbsolutePath().toString());
+        System.setProperty("ansible.action_plugins.enabled", "true");
 
         try {
             // Use reflection to call private isActionPlugin
@@ -81,6 +82,7 @@ class TaskExecutorTest {
             assertTrue((Boolean) method.invoke(executor, "template"));
             assertFalse((Boolean) method.invoke(executor, "unknown_plugin"));
         } finally {
+            System.clearProperty("ansible.action_plugins.enabled");
             if (oldProp != null) {
                 System.setProperty("ansible.site.packages", oldProp);
             } else {
