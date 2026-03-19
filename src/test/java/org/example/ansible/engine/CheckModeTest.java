@@ -51,6 +51,8 @@ class CheckModeTest {
             @Override
             public org.example.ansible.util.OSHandler getOsHandler() { return null; }
             @Override
+            public VariableResolver getVariableResolver() { return new VariableResolver(); }
+            @Override
             public void close() {}
         };
 

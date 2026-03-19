@@ -7,7 +7,6 @@ import org.example.ansible.inventory.Inventory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Disabled;
 
 import java.util.Collections;
 import java.util.List;
@@ -39,10 +38,30 @@ class ActionPluginTest {
     }
 
     @Test
-    @Disabled("Action Plugin execution currently crashes due to core dependencies in GraalPy")
-    void testDebugActionPluginDiscovery() {
-        Task task = new Task("Test Debug", "debug", Map.of("msg", "Hello from Action Plugin"));
+    void testDebugActionPluginMsg() {
+        Task task = new Task("Test Debug Msg", "debug", Map.of("msg", "Hello from Built-in Action Plugin"));
         TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
-        assertTrue(result.success(), "Result should be successful: " + (result != null ? result.message() : "null"));
+        assertTrue(result.success());
+        assertEquals("Hello from Built-in Action Plugin", result.data().get("msg"));
+    }
+
+    @Test
+    void testDebugActionPluginVar() {
+        variableManager.addFacts("localhost", Map.of("my_fact", "fact_value"));
+        Task task = new Task("Test Debug Var", "debug", Map.of("var", "my_fact"));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
+        assertTrue(result.success());
+        assertEquals("fact_value", result.data().get("my_fact"));
+    }
+
+    @Test
+    void testSetFactActionPlugin() {
+        Task task = new Task("Test Set Fact", "set_fact", Map.of("new_fact", "new_value"));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
+        assertTrue(result.success());
+
+        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
+        assertNotNull(facts);
+        assertEquals("new_value", facts.get("new_fact"));
     }
 }

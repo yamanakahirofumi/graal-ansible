@@ -38,6 +38,11 @@ class BecomeTest {
         }
 
         @Override
+        public VariableResolver getVariableResolver() {
+            return new VariableResolver();
+        }
+
+        @Override
         public TaskResult execute(Task task, BecomeContext becomeContext, Map<String, String> environment) {
             return TaskResult.success(Map.of());
         }

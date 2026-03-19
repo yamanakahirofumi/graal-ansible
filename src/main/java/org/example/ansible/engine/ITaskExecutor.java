@@ -53,6 +53,12 @@ public interface ITaskExecutor extends AutoCloseable {
     OSHandler getOsHandler();
 
     /**
+     * Gets the variable resolver used by the executor.
+     * @return The VariableResolver.
+     */
+    VariableResolver getVariableResolver();
+
+    /**
      * Python (Action Plugin) から呼び出され、指定されたモジュールを実行します。
      * @param moduleName モジュール名 (例: "copy", "apt")
      * @param moduleArgs モジュール引数 (Map形式)
