@@ -119,7 +119,28 @@
 - **概要**: docs/implementation/Task-Control.md で予約されていたが未実装だったキーワードの追加。
 - **解決策**: `Task` レコードに `ignore_unreachable`, `delegate_facts` を追加し、`YamlParser` での解析をサポート。
 
+### [✓] タスク制御キーワードの追加実装 (delegate_facts, ignore_unreachable)
+- **完了日**: 2026-03-19
+- **概要**: `delegate_facts` および `ignore_unreachable` の実行エンジン（TaskQueueManager）への組み込み。
+- **解決策**:
+    - `ignore_unreachable`: `UnreachableException` キャッチ時のスキップ処理を実装。
+    - `delegate_facts`: `_ansible_delegated_host` メタデータを利用したファクト保存先制御を実装。
+
+### [✓] Action Plugin の実行ブリッジ実装
+- **完了日**: 2026-03-19
+- **概要**: 管理ノード側での Action Plugin 実行ブリッジ（`ansible_action_launcher.py`）の実装。
+- **解決策**:
+    - `TaskExecutor` において Action Plugin の動的検知とランチャー起動を実装。
+    - Java (ITaskExecutor) から Python (Action Plugin) への双方向呼び出しを実現。
+    - ※ 互換性の課題については [Action-Plugins-Investigation.md](implementation/Action-Plugins-Investigation.md) を参照。
+
 ## 5. 今後のリファクタリング検討事項 (Future Refactoring Items)
+
+### [ ] Action Plugin の互換性向上
+- **概要**: 重厚な Ansible Core への依存を排除し、Action Plugin の動作を安定させる。
+- **検討内容**:
+    - [調査報告書](implementation/Action-Plugins-Investigation.md) に基づく軽量なエミュレータの開発。
+    - 主要なプラグイン (`debug`, `set_fact`, `copy`, `template`) の優先対応。
 
 ### [ ] PlaybookExecutor および実行エンジンのさらなる整理
 - **概要**: `PlaybookExecutor` および `TaskQueueManager`, `TaskExecutor` 内に存在する課題の改善。
@@ -128,6 +149,3 @@
     - `executeLoopTask` のリファクタリング（ループの反復処理とタスク実行ロジックの分離）。
     - **コネクション解決の抽象化**: `ansible_connection` 等の変数に基づき、動的に `Connection` インスタンスを生成・取得する仕組みの導入。
     - **委譲 (delegate_to) の完全実装**: コネクションの動的な切り替えは実装済み。
-    - **delegate_facts のサポート**: [タスク制御の実装詳細](implementation/Task-Control.md)に基づき、ファクトの保存先を元ホストに紐づけるロジックの実装。
-    - **Action Plugin の実行実装**: 管理ノード側での Action Plugin 実行ブリッジ（`ansible_action_launcher.py` 等）の実装。設計仕様は [Action-Plugins.md](implementation/Action-Plugins.md) に策定済み。
-    - **Unreachable ハンドリング**: [タスク制御の実装詳細](implementation/Task-Control.md)に基づき、`ignore_unreachable` 指定時のコネクションエラー無視と `unreachable: true` 記録の実装。
