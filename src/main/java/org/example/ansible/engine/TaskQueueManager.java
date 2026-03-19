@@ -3,6 +3,7 @@ package org.example.ansible.engine;
 import org.example.ansible.connection.Connection;
 import org.example.ansible.connection.ConnectionFactory;
 import org.example.ansible.connection.DefaultConnectionFactory;
+import org.example.ansible.connection.UnreachableException;
 import org.example.ansible.inventory.Group;
 import org.example.ansible.inventory.Host;
 import org.example.ansible.inventory.Inventory;
@@ -66,8 +67,17 @@ public class TaskQueueManager {
                     Map<String, Object> vars = variableManager.getAllVariables(play, host, task);
                     boolean playCheckMode = variableResolver.resolveCheckMode(play.checkMode(), vars, globalCheckMode);
 
-                    Connection connection = getOrCreateConnection(host, vars);
-                    executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications, playCheckMode, null, connection);
+                    try {
+                        Connection connection = getOrCreateConnection(host, vars);
+                        executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications, playCheckMode, null, connection);
+                    } catch (UnreachableException e) {
+                        if (task.ignoreUnreachable()) {
+                            TaskResult unreachableResult = TaskResult.unreachable(e.getMessage());
+                            results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(unreachableResult);
+                        } else {
+                            failedHosts.add(host.name());
+                        }
+                    }
                     executedOnce = true;
                 }
             }
@@ -79,8 +89,12 @@ public class TaskQueueManager {
                 }
                 Map<String, Object> vars = variableManager.getAllVariables(play, host, null);
                 boolean playCheckMode = variableResolver.resolveCheckMode(play.checkMode(), vars, globalCheckMode);
-                Connection connection = getOrCreateConnection(host, vars);
-                flushHandlersForHost(play, host, variableManager, results, failedHosts, hostNotifications, playCheckMode, connection);
+                try {
+                    Connection connection = getOrCreateConnection(host, vars);
+                    flushHandlersForHost(play, host, variableManager, results, failedHosts, hostNotifications, playCheckMode, connection);
+                } catch (UnreachableException e) {
+                    failedHosts.add(host.name());
+                }
             }
         } finally {
             closeAllConnections();
@@ -135,7 +149,17 @@ public class TaskQueueManager {
             return;
         }
 
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, inheritedCheckMode, inheritedEnvironment, connection, connectionFactory);
+        TaskResult result;
+        try {
+            result = taskExecutor.execute(play, host, task, variableManager, inheritedCheckMode, inheritedEnvironment, connection, connectionFactory);
+        } catch (UnreachableException e) {
+            if (task.ignoreUnreachable()) {
+                result = TaskResult.unreachable(e.getMessage());
+            } else {
+                failedHosts.add(host.name());
+                return;
+            }
+        }
 
         if (result != null) {
             results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(result);
@@ -148,12 +172,27 @@ public class TaskQueueManager {
                 variableManager.registerVariable(host.name(), task.register(), result.data());
             }
 
+            // Handle collected facts
+            if (result.data() != null && result.data().containsKey("ansible_facts")) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
+                String factHost = host.name();
+                if (task.delegateFacts() && result.data().containsKey("_ansible_delegated_host")) {
+                    // factHost remains the original host (inventory_hostname)
+                } else if (result.data().containsKey("_ansible_delegated_host")) {
+                    factHost = result.data().get("_ansible_delegated_host").toString();
+                }
+                variableManager.addFacts(factHost, facts);
+            }
+
             if (result.changed() && !task.notifications().isEmpty()) {
                 hostNotifications.computeIfAbsent(host.name(), k -> new HashSet<>()).addAll(task.notifications());
             }
 
-            if (!result.success() && !result.isSkipped()) {
-                if (!task.ignoreErrors()) {
+            if (!result.success()) {
+                if (result.isUnreachable()) {
+                    failedHosts.add(host.name());
+                } else if (!result.isSkipped() && !task.ignoreErrors()) {
                     failedHosts.add(host.name());
                 }
             }

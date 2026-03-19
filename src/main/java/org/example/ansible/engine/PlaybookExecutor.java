@@ -75,8 +75,20 @@ public class PlaybookExecutor {
      * @return A map of host names to their execution results for each task.
      */
     public Map<String, List<TaskResult>> execute(Playbook playbook, Inventory inventory, Map<String, Object> extraVars, Path baseDir, boolean globalCheckMode) {
+        return execute(playbook, inventory, new VariableManager(inventory, extraVars, baseDir), globalCheckMode);
+    }
+
+    /**
+     * Executes the entire playbook with a pre-configured VariableManager.
+     *
+     * @param playbook        The playbook to execute.
+     * @param inventory       The inventory to use.
+     * @param variableManager The variable manager to use.
+     * @param globalCheckMode Whether the execution is in global check mode.
+     * @return A map of host names to their execution results for each task.
+     */
+    public Map<String, List<TaskResult>> execute(Playbook playbook, Inventory inventory, VariableManager variableManager, boolean globalCheckMode) {
         Map<String, List<TaskResult>> results = new HashMap<>();
-        VariableManager variableManager = new VariableManager(inventory, extraVars, baseDir);
 
         // Re-instantiate TaskExecutor with the connectionFactory if it's the default one
         // or if it doesn't have it. Actually, it's better to ensure taskExecutor has the factory.

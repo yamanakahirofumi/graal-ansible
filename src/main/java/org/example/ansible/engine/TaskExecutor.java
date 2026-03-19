@@ -4,6 +4,7 @@ import org.example.ansible.connection.BecomeContext;
 import org.example.ansible.connection.Connection;
 import org.example.ansible.connection.ConnectionFactory;
 import org.example.ansible.connection.DefaultConnectionFactory;
+import org.example.ansible.connection.UnreachableException;
 import org.example.ansible.inventory.Host;
 import org.example.ansible.util.OSHandler;
 import org.example.ansible.util.OSHandlerFactory;
@@ -131,7 +132,13 @@ public class TaskExecutor implements ITaskExecutor {
                 Host delegatedHost = new Host(resolvedDelegateTo);
                 ConnectionFactory factoryToUse = connectionFactory != null ? connectionFactory : this.connectionFactory;
                 effectiveConnection = factoryToUse.createConnection(delegatedHost, delegatedVars);
-                effectiveConnection.connect();
+                try {
+                    effectiveConnection.connect();
+                } catch (UnreachableException e) {
+                    throw e;
+                } catch (Exception e) {
+                    throw new UnreachableException("Failed to connect to delegated host " + resolvedDelegateTo + ": " + e.getMessage(), e);
+                }
                 closeDelegatedConnection = true;
             }
         }
@@ -142,7 +149,13 @@ public class TaskExecutor implements ITaskExecutor {
 
         try {
             if ("meta".equals(resolvedTask.action())) {
-                return TaskResult.success(false, Map.of("meta", resolvedTask.args().getOrDefault("_raw_params", ""), "changed", false));
+                TaskResult metaResult = TaskResult.success(false, Map.of("meta", resolvedTask.args().getOrDefault("_raw_params", ""), "changed", false));
+                if (resolvedDelegateTo != null) {
+                    Map<String, Object> dataWithDelegate = new HashMap<>(metaResult.data());
+                    dataWithDelegate.put("_ansible_delegated_host", resolvedDelegateTo);
+                    metaResult = new TaskResult(metaResult.success(), metaResult.changed(), metaResult.message(), dataWithDelegate);
+                }
+                return metaResult;
             }
 
             // Action Plugin detection (simplified skeleton)
@@ -154,13 +167,24 @@ public class TaskExecutor implements ITaskExecutor {
             Map<String, String> resolvedEnvironment = variableResolver.resolveEnvironment(play, task, variables, inheritedEnvironment);
 
             if (task.until() == null) {
-                return execute(resolvedTask, becomeContext, effectiveConnection, resolvedEnvironment);
+                TaskResult result = execute(resolvedTask, becomeContext, effectiveConnection, resolvedEnvironment);
+                if (resolvedDelegateTo != null) {
+                    Map<String, Object> dataWithDelegate = new HashMap<>(result.data());
+                    dataWithDelegate.put("_ansible_delegated_host", resolvedDelegateTo);
+                    result = new TaskResult(result.success(), result.changed(), result.message(), dataWithDelegate);
+                }
+                return result;
             }
 
             // Retry logic
             TaskResult lastResult = null;
             for (int i = 0; i < task.retries(); i++) {
                 lastResult = execute(resolvedTask, becomeContext, effectiveConnection, resolvedEnvironment);
+                if (resolvedDelegateTo != null) {
+                    Map<String, Object> dataWithDelegate = new HashMap<>(lastResult.data());
+                    dataWithDelegate.put("_ansible_delegated_host", resolvedDelegateTo);
+                    lastResult = new TaskResult(lastResult.success(), lastResult.changed(), lastResult.message(), dataWithDelegate);
+                }
 
                 if (task.register() != null && variableManager != null) {
                 variableManager.registerVariable(host.name(), task.register(), lastResult.data());

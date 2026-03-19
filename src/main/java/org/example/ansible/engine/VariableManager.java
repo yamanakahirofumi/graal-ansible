@@ -44,13 +44,39 @@ public class VariableManager {
     }
 
     /**
+     * Registers facts for a specific host.
+     * Facts are merged into both the top-level variables and the 'ansible_facts' key.
+     *
+     * @param hostName The host name.
+     * @param facts    The facts to register.
+     */
+    public void addFacts(String hostName, Map<String, Object> facts) {
+        if (facts == null || facts.isEmpty()) return;
+        Map<String, Object> hostVariables = hostVars.computeIfAbsent(hostName, k -> new HashMap<>());
+
+        // Merge into top-level variables
+        hostVariables.putAll(facts);
+
+        // Merge into 'ansible_facts' dictionary
+        @SuppressWarnings("unchecked")
+        Map<String, Object> ansibleFacts = (Map<String, Object>) hostVariables.get("ansible_facts");
+        if (ansibleFacts == null) {
+            ansibleFacts = new HashMap<String, Object>();
+            hostVariables.put("ansible_facts", ansibleFacts);
+        }
+        ansibleFacts.putAll(facts);
+    }
+
+    /**
      * Resolves all variables for a given host without play or task context.
      *
      * @param hostName The host name.
      * @return A merged map of variables for the host.
      */
     public Map<String, Object> getVariablesForHost(String hostName) {
-        return getAllVariables(null, new Host(hostName), null);
+        Map<String, Object> vars = new HashMap<>(getAllVariables(null, new Host(hostName), null));
+        vars.put("inventory_hostname", hostName);
+        return vars;
     }
 
     /**
@@ -64,6 +90,11 @@ public class VariableManager {
      */
     public Map<String, Object> getAllVariables(Play play, Host host, Task task) {
         Map<String, Object> variables = new HashMap<>();
+
+        // Magic Variables
+        if (host != null) {
+            variables.put("inventory_hostname", host.name());
+        }
 
         // 1. Role Defaults (Not implemented yet)
 
@@ -91,15 +122,22 @@ public class VariableManager {
             variables.putAll(task.vars());
         }
 
-        // Registered Variables (Higher priority than Task Vars in Ansible)
+        // 10. Registered Variables and Facts (Higher priority than Task Vars in Ansible)
         if (host != null && hostVars.containsKey(host.name())) {
             variables.putAll(hostVars.get(host.name()));
         }
 
-        // 10. Extra Vars
+        // 11. Extra Vars (Highest priority)
         variables.putAll(extraVars);
 
         return Collections.unmodifiableMap(variables);
+    }
+
+    /**
+     * Internal method to get registered and fact variables.
+     */
+    public Map<String, Object> getHostRuntimeVariables(String hostName) {
+        return hostVars.getOrDefault(hostName, Map.of());
     }
 
     @SuppressWarnings("unchecked")
