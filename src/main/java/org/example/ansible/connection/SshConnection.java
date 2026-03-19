@@ -45,7 +45,7 @@ public class SshConnection implements Connection {
             session.addPasswordIdentity(password);
             session.auth().verify(timeout);
         } catch (IOException e) {
-            throw new RuntimeException("Failed to connect to " + host + ":" + port, e);
+            throw new UnreachableException("Failed to connect to " + host + ":" + port, e);
         }
     }
 
@@ -56,6 +56,10 @@ public class SshConnection implements Connection {
         if (becomeContext != null && becomeContext.become()) {
              // In a real implementation, we would wrap the command with sudo/su
              // command = "sudo " + command; 
+        }
+
+        if (session == null || !session.isOpen()) {
+            throw new UnreachableException("SSH session is not open");
         }
 
         try (ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -81,7 +85,7 @@ public class SshConnection implements Connection {
                 exitStatus != null ? exitStatus : -1
             );
         } catch (IOException e) {
-            return new ConnectionResult("", e.getMessage(), 1);
+            throw new UnreachableException("Command execution failed due to connection error: " + e.getMessage(), e);
         }
     }
 

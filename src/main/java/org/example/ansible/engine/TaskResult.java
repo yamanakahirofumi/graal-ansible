@@ -55,11 +55,30 @@ public record TaskResult(boolean success, boolean changed, String message, Map<S
     }
 
     /**
+     * Creates an unreachable task result.
+     *
+     * @param message The unreachable message.
+     * @return An unreachable TaskResult.
+     */
+    public static TaskResult unreachable(String message) {
+        return new TaskResult(false, false, message, Map.of("unreachable", true, "skipped", true, "changed", false));
+    }
+
+    /**
      * Checks if the result indicates the task was skipped.
      *
      * @return true if skipped.
      */
     public boolean isSkipped() {
         return data != null && Boolean.TRUE.equals(data.get("skipped"));
+    }
+
+    /**
+     * Checks if the result indicates the host was unreachable.
+     *
+     * @return true if unreachable.
+     */
+    public boolean isUnreachable() {
+        return data != null && Boolean.TRUE.equals(data.get("unreachable"));
     }
 }
