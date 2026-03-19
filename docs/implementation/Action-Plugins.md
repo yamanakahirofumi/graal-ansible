@@ -3,7 +3,7 @@
 本ドキュメントでは、`graal-ansible` における Ansible Action Plugin の実行メカニズムの設計方針について詳述します。
 
 > [!NOTE]
-> **現在のステータス**: Action Plugin の**検知ロジック**（`ansible/plugins/action` からの検索）は `TaskExecutor` に実装済みですが、プラグインの**実行ブリッジ**（ランチャーを介した Python コードの呼び出し）は将来の実装課題です。
+> **現在のステータス**: Action Plugin の**検知ロジック**（`ansible/plugins/action` からの検索）および**実行ブリッジ**（`ansible_action_launcher.py` を介した Python コードの呼び出し）は `TaskExecutor` に実装済みです。ただし、Ansible Core の重厚な依存関係に起因する GraalPy 上での実行互換性の課題があり、詳細は [Action Plugin 実行ロジックの実装調査報告](Action-Plugins-Investigation.md) を参照してください。
 
 ## 1. Action Plugin の概要
 
@@ -107,6 +107,7 @@ Action Plugin を GraalPy 上で動作させるために、以下の Ansible 内
 | `ansible.template.Templar` | 制御ノード側でのテンプレートレンダリング機能（Java 側の `VariableResolver` と連携）。 |
 
 ## 6. 関連ドキュメント
+- [Action Plugin 実行ロジックの実装調査報告](Action-Plugins-Investigation.md)
 - [GraalPy 統合の詳細](../tech/GraalPy-Integration.md)
 - [タスク実行エンジン](Task-Executor.md)
 - [リモートノードでのモジュール実行仕様](Remote-Module-Execution.md)
