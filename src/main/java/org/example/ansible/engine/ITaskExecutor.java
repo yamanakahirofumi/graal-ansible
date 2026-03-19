@@ -6,6 +6,8 @@ import org.example.ansible.connection.ConnectionFactory;
 import org.example.ansible.inventory.Host;
 import org.example.ansible.util.OSHandler;
 
+import java.util.Map;
+
 /**
  * Interface for executing tasks.
  */
@@ -49,6 +51,15 @@ public interface ITaskExecutor extends AutoCloseable {
      * @return The OSHandler.
      */
     OSHandler getOsHandler();
+
+    /**
+     * Python (Action Plugin) から呼び出され、指定されたモジュールを実行します。
+     * @param moduleName モジュール名 (例: "copy", "apt")
+     * @param moduleArgs モジュール引数 (Map形式)
+     * @param taskVars 現在のタスク変数
+     * @return 実行結果 (Map形式、Ansible互換の辞書)
+     */
+    Map<String, Object> execute_from_python(String moduleName, Map<String, Object> moduleArgs, Map<String, Object> taskVars);
 
     @Override
     void close();

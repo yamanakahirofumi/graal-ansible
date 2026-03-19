@@ -40,7 +40,7 @@ def mock_problematic_modules():
         return
 
     # Aggressively mock native/problematic modules
-    for mname in ['cryptography', 'cryptography.hazmat', 'cryptography.hazmat.bindings', '_cffi_backend', 'yaml._yaml', 'selinux']:
+    for mname in ['cryptography', 'cryptography.hazmat', 'cryptography.hazmat.bindings', '_cffi_backend', 'yaml._yaml', 'selinux', 'markupsafe._speedups']:
         sys.modules[mname] = None
 
     # Mock Display to avoid circular imports
