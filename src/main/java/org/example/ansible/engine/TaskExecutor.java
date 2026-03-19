@@ -420,7 +420,7 @@ public class TaskExecutor implements ITaskExecutor {
         }
     }
 
-    private TaskResult executeActionPlugin(Task task, BecomeContext becomeContext, Connection connection, Map<String, String> environment, Map<String, Object> taskVars) {
+    TaskResult executeActionPlugin(Task task, BecomeContext becomeContext, Connection connection, Map<String, String> environment, Map<String, Object> taskVars) {
         setCurrentConnection(connection);
         setCurrentEnvironment(environment);
         setCurrentBecomeContext(becomeContext);
