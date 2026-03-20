@@ -134,18 +134,32 @@
     - Java (ITaskExecutor) から Python (Action Plugin) への双方向呼び出しを実現。
     - ※ 互換性の課題については [Action-Plugins-Investigation.md](implementation/Action-Plugins-Investigation.md) を参照。
 
+### [✓] Java による Action Plugin 軽量エミュレータの導入
+- **完了日**: 2026-03-20
+- **概要**: GraalPy 上での Ansible Core ロードに伴う互換性問題の回避と高速化。
+- **解決策**:
+    - `ActionPlugin` Java インターフェースを定義し、`TaskExecutor` に組み込みプラグインの検索・実行ロジックを実装。
+    - `debug`, `set_fact` の Java 版エミュレータを実装し、Python 版よりも優先して実行するように調整。
+
+### [✓] 実行エンジン（TQM/Worker）のリファクタリングと抽象化
+- **完了日**: 2026-03-20
+- **概要**: `PlaybookExecutor` および `TaskQueueManager`, `TaskExecutor` の責務の明確化と抽象化。
+- **解決策**:
+    - **コネクション解決の抽象化**: `ConnectionFactory` インターフェースを導入し、`ansible_connection` に基づく動的なコネクション生成を `TaskQueueManager` で管理。
+    - **ループ処理の分離**: `TaskExecutor` 内で `executeLoopTask`, `resolveLoopItems`, `executeLoopIteration` にメソッドを分割し、可読性を向上。
+    - **条件評価の集約**: `when` 句の評価ロジックを `VariableResolver` へ集約し、呼び出し側（TQM, Worker）のコードを簡素化。
+    - **委譲 (delegate_to) の実装**: コネクションの動的な切り替えと、委譲先ホストに応じた変数解決の基盤を実装。
+
 ## 5. 今後のリファクタリング検討事項 (Future Refactoring Items)
 
 ### [ ] Action Plugin の互換性向上
 - **概要**: 重厚な Ansible Core への依存を排除し、Action Plugin の動作を安定させる。
 - **検討内容**:
-    - [調査報告書](implementation/Action-Plugins-Investigation.md) に基づく軽量なエミュレータの開発。
-    - 主要なプラグイン (`debug`, `set_fact`, `copy`, `template`) の優先対応。
+    - [調査報告書](implementation/Action-Plugins-Investigation.md) に基づく軽量なエミュレータの開発継続。
+    - 残りの主要なプラグイン (`copy`, `template`) の優先対応。
 
 ### [ ] PlaybookExecutor および実行エンジンのさらなる整理
-- **概要**: `PlaybookExecutor` および `TaskQueueManager`, `TaskExecutor` 内に存在する課題の改善。
+- **概要**: `PlaybookExecutor` および `TaskQueueManager`, `TaskExecutor` 内に存在する課題の継続的な改善。
 - **検討内容**:
-    - `when` 条件の評価ロジックの集約（`VariableResolver` への集約は進んでいるが、呼び出し側の整理が必要）。
-    - `executeLoopTask` のリファクタリング（ループの反復処理とタスク実行ロジックの分離）。
-    - **コネクション解決の抽象化**: `ansible_connection` 等の変数に基づき、動的に `Connection` インスタンスを生成・取得する仕組みの導入。
-    - **委譲 (delegate_to) の完全実装**: コネクションの動的な切り替えは実装済み。
+    - 複雑な変数の優先順位の完全な実装（現在は主要な 11 段階のみ）。
+    - 動的インベントリの完全なサポート。
