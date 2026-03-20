@@ -29,6 +29,12 @@ class EnvironmentTest {
         public TaskResult execute(Task task, BecomeContext becomeContext, Connection connection, Map<String, String> environment) {
             return execute(task, becomeContext, environment);
         }
+
+        @Override
+        protected TaskResult executeActionPlugin(Task task, BecomeContext becomeContext, Connection connection, Map<String, String> environment, Map<String, Object> taskVars) {
+            capturedEnvironments.add(environment);
+            return TaskResult.success(Map.of());
+        }
     }
 
     @Test

@@ -33,8 +33,20 @@ class BecomeTest {
                     executedContexts.add(bc);
                     return TaskResult.success(Map.of());
                 }
+
+                @Override
+                protected TaskResult executeActionPlugin(Task t, BecomeContext bc, Connection conn, Map<String, String> env, Map<String, Object> vars) {
+                    executedTasks.add(t);
+                    executedContexts.add(bc);
+                    return TaskResult.success(Map.of());
+                }
             };
             return realExecutor.execute(play, host, task, variableManager, inheritedCheckMode, inheritedEnvironment, connection, connectionFactory);
+        }
+
+        @Override
+        public VariableResolver getVariableResolver() {
+            return new VariableResolver();
         }
 
         @Override

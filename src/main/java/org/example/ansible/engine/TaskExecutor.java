@@ -13,6 +13,9 @@ import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Source;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import org.example.ansible.plugin.ActionPlugin;
+import org.example.ansible.plugin.DebugAction;
+import org.example.ansible.plugin.SetFactAction;
 import org.example.ansible.util.PythonEnv;
 
 import java.io.File;
@@ -72,6 +75,7 @@ public class TaskExecutor implements ITaskExecutor {
     }
 
     private final Map<String, org.example.ansible.module.Module> modules = new HashMap<>();
+    private final Map<String, ActionPlugin> builtInActionPlugins = new HashMap<>();
     private final Map<String, Boolean> actionPluginCache = new ConcurrentHashMap<>();
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final OSHandler osHandler;
@@ -90,6 +94,9 @@ public class TaskExecutor implements ITaskExecutor {
     public TaskExecutor(OSHandler osHandler, ConnectionFactory connectionFactory) {
         this.osHandler = osHandler;
         this.connectionFactory = connectionFactory;
+        this.builtInActionPlugins.put("debug", new DebugAction());
+        this.builtInActionPlugins.put("set_fact", new SetFactAction());
+
         Context.Builder builder = Context.newBuilder("python")
                 .allowAllAccess(true);
 
@@ -104,6 +111,11 @@ public class TaskExecutor implements ITaskExecutor {
     @Override
     public OSHandler getOsHandler() {
         return osHandler;
+    }
+
+    @Override
+    public VariableResolver getVariableResolver() {
+        return variableResolver;
     }
 
     public void registerModule(String action, org.example.ansible.module.Module module) {
@@ -251,6 +263,9 @@ public class TaskExecutor implements ITaskExecutor {
 
     private boolean isActionPlugin(String action) {
         if (action == null) return false;
+        if (builtInActionPlugins.containsKey(action)) {
+            return true;
+        }
         if (!Boolean.parseBoolean(System.getProperty("ansible.action_plugins.enabled", "false"))) {
             return false;
         }
@@ -420,7 +435,16 @@ public class TaskExecutor implements ITaskExecutor {
         }
     }
 
-    private TaskResult executeActionPlugin(Task task, BecomeContext becomeContext, Connection connection, Map<String, String> environment, Map<String, Object> taskVars) {
+    protected TaskResult executeActionPlugin(Task task, BecomeContext becomeContext, Connection connection, Map<String, String> environment, Map<String, Object> taskVars) {
+        ActionPlugin builtInPlugin = builtInActionPlugins.get(task.action());
+        if (builtInPlugin != null) {
+            try {
+                return builtInPlugin.execute(task, taskVars, this);
+            } catch (Exception e) {
+                return TaskResult.failure("Built-in Action Plugin execution failed: " + e.getMessage());
+            }
+        }
+
         setCurrentConnection(connection);
         setCurrentEnvironment(environment);
         setCurrentBecomeContext(becomeContext);
