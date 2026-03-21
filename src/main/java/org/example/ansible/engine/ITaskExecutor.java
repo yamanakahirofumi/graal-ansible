@@ -59,6 +59,19 @@ public interface ITaskExecutor extends AutoCloseable {
     VariableResolver getVariableResolver();
 
     /**
+     * Gets the variable manager currently used.
+     * @return The VariableManager.
+     */
+    VariableManager getVariableManager();
+
+    /**
+     * Resolves a local path relative to the playbook's base directory.
+     * @param path The path to resolve.
+     * @return The absolute path as a String.
+     */
+    String resolveLocalPath(String path);
+
+    /**
      * Python (Action Plugin) から呼び出され、指定されたモジュールを実行します。
      * @param moduleName モジュール名 (例: "copy", "apt")
      * @param moduleArgs モジュール引数 (Map形式)

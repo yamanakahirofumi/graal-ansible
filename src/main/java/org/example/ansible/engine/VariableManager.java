@@ -33,6 +33,14 @@ public class VariableManager {
     }
 
     /**
+     * Gets the base directory for file resolution.
+     * @return The base directory.
+     */
+    public Path getBaseDir() {
+        return baseDir;
+    }
+
+    /**
      * Registers a variable for a specific host.
      *
      * @param hostName The host name.

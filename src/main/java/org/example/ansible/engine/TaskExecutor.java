@@ -16,6 +16,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.ansible.plugin.ActionPlugin;
 import org.example.ansible.plugin.DebugAction;
 import org.example.ansible.plugin.SetFactAction;
+import org.example.ansible.plugin.CopyAction;
 import org.example.ansible.util.PythonEnv;
 
 import java.io.File;
@@ -37,6 +38,7 @@ public class TaskExecutor implements ITaskExecutor {
     private static final ThreadLocal<Connection> currentConnection = new ThreadLocal<>();
     private static final ThreadLocal<Map<String, String>> currentEnvironment = new ThreadLocal<>();
     private static final ThreadLocal<BecomeContext> currentBecomeContext = new ThreadLocal<>();
+    private static final ThreadLocal<VariableManager> currentVariableManager = new ThreadLocal<>();
 
     public static void setCurrentConnection(Connection connection) {
         currentConnection.set(connection);
@@ -74,6 +76,18 @@ public class TaskExecutor implements ITaskExecutor {
         currentBecomeContext.remove();
     }
 
+    public static void setCurrentVariableManager(VariableManager variableManager) {
+        currentVariableManager.set(variableManager);
+    }
+
+    public static VariableManager getCurrentVariableManager() {
+        return currentVariableManager.get();
+    }
+
+    public static void clearCurrentVariableManager() {
+        currentVariableManager.remove();
+    }
+
     private final Map<String, org.example.ansible.module.Module> modules = new HashMap<>();
     private final Map<String, ActionPlugin> builtInActionPlugins = new HashMap<>();
     private final Map<String, Boolean> actionPluginCache = new ConcurrentHashMap<>();
@@ -96,6 +110,7 @@ public class TaskExecutor implements ITaskExecutor {
         this.connectionFactory = connectionFactory;
         this.builtInActionPlugins.put("debug", new DebugAction());
         this.builtInActionPlugins.put("set_fact", new SetFactAction());
+        this.builtInActionPlugins.put("copy", new CopyAction());
 
         Context.Builder builder = Context.newBuilder("python")
                 .allowAllAccess(true);
@@ -116,6 +131,25 @@ public class TaskExecutor implements ITaskExecutor {
     @Override
     public VariableResolver getVariableResolver() {
         return variableResolver;
+    }
+
+    @Override
+    public VariableManager getVariableManager() {
+        return getCurrentVariableManager();
+    }
+
+    @Override
+    public String resolveLocalPath(String path) {
+        if (path == null) return null;
+        File file = new File(path);
+        if (file.isAbsolute()) {
+            return path;
+        }
+        VariableManager vm = getVariableManager();
+        if (vm != null && vm.getBaseDir() != null) {
+            return vm.getBaseDir().resolve(path).toAbsolutePath().toString();
+        }
+        return file.getAbsolutePath();
     }
 
     public void registerModule(String action, org.example.ansible.module.Module module) {
@@ -191,15 +225,20 @@ public class TaskExecutor implements ITaskExecutor {
             BecomeContext becomeContext = variableResolver.resolveBecomeContext(play, resolvedTask, variables);
             Map<String, String> resolvedEnvironment = variableResolver.resolveEnvironment(play, task, variables, inheritedEnvironment);
 
-            // Action Plugin detection
-            if (isActionPlugin(resolvedTask.action())) {
-                TaskResult actionResult = executeActionPlugin(resolvedTask, becomeContext, effectiveConnection, resolvedEnvironment, variables);
-                if (resolvedDelegateTo != null) {
-                    Map<String, Object> dataWithDelegate = new HashMap<>(actionResult.data());
-                    dataWithDelegate.put("_ansible_delegated_host", resolvedDelegateTo);
-                    actionResult = new TaskResult(actionResult.success(), actionResult.changed(), actionResult.message(), dataWithDelegate);
+            setCurrentVariableManager(variableManager);
+            try {
+                // Action Plugin detection
+                if (isActionPlugin(resolvedTask.action())) {
+                    TaskResult actionResult = executeActionPlugin(resolvedTask, becomeContext, effectiveConnection, resolvedEnvironment, variables);
+                    if (resolvedDelegateTo != null) {
+                        Map<String, Object> dataWithDelegate = new HashMap<>(actionResult.data());
+                        dataWithDelegate.put("_ansible_delegated_host", resolvedDelegateTo);
+                        actionResult = new TaskResult(actionResult.success(), actionResult.changed(), actionResult.message(), dataWithDelegate);
+                    }
+                    return actionResult;
                 }
-                return actionResult;
+            } finally {
+                clearCurrentVariableManager();
             }
 
             if (task.until() == null) {
@@ -438,10 +477,17 @@ public class TaskExecutor implements ITaskExecutor {
     protected TaskResult executeActionPlugin(Task task, BecomeContext becomeContext, Connection connection, Map<String, String> environment, Map<String, Object> taskVars) {
         ActionPlugin builtInPlugin = builtInActionPlugins.get(task.action());
         if (builtInPlugin != null) {
+            setCurrentConnection(connection);
+            setCurrentEnvironment(environment);
+            setCurrentBecomeContext(becomeContext);
             try {
                 return builtInPlugin.execute(task, taskVars, this);
             } catch (Exception e) {
                 return TaskResult.failure("Built-in Action Plugin execution failed: " + e.getMessage());
+            } finally {
+                clearCurrentConnection();
+                clearCurrentEnvironment();
+                clearCurrentBecomeContext();
             }
         }
 
