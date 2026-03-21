@@ -2,8 +2,10 @@
 
 本ドキュメントでは、`graal-ansible` における Ansible Action Plugin の実行メカニズムの設計方針について詳述します。
 
-> [!NOTE]
-> **現在のステータス**: Action Plugin の**検知ロジック**（`ansible/plugins/action` からの検索）および**実行ブリッジ**（`ansible_action_launcher.py` を介した Python コードの呼び出し）は `TaskExecutor` に実装済みです。ただし、Ansible Core の重厚な依存関係に起因する GraalPy 上での実行互換性の課題があり、詳細は [Action Plugin 実行ロジックの実装調査報告](Action-Plugins-Investigation.md) を参照してください。
+> [!IMPORTANT]
+> **現在のステータスと方針**:
+> 以前は Python 実装の Action Plugin をそのまま GraalPy で動かす方針でしたが、[Action Plugin 実行ロジックの実装調査報告](Action-Plugins-Investigation.md) の通り、Ansible Core の依存関係による互換性の課題が判明しました。
+> そのため、現在は **Java による軽量エミュレータ（ハイブリッド戦略）** を優先する方針にシフトしています。詳細は [Java Action Plugin 実装ガイド](Java-Action-Plugins.md) を参照してください。
 
 ## 1. Action Plugin の概要
 
@@ -14,16 +16,20 @@ Ansible のタスク実行には、大きく分けて以下の 2 種類があり
 
 `graal-ansible` では、本家 Ansible の Python 実装の Action Plugin を管理ノード側の GraalPy 上でそのまま動作させることで、高い互換性を維持します。
 
-## 2. 検知ロジックと優先順位
+## 2. ハイブリッド実行戦略と優先順位
 
-Worker Process (`TaskExecutor`) は、タスクの `action` 名に基づき、それが Action Plugin であるかどうかを以下の手順で判定します。
+Worker Process (`TaskExecutor`) は、タスクの `action` 名に基づき、以下の優先順位で実行方式を選択します。
 
-1.  **組み込みプラグイン (Java) の検索**: `TaskExecutor` が内部で保持する `builtInActionPlugins` マップ（`ActionPlugin` インターフェースの実装）を検索します。
-2.  **外部プラグイン (Python) の検索**: 組み込みに存在しない場合、`ansible-core` のコレクション（`ansible.builtin` 等）内の `plugins/action/` ディレクトリから、アクション名に一致する Python スクリプト（例: `template.py`）を検索します。
-3.  **優先判定**: アクション名に一致する Action Plugin が存在する場合、通常のモジュール実行（`ansible/modules/` 配下）よりも優先して Action Plugin として実行します。
-
-> [!TIP]
-> **Java 実装 (Lightweight Emulator) の優先**: `debug` や `set_fact` などの頻繁に利用されるアクションについては、GraalPy のオーバーヘッドや Ansible Core への依存を避けるため、Java による軽量なエミュレータ実装を優先して実行します。
+1.  **Java による軽量エミュレータ (優先)**:
+    - `TaskExecutor` が内部で保持する `builtInActionPlugins` マップ（`ActionPlugin` インターフェースの実装）を検索します。
+    - `debug`, `set_fact` に加え、今後は `copy`, `template` などの主要なプラグインを Java で順次実装します。
+    - 実装方法は [Java Action Plugin 実装ガイド](Java-Action-Plugins.md) を参照してください。
+2.  **Python 実装の実行 (フォールバック)**:
+    - Java 実装が存在しない場合、`ansible-core` のコレクション内の `plugins/action/` ディレクトリから Python スクリプトを検索します。
+    - 実行ブリッジ（`ansible_action_launcher.py`）を介して GraalPy 上で動作させます。
+    - ※ただし、Ansible Core への依存度が高いプラグインは動作しない可能性があります。
+3.  **通常のモジュール実行**:
+    - Action Plugin が存在しない場合、通常のモジュール実行フロー（ターゲットノードへの転送・実行）に移行します。
 
 ## 3. 実行フロー
 
