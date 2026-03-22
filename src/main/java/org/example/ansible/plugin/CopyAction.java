@@ -50,32 +50,7 @@ public class CopyAction implements ActionPlugin {
                 return TaskResult.failure("Either src or content is required for copy module");
             }
 
-            // Perform the file transfer
-            org.example.ansible.connection.Connection connection = org.example.ansible.engine.TaskExecutor.getCurrentConnection();
-            if (connection == null) {
-                return TaskResult.failure("No active connection for file transfer");
-            }
-
-            connection.putFile(localPath, dest);
-
-            // Handle file attributes (mode, owner, group)
-            Map<String, Object> fileArgs = new HashMap<>();
-            fileArgs.put("path", dest);
-            fileArgs.put("state", "file");
-            if (args.containsKey("mode")) fileArgs.put("mode", args.get("mode"));
-            if (args.containsKey("owner")) fileArgs.put("owner", args.get("owner"));
-            if (args.containsKey("group")) fileArgs.put("group", args.get("group"));
-
-            if (fileArgs.size() > 2) {
-                Map<String, Object> fileResult = taskExecutor.execute_from_python("file", fileArgs, variables);
-                // Merge results if necessary, but primarily we want the changed status
-                Map<String, Object> combinedData = new HashMap<>(fileResult);
-                combinedData.put("dest", dest);
-                combinedData.put("changed", true); // Transfer always means changed for now (simplification)
-                return TaskResult.success(combinedData);
-            }
-
-            return TaskResult.success(true, Map.of("dest", dest, "changed", true));
+            return ActionPluginHelper.transferAndSetAttributes(task, dest, localPath, taskExecutor, variables);
 
         } catch (IOException e) {
             return TaskResult.failure("Copy operation failed: " + e.getMessage());

@@ -152,11 +152,12 @@
 
 ## 5. 今後のリファクタリング検討事項 (Future Refactoring Items)
 
-### [ ] Action Plugin の互換性向上
+### [✓] Action Plugin の互換性向上
+- **完了日**: 2026-03-22
 - **概要**: 重厚な Ansible Core への依存を排除し、Action Plugin の動作を安定させる。
-- **検討内容**:
-    - [テクニカルリファレンス](implementation/Action-Plugins-Investigation.md) に基づく軽量なエミュレータの開発継続。
-    - `copy` は Java で実装済み。残りの主要なプラグイン (`template`) の優先対応。
+- **解決策**:
+    - [テクニカルリファレンス](implementation/Action-Plugins-Investigation.md) に基づく軽量なエミュレータの開発。
+    - `copy` および `template` を Java で実装済み。
 
 ### [ ] PlaybookExecutor および実行エンジンのさらなる整理
 - **概要**: `PlaybookExecutor` および `TaskQueueManager`, `TaskExecutor` 内に存在する課題の継続的な改善。

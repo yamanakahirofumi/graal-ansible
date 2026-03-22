@@ -81,4 +81,14 @@ class VariableResolverTest {
         assertNotNull(resolved);
         assertTrue(resolved.containsKey("key"));
     }
+
+    @Test
+    void testJinjaTags() {
+        Map<String, Object> variables = Map.of("show", true);
+        String template = "{% if show %}hello{% endif %}";
+        assertEquals("hello", resolver.resolveValue(template, variables));
+
+        template = "{# comment #}hello";
+        assertEquals("hello", resolver.resolveValue(template, variables));
+    }
 }
