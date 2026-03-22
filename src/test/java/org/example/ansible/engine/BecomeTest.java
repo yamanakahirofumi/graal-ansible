@@ -50,6 +50,16 @@ class BecomeTest {
         }
 
         @Override
+        public VariableManager getVariableManager() {
+            return null;
+        }
+
+        @Override
+        public String resolveLocalPath(String path) {
+            return path;
+        }
+
+        @Override
         public TaskResult execute(Task task, BecomeContext becomeContext, Map<String, String> environment) {
             return TaskResult.success(Map.of());
         }

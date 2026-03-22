@@ -59,6 +59,10 @@ class CheckModeTest {
             @Override
             public VariableResolver getVariableResolver() { return new VariableResolver(); }
             @Override
+            public VariableManager getVariableManager() { return null; }
+            @Override
+            public String resolveLocalPath(String path) { return path; }
+            @Override
             public void close() {}
         };
 
