@@ -41,10 +41,15 @@ Caused by: com.oracle.graal.python.builtins.objects.cext.common.LoadCExtExceptio
     - *難易度*: 環境に依存。
 
 ## 4. 今後の推奨事項
-現在の環境では、Ansible の重厚なコアライブラリをそのまま GraalPy 上でロードすることに限界があります。Action Plugin の完全な互換性を維持するためには、以下のいずれかの検討を推奨します。
+現在の環境では、Ansible の重厚なコアライブラリをそのまま GraalPy 上でロードすることに限界があります。Action Plugin の完全な互換性を維持するため、**「動かない import 先だけを最小限に実装・モック化する」** 方針を推奨します。
 
-1.  **軽量な Action Plugin エミュレータの開発**: 良く使われる Action Plugin（`debug`, `set_fact`, `copy`, `template`）に限定して、Ansible Core に依存しない独自の Python ベースまたは Java ベースの実行ロジックを実装する。
-2.  **インポート不要なブリッジ**: Action Plugin の Python コードを、Ansible Core なしで動作するように事前変換またはラップするツールの導入。
+1.  **最小限の依存関係エミュレーション**:
+    - `ansible.plugins.action.ActionBase` のように、Action Plugin が直接継承するクラスのメソッド（`_execute_module` 等）のみを、Java ブリッジを介して動作するように再実装します。
+    - インポートエラーを引き起こすネイティブモジュール（`cryptography` 等）や、GraalPy 上で重いライブラリをスタブ（空のクラスや関数）に置き換えます。
+2.  **本物の Action Plugin コードの利用**:
+    - プラグイン本体（`copy.py`, `template.py` 等）には手を加えず、周辺環境を整えることでそのまま実行します。
+3.  **軽量エミュレータ（Java）の活用**:
+    - 性能要件が非常に厳しい場合や、スタブ化による対応が困難な場合に限り、[Java Action Plugin](Java-Action-Plugins.md) として完全に再実装します。
 
 ---
 本調査により、Java-Python 間の双方向呼び出し基盤は確立されましたが、Ansible Core の重厚な依存関係が GraalPy 上での実行における主要な障壁であることが明らかになりました。

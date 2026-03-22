@@ -2,8 +2,12 @@
 
 本ドキュメントでは、`graal-ansible` における Ansible Action Plugin の実行メカニズムの設計方針について詳述します。
 
-> [!NOTE]
-> **現在のステータス**: Action Plugin の**検知ロジック**（`ansible/plugins/action` からの検索）および**実行ブリッジ**（`ansible_action_launcher.py` を介した Python コードの呼び出し）は `TaskExecutor` に実装済みです。ただし、Ansible Core の重厚な依存関係に起因する GraalPy 上での実行互換性の課題があり、詳細は [Action Plugin 実行ロジックの実装調査報告](Action-Plugins-Investigation.md) を参照してください。
+> [!IMPORTANT]
+> **基本方針**:
+> `graal-ansible` では、**本家 Ansible の Python 実装（Action Plugin）を極力そのまま利用すること** を最優先の方針とします。
+> GraalPy 上で動作を阻害する「インポートエラーが発生する依存関係」や「Ansible Core の重厚なライブラリ」については、その **インターフェースのみを最小限にエミュレート（実装・モック化）** することで、プラグイン本体のロジックを改変せずに動作させることを目指します。
+>
+> Java による軽量エミュレータは、パフォーマンス上の理由や、依存関係の解決が極めて困難な場合に限定して利用します。
 
 ## 1. Action Plugin の概要
 
@@ -14,16 +18,18 @@ Ansible のタスク実行には、大きく分けて以下の 2 種類があり
 
 `graal-ansible` では、本家 Ansible の Python 実装の Action Plugin を管理ノード側の GraalPy 上でそのまま動作させることで、高い互換性を維持します。
 
-## 2. 検知ロジックと優先順位
+## 2. 実行戦略と優先順位
 
-Worker Process (`TaskExecutor`) は、タスクの `action` 名に基づき、それが Action Plugin であるかどうかを以下の手順で判定します。
+Worker Process (`TaskExecutor`) は、タスクの `action` 名に基づき、以下の優先順位で実行方式を選択します。
 
-1.  **組み込みプラグイン (Java) の検索**: `TaskExecutor` が内部で保持する `builtInActionPlugins` マップ（`ActionPlugin` インターフェースの実装）を検索します。
-2.  **外部プラグイン (Python) の検索**: 組み込みに存在しない場合、`ansible-core` のコレクション（`ansible.builtin` 等）内の `plugins/action/` ディレクトリから、アクション名に一致する Python スクリプト（例: `template.py`）を検索します。
-3.  **優先判定**: アクション名に一致する Action Plugin が存在する場合、通常のモジュール実行（`ansible/modules/` 配下）よりも優先して Action Plugin として実行します。
-
-> [!TIP]
-> **Java 実装 (Lightweight Emulator) の優先**: `debug` や `set_fact` などの頻繁に利用されるアクションについては、GraalPy のオーバーヘッドや Ansible Core への依存を避けるため、Java による軽量なエミュレータ実装を優先して実行します。
+1.  **Python 実装の実行 (最優先)**:
+    - `ansible-core` コレクションの `plugins/action/` 配下にある本物の Python スクリプトを、実行ブリッジ（`ansible_action_launcher.py`）を介して実行します。
+    - プラグインが依存する `ansible.plugins.action.ActionBase` などのクラスについて、**動かない（インポートエラーになる）部分のみを Java/Python で再実装・モック化** して提供します。
+2.  **Java による軽量エミュレータ (特定用途)**:
+    - `debug`, `set_fact` など、頻繁に呼び出されパフォーマンスが重視されるものや、依存解決が極めて複雑なものについて、Java で実装されたエミュレータを使用します。
+    - 実装方法は [Java Action Plugin 実装ガイド](Java-Action-Plugins.md) を参照してください。
+3.  **通常のモジュール実行**:
+    - Action Plugin が存在しない場合、通常のモジュール実行フロー（ターゲットノードへの転送・実行）に移行します。
 
 ## 3. 実行フロー
 
