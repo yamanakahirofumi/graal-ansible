@@ -4,7 +4,11 @@
 
 ## 1. 概要
 
-[Action Plugin 実行ロジックの実装調査報告](Action-Plugins-Investigation.md) で述べた通り、Ansible Core の重厚な依存関係を GraalPy 上で完全に解決することは困難です。そのため、頻繁に使用される重要な Action Plugin については、Java による軽量なエミュレータ実装を優先します。
+[Action Plugin 実行ロジックの実装調査報告](Action-Plugins-Investigation.md) で述べた通り、Ansible Core の重厚な依存関係を GraalPy 上で完全に解決することは困難です。
+
+本プロジェクトの基本方針は「本物の Python プラグインを動かす」ことですが、以下のケースに限り Java による軽量エミュレータを導入します。
+- **高パフォーマンス要件**: `debug` や `set_fact` のように、頻繁に呼び出され、Python インタプリタのオーバーヘッドを避けたい場合。
+- **依存解決の困難性**: 依存ライブラリのスタブ化が極めて困難で、Java で再実装したほうが安定性が高い場合。
 
 Java で実装することで、以下のメリットが得られます。
 - **高速な起動**: Python インタプリタの初期化や大量のライブラリロードを回避。

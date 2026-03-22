@@ -3,9 +3,11 @@
 本ドキュメントでは、`graal-ansible` における Ansible Action Plugin の実行メカニズムの設計方針について詳述します。
 
 > [!IMPORTANT]
-> **現在のステータスと方針**:
-> 以前は Python 実装の Action Plugin をそのまま GraalPy で動かす方針でしたが、[Action Plugin 実行ロジックの実装調査報告](Action-Plugins-Investigation.md) の通り、Ansible Core の依存関係による互換性の課題が判明しました。
-> そのため、現在は **Java による軽量エミュレータ（ハイブリッド戦略）** を優先する方針にシフトしています。詳細は [Java Action Plugin 実装ガイド](Java-Action-Plugins.md) を参照してください。
+> **基本方針**:
+> `graal-ansible` では、**本家 Ansible の Python 実装（Action Plugin）を極力そのまま利用すること** を最優先の方針とします。
+> GraalPy 上で動作を阻害する「インポートエラーが発生する依存関係」や「Ansible Core の重厚なライブラリ」については、その **インターフェースのみを最小限にエミュレート（実装・モック化）** することで、プラグイン本体のロジックを改変せずに動作させることを目指します。
+>
+> Java による軽量エミュレータは、パフォーマンス上の理由や、依存関係の解決が極めて困難な場合に限定して利用します。
 
 ## 1. Action Plugin の概要
 
@@ -16,18 +18,16 @@ Ansible のタスク実行には、大きく分けて以下の 2 種類があり
 
 `graal-ansible` では、本家 Ansible の Python 実装の Action Plugin を管理ノード側の GraalPy 上でそのまま動作させることで、高い互換性を維持します。
 
-## 2. ハイブリッド実行戦略と優先順位
+## 2. 実行戦略と優先順位
 
 Worker Process (`TaskExecutor`) は、タスクの `action` 名に基づき、以下の優先順位で実行方式を選択します。
 
-1.  **Java による軽量エミュレータ (優先)**:
-    - `TaskExecutor` が内部で保持する `builtInActionPlugins` マップ（`ActionPlugin` インターフェースの実装）を検索します。
-    - `debug`, `set_fact` に加え、今後は `copy`, `template` などの主要なプラグインを Java で順次実装します。
+1.  **Python 実装の実行 (最優先)**:
+    - `ansible-core` コレクションの `plugins/action/` 配下にある本物の Python スクリプトを、実行ブリッジ（`ansible_action_launcher.py`）を介して実行します。
+    - プラグインが依存する `ansible.plugins.action.ActionBase` などのクラスについて、**動かない（インポートエラーになる）部分のみを Java/Python で再実装・モック化** して提供します。
+2.  **Java による軽量エミュレータ (特定用途)**:
+    - `debug`, `set_fact` など、頻繁に呼び出されパフォーマンスが重視されるものや、依存解決が極めて複雑なものについて、Java で実装されたエミュレータを使用します。
     - 実装方法は [Java Action Plugin 実装ガイド](Java-Action-Plugins.md) を参照してください。
-2.  **Python 実装の実行 (フォールバック)**:
-    - Java 実装が存在しない場合、`ansible-core` のコレクション内の `plugins/action/` ディレクトリから Python スクリプトを検索します。
-    - 実行ブリッジ（`ansible_action_launcher.py`）を介して GraalPy 上で動作させます。
-    - ※ただし、Ansible Core への依存度が高いプラグインは動作しない可能性があります。
 3.  **通常のモジュール実行**:
     - Action Plugin が存在しない場合、通常のモジュール実行フロー（ターゲットノードへの転送・実行）に移行します。
 
