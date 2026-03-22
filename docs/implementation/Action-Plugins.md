@@ -140,8 +140,30 @@ Action Plugin を GraalPy 上で動作させるために、以下の Ansible 内
 | `ansible.executor.playbook_executor` | 実行コンテキストのシミュレーション。 |
 | `ansible.template.Templar` | 制御ノード側でのテンプレートレンダリング機能（Java 側の `VariableResolver` と連携）。 |
 
-## 7. 関連ドキュメント
-- [Action Plugin 実行ロジックの実装調査報告](Action-Plugins-Investigation.md)
+## 7. 依存関係エミュレーション戦略 (Dependency Emulation Strategy)
+
+GraalPy 上での実行において、Ansible Core の重厚な依存関係がボトルネックとなる場合があります。特に C 拡張を含むモジュールは `ApiInitException` などの原因となるため、以下の戦略で回避します。
+
+### 7.1 強制的なモック化
+`ansible_bridge.py` において、以下のモジュールを強制的に `None` またはスタブに置き換えることで、ロード時のクラッシュを防ぎます。
+- `cryptography`, `cffi`: ネイティブライブラリのロード失敗を回避。
+- `yaml._yaml`: C 拡張版の YAML ローダーを無効化（Pure Python 版を使用）。
+- `markupsafe._speedups`: Jinja2 関連の C 拡張を回避。
+
+### 7.2 OS 依存モジュールのエミュレーション
+Windows 管理ノード対応などのため、Linux 固有のモジュール（`grp`, `pwd`, `syslog`, `termios`）を Python の `types.ModuleType` を用いて動的にエミュレートし、インポートエラーを抑制します。
+
+## 8. 実装済みの Action Plugin
+
+| プラグイン名 | 実装方式 | 備考 |
+| :--- | :--- | :--- |
+| `debug` | Java Emulator | 高速な変数表示。 |
+| `set_fact` | Java Emulator | 変数の動的登録。 |
+| `copy` | Java Emulator | ファイル転送、パーミッション設定（`file` モジュールへの委譲を含む）。 |
+| その他 | Python (Actual) | `ansible_action_launcher.py` 経由での実行。 |
+
+## 9. 関連ドキュメント
+- [GraalPy 互換性テクニカルリファレンス](Action-Plugins-Investigation.md)
 - [GraalPy 統合の詳細](../tech/GraalPy-Integration.md)
 - [タスク実行エンジン](Task-Executor.md)
 - [リモートノードでのモジュール実行仕様](Remote-Module-Execution.md)

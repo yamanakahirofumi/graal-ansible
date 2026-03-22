@@ -139,7 +139,7 @@
 - **概要**: GraalPy 上での Ansible Core ロードに伴う互換性問題の回避と高速化。
 - **解決策**:
     - `ActionPlugin` Java インターフェースを定義し、`TaskExecutor` に組み込みプラグインの検索・実行ロジックを実装。
-    - `debug`, `set_fact` の Java 版エミュレータを実装し、Python 版よりも優先して実行するように調整。
+    - `debug`, `set_fact`, `copy` の Java 版エミュレータを実装し、Python 版よりも優先して実行するように調整。
 
 ### [✓] 実行エンジン（TQM/Worker）のリファクタリングと抽象化
 - **完了日**: 2026-03-20
@@ -155,8 +155,8 @@
 ### [ ] Action Plugin の互換性向上
 - **概要**: 重厚な Ansible Core への依存を排除し、Action Plugin の動作を安定させる。
 - **検討内容**:
-    - [調査報告書](implementation/Action-Plugins-Investigation.md) に基づく軽量なエミュレータの開発継続。
-    - 残りの主要なプラグイン (`copy`, `template`) の優先対応。
+    - [テクニカルリファレンス](implementation/Action-Plugins-Investigation.md) に基づく軽量なエミュレータの開発継続。
+    - `copy` は Java で実装済み。残りの主要なプラグイン (`template`) の優先対応。
 
 ### [ ] PlaybookExecutor および実行エンジンのさらなる整理
 - **概要**: `PlaybookExecutor` および `TaskQueueManager`, `TaskExecutor` 内に存在する課題の継続的な改善。

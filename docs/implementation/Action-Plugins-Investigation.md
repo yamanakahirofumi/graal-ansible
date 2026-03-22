@@ -1,55 +1,56 @@
-# Action Plugin 実行ロジックの実装調査報告
+# GraalPy 互換性テクニカルリファレンス (Technical Reference)
 
-**最終更新日: 2026-03-19**
+**最終更新日: 2026-03-22**
 
 ## 1. 概要
-Ansible Action Plugin を制御ノード（管理ノード）上の GraalPy で実行するための基盤整備を行いました。Action Plugin は制御ノード上で実行され、必要に応じてターゲットノードに対してモジュール実行を指示する特殊なプラグインです。
+本ドキュメントでは、Ansible Action Plugin および各種モジュールを制御ノード（管理ノード）上の GraalPy で実行する際に直面した技術的な課題とその解決策（ワークアラウンド）を記録します。
 
-## 2. 実装した内容
+## 2. インポート時のクラッシュ問題 (ApiInitException)
 
-### 2.1 Java 側の基盤整備
-- **ITaskExecutor への callback 追加**: `execute_from_python` メソッドを追加し、Python 側から Java のタスク実行ロジックを再帰的に呼び出せるようにしました。
-- **TaskExecutor での実行ロジック**: `executeActionPlugin` メソッドを実装し、GraalPy コンテキストの初期化、必要な Java オブジェクト（`Connection`, `TaskExecutor`）のバインド、および実行ブリッジ（`ansible_action_launcher.py`）の呼び出しを統合しました。
-- **コンテキスト管理**: `ThreadLocal` を使用して、再帰呼び出し時にも `BecomeContext` や `Connection` を適切に維持する仕組みを導入しました。
-
-### 2.2 Python 側の実行ブリッジ (`ansible_action_launcher.py`)
-- **ActionBase のモンキーパッチ**: `ActionBase._execute_module` をパッチし、Java 側の `execute_from_python` を呼び出すように変更しました。これにより、Action Plugin 内部でのモジュール実行が Java 経由で行われます。
-- **コアクラスのモック**: Action Plugin のインスタンス化に必要な `Task`, `PlayContext` などのクラスをモック化しました。
-
-## 3. 調査結果と課題
-
-### 3.1 発生している問題
-`ActionPluginTest` の実行において、Ansible のコアモジュール（特に `ansible.plugins.action.ActionBase`）をインポートする際に、GraalPy が以下のエラーでクラッシュする現象が確認されました。
+### 2.1 発生現象
+`ActionPluginTest` などの実行において、Ansible のコアモジュール（特に `ansible.plugins.action.ActionBase`）をインポートする際に、GraalPy が以下のエラーで停止することがあります。
 
 ```
 com.oracle.truffle.api.CompilerDirectives$ShouldNotReachHere
 Caused by: com.oracle.graal.python.builtins.objects.cext.common.LoadCExtException$ApiInitException
 ```
 
-### 3.2 調査した依存関係
-以下のモジュールにおいて C 拡張の初期化失敗またはインポートエラーが発生し、対策（モック化）を試みましたが、完全な回避には至りませんでした。
+### 2.2 原因
+GraalPy が Python の C 拡張（ネイティブモジュール）をロードする際に、シンボルの不一致やライブラリの初期化失敗が発生するために起こります。Ansible が依存する `cryptography`, `PyYAML (_yaml)`, `MarkupSafe (_speedups)` などが代表的な例です。
 
-1.  **cryptography / cffi**: 多くのコアコンポーネントが依存していますが、GraalPy 上でのネイティブライブラリのロードに失敗します。
-2.  **PyYAML (_yaml)**: C 拡張のロードを回避するためにモック化が必要です。
-3.  **MarkupSafe (_speedups)**: インポート時にクラッシュの原因となる可能性があります。
-4.  **ansible.executor.module_common**: Action Plugin が依存する多くの内部クラスを保持していますが、そのインポート過程で連鎖的にクラッシュが発生します。
+### 2.3 解決策
+`ansible_bridge.py` において、これらのモジュールを強制的に `None` またはスタブに置き換える（モンキーパッチ）ことで、ロード処理自体を回避します。
 
-### 3.3 回避策の検討
-- **アプローチ A (モック化の徹底)**: `ActionBase` 自体を継承せず、Java 側で完全にエミュレートしたプロパティを持つオブジェクトを Action Plugin に渡す。
-    - *難易度*: 極めて高い。Ansible の既存 Action Plugin は `ActionBase` の内部実装に強く依存しているため。
-- **アプローチ B (GraalPy 環境の改善)**: より互換性の高い GraalPy バージョンの利用や、ネイティブモジュールの適切なプリインストールを行う。
-    - *難易度*: 環境に依存。
+```python
+# ansible_bridge.py での例
+for mname in ['cryptography', 'yaml._yaml', 'markupsafe._speedups']:
+    sys.modules[mname] = None
+```
 
-## 4. 今後の推奨事項
-現在の環境では、Ansible の重厚なコアライブラリをそのまま GraalPy 上でロードすることに限界があります。Action Plugin の完全な互換性を維持するため、**「動かない import 先だけを最小限に実装・モック化する」** 方針を推奨します。
+## 3. 実装上の工夫とブリッジ仕様
 
-1.  **最小限の依存関係エミュレーション**:
-    - `ansible.plugins.action.ActionBase` のように、Action Plugin が直接継承するクラスのメソッド（`_execute_module` 等）のみを、Java ブリッジを介して動作するように再実装します。
-    - インポートエラーを引き起こすネイティブモジュール（`cryptography` 等）や、GraalPy 上で重いライブラリをスタブ（空のクラスや関数）に置き換えます。
-2.  **本物の Action Plugin コードの利用**:
-    - プラグイン本体（`copy.py`, `template.py` 等）には手を加えず、周辺環境を整えることでそのまま実行します。
-3.  **軽量エミュレータ（Java）の活用**:
-    - 性能要件が非常に厳しい場合や、スタブ化による対応が困難な場合に限り、[Java Action Plugin](Java-Action-Plugins.md) として完全に再実装します。
+### 3.1 `ansible_bridge.py` の役割
+Java と Python の間にあるギャップを埋めるためのランタイム初期化スクリプトです。
+- **環境変数の同期**: Java 側の環境変数を `os.environ` へ反映。
+- **標準ライブラリのモック化**: Linux 固有のモジュール（`grp`, `pwd` 等）を Windows 環境でも動作するようスタブを提供。
+- **AnsibleModule のパッチ**: `_load_params` をパッチして、Java から渡された `complex_args` を直接利用。
 
----
-本調査により、Java-Python 間の双方向呼び出し基盤は確立されましたが、Ansible Core の重厚な依存関係が GraalPy 上での実行における主要な障壁であることが明らかになりました。
+### 3.2 `ansible_action_launcher.py` の役割
+Action Plugin を起動するためのエントリポイントです。
+- **ActionBase._execute_module のパッチ**: Action Plugin 内からのモジュール実行を Java の `ITaskExecutor.execute_from_python` へルーティング。
+- **双方向呼び出し**: Java (Worker) -> Python (Action Plugin) -> Java (Worker/Module) という再帰的な実行を可能にします。
+
+## 4. 課題と制限事項
+
+### 4.1 動作しないライブラリ
+- **cryptography**: 現時点では完全にモック化しており、暗号化/復号を伴うアクション（Vault 連携等）は制限されます。
+- **native yaml**: C 拡張版は無効化しており、Pure Python 版を使用するためパフォーマンスに影響が出る可能性があります。
+
+### 4.2 今後の課題
+- **ansible.executor.module_common**: インポート時に複雑な連鎖を引き起こしやすく、より洗練されたモック化が必要です。
+- **Jinja2 互換性**: GraalPy 上での Jinja2 実行において、一部のフィルターやグローバル関数が期待通りに動作しないケースがあり、継続的な調査が必要です。
+
+## 5. 関連ソースコード
+- `src/main/python/ansible_bridge.py`
+- `src/main/python/ansible_action_launcher.py`
+- `src/main/java/org/example/ansible/engine/TaskExecutor.java`
