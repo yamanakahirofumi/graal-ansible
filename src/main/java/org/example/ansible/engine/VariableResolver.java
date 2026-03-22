@@ -73,7 +73,7 @@ public class VariableResolver {
 
     private Object resolveString(String input, Map<String, Object> variables) {
         if (input == null) return null;
-        if (!input.contains("{{")) {
+        if (!input.contains("{{") && !input.contains("{%") && !input.contains("{#")) {
             return input;
         }
 

@@ -17,6 +17,7 @@ import org.example.ansible.plugin.ActionPlugin;
 import org.example.ansible.plugin.DebugAction;
 import org.example.ansible.plugin.SetFactAction;
 import org.example.ansible.plugin.CopyAction;
+import org.example.ansible.plugin.TemplateAction;
 import org.example.ansible.util.PythonEnv;
 
 import java.io.File;
@@ -111,6 +112,7 @@ public class TaskExecutor implements ITaskExecutor {
         this.builtInActionPlugins.put("debug", new DebugAction());
         this.builtInActionPlugins.put("set_fact", new SetFactAction());
         this.builtInActionPlugins.put("copy", new CopyAction());
+        this.builtInActionPlugins.put("template", new TemplateAction());
 
         Context.Builder builder = Context.newBuilder("python")
                 .allowAllAccess(true);
