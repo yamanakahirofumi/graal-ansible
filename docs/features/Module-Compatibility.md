@@ -15,6 +15,7 @@ Ansible モジュールの `graal-ansible` 上での実行における最終的�
 本プロジェクトでは、本家 Ansible の Python モジュールを GraalPy 上で実行することで、最高水準の互換性を維持します。
 
 - **GraalPy Module (Primary)**: 本家 Ansible の Python モジュールやコレクションを GraalPy 上でそのまま実行します。ロジックの Java による再実装は原則として行わず、本物の Python コードを使用することで動作の信頼性を確保します。
+- **Java Emulators / Built-in Modules (Provisional)**: 現在のフェーズでは、多くのモジュールを早期に安定して動作させるため、一部のコア機能（`command`, `shell`, `copy`, `template`, `debug`, `set_fact`）を Java で実装しています。これらは **暫定的な対策** であり、最終的には本家 Python モジュールへの移行と、Windows 管理ノードのサポートを目指します。
 - **Java Bridge/Native (Internal)**: モジュールの入出力を Java 側で適切に制御するためのブリッジ。Ansible の内部仕様（`ansible.module_utils` 等）との結合を最小限に抑えつつ、効率的なデータ交換を実現します。
 
 ## 3. サポート対象の範囲 (Target Scope)
