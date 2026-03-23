@@ -141,53 +141,14 @@ public class PlaybookCli implements Callable<Integer> {
     }
 
     private void registerStandardModules(TaskExecutor executor) {
+        // debug is now mostly handled by Action Plugin (DebugAction), but we keep this as a fallback for direct module calls if needed.
         executor.registerModule("debug", (args, becomeContext, context) -> {
             Object msg = args.getOrDefault("msg", "Hello world");
             System.out.println("DEBUG: " + msg);
             return TaskResult.success(false, Map.of("msg", msg));
         });
 
-        executor.registerModule("command", (args, becomeContext, context) -> {
-            String command = (String) args.get("_raw_params");
-            if (command == null) command = (String) args.get("cmd");
-            if (command == null) return TaskResult.failure("no command given");
-
-            org.example.ansible.connection.Connection connection = TaskExecutor.getCurrentConnection();
-            if (connection == null) connection = new LocalConnection();
-
-            org.example.ansible.connection.ConnectionResult result = connection.execCommand(command, becomeContext, TaskExecutor.getCurrentEnvironment());
-            Map<String, Object> data = new HashMap<>();
-            data.put("stdout", result.stdout());
-            data.put("stderr", result.stderr());
-            data.put("rc", result.exitCode());
-            data.put("changed", result.exitCode() == 0);
-
-            if (result.exitCode() != 0) {
-                return new TaskResult(false, false, "Command failed with rc " + result.exitCode(), data);
-            }
-            return TaskResult.success(data);
-        });
-
-        executor.registerModule("shell", (args, becomeContext, context) -> {
-            String command = (String) args.get("_raw_params");
-            if (command == null) command = (String) args.get("cmd");
-            if (command == null) return TaskResult.failure("no command given");
-
-            org.example.ansible.connection.Connection connection = TaskExecutor.getCurrentConnection();
-            if (connection == null) connection = new LocalConnection();
-
-            org.example.ansible.connection.ConnectionResult result = connection.execCommand(command, becomeContext, TaskExecutor.getCurrentEnvironment());
-            Map<String, Object> data = new HashMap<>();
-            data.put("stdout", result.stdout());
-            data.put("stderr", result.stderr());
-            data.put("rc", result.exitCode());
-            data.put("changed", result.exitCode() == 0);
-
-            if (result.exitCode() != 0) {
-                return new TaskResult(false, false, "Shell command failed with rc " + result.exitCode(), data);
-            }
-            return TaskResult.success(data);
-        });
+        // command, shell, and setup are now registered by default in TaskExecutor constructor.
 
         executor.registerModule("file", new PythonModule("ansible.builtin.file"));
         executor.registerModule("copy", new PythonModule("ansible.builtin.copy"));
