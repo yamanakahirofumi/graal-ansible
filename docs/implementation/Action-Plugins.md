@@ -160,9 +160,19 @@ Windows 管理ノード対応などのため、Linux 固有のモジュール（
 | `debug` | Java Emulator | 高速な変数表示。 |
 | `set_fact` | Java Emulator | 変数の動的登録。 |
 | `copy` | Java Emulator | ファイル転送、パーミッション設定（`file` モジュールへの委譲を含む）。 |
+| `template` | Java Emulator | Jinja2 テンプレートのレンダリングと転送。 |
 | その他 | Python (Actual) | `ansible_action_launcher.py` 経由での実行。 |
 
-## 9. 関連ドキュメント
+## 9. 標準モジュールの Java による最適化 (Built-in Module Optimizations)
+
+Action Plugin 以外にも、`command` や `shell` などの頻繁に使用される標準モジュールについては、以下の理由から Java 側で直接実行する最適化（Built-in Module）を行っています。
+
+- **パフォーマンス**: 管理ノードからターゲットノードへの転送を伴わずに、コネクションプラグインを介して直接コマンドを実行するため高速です。
+- **互換性の回避**: GraalPy 上で Python 版 `command` モジュールを動かす際の依存関係（`ansible.module_utils` 等）による問題を回避できます。
+
+これらのモジュールは、`TaskExecutor` 内で登録され、通常の Python モジュール実行フローよりも優先して呼び出されます。
+
+## 10. 関連ドキュメント
 - [GraalPy 互換性テクニカルリファレンス](Action-Plugins-Investigation.md)
 - [GraalPy 統合の詳細](../tech/GraalPy-Integration.md)
 - [タスク実行エンジン](Task-Executor.md)

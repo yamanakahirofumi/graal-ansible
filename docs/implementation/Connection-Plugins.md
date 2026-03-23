@@ -6,14 +6,14 @@
 
 Ansible と同様に、ターゲットノードに対する実行環境（ローカル実行、SSH経由のリモート実行など）をプラグイン形式で切り替え可能にします。Java での実装を前提とし、GraalVM Native Image での動作を最適化します。
 
-## 2. サポート予定のコネクションタイプ
+## 2. サポートされているコネクションタイプ
 
-| タイプ | 説明 | 実装ライブラリ案 | 優先度 |
+| タイプ | 状態 | 説明 | 実装ライブラリ / 手法 |
 | :--- | :--- | :--- | :--- |
-| `ssh` | 標準的なリモート接続 (OpenSSH 互換) | [Apache MINA SSHD](https://mina.apache.org/sshd-project/) または `ssh` コマンド呼び出し | 高 |
-| `local` | 管理ノード（制御ノード）自身での実行 | `java.lang.ProcessBuilder` | 高 |
-| `docker` | 稼働中の Docker コンテナ内での実行 | Docker CLI 呼び出し | 中 |
-| `winrm` | Windows ターゲットノードへの接続 | [WinRM4J](https://github.com/CloudBees-Community/winrm4j) | 低 |
+| `ssh` | **実装済** | 標準的なリモート接続 (OpenSSH 互換) | [Apache MINA SSHD](https://mina.apache.org/sshd-project/) |
+| `local` | **実装済** | 管理ノード（制御ノード）自身での実行 | `java.lang.ProcessBuilder` |
+| `docker` | 未実装 | 稼働中の Docker コンテナ内での実行 | Docker CLI 呼び出し |
+| `winrm` | 未実装 | Windows ターゲットノードへの接続 | [WinRM4J](https://github.com/CloudBees-Community/winrm4j) |
 
 ## 3. インターフェース定義
 
@@ -64,7 +64,7 @@ GraalVM Native Image との相性を考慮し、純粋な Java 実装である *
 
 ## 8. コネクションファクトリと解決ロジック
 
-現在は `LocalConnection` または `SshConnection` がコード内で明示的に選択されていますが、インベントリ変数に基づき動的に `Connection` インスタンスを生成する `ConnectionFactory` を導入します。
+インベントリ変数（`ansible_connection` 等）に基づき動的に `Connection` インスタンスを生成するため、`ConnectionFactory` を導入しています。
 
 ### 8.1 ConnectionFactory インターフェース
 
