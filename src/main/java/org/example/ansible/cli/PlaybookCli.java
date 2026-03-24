@@ -152,6 +152,7 @@ public class PlaybookCli implements Callable<Integer> {
 
         executor.registerModule("file", new PythonModule("ansible.builtin.file"));
         executor.registerModule("copy", new PythonModule("ansible.builtin.copy"));
+        executor.registerModule("lineinfile", new PythonModule("ansible.builtin.lineinfile"));
     }
 
     private void printSummary(Map<String, List<TaskResult>> results) {

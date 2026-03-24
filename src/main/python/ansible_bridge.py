@@ -173,6 +173,7 @@ def patch_ansible():
     def mocked_basic_load_params(*args, **kwargs):
         return (_current_task_context['complex_args'], 'main')
     ansible.module_utils.basic._load_params = mocked_basic_load_params
+    ansible.module_utils.basic._ANSIBLE_PROFILE = 'modern'
 
     def mocked_load_params(self, *args, **kwargs):
         self.params = _current_task_context['complex_args']
@@ -225,10 +226,20 @@ def execute_module(module_name, complex_args, module_code=None):
             # Actual mode
             path = module_loader.find_plugin(module_name)
             if not path:
+                # Try with ansible.builtin. prefix if not found
+                if not module_name.startswith('ansible.builtin.'):
+                    path = module_loader.find_plugin(f"ansible.builtin.{module_name}")
+
+            if not path:
                 return json.dumps({'failed': True, 'msg': f'Module {module_name} not found'})
 
             with open(path, 'rb') as f:
-                code = compile(f.read(), path, 'exec')
+                code_text = f.read()
+                # lineinfile might have encoding issues or other things that cause ShouldNotReachHere in GraalPy
+                # Let's try to decode it explicitly if it's bytes
+                if isinstance(code_text, bytes):
+                    code_text = code_text.decode('utf-8')
+                code = compile(code_text, path, 'exec')
             try:
                 exec(code, {'__name__': '__main__', '__file__': path, '__package__': 'ansible.modules'})
             except SystemExit:
