@@ -14,12 +14,7 @@ import org.graalvm.polyglot.Source;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.example.ansible.plugin.ActionPlugin;
-import org.example.ansible.plugin.DebugAction;
-import org.example.ansible.plugin.SetFactAction;
-import org.example.ansible.plugin.CopyAction;
-import org.example.ansible.plugin.TemplateAction;
-import org.example.ansible.module.CommandModule;
-import org.example.ansible.module.SetupModule;
+import org.example.ansible.module.python.PythonModule;
 import org.example.ansible.util.PythonEnv;
 
 import java.io.File;
@@ -111,22 +106,12 @@ public class TaskExecutor implements ITaskExecutor {
     public TaskExecutor(OSHandler osHandler, ConnectionFactory connectionFactory) {
         this.osHandler = osHandler;
         this.connectionFactory = connectionFactory;
-        this.builtInActionPlugins.put("debug", new DebugAction());
-        this.builtInActionPlugins.put("set_fact", new SetFactAction());
-        this.builtInActionPlugins.put("copy", new CopyAction());
-        this.builtInActionPlugins.put("template", new TemplateAction());
-
-        this.modules.put("command", new CommandModule("command"));
-        this.modules.put("shell", new CommandModule("shell"));
-        this.modules.put("setup", new SetupModule());
 
         Context.Builder builder = Context.newBuilder("python")
                 .allowAllAccess(true);
 
-        if ("Linux".equals(osHandler.getOSFamily())) {
-            builder.option("python.IsolateNativeModules", "true");
-            builder.option("python.PosixModuleBackend", "native");
-        }
+        // Using IsolateNativeModules=false for stability with ansible-core
+        builder.option("python.IsolateNativeModules", "false");
 
         this.context = builder.build();
     }
@@ -313,9 +298,6 @@ public class TaskExecutor implements ITaskExecutor {
         if (builtInActionPlugins.containsKey(action)) {
             return true;
         }
-        if (!Boolean.parseBoolean(System.getProperty("ansible.action_plugins.enabled", "false"))) {
-            return false;
-        }
         return actionPluginCache.computeIfAbsent(action, a -> {
             List<String> sitePackages = PythonEnv.getSitePackagesFromEnv();
             for (String path : sitePackages) {
@@ -459,7 +441,7 @@ public class TaskExecutor implements ITaskExecutor {
     public TaskResult execute(Task task, BecomeContext becomeContext, Map<String, String> environment) {
         org.example.ansible.module.Module module = modules.get(task.action());
         if (module == null) {
-            return TaskResult.failure("Module not found: " + task.action());
+            module = new PythonModule(task.action());
         }
         try {
             return module.execute(task.args(), becomeContext, context);
@@ -526,6 +508,11 @@ public class TaskExecutor implements ITaskExecutor {
             String output = pythonResult.asString();
             @SuppressWarnings("unchecked")
             Map<String, Object> resultMap = objectMapper.readValue(output, Map.class);
+
+            final boolean failed = Boolean.TRUE.equals(resultMap.get("failed"));
+            if (failed) {
+                return new TaskResult(false, false, "Action Plugin failed: " + resultMap.get("msg"), resultMap);
+            }
             return TaskResult.success(resultMap);
 
         } catch (Throwable t) {

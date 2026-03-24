@@ -7,11 +7,13 @@ complex_args = dict(complex_args_java) if complex_args_java is not None else {}
 env = environment_java if 'environment_java' in globals() else None
 
 try:
-    ansible_bridge.setup_sys_path(site_packages_java)
-    ansible_bridge.setup_env(env)
-
-    # Bind current task context
-    ansible_bridge.bind_task(complex_args, connection_java, become_context_java, env)
+    ansible_bridge.initialize(
+        site_packages=site_packages_java,
+        env_vars=env,
+        complex_args=complex_args,
+        connection_java=connection_java,
+        become_context_java=become_context_java
+    )
 
     result = ansible_bridge.execute_module(module_name, complex_args, module_code)
 except Exception as e:

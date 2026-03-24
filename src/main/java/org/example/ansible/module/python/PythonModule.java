@@ -284,11 +284,18 @@ public class PythonModule implements Module {
     }
 
     private Optional<File> findModuleFile() {
+        String baseName = moduleName;
+        if (baseName.startsWith("ansible.builtin.")) {
+            baseName = baseName.substring("ansible.builtin.".length());
+        } else if (baseName.startsWith("ansible.legacy.")) {
+            baseName = baseName.substring("ansible.legacy.".length());
+        }
+
         List<String> sitePackages = PythonEnv.getSitePackagesFromEnv();
         for (String path : sitePackages) {
             File modulesDir = new File(path, "ansible/modules");
             if (modulesDir.exists() && modulesDir.isDirectory()) {
-                File moduleFile = new File(modulesDir, moduleName + ".py");
+                File moduleFile = new File(modulesDir, baseName + ".py");
                 if (moduleFile.exists()) {
                     return Optional.of(moduleFile);
                 }
