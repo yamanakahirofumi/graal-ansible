@@ -38,7 +38,7 @@ def bind_task(complex_args, connection_java, become_context_java, environment_ja
 def setup_sys_path(site_packages):
     if not site_packages: return
     for p in site_packages:
-        if p not in sys.path: sys.path.append(p)
+        if p not in sys.path: sys.path.append(str(p))
 
 def setup_env(env_vars):
     if not env_vars: return
@@ -149,7 +149,15 @@ def patch_ansible():
     try:
         import ansible.module_utils.basic
     except ImportError:
+        # Try to make module_utils available even if basic is missing
+        if 'ansible.module_utils' not in sys.modules:
+             sys.modules['ansible.module_utils'] = types.ModuleType('ansible.module_utils')
         return
+
+    # Ensure basic is attached to module_utils
+    import ansible.module_utils
+    if not hasattr(ansible.module_utils, 'basic'):
+        ansible.module_utils.basic = sys.modules['ansible.module_utils.basic']
 
     # JSON handling with foreign object support
     if not hasattr(json, '_graal_ansible_patched'):
