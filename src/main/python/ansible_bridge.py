@@ -52,7 +52,8 @@ class MockLoader:
 
 class MockShell:
     def __init__(self):
-        self.tmpdir = "/tmp"
+        import tempfile
+        self.tmpdir = tempfile.gettempdir()
     def path_has_trailing_slash(self, path):
         return path.endswith('/') or path.endswith('\\')
     def join_path(self, *args):
@@ -273,8 +274,10 @@ def apply_mocks():
     })
 
     # 2. Display & PlayContext
+    import tempfile
+    tmp_dir = tempfile.gettempdir()
     create_mock('ansible')
-    create_mock('ansible.constants', {'DEFAULT_REMOTE_TMP': '/tmp', 'DEFAULT_LOCAL_TMP': '/tmp'})
+    create_mock('ansible.constants', {'DEFAULT_REMOTE_TMP': tmp_dir, 'DEFAULT_LOCAL_TMP': tmp_dir})
     create_mock('ansible.config', {'ConfigManager': type('CM', (), {'get_config_value': lambda *a, **kw: None})})
     create_mock('ansible.config.manager', {'ConfigManager': type('CM', (), {'get_config_value': lambda *a, **kw: None}), 'ensure_type': lambda x, t: x})
     create_mock('ansible.utils')
@@ -314,7 +317,7 @@ def apply_mocks():
 
     # 4. Errors
     class AnsibleError(Exception):
-        def __init__(self, message="", obj=None, show_content=True, suppress_extended_error=False, orig_exception=None): super().__init__(message)
+        def __init__(self, message="", obj=None, show_content=True, suppress_extended_error=False, orig_exception=None, **kwargs): super().__init__(message)
     class AnsibleValueOmittedError(AnsibleError): pass
     class AnsibleActionFail(AnsibleError): pass
     class AnsibleActionSkip(AnsibleError): pass
