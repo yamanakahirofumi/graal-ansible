@@ -149,4 +149,91 @@ class ActualModuleIntegrationTest {
         assertEquals(0, execResult.exitCode());
         assertEquals(content, execResult.stdout().trim());
     }
+
+    @Test
+    void testActualDebugModule() {
+        taskExecutor.registerModule("debug", new PythonModule("debug"));
+
+        Task task = new Task("test_debug", "debug", Map.of("msg", "Hello from Actual Debug Module"));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        assertEquals("Hello from Actual Debug Module", result.data().get("msg"));
+    }
+
+    @Test
+    void testActualSetupModule() {
+        taskExecutor.registerModule("setup", new PythonModule("setup"));
+
+        Task task = new Task("test_setup", "setup", Map.of());
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
+        assertNotNull(facts);
+        assertTrue(facts.containsKey("ansible_os_family"));
+    }
+
+    @Test
+    void testActualCommandModule() {
+        taskExecutor.registerModule("command", new PythonModule("command"));
+
+        Task task = new Task("test_command", "command", Map.of("_raw_params", "echo hello_command"));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        assertEquals("hello_command", ((String) result.data().get("stdout")).trim());
+    }
+
+    @Test
+    void testActualShellModule() {
+        taskExecutor.registerModule("shell", new PythonModule("shell"));
+
+        Task task = new Task("test_shell", "shell", Map.of("_raw_params", "echo 'line1\nline2' | grep line2"));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        assertEquals("line2", ((String) result.data().get("stdout")).trim());
+    }
+
+    @Test
+    void testActualLineInFileModule() {
+        taskExecutor.registerModule("lineinfile", new PythonModule("lineinfile"));
+
+        String remotePath = "/tmp/lineinfile-test.txt";
+        connection.execCommand("echo \"initial line\" > " + remotePath, BecomeContext.empty(), null);
+
+        Task task = new Task("test_lineinfile", "lineinfile", Map.of(
+                "path", remotePath,
+                "line", "new line added"
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        assertTrue(result.changed());
+
+        var execResult = connection.execCommand("cat " + remotePath, BecomeContext.empty(), null);
+        assertTrue(execResult.stdout().contains("new line added"));
+    }
+
+    @Test
+    void testActualReplaceModule() {
+        taskExecutor.registerModule("replace", new PythonModule("replace"));
+
+        String remotePath = "/tmp/replace-test.txt";
+        connection.execCommand("echo \"Hello World\" > " + remotePath, BecomeContext.empty(), null);
+
+        Task task = new Task("test_replace", "replace", Map.of(
+                "path", remotePath,
+                "regexp", "World",
+                "replace", "Ansible"
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        assertTrue(result.changed());
+
+        var execResult = connection.execCommand("cat " + remotePath, BecomeContext.empty(), null);
+        assertEquals("Hello Ansible", execResult.stdout().trim());
+    }
 }
