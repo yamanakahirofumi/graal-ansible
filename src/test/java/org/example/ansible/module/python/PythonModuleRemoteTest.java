@@ -45,6 +45,7 @@ class PythonModuleRemoteTest {
         Files.createDirectories(ansibleDir.resolve("modules"));
         Files.writeString(ansibleDir.resolve("__init__.py"), "");
         Files.writeString(ansibleDir.resolve("release.py"), "__version__ = '1.0.0'");
+        Files.writeString(ansibleDir.resolve("modules/__init__.py"), "");
         Files.writeString(ansibleDir.resolve("module_utils/basic.py"), "class AnsibleModule: pass");
         Files.writeString(ansibleDir.resolve("_vendor/__init__.py"), "");
         Files.writeString(ansibleDir.resolve("_internal/__init__.py"), "");
@@ -67,6 +68,10 @@ class PythonModuleRemoteTest {
             PythonModule module = new PythonModule("ping");
 
             TaskResult result = module.execute(Map.of(), BecomeContext.empty(), null); // null context since it's remote
+            if (!result.success()) {
+                System.out.println("Module execution failed: " + result.message());
+                if (result.data().get("msg") != null) System.out.println("Detail: " + result.data().get("msg"));
+            }
 
             // Verify zip was transferred
             ArgumentCaptor<String> remotePathCaptor = ArgumentCaptor.forClass(String.class);
@@ -105,7 +110,7 @@ class PythonModuleRemoteTest {
                 if (content.contains("ansible.module_utils.basic._ANSIBLE_PROFILE = 'modern'")) {
                     scriptHasProfile = true;
                 }
-                if (content.contains("exec(compile(module_code, 'Ansiballz_ping.py', 'exec'), globals())")) {
+                if (content.contains("exec(compile(module_code, 'Ansiballz_ping.py', 'exec'), {'__name__': '__main__', '__package__': 'ansible.modules', 'complex_args': complex_args, '__file__': __file__})")) {
                     scriptHasCompileWithPrefix = true;
                 }
             }

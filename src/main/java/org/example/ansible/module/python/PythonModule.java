@@ -252,6 +252,7 @@ public class PythonModule implements Module {
                     // Add __init__.py and release.py
                     addFileToZip(zos, ansibleBase.resolve("__init__.py"), "ansible/__init__.py");
                     addFileToZip(zos, ansibleBase.resolve("release.py"), "ansible/release.py");
+                    addFileToZip(zos, ansibleBase.resolve("modules/__init__.py"), "ansible/modules/__init__.py");
 
                     // Add core directories recursively
                     String[] coreDirs = {"module_utils", "_vendor", "_internal", "compat"};
