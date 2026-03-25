@@ -273,8 +273,9 @@ def apply_mocks():
     })
 
     # 2. Display & PlayContext
+    import tempfile
     create_mock('ansible')
-    create_mock('ansible.constants', {'DEFAULT_REMOTE_TMP': '/tmp', 'DEFAULT_LOCAL_TMP': '/tmp'})
+    create_mock('ansible.constants', {'DEFAULT_REMOTE_TMP': '/tmp', 'DEFAULT_LOCAL_TMP': tempfile.gettempdir()})
     create_mock('ansible.config', {'ConfigManager': type('CM', (), {'get_config_value': lambda *a, **kw: None})})
     create_mock('ansible.config.manager', {'ConfigManager': type('CM', (), {'get_config_value': lambda *a, **kw: None}), 'ensure_type': lambda x, t: x})
     create_mock('ansible.utils')
@@ -314,7 +315,9 @@ def apply_mocks():
 
     # 4. Errors
     class AnsibleError(Exception):
-        def __init__(self, message="", obj=None, show_content=True, suppress_extended_error=False, orig_exception=None): super().__init__(message)
+        def __init__(self, message="", obj=None, show_content=True, suppress_extended_error=False, orig_exception=None, **kwargs):
+            super().__init__(message)
+            for k, v in kwargs.items(): setattr(self, k, v)
     class AnsibleValueOmittedError(AnsibleError): pass
     class AnsibleActionFail(AnsibleError): pass
     class AnsibleActionSkip(AnsibleError): pass
@@ -373,28 +376,35 @@ def apply_mocks():
             m.RoutingMarkerBehavior = type('RoMB', (), {'__init__': lambda *a, **kw: None})
 
     # 8. Module Utils
-    create_mock('ansible.module_utils', is_package=True)
-    for m in ['facts', 'urls', 'six', 'compat', 'service', 'pycompat24', 'distro']:
-        create_mock(f'ansible.module_utils.{m}')
-    create_mock('ansible.module_utils.common', is_package=True)
-    for m in ['text', 'collections', 'validation', 'parameters', 'process', 'file', 'locale']:
-        create_mock(f'ansible.module_utils.common.{m}')
-    create_mock('ansible.module_utils.common.text', is_package=True)
-    create_mock('ansible.module_utils.common.text.converters', {
-        'to_bytes': lambda s, *a, **kw: str(s).encode('utf-8'),
-        'to_text': lambda s, *a, **kw: str(s),
-        'to_native': lambda s, *a, **kw: str(s)
-    })
-    create_mock('ansible.module_utils.common.validation', {
-        '_check_type_str_no_conversion': lambda s, *a, **kw: s,
-        'check_type_int': lambda x: int(x),
-        'check_type_bool': lambda x: str(x).lower() in ('yes', 'true', 't', '1'),
-        'check_type_list': lambda x: x if isinstance(x, list) else [x]
-    })
-    create_mock('ansible.module_utils.common.collections', {
-        'is_iterable': lambda x, *a, **kw: hasattr(x, '__iter__') and not isinstance(x, (str, bytes))
-    })
-    create_mock('ansible.module_utils.parsing', is_package=True)
+    # We remove aggressive mocks that block loading of real modules from ansible-core.
+    # But we still provide necessary core mocks if they are not in sys.path or if we need to override them.
+    # create_mock('ansible.module_utils', is_package=True)
+    # for m in ['facts', 'urls', 'six', 'compat', 'service', 'pycompat24', 'distro']:
+    #     create_mock(f'ansible.module_utils.{m}')
+
+    create_mock('ansible.module_utils.common.sentinel', {'Sentinel': type('Sentinel', (), {})})
+    create_mock('ansible.module_utils.common.sys_info', {'get_distribution': lambda: 'Linux', 'get_distribution_version': lambda: 'Any'})
+    create_mock('ansible.module_utils.compat.version', {'LooseVersion': str, 'StrictVersion': str})
+
+    # create_mock('ansible.module_utils.common', is_package=True)
+    # for m in ['text', 'collections', 'validation', 'parameters', 'process', 'file', 'locale']:
+    #     create_mock(f'ansible.module_utils.common.{m}')
+    # create_mock('ansible.module_utils.common.text', is_package=True)
+    # create_mock('ansible.module_utils.common.text.converters', {
+    #     'to_bytes': lambda s, *a, **kw: str(s).encode('utf-8'),
+    #     'to_text': lambda s, *a, **kw: str(s),
+    #     'to_native': lambda s, *a, **kw: str(s)
+    # })
+    # create_mock('ansible.module_utils.common.validation', {
+    #     '_check_type_str_no_conversion': lambda s, *a, **kw: s,
+    #     'check_type_int': lambda x: int(x),
+    #     'check_type_bool': lambda x: str(x).lower() in ('yes', 'true', 't', '1'),
+    #     'check_type_list': lambda x: x if isinstance(x, list) else [x]
+    # })
+    # create_mock('ansible.module_utils.common.collections', {
+    #     'is_iterable': lambda x, *a, **kw: hasattr(x, '__iter__') and not isinstance(x, (str, bytes))
+    # })
+    # create_mock('ansible.module_utils.parsing', is_package=True)
     create_mock('ansible.module_utils.parsing.convert_bool', {
         'convert_bool': lambda x, *a, **kw: str(x).lower() in ('yes', 'true', 't', '1'),
         'boolean': lambda x, *a, **kw: str(x).lower() in ('yes', 'true', 't', '1')

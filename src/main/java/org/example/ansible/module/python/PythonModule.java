@@ -205,12 +205,16 @@ public class PythonModule implements Module {
         String base64Args = Base64.getEncoder().encodeToString(jsonArgs.getBytes(StandardCharsets.UTF_8));
 
         StringBuilder sb = new StringBuilder();
-        sb.append("import json, sys, os, base64, __main__\n");
+        sb.append("import json, sys, os, base64, __main__, types\n");
         sb.append("__main__._module_fqn = 'ansible.builtin.").append(moduleName).append("'\n");
         if (zipFileName != null) {
             sb.append("script_dir = os.path.dirname(os.path.abspath(__file__))\n");
             sb.append("sys.path.insert(0, os.path.join(script_dir, '").append(zipFileName).append("'))\n");
         }
+        sb.append("if 'ansible' not in sys.modules:\n");
+        sb.append("    ansible = types.ModuleType('ansible'); ansible.__path__ = []; sys.modules['ansible'] = ansible\n");
+        sb.append("if 'ansible.modules' not in sys.modules:\n");
+        sb.append("    ansible_mod = types.ModuleType('ansible.modules'); ansible_mod.__path__ = []; sys.modules['ansible.modules'] = ansible_mod\n");
         sb.append("complex_args = json.loads(base64.b64decode('").append(base64Args).append("').decode('utf-8'))\n");
         sb.append("try:\n");
         sb.append("    import ansible.module_utils.basic\n");
@@ -222,7 +226,7 @@ public class PythonModule implements Module {
         sb.append("module_code = base64.b64decode('").append(base64ModuleCode).append("').decode('utf-8')\n");
         sb.append("if __name__ == '__main__':\n");
         sb.append("    __main__.complex_args = complex_args\n");
-        sb.append("    exec(compile(module_code, 'Ansiballz_").append(moduleName).append(".py', 'exec'), globals())\n");
+        sb.append("    exec(compile(module_code, 'Ansiballz_").append(moduleName).append(".py', 'exec'), {'__name__': '__main__', '__package__': 'ansible.modules', 'complex_args': complex_args, '__file__': __file__})\n");
 
         return sb.toString();
     }
