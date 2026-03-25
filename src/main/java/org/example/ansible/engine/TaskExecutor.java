@@ -114,6 +114,13 @@ public class TaskExecutor implements ITaskExecutor {
         builder.option("python.IsolateNativeModules", "false");
 
         this.context = builder.build();
+
+        // Pre-load the bridge
+        try {
+            this.context.eval(loadResource("ansible_bridge.py"));
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to pre-load ansible_bridge.py", e);
+        }
     }
 
     @Override
@@ -295,15 +302,23 @@ public class TaskExecutor implements ITaskExecutor {
 
     private boolean isActionPlugin(String action) {
         if (action == null) return false;
-        if (builtInActionPlugins.containsKey(action)) {
+        String baseName = action;
+        if (baseName.startsWith("ansible.builtin.")) {
+            baseName = baseName.substring("ansible.builtin.".length());
+        } else if (baseName.startsWith("ansible.legacy.")) {
+            baseName = baseName.substring("ansible.legacy.".length());
+        }
+
+        final String finalBaseName = baseName;
+        if (builtInActionPlugins.containsKey(finalBaseName)) {
             return true;
         }
-        return actionPluginCache.computeIfAbsent(action, a -> {
+        return actionPluginCache.computeIfAbsent(finalBaseName, a -> {
             List<String> sitePackages = PythonEnv.getSitePackagesFromEnv();
             for (String path : sitePackages) {
                 File actionDir = new File(path, "ansible/plugins/action");
                 if (actionDir.exists() && actionDir.isDirectory()) {
-                    File actionFile = new File(actionDir, a + ".py");
+                    File actionFile = new File(actionDir, finalBaseName + ".py");
                     if (actionFile.exists()) {
                         return true;
                     }
@@ -439,7 +454,14 @@ public class TaskExecutor implements ITaskExecutor {
 
     @Override
     public TaskResult execute(Task task, BecomeContext becomeContext, Map<String, String> environment) {
-        org.example.ansible.module.Module module = modules.get(task.action());
+        String actionName = task.action();
+        if (actionName.startsWith("ansible.builtin.")) {
+            actionName = actionName.substring("ansible.builtin.".length());
+        } else if (actionName.startsWith("ansible.legacy.")) {
+            actionName = actionName.substring("ansible.legacy.".length());
+        }
+
+        org.example.ansible.module.Module module = modules.get(actionName);
         if (module == null) {
             module = new PythonModule(task.action());
         }
@@ -465,7 +487,14 @@ public class TaskExecutor implements ITaskExecutor {
     }
 
     protected TaskResult executeActionPlugin(Task task, BecomeContext becomeContext, Connection connection, Map<String, String> environment, Map<String, Object> taskVars) {
-        ActionPlugin builtInPlugin = builtInActionPlugins.get(task.action());
+        String actionName = task.action();
+        if (actionName.startsWith("ansible.builtin.")) {
+            actionName = actionName.substring("ansible.builtin.".length());
+        } else if (actionName.startsWith("ansible.legacy.")) {
+            actionName = actionName.substring("ansible.legacy.".length());
+        }
+
+        ActionPlugin builtInPlugin = builtInActionPlugins.get(actionName);
         if (builtInPlugin != null) {
             setCurrentConnection(connection);
             setCurrentEnvironment(environment);
@@ -492,11 +521,10 @@ public class TaskExecutor implements ITaskExecutor {
             context.getBindings("python").putMember("become_context_java", becomeContext);
             context.getBindings("python").putMember("environment_java", environment);
             context.getBindings("python").putMember("task_vars_java", taskVars);
-            context.getBindings("python").putMember("action_name", task.action());
+            context.getBindings("python").putMember("action_name", actionName);
             context.getBindings("python").putMember("module_args_java", task.args());
             context.getBindings("python").putMember("site_packages_java", sitePackages);
 
-            context.eval(loadResource("ansible_bridge.py"));
             context.eval(loadResource("ansible_action_launcher.py"));
 
             org.graalvm.polyglot.Value pythonResult = context.getBindings("python").getMember("result");
@@ -511,6 +539,9 @@ public class TaskExecutor implements ITaskExecutor {
 
             final boolean failed = Boolean.TRUE.equals(resultMap.get("failed"));
             if (failed) {
+                if (resultMap.containsKey("traceback")) {
+                    System.err.println(resultMap.get("traceback"));
+                }
                 return new TaskResult(false, false, "Action Plugin failed: " + resultMap.get("msg"), resultMap);
             }
             return TaskResult.success(resultMap);

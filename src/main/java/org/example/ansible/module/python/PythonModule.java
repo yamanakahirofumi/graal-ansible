@@ -84,8 +84,7 @@ public class PythonModule implements Module {
             context.getBindings("python").putMember("become_context_java", becomeContext);
             context.getBindings("python").putMember("environment_java", TaskExecutor.getCurrentEnvironment());
 
-            // Load and evaluate the bridge first
-            context.eval(loadResource("ansible_bridge.py"));
+            // Bridge is pre-loaded in TaskExecutor constructor
 
             Source source;
             if (scriptContent != null) {

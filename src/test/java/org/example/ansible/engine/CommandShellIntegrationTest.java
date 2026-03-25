@@ -44,7 +44,7 @@ class CommandShellIntegrationTest {
         Task task = new Task("Run echo", "command", Map.of("_raw_params", "echo hello"));
         TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
 
-        assertTrue(result.success(), result.message());
+        assertTrue(result.success(), "Execution failed: " + result.message() + " Data: " + result.data());
         assertTrue(result.changed());
         assertEquals(0, result.data().get("rc"));
         assertEquals("hello", ((String)result.data().get("stdout")).trim());
