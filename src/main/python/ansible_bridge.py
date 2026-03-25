@@ -411,7 +411,7 @@ def apply_mocks():
     })
     create_mock('ansible.module_utils.urls', {
         'fetch_url': lambda *a, **kw: (None, {'status': 200}),
-        'fetch_file': lambda *a, **kw: '/tmp/mock_file',
+        'fetch_file': lambda *a, **kw: os.path.join(tmp_dir, 'mock_file'),
         'url_argument_spec': lambda *a, **kw: {},
         'get_response_filename': lambda *a, **kw: 'mock_file'
     })
