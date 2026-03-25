@@ -211,10 +211,6 @@ public class PythonModule implements Module {
             sb.append("script_dir = os.path.dirname(os.path.abspath(__file__))\n");
             sb.append("sys.path.insert(0, os.path.join(script_dir, '").append(zipFileName).append("'))\n");
         }
-        sb.append("if 'ansible' not in sys.modules:\n");
-        sb.append("    ansible = types.ModuleType('ansible'); ansible.__path__ = []; sys.modules['ansible'] = ansible\n");
-        sb.append("if 'ansible.modules' not in sys.modules:\n");
-        sb.append("    ansible_mod = types.ModuleType('ansible.modules'); ansible_mod.__path__ = []; sys.modules['ansible.modules'] = ansible_mod\n");
         sb.append("complex_args = json.loads(base64.b64decode('").append(base64Args).append("').decode('utf-8'))\n");
         sb.append("try:\n");
         sb.append("    import ansible.module_utils.basic\n");

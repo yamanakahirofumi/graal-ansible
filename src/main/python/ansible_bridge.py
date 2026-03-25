@@ -69,7 +69,8 @@ class MockLoader:
 
 class MockShell:
     def __init__(self):
-        self.tmpdir = "/tmp"
+        import tempfile
+        self.tmpdir = tempfile.gettempdir()
     def path_has_trailing_slash(self, path):
         return path.endswith('/') or path.endswith('\\')
     def join_path(self, *args):
@@ -371,7 +372,9 @@ def apply_mocks():
     # 7. Templating
     create_mock('ansible.template', {'Templar': Templar, 'trust_as_template': lambda x: x})
 
-    create_mock('ansible._internal')
+    create_mock('ansible._internal', {
+        'get_controller_serialize_map': lambda: {}
+    })
     create_mock('ansible._internal._templating', {
         '_template_vars': types.SimpleNamespace(generate_ansible_template_vars=lambda *a, **kw: {}),
         'get_text_file_contents': lambda x, *a, **kw: (open(x, 'r').read() if x and os.path.exists(x) else "mock_content", True)
@@ -390,18 +393,27 @@ def apply_mocks():
     # 8. Module Utils
     # Mock core packages as base for hybrid loading
     for mname in ['ansible', 'ansible.module_utils', 'ansible.module_utils.common', 'ansible.module_utils.compat', 'ansible.module_utils._internal', 'ansible.module_utils.parsing']:
-        create_mock(mname, is_package=True)
+        attrs = {}
+        if mname == 'ansible.module_utils._internal':
+            attrs['get_controller_serialize_map'] = lambda: {}
+        create_mock(mname, attributes=attrs, is_package=True)
 
     if mocks_applied: return
 
     create_mock('ansible.module_utils.common.sentinel', {'Sentinel': type('Sentinel', (), {})})
-    create_mock('ansible.module_utils.common.sys_info', {'get_distribution': lambda: 'Linux', 'get_distribution_version': lambda: 'Any'})
+    create_mock('ansible.module_utils.common.sys_info', {
+        'get_distribution': lambda: 'Linux',
+        'get_distribution_version': lambda: 'Any',
+        'get_distribution_codename': lambda: 'Any',
+        'get_platform_subclass': lambda cls: cls
+    })
     create_mock('ansible.module_utils.compat.version', {'LooseVersion': str, 'StrictVersion': str})
     create_mock('ansible.module_utils.parsing.convert_bool', {
         'convert_bool': lambda x, *a, **kw: str(x).lower() in ('yes', 'true', 't', '1'),
         'boolean': lambda x, *a, **kw: str(x).lower() in ('yes', 'true', 't', '1')
     })
     FILE_COMMON_ARGUMENTS = {
+        'path': dict(type='str', aliases=['dest', 'name']),
         'mode': dict(type='raw'),
         'owner': dict(type='str'),
         'group': dict(type='str'),
@@ -421,7 +433,9 @@ def apply_mocks():
         'FILE_COMMON_ARGUMENTS': FILE_COMMON_ARGUMENTS,
         'missing_required_lib': lambda *a, **kw: None,
         'sanitize_keys': lambda x, *a, **kw: x,
-        'get_bin_path': mock_get_bin_path
+        'get_bin_path': mock_get_bin_path,
+        'get_distribution': lambda: 'Linux',
+        'is_executable': lambda x: True
     })
 
     # 9. Password/Group System Mocks
