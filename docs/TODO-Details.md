@@ -5,11 +5,11 @@
 
 ## 1. 技術面 (Technical)
 
-### [ ] 実際の Ansible コレクションを使ったテストの実施
+### [✓] 実際の Ansible コレクションを使ったテストの実施
+- **完了日**: 2026-03-25
 - **概要**: [実際のコレクションを使ったテスト方法の設計](tech/Actual-Collection-Testing.md) に基づき、主要なモジュールのテストを統合。
-- **進捗**:
-    - `ansible.builtin.ping`, `copy`, `file`, `stat`, `template` の統合テストを CI 環境へ統合済み。
-    - `command`, `shell`, `setup`, `lineinfile` 等のテスト統合が進行中。
+- **解決策**:
+    - `ansible.builtin.ping`, `copy`, `file`, `stat`, `template`, `command`, `shell`, `setup`, `lineinfile`, `replace` の統合テストを CI 環境へ統合済み。
     - GraalPy および `ansible-core` のセットアップを GitHub Actions 上で自動化済み。
 
 ### [ ] CI における Native Image ビルドの安定化
@@ -134,12 +134,19 @@
     - Java (ITaskExecutor) から Python (Action Plugin) への双方向呼び出しを実現。
     - ※ 互換性の課題については [Action-Plugins-Investigation.md](implementation/Action-Plugins-Investigation.md) を参照。
 
+### [✓] 「Python-first」アーキテクチャへの移行
+- **完了日**: 2026-03-25
+- **概要**: 暫定的な Java 実装から、本家 Ansible の Python モジュール・プラグインをそのまま再利用するアーキテクチャへ移行。
+- **解決策**:
+    - `command`, `shell`, `setup`, `debug`, `set_fact`, `copy`, `template` をオリジナルの Python 実装で実行するように統一。
+    - 不要になった Java 版モジュールを削除し、コードの複雑性を低減。
+
 ### [✓] Java による Action Plugin 軽量エミュレータの導入
 - **完了日**: 2026-03-20
 - **概要**: GraalPy 上での Ansible Core ロードに伴う互換性問題の回避と高速化。
 - **解決策**:
     - `ActionPlugin` Java インターフェースを定義し、`TaskExecutor` に組み込みプラグインの検索・実行ロジックを実装。
-    - `debug`, `set_fact`, `copy` の Java 版エミュレータを実装し、Python 版よりも優先して実行するように調整。
+    - `debug`, `set_fact`, `copy` の Java 版エミュレータを実装済み（※現在は Python 実装を優先し、オプションとして保持）。
 
 ### [✓] 実行エンジン（TQM/Worker）のリファクタリングと抽象化
 - **完了日**: 2026-03-20
@@ -157,7 +164,7 @@
 - **概要**: 重厚な Ansible Core への依存を排除し、Action Plugin の動作を安定させる。
 - **解決策**:
     - [テクニカルリファレンス](implementation/Action-Plugins-Investigation.md) に基づく軽量なエミュレータの開発。
-    - `copy` および `template` を Java で実装済み。
+    - `copy` および `template` を Java で実装済み（※現在は Python 実装を優先）。
 
 ### [ ] PlaybookExecutor および実行エンジンのさらなる整理
 - **概要**: `PlaybookExecutor` および `TaskQueueManager`, `TaskExecutor` 内に存在する課題の継続的な改善。

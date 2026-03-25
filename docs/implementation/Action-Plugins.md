@@ -155,27 +155,25 @@ Windows 管理ノード対応などのため、Linux 固有のモジュール（
 
 ## 8. 実装済みの Action Plugin
 
+`graal-ansible` では、「Python-first」戦略に基づき、原則として本家 Ansible の Python 実装をそのまま使用します。
+
 | プラグイン名 | 実装方式 | 備考 |
 | :--- | :--- | :--- |
-| `debug` | Java Emulator | 高速な変数表示。 |
-| `set_fact` | Java Emulator | 変数の動的登録。 |
-| `copy` | Java Emulator | ファイル転送、パーミッション設定（`file` モジュールへの委譲を含む）。 |
-| `template` | Java Emulator | Jinja2 テンプレートのレンダリングと転送。 |
+| `debug` | Python (Actual) | 標準。Java エミュレータも選択可能。 |
+| `set_fact` | Python (Actual) | 標準。Java エミュレータも選択可能。 |
+| `copy` | Python (Actual) | 標準。Java エミュレータも選択可能。 |
+| `template` | Python (Actual) | 標準。Java エミュレータも選択可能。 |
 | その他 | Python (Actual) | `ansible_action_launcher.py` 経由での実行。 |
 
-## 9. 標準モジュールの Java による最適化 (Built-in Module Optimizations)
+※ パフォーマンス上の理由から Java エミュレータを使用する場合は、システムプロパティ `ansible.action_plugins.enabled` 等で制御可能です。
 
-> [!NOTE]
-> **暫定的な実装方針**:
-> `command` や `shell` などの頻繁に使用される標準モジュールの Java による実装は、現フェーズにおける **「多くのモジュールを早期に動作させるための暫定的な対策」** です。
-> プロジェクトの最終的な目標は、**「Windows を管理ノードにすること」** および **「本家 Ansible の Python モジュールをそのまま再利用すること」** です。
+## 9. 標準モジュールの実行 (Module Execution Strategy)
 
-Action Plugin 以外にも、一部の標準モジュールについては、以下の理由から Java 側で直接実行する最適化（Built-in Module）を行っています。
+以前のフェーズでは `command` や `shell` などを Java で暫定実装していましたが、現在は**本家 Ansible の Python モジュールをそのまま再利用する「Python-first」アーキテクチャ**へ移行しました。
 
-- **パフォーマンス**: 管理ノードからターゲットノードへの転送を伴わずに、コネクションプラグインを介して直接コマンドを実行するため高速です。
-- **互換性の回避**: 現時点の GraalPy 環境において、Python 版 `command` モジュールが依存する `ansible.module_utils` 等のロードに伴う互換性問題を回避し、安定した実行を優先しています。
-
-これらのモジュールは、`TaskExecutor` 内で登録され、通常の Python モジュール実行フローよりも優先して呼び出されます。
+- **実行方式**: `PythonModule` クラスを介して、ターゲットノード上でオリジナルの Python スクリプトを実行します。
+- **メリット**: Ansible 本来の複雑な引数処理や挙動（`creates`, `removes`, `chdir` 等）を完全に再現できます。
+- **最適化**: 頻繁に使用されるモジュールについては、GraalPy のコンテキストを再利用することで実行オーバーヘッドを最小限に抑えています。
 
 ## 10. 関連ドキュメント
 - [GraalPy 互換性テクニカルリファレンス](Action-Plugins-Investigation.md)
