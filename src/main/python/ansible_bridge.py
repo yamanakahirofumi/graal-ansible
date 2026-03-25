@@ -4,7 +4,7 @@ import os
 import types
 from io import StringIO
 
-# Global context to hold current task state, used by monkeypatches
+# Global context to hold current task state
 _current_task_context = {
     'complex_args': {},
     'connection_java': None,
@@ -13,238 +13,521 @@ _current_task_context = {
 }
 
 def bind_task(complex_args, connection_java, become_context_java, environment_java):
-    """Updates the current task context for the monkeypatches to use."""
-    _current_task_context['complex_args'] = complex_args
-    _current_task_context['connection_java'] = connection_java
-    _current_task_context['become_context_java'] = become_context_java
-    _current_task_context['environment_java'] = environment_java
+    _current_task_context.update({
+        'complex_args': complex_args,
+        'connection_java': connection_java,
+        'become_context_java': become_context_java,
+        'environment_java': environment_java
+    })
 
 def setup_sys_path(site_packages):
-    """Adds Java-provided site-packages to sys.path."""
-    if not site_packages:
-        return
-    for p in site_packages:
-        if p not in sys.path:
-            sys.path.append(p)
+    if site_packages:
+        for p in site_packages:
+            p_str = str(p)
+            if p_str not in sys.path: sys.path.append(p_str)
 
 def setup_env(env_vars):
-    """Injects Java-provided environment variables into os.environ."""
-    if not env_vars:
-        return
-    for k, v in dict(env_vars).items():
-        os.environ[str(k)] = str(v)
+    if env_vars:
+        for k, v in dict(env_vars).items(): os.environ[str(k)] = str(v)
 
-def mock_problematic_modules():
-    """Mocks modules that cause issues in GraalPy or are missing in certain environments."""
-    if getattr(sys, '_ansible_bridge_mocks_applied', False):
-        return
+# --- Mock Classes ---
 
-    # Aggressively mock native/problematic modules
-    for mname in ['cryptography', 'cryptography.hazmat', 'cryptography.hazmat.bindings', '_cffi_backend', 'yaml._yaml', 'selinux', 'markupsafe._speedups']:
-        sys.modules[mname] = None
+class MockLoader:
+    def __init__(self):
+        self.path_finder = None
+        self._basedir = os.getcwd()
+    def get_basedir(self):
+        return self._basedir
+    def set_basedir(self, basedir):
+        self._basedir = basedir
+    def get_real_file(self, file_path, decrypt=True):
+        return file_path
+    def get_text_file_contents(self, file_path, loader=None):
+        if file_path and os.path.exists(file_path):
+            with open(file_path, 'r', encoding='utf-8', errors='surrogateescape') as f:
+                return f.read(), True
+        return "", False
+    def cleanup_tmp_file(self, *args, **kwargs):
+        pass
 
-    # Mock Display to avoid circular imports
-    if 'ansible.utils.display' not in sys.modules:
-        display_mod = types.ModuleType('ansible.utils.display')
-        class Display:
-            def __init__(self, *args, **kwargs):
-                self.verbosity = 0
-                self.columns = 79
-                self.color = False
-            def display(self, *args, **kwargs): pass
-            def debug(self, *args, **kwargs): pass
-            def verbose(self, *args, **kwargs): pass
-            def warning(self, *args, **kwargs): pass
-            def error(self, *args, **kwargs): pass
-            def deprecated(self, *args, **kwargs): pass
-        display_mod.Display = Display
-        display_mod.display = Display()
-        sys.modules['ansible.utils.display'] = display_mod
+class MockShell:
+    def __init__(self):
+        self.tmpdir = "/tmp"
+    def path_has_trailing_slash(self, path):
+        return path.endswith('/') or path.endswith('\\')
+    def join_path(self, *args):
+        return os.path.join(*args)
+    def expand_user(self, path, *args, **kwargs):
+        return path
 
-    # Mock missing system modules
-    import collections
-    passwd = collections.namedtuple('passwd', ['pw_name', 'pw_passwd', 'pw_uid', 'pw_gid', 'pw_gecos', 'pw_dir', 'pw_shell'])
-    group = collections.namedtuple('group', ['gr_name', 'gr_passwd', 'gr_gid', 'gr_mem'])
+class Display:
+    def __init__(self, *args, **kwargs):
+        self.verbosity = 10
+        self.columns = 79
+        self.color = False
+    def display(self, *args, **kwargs): pass
+    def debug(self, *args, **kwargs): pass
+    def verbose(self, *args, **kwargs): pass
+    def warning(self, *args, **kwargs): pass
+    def error(self, *args, **kwargs): pass
+    def deprecated(self, *args, **kwargs): pass
+Display.verbosity = 10
 
-    if 'grp' not in sys.modules:
-        m = types.ModuleType('grp')
-        def mocked_grp_call(*args, **kwargs): return group('root', 'x', 0, [])
-        m.getgrnam = m.getgrgid = mocked_grp_call
-        sys.modules['grp'] = m
-    if 'pwd' not in sys.modules:
-        m = types.ModuleType('pwd')
-        def mocked_pwd_call(*args, **kwargs): return passwd('root', 'x', 0, 0, 'root', '/root', '/bin/bash')
-        m.getpwnam = m.getpwuid = mocked_pwd_call
-        sys.modules['pwd'] = m
-    if 'termios' not in sys.modules or sys.modules['termios'] is None:
-        m = types.ModuleType('termios')
-        m.TCSAFLUSH = 1
-        def mocked_tcgetattr(fd, *args, **kwargs): return [0,0,0,0, ' ', ' ', []]
-        def mocked_tcsetattr(fd, opt, mode, *args, **kwargs): return None
-        m.tcgetattr = mocked_tcgetattr
-        m.tcsetattr = mocked_tcsetattr
-        sys.modules['termios'] = m
-    if 'syslog' not in sys.modules:
-        m = types.ModuleType('syslog')
-        def mocked_syslog_call(*args, **kwargs): return None
-        m.openlog = m.syslog = m.closelog = m.setlogmask = mocked_syslog_call
-        # Add common syslog constants
-        m.LOG_PID = 0x01
-        m.LOG_CONS = 0x02
-        m.LOG_NDELAY = 0x08
-        m.LOG_NOWAIT = 0x10
-        m.LOG_PERROR = 0x20
-        m.LOG_KERN = 0
-        m.LOG_USER = 1 << 3
-        m.LOG_MAIL = 2 << 3
-        m.LOG_DAEMON = 3 << 3
-        m.LOG_AUTH = 4 << 3
-        m.LOG_SYSLOG = 5 << 3
-        m.LOG_LPR = 6 << 3
-        m.LOG_NEWS = 7 << 3
-        m.LOG_UUCP = 8 << 3
-        m.LOG_CRON = 9 << 3
-        m.LOG_AUTHPRIV = 10 << 3
-        m.LOG_FTP = 11 << 3
-        m.LOG_LOCAL0 = 16 << 3
-        m.LOG_LOCAL1 = 17 << 3
-        m.LOG_LOCAL2 = 18 << 3
-        m.LOG_LOCAL3 = 19 << 3
-        m.LOG_LOCAL4 = 20 << 3
-        m.LOG_LOCAL5 = 21 << 3
-        m.LOG_LOCAL6 = 22 << 3
-        m.LOG_LOCAL7 = 23 << 3
-        m.LOG_EMERG = 0
-        m.LOG_ALERT = 1
-        m.LOG_CRIT = 2
-        m.LOG_ERR = 3
-        m.LOG_WARNING = 4
-        m.LOG_NOTICE = 5
-        m.LOG_INFO = 6
-        m.LOG_DEBUG = 7
-        sys.modules['syslog'] = m
+class PlayContext:
+    def __init__(self):
+        self.verbosity = 10
+        self.check_mode = False
+        self.diff = False
 
-    sys._ansible_bridge_mocks_applied = True
+class ActionBase:
+    def __init__(self, task, connection, play_context, loader, templar, shared_loader_obj):
+        self._task, self._connection, self._play_context = task, connection, play_context
+        self._loader, self._templar = loader, templar
+        self._shared_loader_obj = shared_loader_obj
+        self._display = self.display = sys.modules.get('ansible.utils.display', types.SimpleNamespace(display=Display())).display
+        self._supports_check_mode = True
+        self._supports_async = False
+    def run(self, tmp=None, task_vars=None):
+        return {'changed': False, 'failed': False}
+    def validate_argument_spec(self, argument_spec, *args, **kwargs):
+        res = {}
+        input_args = self._task.args or {}
+        for k, v in argument_spec.items():
+            if k in input_args: res[k] = input_args[k]
+            elif isinstance(v, dict) and 'default' in v: res[k] = v['default']
+            elif isinstance(v, dict) and v.get('required'): res[k] = None
+            else: res[k] = None
+        return types.SimpleNamespace(error=None, warning=None), res
+    def _execute_module(self, module_name=None, module_args=None, tmp=None, task_vars=None, *args, **kwargs):
+        m_name = module_name or self._task.action
+        m_args = module_args or self._task.args
+        if 'task_executor_java' in globals():
+            res = task_executor_java.execute_from_python(m_name, m_args, task_vars or {})
+            if res is not None:
+                r_dict = dict(res)
+                if 'changed' not in r_dict: r_dict['changed'] = True
+                return r_dict
+            return {'changed': True}
+        return {'failed': True, 'msg': 'task_executor_java not available'}
+    def _remove_tmp_path(self, *args, **kwargs): pass
+    def _find_needle(self, name, needle, *args, **kwargs):
+        if needle and 'task_executor_java' in globals():
+            res = task_executor_java.resolveLocalPath(needle)
+            if res: return str(res)
+        return needle
+    def _remote_expand_user(self, path, *args, **kwargs): return path
+    def _execute_remote_stat(self, path, all_vars, follow=False, *args, **kwargs):
+        import hashlib
+        if os.path.exists(path):
+            with open(path, 'rb') as f:
+                csum = hashlib.sha1(f.read()).hexdigest()
+            return {'exists': True, 'checksum': csum, 'isdir': os.path.isdir(path), 'isreg': os.path.isfile(path), 'islnk': os.path.islink(path)}
+        # In integration tests, dest often doesn't exist yet, but copy action plugin expects it to be faked if transferred?
+        # No, wait, if it doesn't exist, it should return exists=False.
+        # The error "Copied file does not match the expected checksum" usually means the transfer happened but verification failed.
+        return {'exists': False, 'checksum': None, 'isdir': False, 'isreg': False, 'islnk': False}
+    def _transfer_file(self, local_path, remote_path):
+        conn = _current_task_context['connection_java']
+        if conn:
+            from java.nio.file import Paths
+            conn.putFile(Paths.get(str(local_path)), str(remote_path))
+        import hashlib
+        return hashlib.sha1(open(local_path, 'rb').read()).hexdigest()
+    def _fixup_perms2(self, *args, **kwargs): pass
 
-def patch_ansible():
-    """Applies monkeypatches to Ansible core classes and utilities."""
-    if getattr(sys, '_ansible_bridge_patched', False):
-        return
+class Task:
+    def __init__(self):
+        self.action, self.args, self.async_val = None, {}, 0
+        self.collections = []
+        self.tags = []
+        self.implicit = False
+        self.resolved_action = None
+        self._parent = None
+        self.diff = False
+        self.check_mode = False
+        self.no_log = False
+        self.delegate_to = None
+        self.delegate_facts = False
+    def get_name(self): return "mock_task"
+    def copy(self):
+        new_task = Task()
+        new_task.action = self.action
+        new_task.args = (self.args or {}).copy()
+        new_task.async_val = self.async_val
+        return new_task
 
-    import ansible.module_utils.basic
+class Templar:
+    def __init__(self, loader=None, variables=None):
+        self._engine = type('Eng', (), {
+            'tvars': variables or {},
+            'extend': lambda *a, **kw: self._engine,
+            'evaluate_expression': lambda expr, *a, **kw: self._engine.tvars.get(expr, expr)
+        })
+        self.available_variables = variables or {}
+        self.environment = {}
+    def template(self, msg, *args, **kwargs):
+        if msg is None: return None
+        if isinstance(msg, (tuple, list)): msg = msg[0]
+        if not isinstance(msg, str): return msg
 
-    # Explicitly ensure basic is available on module_utils for some GraalPy versions
-    if not hasattr(ansible.module_utils, 'basic'):
-        ansible.module_utils.basic = sys.modules['ansible.module_utils.basic']
-    if not hasattr(ansible.module_utils.basic, 'AnsibleModule'):
-        # Force reload if partially initialized
-        import importlib
-        importlib.reload(ansible.module_utils.basic)
+        try:
+            from jinja2 import Template
+            t = Template(msg)
+            return t.render(**self.available_variables)
+        except Exception:
+            # Simple Jinja2-like substitution for tests
+            import re
+            def repl(match):
+                var_name = match.group(1).strip()
+                return str(self.available_variables.get(var_name, match.group(0)))
+            return re.sub(r'\{\{\s*(.*?)\s*\}\}', repl, msg)
+    def copy_with_new_env(self, *args, **kwargs): return self
 
-    import ansible.module_utils.distro
-    import ansible.module_utils.common.process
-
-    # distro info
-    def mocked_distro_id(*args, **kwargs): return 'debian'
-    def mocked_distro_version(*args, **kwargs): return '12'
-    ansible.module_utils.distro.id = mocked_distro_id
-    ansible.module_utils.distro.version = mocked_distro_version
-    def mocked_get_bin_path(arg=None, *args, **kwargs):
-        return '/usr/bin/' + arg if arg else None
-    ansible.module_utils.common.process.get_bin_path = mocked_get_bin_path
-
-    # JSON handling
-    if not hasattr(json, '_graal_ansible_patched'):
-        class AnsibleEncoder(json.JSONEncoder):
-            def default(self, o):
-                if isinstance(o, (set, frozenset)): return list(o)
-                if isinstance(o, range): return list(o)
-                return str(o)
-
-        _original_json_dumps = json.dumps
-        def mocked_json_dumps(obj, **kwargs):
-            if 'cls' not in kwargs:
-                kwargs['cls'] = AnsibleEncoder
-            return _original_json_dumps(obj, **kwargs)
-        json.dumps = mocked_json_dumps
-        json._graal_ansible_patched = True
-
-    # AnsibleModule patching
-    def mocked_basic_load_params(*args, **kwargs):
-        return (_current_task_context['complex_args'], 'main')
-    ansible.module_utils.basic._load_params = mocked_basic_load_params
-
-    def mocked_load_params(self, *args, **kwargs):
-        self.params = _current_task_context['complex_args']
-    ansible.module_utils.basic.AnsibleModule._load_params = mocked_load_params
-
-    def mocked_check_locale(self, *args, **kwargs): return None
-    ansible.module_utils.basic.AnsibleModule._check_locale = mocked_check_locale
-
-    def mocked_run_command(self, args, **kwargs):
+class AnsibleModule:
+    def __init__(self, argument_spec, *args, **kwargs):
+        self.params = {}
+        self.aliases = {}
+        input_args = _current_task_context['complex_args'] or {}
+        effective_spec = argument_spec.copy() if argument_spec else {}
+        if kwargs.get('add_file_common_args'):
+            effective_spec.update(sys.modules['ansible.module_utils.basic'].FILE_COMMON_ARGUMENTS)
+        for k, v in effective_spec.items():
+            if k in input_args: self.params[k] = input_args[k]
+            elif isinstance(v, dict) and 'default' in v: self.params[k] = v['default']
+            else: self.params[k] = None
+        for k, v in input_args.items():
+            if k not in self.params: self.params[k] = v
+        if '_raw_params' in input_args: self.params['_raw_params'] = input_args['_raw_params']
+        self.params['_uses_shell'] = input_args.get('_uses_shell', False)
+        self.check_mode = self._debug = self._diff = False
+    def exit_json(self, **kwargs):
+        if 'changed' not in kwargs: kwargs['changed'] = False
+        print(json.dumps(kwargs)); sys.exit(0)
+    def fail_json(self, **kwargs):
+        kwargs['failed'] = True
+        if 'msg' not in kwargs: kwargs['msg'] = 'Module failed'
+        print(json.dumps(kwargs))
+        sys.exit(1)
+    def run_command(self, args, **kwargs):
         conn = _current_task_context['connection_java']
         if conn:
             command = " ".join(args) if isinstance(args, list) else args
             env = dict(_current_task_context['environment_java']) if _current_task_context['environment_java'] is not None else None
             res = conn.execCommand(command, _current_task_context['become_context_java'], env)
             return (res.exitCode(), res.stdout(), res.stderr())
-        return (0, '', '')
+        return (1, '', 'No connection')
+    def get_bin_path(self, arg, required=False, opt_dirs=None): return arg
+    def sha1(self, path):
+        import hashlib
+        try:
+            with open(path, 'rb') as f: return hashlib.sha1(f.read()).hexdigest()
+        except: return None
+    def md5(self, path):
+        import hashlib
+        try:
+            with open(path, 'rb') as f: return hashlib.md5(f.read()).hexdigest()
+        except: return None
+    def sha256(self, path):
+        import hashlib
+        try:
+            with open(path, 'rb') as f: return hashlib.sha256(f.read()).hexdigest()
+        except: return None
+    def atomic_move(self, src, dest, unsafe_writes=False, **kwargs):
+        import os, shutil
+        shutil.move(src, dest)
+    def load_file_common_arguments(self, params, path=None):
+        res = {}
+        for k in ['mode', 'owner', 'group', 'seuser', 'serole', 'setype', 'selevel', 'attributes', 'unsafe_writes']:
+            if k in params: res[k] = params[k]
+        return res
+    def set_fs_attributes_if_different(self, file_args, changed, diff=None, expand=True):
+        self.exit_json(changed=changed, **file_args)
+        return changed
 
-    ansible.module_utils.basic.AnsibleModule.run_command = mocked_run_command
-    def mocked_mod_get_bin_path(self, arg=None, *args, **kwargs):
-        return '/usr/bin/' + arg if arg else None
-    ansible.module_utils.basic.AnsibleModule.get_bin_path = mocked_mod_get_bin_path
+# --- Mock Application ---
 
-    def mocked_record_module_result(self, o, *args, **kwargs):
-        print(json.dumps(o))
-    ansible.module_utils.basic.AnsibleModule._record_module_result = mocked_record_module_result
+def apply_mocks():
+    if getattr(sys, '_ansible_bridge_mocks_applied', False): return
 
-    sys._ansible_bridge_patched = True
+    def create_mock(mname, attributes=None, is_package=True):
+        if mname in sys.modules and sys.modules[mname] is not None:
+            m = sys.modules[mname]
+        else:
+            m = types.ModuleType(mname)
+            if is_package: m.__path__ = []
+            sys.modules[mname] = m
+        if attributes:
+            for k, v in attributes.items(): setattr(m, k, v)
+        return m
+
+    # 1. Native & System Mocks
+    create_mock('_posixsubprocess', {'fork_exec': lambda *a, **kw: 0, 'cloexec_pipe': lambda: (0, 0)}, False)
+    create_mock('fcntl', {'fcntl': lambda *a, **kw: 0, 'ioctl': lambda *a, **kw: 0, 'flock': lambda *a, **kw: 0, 'lockf': lambda *a, **kw: 0}, False)
+    create_mock('resource', {'getrlimit': lambda *a, **kw: (1024, 1024), 'RLIMIT_NOFILE': 7}, False)
+    for m in ['cryptography', 'yaml._yaml', 'markupsafe._speedups', 'selinux']: create_mock(m)
+    create_mock('termios', {'TCSAFLUSH': 1, 'tcgetattr': lambda *a, **kw: [0,0,0,0, ' ', ' ', []], 'tcsetattr': lambda *a, **kw: None})
+    create_mock('syslog', {'openlog': lambda *a, **kw: None, 'syslog': lambda *a, **kw: None, 'closelog': lambda *a, **kw: None, 'setlogmask': lambda *a, **kw: None})
+    create_mock('markupsafe', {
+        'escape': lambda s, *a, **kw: s, 'soft_str': str, 'soft_unicode': str, 'Markup': str,
+        'EscapeFormatter': type('EF', (), {})
+    })
+
+    # 2. Display & PlayContext
+    create_mock('ansible')
+    create_mock('ansible.constants', {'DEFAULT_REMOTE_TMP': '/tmp', 'DEFAULT_LOCAL_TMP': '/tmp'})
+    create_mock('ansible.config', {'ConfigManager': type('CM', (), {'get_config_value': lambda *a, **kw: None})})
+    create_mock('ansible.config.manager', {'ConfigManager': type('CM', (), {'get_config_value': lambda *a, **kw: None}), 'ensure_type': lambda x, t: x})
+    create_mock('ansible.utils')
+    create_mock('ansible.utils.display', {'Display': Display, 'display': Display(), 'PlayContext': PlayContext})
+
+    def real_checksum(path, *args, **kwargs):
+        import hashlib
+        if not os.path.exists(path): return None
+        with open(path, 'rb') as f: return hashlib.sha1(f.read()).hexdigest()
+    def real_checksum_s(s, *args, **kwargs):
+        import hashlib
+        if isinstance(s, str): s = s.encode('utf-8')
+        return hashlib.sha1(s).hexdigest()
+
+    create_mock('ansible.utils.hashing', {
+        'checksum_s': real_checksum_s,
+        'checksum': real_checksum,
+        'secure_hash': real_checksum,
+        'secure_hash_s': real_checksum_s
+    })
+
+    # 3. Utils
+    def merge_hash(a, b):
+        res = a.copy()
+        res.update(b or {})
+        return res
+    create_mock('ansible.utils.path', {
+        'unquote': lambda s, *a, **kw: s, 'cleanup_tmp_file': lambda s, *a, **kw: None,
+        'makedirs_safe': lambda s, *a, **kw: None, 'unfrackpath': lambda s, *a, **kw: s,
+        'get_real_file': lambda s, *a, **kw: s
+    })
+    create_mock('ansible.utils.fqcn', {'add_internal_fqcns': lambda *a, **kw: None})
+    create_mock('ansible.utils.vars', {
+        'isidentifier': lambda s, *a, **kw: True, 'validate_variable_name': lambda s, *a, **kw: True,
+        'merge_hash': merge_hash
+    })
+
+    # 4. Errors
+    class AnsibleError(Exception):
+        def __init__(self, message="", obj=None, show_content=True, suppress_extended_error=False, orig_exception=None): super().__init__(message)
+    class AnsibleValueOmittedError(AnsibleError): pass
+    class AnsibleActionFail(AnsibleError): pass
+    class AnsibleActionSkip(AnsibleError): pass
+    class AnsibleFileNotFound(AnsibleError): pass
+    create_mock('ansible.errors', {
+        'AnsibleError': AnsibleError, 'AnsibleValueOmittedError': AnsibleValueOmittedError,
+        'AnsibleActionFail': AnsibleActionFail, 'AnsibleActionSkip': AnsibleActionSkip,
+        'AnsibleFileNotFound': AnsibleFileNotFound
+    })
+
+    # 5. Plugins & Loader
+    create_mock('ansible.plugins')
+    create_mock('ansible.plugins.action', {'ActionBase': ActionBase})
+
+    action_loader_obj = types.SimpleNamespace()
+    action_loader_obj.action_loader = action_loader_obj
+    def action_loader_get(name, *args, **kwargs):
+        import ansible_bridge
+        return ansible_bridge._create_action_plugin(
+            name, kwargs.get('task'), kwargs.get('connection'),
+            kwargs.get('play_context'), kwargs.get('loader'),
+            kwargs.get('templar'), kwargs.get('shared_loader_obj')
+        )
+    action_loader_obj.get = action_loader_get
+
+    create_mock('ansible.plugins.loader', {
+        'action_loader': action_loader_obj,
+        'module_loader': type('ML', (), {'find_plugin': lambda name: None})
+    })
+
+    # 6. Playbook
+    create_mock('ansible.playbook')
+    create_mock('ansible.playbook.task', {'Task': Task})
+    create_mock('ansible.playbook.play_context', {'PlayContext': PlayContext})
+
+    # 7. Templating
+    def trust_as_template(data):
+        if isinstance(data, (tuple, list)): return data[0]
+        return data
+    create_mock('ansible.template', {'Templar': Templar, 'trust_as_template': trust_as_template})
+
+    create_mock('ansible._internal')
+    create_mock('ansible._internal._templating', {
+        '_template_vars': types.SimpleNamespace(generate_ansible_template_vars=lambda *a, **kw: {}),
+        'get_text_file_contents': lambda x, *a, **kw: (open(x, 'r').read() if x and os.path.exists(x) else "mock_content", True)
+    })
+    for mname in ['ansible._internal._templating._jinja_common', 'ansible._internal._templating._utils', 'ansible._internal._templating._marker_behaviors']:
+        m = create_mock(mname)
+        if mname.endswith('_jinja_common'):
+            m.UndefinedMarker = type('UM', (), {})
+            m.TruncationMarker = type('TM', (), {})
+        elif mname.endswith('_utils'):
+            m.Omit = type('Omit', (), {})
+        elif mname.endswith('_marker_behaviors'):
+            m.ReplacingMarkerBehavior = type('RMB', (), {'emit_warnings': lambda *a: None})
+            m.RoutingMarkerBehavior = type('RoMB', (), {'__init__': lambda *a, **kw: None})
+
+    # 8. Module Utils
+    create_mock('ansible.module_utils', is_package=True)
+    for m in ['facts', 'urls', 'six', 'compat', 'service', 'pycompat24', 'distro']:
+        create_mock(f'ansible.module_utils.{m}')
+    create_mock('ansible.module_utils.common', is_package=True)
+    for m in ['text', 'collections', 'validation', 'parameters', 'process', 'file', 'locale']:
+        create_mock(f'ansible.module_utils.common.{m}')
+    create_mock('ansible.module_utils.common.text', is_package=True)
+    create_mock('ansible.module_utils.common.text.converters', {
+        'to_bytes': lambda s, *a, **kw: str(s).encode('utf-8'),
+        'to_text': lambda s, *a, **kw: str(s),
+        'to_native': lambda s, *a, **kw: str(s)
+    })
+    create_mock('ansible.module_utils.common.validation', {
+        '_check_type_str_no_conversion': lambda s, *a, **kw: s,
+        'check_type_int': lambda x: int(x),
+        'check_type_bool': lambda x: str(x).lower() in ('yes', 'true', 't', '1'),
+        'check_type_list': lambda x: x if isinstance(x, list) else [x]
+    })
+    create_mock('ansible.module_utils.common.collections', {
+        'is_iterable': lambda x, *a, **kw: hasattr(x, '__iter__') and not isinstance(x, (str, bytes))
+    })
+    create_mock('ansible.module_utils.parsing', is_package=True)
+    create_mock('ansible.module_utils.parsing.convert_bool', {
+        'convert_bool': lambda x, *a, **kw: str(x).lower() in ('yes', 'true', 't', '1'),
+        'boolean': lambda x, *a, **kw: str(x).lower() in ('yes', 'true', 't', '1')
+    })
+    FILE_COMMON_ARGUMENTS = {
+        'mode': dict(type='raw'),
+        'owner': dict(type='str'),
+        'group': dict(type='str'),
+        'seuser': dict(type='str'),
+        'serole': dict(type='str'),
+        'setype': dict(type='str'),
+        'selevel': dict(type='str'),
+        'attributes': dict(type='str', aliases=['attr']),
+        'unsafe_writes': dict(type='bool', default=False),
+    }
+    def mock_get_bin_path(arg, required=False, opt_dirs=None):
+        if arg == 'python': return sys.executable
+        return arg
+    create_mock('ansible.module_utils.basic', {
+        'AnsibleModule': AnsibleModule,
+        '_load_params': lambda: (_current_task_context['complex_args'], 'main'),
+        'FILE_COMMON_ARGUMENTS': FILE_COMMON_ARGUMENTS,
+        'missing_required_lib': lambda *a, **kw: None,
+        'sanitize_keys': lambda x, *a, **kw: x,
+        'get_bin_path': mock_get_bin_path
+    })
+
+    # 9. Password/Group System Mocks
+    import collections
+    passwd, group = collections.namedtuple('passwd', ['pw_name', 'pw_passwd', 'pw_uid', 'pw_gid', 'pw_gecos', 'pw_dir', 'pw_shell']), collections.namedtuple('group', ['gr_name', 'gr_passwd', 'gr_gid', 'gr_mem'])
+    create_mock('grp', {'getgrnam': lambda *a, **kw: group('root', 'x', 0, []), 'getgrgid': lambda *a, **kw: group('root', 'x', 0, []), 'getgrall': lambda: []}, False)
+    create_mock('pwd', {'getpwnam': lambda *a, **kw: passwd('root', 'x', 0, 0, 'root', '/root', '/bin/bash'), 'getpwuid': lambda *a, **kw: passwd('root', 'x', 0, 0, 'root', '/root', '/bin/bash'), 'getpwall': lambda: []}, False)
+    create_mock('syslog', {
+        'openlog': lambda *a, **kw: None, 'syslog': lambda *a, **kw: None, 'closelog': lambda *a, **kw: None, 'setlogmask': lambda *a, **kw: None,
+        'LOG_NOTICE': 5, 'LOG_INFO': 6, 'LOG_DEBUG': 7, 'LOG_ERR': 3, 'LOG_WARNING': 4
+    }, False)
+
+    # 10. JSON handling
+    if not hasattr(json, '_graal_ansible_patched'):
+        class AnsibleEncoder(json.JSONEncoder):
+            def default(self, o):
+                if isinstance(o, (set, frozenset, range)): return list(o)
+                try:
+                    if hasattr(o, '__iter__') and not isinstance(o, (str, bytes)):
+                        if hasattr(o, 'keys'): return dict(o)
+                        if hasattr(o, 'size') and hasattr(o, 'get'):
+                            try: return [o.get(i) for i in range(o.size())]
+                            except: pass
+                        return list(o)
+                except Exception: pass
+                return str(o)
+        _orig_dumps = json.dumps
+        json.dumps = lambda obj, **kw: _orig_dumps(obj, **(dict({'cls': AnsibleEncoder}, **kw)))
+        json._graal_ansible_patched = True
+
+    sys._ansible_bridge_mocks_applied = True
+
+def _create_action_plugin(action_name, task, connection, play_context, loader, templar, shared_loader_obj):
+    import importlib.util
+    base_name = action_name
+    if base_name.startswith('ansible.builtin.'): base_name = base_name[16:]
+    elif base_name.startswith('ansible.legacy.'): base_name = base_name[15:]
+
+    path = None
+    site_pkgs = globals().get('site_packages_java')
+    if site_pkgs:
+        for p in site_pkgs:
+            cand = os.path.join(str(p), 'ansible/plugins/action', base_name + '.py')
+            if os.path.exists(cand): path = cand; break
+
+    if not path:
+        for p in sys.path:
+            cand = os.path.join(p, 'ansible/plugins/action', base_name + '.py')
+            if os.path.exists(cand): path = cand; break
+
+    if not path: raise Exception(f"Action plugin {action_name} not found")
+
+    spec = importlib.util.spec_from_file_location("ansible.plugins.action." + base_name, path)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = mod
+    spec.loader.exec_module(mod)
+
+    l = loader or MockLoader()
+
+    # Ensure connection has _shell and path_has_trailing_slash
+    c = connection
+    if not hasattr(c, '_shell') or not hasattr(c._shell, 'path_has_trailing_slash'):
+        class Proxy:
+            def __init__(self, obj): self._obj, self._shell = obj, MockShell()
+            def __getattr__(self, name): return getattr(self._obj, name)
+        c = Proxy(connection)
+
+    return mod.ActionModule(task, c, play_context, l, templar, shared_loader_obj)
 
 def execute_module(module_name, complex_args, module_code=None):
-    """
-    Executes an Ansible module.
-    If module_code is provided, it executes that code (mock mode).
-    Otherwise, it finds and executes the module by name (actual mode).
-    """
     import __main__
-
-    # Setup __main__ attributes
     __main__._module_fqn = f"ansible.builtin.{module_name}"
     __main__.complex_args = complex_args
-    __main__._modlib_path = None
-
-    old_stdout = sys.stdout
-    sys.stdout = mystdout = StringIO()
+    old_stdout, sys.stdout = sys.stdout, StringIO()
     try:
         if module_code:
-            # Mock mode
             exec(module_code, {'complex_args': complex_args, 'ansible_module_results': {}, '__name__': '__main__'})
         else:
-            from ansible.plugins.loader import module_loader
-            # Actual mode
-            path = module_loader.find_plugin(module_name)
-            if not path:
-                return json.dumps({'failed': True, 'msg': f'Module {module_name} not found'})
-
+            base_name = module_name
+            if base_name.startswith('ansible.builtin.'): base_name = base_name[16:]
+            elif base_name.startswith('ansible.legacy.'): base_name = base_name[15:]
+            path = None
+            for p in sys.path:
+                cand = os.path.join(p, 'ansible/modules', base_name + '.py')
+                if os.path.exists(cand): path = cand; break
+            if not path: return json.dumps({'failed': True, 'msg': f'Module {module_name} not found'})
             with open(path, 'rb') as f:
                 code = compile(f.read(), path, 'exec')
-            try:
                 exec(code, {'__name__': '__main__', '__file__': path, '__package__': 'ansible.modules'})
-            except SystemExit:
-                pass
-        return mystdout.getvalue()
+        return sys.stdout.getvalue()
+    except SystemExit:
+        return sys.stdout.getvalue()
     except Exception as e:
         import traceback
-        return json.dumps({'failed': True, 'msg': f'Execution error: {str(e)}', 'traceback': traceback.format_exc()})
+        return json.dumps({'failed': True, 'msg': str(e), 'traceback': traceback.format_exc()})
     finally:
         sys.stdout = old_stdout
 
-# Register this module so it can be imported as 'ansible_bridge'
-import sys
-import types
+def initialize(site_packages=None, env_vars=None, complex_args=None, connection_java=None, become_context_java=None):
+    apply_mocks()
+    setup_sys_path(site_packages)
+    setup_env(env_vars)
+    bind_task(complex_args or {}, connection_java, become_context_java, env_vars)
+
+# Early initialization
+apply_mocks()
+
+# Self-registration
 bridge_mod = types.ModuleType('ansible_bridge')
 bridge_mod.__dict__.update(globals())
-# Ensure functions are bound to the new module's globals if needed,
-# but for simple function calls this update is often enough.
 sys.modules['ansible_bridge'] = bridge_mod

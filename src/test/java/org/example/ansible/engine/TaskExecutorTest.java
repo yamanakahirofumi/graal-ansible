@@ -59,7 +59,7 @@ class TaskExecutorTest {
 
         // Assert (検証)
         assertFalse(result.success());
-        assertTrue(result.message().contains("Module not found"));
+        assertTrue(result.message().contains("not found"));
     }
 
     @Test

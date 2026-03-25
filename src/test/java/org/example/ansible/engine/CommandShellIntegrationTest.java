@@ -30,49 +30,6 @@ class CommandShellIntegrationTest {
         Inventory inventory = new Inventory(new Group("all", List.of(host), List.of(), Map.of()));
         variableManager = new VariableManager(inventory, Map.of());
         play = new Play("Test Play", "all", List.of(), Map.of(), List.of(), List.of(), null, null, null, null, null, Map.of());
-
-        // Register command and shell modules as they are registered in PlaybookCli
-        taskExecutor.registerModule("command", (args, becomeContext, context) -> {
-            String command = (String) args.get("_raw_params");
-            if (command == null) command = (String) args.get("cmd");
-            if (command == null) return TaskResult.failure("no command given");
-
-            org.example.ansible.connection.Connection connection = TaskExecutor.getCurrentConnection();
-            if (connection == null) connection = new LocalConnection();
-
-            org.example.ansible.connection.ConnectionResult result = connection.execCommand(command, becomeContext, TaskExecutor.getCurrentEnvironment());
-            Map<String, Object> data = new HashMap<>();
-            data.put("stdout", result.stdout());
-            data.put("stderr", result.stderr());
-            data.put("rc", result.exitCode());
-            data.put("changed", result.exitCode() == 0);
-
-            if (result.exitCode() != 0) {
-                return new TaskResult(false, false, "Command failed with rc " + result.exitCode(), data);
-            }
-            return TaskResult.success(data);
-        });
-
-        taskExecutor.registerModule("shell", (args, becomeContext, context) -> {
-            String command = (String) args.get("_raw_params");
-            if (command == null) command = (String) args.get("cmd");
-            if (command == null) return TaskResult.failure("no command given");
-
-            org.example.ansible.connection.Connection connection = TaskExecutor.getCurrentConnection();
-            if (connection == null) connection = new LocalConnection();
-
-            org.example.ansible.connection.ConnectionResult result = connection.execCommand(command, becomeContext, TaskExecutor.getCurrentEnvironment());
-            Map<String, Object> data = new HashMap<>();
-            data.put("stdout", result.stdout());
-            data.put("stderr", result.stderr());
-            data.put("rc", result.exitCode());
-            data.put("changed", result.exitCode() == 0);
-
-            if (result.exitCode() != 0) {
-                return new TaskResult(false, false, "Shell command failed with rc " + result.exitCode(), data);
-            }
-            return TaskResult.success(data);
-        });
     }
 
     @AfterEach
@@ -87,7 +44,7 @@ class CommandShellIntegrationTest {
         Task task = new Task("Run echo", "command", Map.of("_raw_params", "echo hello"));
         TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
 
-        assertTrue(result.success());
+        assertTrue(result.success(), "Execution failed: " + result.message() + " Data: " + result.data());
         assertTrue(result.changed());
         assertEquals(0, result.data().get("rc"));
         assertEquals("hello", ((String)result.data().get("stdout")).trim());
@@ -111,7 +68,7 @@ class CommandShellIntegrationTest {
         Task task = new Task("Run pipe", "shell", Map.of("_raw_params", command));
         TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
 
-        assertTrue(result.success());
+        assertTrue(result.success(), result.message());
         assertEquals("line2", ((String)result.data().get("stdout")).trim());
     }
 
@@ -142,7 +99,7 @@ class CommandShellIntegrationTest {
 
         TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
 
-        assertTrue(result.success());
+        assertTrue(result.success(), result.message());
         assertFalse(result.changed(), "Should not be changed due to changed_when: false");
     }
 
@@ -160,7 +117,7 @@ class CommandShellIntegrationTest {
 
         TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
 
-        assertTrue(result.success());
+        assertTrue(result.success(), result.message());
         // Note: shell expansion of $MY_VAR might only work in 'shell' or if 'command' is executed via shell
         // Our 'command' implementation currently uses osHandler.getShellExecutable() which IS a shell.
         assertEquals("my_value", ((String)result.data().get("stdout")).trim());

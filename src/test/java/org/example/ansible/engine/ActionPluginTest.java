@@ -41,7 +41,7 @@ class ActionPluginTest {
     void testDebugActionPluginMsg() {
         Task task = new Task("Test Debug Msg", "debug", Map.of("msg", "Hello from Built-in Action Plugin"));
         TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
-        assertTrue(result.success());
+        assertTrue(result.success(), result.message());
         assertEquals("Hello from Built-in Action Plugin", result.data().get("msg"));
     }
 
@@ -50,7 +50,7 @@ class ActionPluginTest {
         variableManager.addFacts("localhost", Map.of("my_fact", "fact_value"));
         Task task = new Task("Test Debug Var", "debug", Map.of("var", "my_fact"));
         TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
-        assertTrue(result.success());
+        assertTrue(result.success(), result.message());
         assertEquals("fact_value", result.data().get("my_fact"));
     }
 
@@ -58,7 +58,7 @@ class ActionPluginTest {
     void testSetFactActionPlugin() {
         Task task = new Task("Test Set Fact", "set_fact", Map.of("new_fact", "new_value"));
         TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
-        assertTrue(result.success());
+        assertTrue(result.success(), result.message());
 
         Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
         assertNotNull(facts);

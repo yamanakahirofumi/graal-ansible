@@ -84,8 +84,7 @@ public class PythonModule implements Module {
             context.getBindings("python").putMember("become_context_java", becomeContext);
             context.getBindings("python").putMember("environment_java", TaskExecutor.getCurrentEnvironment());
 
-            // Load and evaluate the bridge first
-            context.eval(loadResource("ansible_bridge.py"));
+            // Bridge is pre-loaded in TaskExecutor constructor
 
             Source source;
             if (scriptContent != null) {
@@ -284,11 +283,18 @@ public class PythonModule implements Module {
     }
 
     private Optional<File> findModuleFile() {
+        String baseName = moduleName;
+        if (baseName.startsWith("ansible.builtin.")) {
+            baseName = baseName.substring("ansible.builtin.".length());
+        } else if (baseName.startsWith("ansible.legacy.")) {
+            baseName = baseName.substring("ansible.legacy.".length());
+        }
+
         List<String> sitePackages = PythonEnv.getSitePackagesFromEnv();
         for (String path : sitePackages) {
             File modulesDir = new File(path, "ansible/modules");
             if (modulesDir.exists() && modulesDir.isDirectory()) {
-                File moduleFile = new File(modulesDir, moduleName + ".py");
+                File moduleFile = new File(modulesDir, baseName + ".py");
                 if (moduleFile.exists()) {
                     return Optional.of(moduleFile);
                 }
