@@ -376,9 +376,50 @@ def apply_mocks():
     create_mock('ansible.module_utils', is_package=True)
     for m in ['facts', 'urls', 'six', 'compat', 'service', 'pycompat24', 'distro']:
         create_mock(f'ansible.module_utils.{m}')
+    create_mock('ansible.module_utils.facts.system')
+    create_mock('ansible.module_utils.facts.timeout', {'timeout': lambda *a, **kw: lambda f: f})
+    create_mock('ansible.module_utils.facts', {
+        'ansible_collector': type('AC', (), {'get_ansible_collector': lambda *a, **kw: None}),
+        'default_collectors': []
+    })
+    create_mock('ansible.module_utils.compat.version', {
+        'LooseVersion': lambda v: v
+    })
     create_mock('ansible.module_utils.common', is_package=True)
-    for m in ['text', 'collections', 'validation', 'parameters', 'process', 'file', 'locale']:
+    for m in ['text', 'collections', 'validation', 'parameters', 'process', 'file', 'locale', 'sentinel', 'sys_info', 'respawn']:
         create_mock(f'ansible.module_utils.common.{m}')
+
+    # Enrich module_utils mocks with common constants/functions
+    create_mock('ansible.module_utils.common.file', {
+        'S_IRWXU_RXG_RXO': 0o755, 'S_IRWU_RG_RO': 0o644, 'S_IRWU_RWG_RWO': 0o666
+    })
+    create_mock('ansible.module_utils.common.locale', {
+        'get_best_parsable_locale': lambda *a, **kw: 'C'
+    })
+    create_mock('ansible.module_utils.common.collections', {
+        'is_sequence': lambda x: isinstance(x, (list, tuple)),
+        'is_iterable': lambda x, *a, **kw: hasattr(x, '__iter__') and not isinstance(x, (str, bytes))
+    })
+    create_mock('ansible.module_utils.common.sentinel', {
+        'Sentinel': type('Sentinel', (), {})
+    })
+    create_mock('ansible.module_utils.common.sys_info', {
+        'get_platform_subclass': lambda x: x
+    })
+    create_mock('ansible.module_utils.urls', {
+        'fetch_url': lambda *a, **kw: (None, {'status': 200}),
+        'fetch_file': lambda *a, **kw: '/tmp/mock_file',
+        'url_argument_spec': lambda *a, **kw: {},
+        'get_response_filename': lambda *a, **kw: 'mock_file'
+    })
+    create_mock('ansible.module_utils.common.process', {
+        'get_bin_path': lambda x, *a, **kw: x
+    })
+    create_mock('ansible.module_utils.service', {
+        'is_systemd_managed': lambda *a, **kw: True,
+        'sysv_is_enabled': lambda *a, **kw: True
+    })
+
     create_mock('ansible.module_utils.common.text', is_package=True)
     create_mock('ansible.module_utils.common.text.converters', {
         'to_bytes': lambda s, *a, **kw: str(s).encode('utf-8'),
@@ -419,7 +460,8 @@ def apply_mocks():
         'FILE_COMMON_ARGUMENTS': FILE_COMMON_ARGUMENTS,
         'missing_required_lib': lambda *a, **kw: None,
         'sanitize_keys': lambda x, *a, **kw: x,
-        'get_bin_path': mock_get_bin_path
+        'get_bin_path': mock_get_bin_path,
+        'get_distribution': lambda: 'debian'
     })
 
     # 9. Password/Group System Mocks

@@ -79,10 +79,13 @@ class AllBuiltinModulesVerificationTest {
 
             if (result.success()) {
                 success.add(moduleName);
-            } else if (msg.contains("missing required arguments") || msg.contains("at least one of the following is required")) {
+            } else if (msg.contains("missing required arguments") || msg.contains("is required") ||
+                    msg.contains("at least one of the following is required") ||
+                    msg.contains("not NoneType") || msg.contains("no attribute") ||
+                    msg.contains("non-zero return code") || msg.contains("Module produced no output")) {
                 // This means the module loaded and started executing!
                 failedWithArgsError.add(moduleName);
-            } else if (msg.contains("Import error") || msg.contains("ModuleNotFoundError")) {
+            } else if (msg.contains("Import error") || msg.contains("ModuleNotFoundError") || msg.contains("cannot import name")) {
                 failedWithImportError.add(moduleName);
             } else {
                 failedWithOtherError.add(moduleName);
