@@ -86,6 +86,11 @@ public class TaskExecutor implements ITaskExecutor {
         currentVariableManager.remove();
     }
 
+    private static final List<String> WELL_KNOWN_ACTION_PLUGINS = List.of(
+            "debug", "set_fact", "copy", "template", "assemble", "group_by",
+            "include_vars", "fetch", "pause", "wait_for_connection", "gather_facts",
+            "unarchive", "uri", "script", "reboot", "async_status", "add_host", "assert"
+    );
     private final Map<String, org.example.ansible.module.Module> modules = new HashMap<>();
     private final Map<String, ActionPlugin> builtInActionPlugins = new HashMap<>();
     private final Map<String, Boolean> actionPluginCache = new ConcurrentHashMap<>();
@@ -310,7 +315,7 @@ public class TaskExecutor implements ITaskExecutor {
         }
 
         final String finalBaseName = baseName;
-        if (builtInActionPlugins.containsKey(finalBaseName)) {
+        if (builtInActionPlugins.containsKey(finalBaseName) || WELL_KNOWN_ACTION_PLUGINS.contains(finalBaseName)) {
             return true;
         }
         return actionPluginCache.computeIfAbsent(finalBaseName, a -> {
@@ -454,6 +459,17 @@ public class TaskExecutor implements ITaskExecutor {
 
     @Override
     public TaskResult execute(Task task, BecomeContext becomeContext, Map<String, String> environment) {
+        setCurrentBecomeContext(becomeContext);
+        setCurrentEnvironment(environment);
+        try {
+            return executeInternal(task, becomeContext, environment);
+        } finally {
+            clearCurrentBecomeContext();
+            clearCurrentEnvironment();
+        }
+    }
+
+    private TaskResult executeInternal(Task task, BecomeContext becomeContext, Map<String, String> environment) {
         String actionName = task.action();
         if (actionName.startsWith("ansible.builtin.")) {
             actionName = actionName.substring("ansible.builtin.".length());

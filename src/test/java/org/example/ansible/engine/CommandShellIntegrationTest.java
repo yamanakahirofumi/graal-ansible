@@ -47,7 +47,9 @@ class CommandShellIntegrationTest {
         assertTrue(result.success(), "Execution failed: " + result.message() + " Data: " + result.data());
         assertTrue(result.changed());
         assertEquals(0, result.data().get("rc"));
-        assertEquals("hello", ((String)result.data().get("stdout")).trim());
+        String stdout = (String) result.data().get("stdout");
+        assertNotNull(stdout, "stdout should not be null");
+        assertEquals("hello", stdout.trim());
     }
 
     @Test
@@ -69,7 +71,9 @@ class CommandShellIntegrationTest {
         TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
 
         assertTrue(result.success(), result.message());
-        assertEquals("line2", ((String)result.data().get("stdout")).trim());
+        String stdout = (String) result.data().get("stdout");
+        assertNotNull(stdout, "stdout should not be null");
+        assertEquals("line2", stdout.trim());
     }
 
     @Test
@@ -122,6 +126,8 @@ class CommandShellIntegrationTest {
         assertTrue(result.success(), result.message());
         // Note: shell expansion of $MY_VAR might only work in 'shell' or if 'command' is executed via shell
         // Our 'command' implementation currently uses osHandler.getShellExecutable() which IS a shell.
-        assertEquals("my_value", ((String)result.data().get("stdout")).trim());
+        String stdout = (String) result.data().get("stdout");
+        assertNotNull(stdout, "stdout should not be null");
+        assertEquals("my_value", stdout.trim());
     }
 }

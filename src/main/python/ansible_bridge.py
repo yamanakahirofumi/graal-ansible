@@ -163,6 +163,9 @@ class Task:
         self.no_log = False
         self.delegate_to = None
         self.delegate_facts = False
+        self.environment = {}
+        self._role = None
+        self._original_basename = None
     def get_name(self): return "mock_task"
     def copy(self):
         new_task = Task()
@@ -249,13 +252,13 @@ class AnsibleModule:
     def atomic_move(self, src, dest, unsafe_writes=False, **kwargs):
         import os, shutil
         shutil.move(src, dest)
+    def debug(self, msg): pass
     def load_file_common_arguments(self, params, path=None):
         res = {}
         for k in ['mode', 'owner', 'group', 'seuser', 'serole', 'setype', 'selevel', 'attributes', 'unsafe_writes']:
             if k in params: res[k] = params[k]
         return res
     def set_fs_attributes_if_different(self, file_args, changed, diff=None, expand=True):
-        self.exit_json(changed=changed, **file_args)
         return changed
 
 # --- Mock Application ---
@@ -281,6 +284,8 @@ def apply_mocks():
         return m
 
     # 1. Native & System Mocks
+    if not hasattr(os, 'geteuid'): os.geteuid = lambda: 0
+    if not hasattr(os, 'getuid'): os.getuid = lambda: 0
     create_mock('_posixsubprocess', {'fork_exec': lambda *a, **kw: 0, 'cloexec_pipe': lambda: (0, 0)}, False)
     create_mock('fcntl', {'fcntl': lambda *a, **kw: 0, 'ioctl': lambda *a, **kw: 0, 'flock': lambda *a, **kw: 0, 'lockf': lambda *a, **kw: 0}, False)
     create_mock('resource', {'getrlimit': lambda *a, **kw: (1024, 1024), 'RLIMIT_NOFILE': 7}, False)
@@ -338,10 +343,21 @@ def apply_mocks():
     class AnsibleActionFail(AnsibleError): pass
     class AnsibleActionSkip(AnsibleError): pass
     class AnsibleFileNotFound(AnsibleError): pass
+    class AnsibleConnectionFailure(AnsibleError): pass
+    class AnsibleParserError(AnsibleError): pass
+    class AnsiblePromptInterrupt(AnsibleError): pass
+    class AnsiblePromptNoninteractive(AnsibleError): pass
+
     create_mock('ansible.errors', {
-        'AnsibleError': AnsibleError, 'AnsibleValueOmittedError': AnsibleValueOmittedError,
-        'AnsibleActionFail': AnsibleActionFail, 'AnsibleActionSkip': AnsibleActionSkip,
-        'AnsibleFileNotFound': AnsibleFileNotFound
+        'AnsibleError': AnsibleError,
+        'AnsibleValueOmittedError': AnsibleValueOmittedError,
+        'AnsibleActionFail': AnsibleActionFail,
+        'AnsibleActionSkip': AnsibleActionSkip,
+        'AnsibleFileNotFound': AnsibleFileNotFound,
+        'AnsibleConnectionFailure': AnsibleConnectionFailure,
+        'AnsibleParserError': AnsibleParserError,
+        'AnsiblePromptInterrupt': AnsiblePromptInterrupt,
+        'AnsiblePromptNoninteractive': AnsiblePromptNoninteractive
     })
 
     # 5. Plugins & Loader
@@ -375,6 +391,9 @@ def apply_mocks():
     create_mock('ansible._internal', {
         'get_controller_serialize_map': lambda: {}
     })
+    create_mock('ansible._internal._locking')
+    create_mock('ansible._internal._datatag', {'SourceWasEncrypted': type('SWE', (Exception,), {})})
+    create_mock('ansible._internal._datatag._tags', {'SourceWasEncrypted': type('SWE', (Exception,), {})})
     create_mock('ansible._internal._templating', {
         '_template_vars': types.SimpleNamespace(generate_ansible_template_vars=lambda *a, **kw: {}),
         'get_text_file_contents': lambda x, *a, **kw: (open(x, 'r').read() if x and os.path.exists(x) else "mock_content", True)
@@ -410,7 +429,9 @@ def apply_mocks():
     create_mock('ansible.module_utils.compat.version', {'LooseVersion': str, 'StrictVersion': str})
     create_mock('ansible.module_utils.parsing.convert_bool', {
         'convert_bool': lambda x, *a, **kw: str(x).lower() in ('yes', 'true', 't', '1'),
-        'boolean': lambda x, *a, **kw: str(x).lower() in ('yes', 'true', 't', '1')
+        'boolean': lambda x, *a, **kw: str(x).lower() in ('yes', 'true', 't', '1'),
+        'BOOLEANS_TRUE': frozenset(['y', 'yes', 'on', '1', 'true', 't', 1, True]),
+        'BOOLEANS_FALSE': frozenset(['n', 'no', 'off', '0', 'false', 'f', 0, False])
     })
     FILE_COMMON_ARGUMENTS = {
         'path': dict(type='str', aliases=['dest', 'name']),
@@ -430,6 +451,7 @@ def apply_mocks():
     create_mock('ansible.module_utils.basic', {
         'AnsibleModule': AnsibleModule,
         '_load_params': lambda: (_current_task_context['complex_args'], 'main'),
+        '_ANSIBLE_PROFILE': 'modern',
         'FILE_COMMON_ARGUMENTS': FILE_COMMON_ARGUMENTS,
         'missing_required_lib': lambda *a, **kw: None,
         'sanitize_keys': lambda x, *a, **kw: x,
@@ -441,8 +463,17 @@ def apply_mocks():
     # 9. Password/Group System Mocks
     import collections
     passwd, group = collections.namedtuple('passwd', ['pw_name', 'pw_passwd', 'pw_uid', 'pw_gid', 'pw_gecos', 'pw_dir', 'pw_shell']), collections.namedtuple('group', ['gr_name', 'gr_passwd', 'gr_gid', 'gr_mem'])
-    create_mock('grp', {'getgrnam': lambda *a, **kw: group('root', 'x', 0, []), 'getgrgid': lambda *a, **kw: group('root', 'x', 0, []), 'getgrall': lambda: []}, False)
-    create_mock('pwd', {'getpwnam': lambda *a, **kw: passwd('root', 'x', 0, 0, 'root', '/root', '/bin/bash'), 'getpwuid': lambda *a, **kw: passwd('root', 'x', 0, 0, 'root', '/root', '/bin/bash'), 'getpwall': lambda: []}, False)
+
+    def mock_getgrnam(name):
+        if name == 'root': return group('root', 'x', 0, [])
+        return group(str(name), 'x', 1001, [])
+
+    def mock_getpwnam(name):
+        if name == 'root': return passwd('root', 'x', 0, 0, 'root', '/root', '/bin/bash')
+        return passwd(str(name), 'x', 1001, 1001, str(name), f'/home/{name}', '/bin/bash')
+
+    create_mock('grp', {'getgrnam': mock_getgrnam, 'getgrgid': lambda *a, **kw: group('root', 'x', 0, []), 'getgrall': lambda: []}, False)
+    create_mock('pwd', {'getpwnam': mock_getpwnam, 'getpwuid': lambda *a, **kw: passwd('root', 'x', 0, 0, 'root', '/root', '/bin/bash'), 'getpwall': lambda: []}, False)
     create_mock('syslog', {
         'openlog': lambda *a, **kw: None, 'syslog': lambda *a, **kw: None, 'closelog': lambda *a, **kw: None, 'setlogmask': lambda *a, **kw: None,
         'LOG_NOTICE': 5, 'LOG_INFO': 6, 'LOG_DEBUG': 7, 'LOG_ERR': 3, 'LOG_WARNING': 4
