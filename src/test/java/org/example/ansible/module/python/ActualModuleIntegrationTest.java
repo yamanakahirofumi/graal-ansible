@@ -152,7 +152,7 @@ class ActualModuleIntegrationTest {
 
     @Test
     void testActualDebugModule() {
-        taskExecutor.registerModule("debug", new PythonModule("debug"));
+        // debug is an Action Plugin, no need to register it manually as a PythonModule.
 
         Task task = new Task("test_debug", "debug", Map.of("msg", "Hello from Actual Debug Module"));
         TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);

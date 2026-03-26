@@ -461,6 +461,11 @@ public class TaskExecutor implements ITaskExecutor {
             actionName = actionName.substring("ansible.legacy.".length());
         }
 
+        // Try Action Plugin first
+        if (isActionPlugin(task.action())) {
+            return executeActionPlugin(task, becomeContext, getCurrentConnection(), environment, Map.of());
+        }
+
         org.example.ansible.module.Module module = modules.get(actionName);
         if (module == null) {
             module = new PythonModule(task.action());
