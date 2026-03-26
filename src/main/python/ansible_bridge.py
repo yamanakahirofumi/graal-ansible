@@ -204,6 +204,7 @@ class AnsibleModule:
     def __init__(self, argument_spec, *args, **kwargs):
         self.params = {}
         self.aliases = {}
+        self._stored_file_args = {}
         input_args = _current_task_context['complex_args'] or {}
         effective_spec = argument_spec.copy() if argument_spec else {}
         if kwargs.get('add_file_common_args'):
@@ -219,6 +220,10 @@ class AnsibleModule:
         self.check_mode = self._debug = self._diff = False
     def exit_json(self, **kwargs):
         if 'changed' not in kwargs: kwargs['changed'] = False
+        # Inject stored file attributes if they were requested but missing from result
+        for k, v in self._stored_file_args.items():
+            if k not in kwargs and v is not None:
+                kwargs[k] = v
         print(json.dumps(kwargs)); sys.exit(0)
     def fail_json(self, **kwargs):
         kwargs['failed'] = True
@@ -259,6 +264,7 @@ class AnsibleModule:
             if k in params: res[k] = params[k]
         return res
     def set_fs_attributes_if_different(self, file_args, changed, diff=None, expand=True):
+        if file_args: self._stored_file_args.update(file_args)
         return changed
 
 # --- Mock Application ---
