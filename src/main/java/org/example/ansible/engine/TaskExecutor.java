@@ -578,19 +578,32 @@ public class TaskExecutor implements ITaskExecutor {
 
     @Override
     public Map<String, Object> execute_from_python(String moduleName, Map<String, Object> moduleArgs, Map<String, Object> taskVars) {
-        // Create a temporary task for the module execution
-        Task subTask = new Task(
-                "execute_from_python",
-                moduleName,
-                moduleArgs,
-                null, null, null, null, null, null, null, false,
-                null, 0, 0, null, false, false, false, null, null, null,
-                null, null, null, null, null, null
-        );
+        try {
+            // Create a temporary task for the module execution
+            Task subTask = new Task(
+                    "execute_from_python",
+                    moduleName,
+                    moduleArgs,
+                    null, null, null, null, null, null, null, false,
+                    null, 0, 0, null, false, false, false, null, null, null,
+                    null, null, null, null, null, null
+            );
 
-        // Execute as a normal module, using the current connection and environment
-        TaskResult result = execute(subTask, getCurrentBecomeContext(), getCurrentConnection(), getCurrentEnvironment());
-        return result.data();
+            // Execute as a normal module, using the current connection and environment
+            TaskResult result = execute(subTask, getCurrentBecomeContext(), getCurrentConnection(), getCurrentEnvironment());
+            if (result == null) {
+                return Map.of("failed", true, "msg", "Module execution returned null result");
+            }
+            Map<String, Object> data = new HashMap<>(result.data());
+            data.put("failed", !result.success());
+            data.put("changed", result.changed());
+            if (result.message() != null && !result.message().isEmpty()) {
+                data.put("msg", result.message());
+            }
+            return data;
+        } catch (Throwable t) {
+            return Map.of("failed", true, "msg", "Execution from Python failed: " + t.getMessage());
+        }
     }
 
     private Source loadResource(String name) throws java.io.IOException {

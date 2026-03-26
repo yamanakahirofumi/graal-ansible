@@ -172,7 +172,7 @@ public class PythonModule implements Module {
             String output = execRes.stdout();
 
             if (output == null || output.isBlank()) {
-                return TaskResult.failure("Module produced no output: " + execRes.stderr());
+                return TaskResult.failure("Module produced no output (exit code " + execRes.exitCode() + "): " + execRes.stderr());
             }
 
             String jsonOutput = output;
