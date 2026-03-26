@@ -12,9 +12,25 @@ _current_task_context = {
     'environment_java': None
 }
 
+def _deep_convert(obj):
+    if hasattr(obj, 'items'):
+        return {str(k): _deep_convert(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [_deep_convert(v) for v in obj]
+    elif hasattr(obj, '__iter__') and not isinstance(obj, (str, bytes)):
+        try: return [_deep_convert(v) for v in obj]
+        except: return obj
+    return obj
+
 def bind_task(complex_args, connection_java, become_context_java, environment_java):
+    if complex_args is not None:
+        complex_args = _deep_convert(complex_args)
+        if not isinstance(complex_args, dict):
+            try: complex_args = dict(complex_args)
+            except: pass
+
     _current_task_context.update({
-        'complex_args': complex_args,
+        'complex_args': complex_args or {},
         'connection_java': connection_java,
         'become_context_java': become_context_java,
         'environment_java': environment_java
@@ -92,10 +108,13 @@ class ActionBase:
     def validate_argument_spec(self, argument_spec, *args, **kwargs):
         res = {}
         input_args = self._task.args or {}
+        missing = []
         for k, v in argument_spec.items():
             if k in input_args: res[k] = input_args[k]
             elif isinstance(v, dict) and 'default' in v: res[k] = v['default']
-            elif isinstance(v, dict) and v.get('required'): res[k] = None
+            elif isinstance(v, dict) and v.get('required'):
+                res[k] = None
+                missing.append(k)
             else: res[k] = None
         return types.SimpleNamespace(error=None, warning=None), res
     def _execute_module(self, module_name=None, module_args=None, tmp=None, task_vars=None, *args, **kwargs):
@@ -122,9 +141,6 @@ class ActionBase:
             with open(path, 'rb') as f:
                 csum = hashlib.sha1(f.read()).hexdigest()
             return {'exists': True, 'checksum': csum, 'isdir': os.path.isdir(path), 'isreg': os.path.isfile(path), 'islnk': os.path.islink(path)}
-        # In integration tests, dest often doesn't exist yet, but copy action plugin expects it to be faked if transferred?
-        # No, wait, if it doesn't exist, it should return exists=False.
-        # The error "Copied file does not match the expected checksum" usually means the transfer happened but verification failed.
         return {'exists': False, 'checksum': None, 'isdir': False, 'isreg': False, 'islnk': False}
     def _transfer_file(self, local_path, remote_path):
         conn = _current_task_context['connection_java']
@@ -191,31 +207,84 @@ class AnsibleModule:
         effective_spec = argument_spec.copy() if argument_spec else {}
         if kwargs.get('add_file_common_args'):
             effective_spec.update(sys.modules['ansible.module_utils.basic'].FILE_COMMON_ARGUMENTS)
+
+        missing = []
         for k, v in effective_spec.items():
-            if k in input_args: self.params[k] = input_args[k]
-            elif isinstance(v, dict) and 'default' in v: self.params[k] = v['default']
-            else: self.params[k] = None
+            if k in input_args:
+                self.params[k] = input_args[k]
+            elif isinstance(v, dict) and 'default' in v:
+                self.params[k] = v['default']
+            elif isinstance(v, dict) and v.get('required'):
+                missing.append(k)
+            else:
+                self.params[k] = None
+
+        if missing and not input_args:
+            self.fail_json(msg=f"missing required arguments: {', '.join(missing)}")
+
         for k, v in input_args.items():
             if k not in self.params: self.params[k] = v
         if '_raw_params' in input_args: self.params['_raw_params'] = input_args['_raw_params']
         self.params['_uses_shell'] = input_args.get('_uses_shell', False)
-        self.check_mode = self._debug = self._diff = False
+        self.check_mode = input_args.get('_ansible_check_mode', False)
+
+        # Force common parameters to string if they are bytes or Graal values
+        for key in ['path', 'dest', 'src', 'regexp', 'replace', 'line']:
+            if key in self.params:
+                val = self.params[key]
+                if isinstance(val, bytes):
+                    self.params[key] = val.decode('utf-8')
+                elif hasattr(val, 'decode'):
+                    try: self.params[key] = val.decode('utf-8')
+                    except: pass
+
+        # Resolve relative paths
+        for key in ['path', 'dest']:
+            if key in self.params and self.params[key]:
+                p = str(self.params[key])
+                if not os.path.isabs(p) and 'task_executor_java' in globals():
+                    res = task_executor_java.resolveLocalPath(p)
+                    if res: self.params[key] = str(res)
+                else:
+                    self.params[key] = p
+
+        self._debug = self._diff = False
+        self.tmpdir = "/tmp"
+
     def exit_json(self, **kwargs):
         if 'changed' not in kwargs: kwargs['changed'] = False
+        # Inject file attributes if they were requested but not in the result
+        for key in ['mode', 'owner', 'group', 'seuser', 'serole', 'setype', 'selevel', 'attributes']:
+            if key in self.params and key not in kwargs:
+                kwargs[key] = self.params[key]
         print(json.dumps(kwargs)); sys.exit(0)
     def fail_json(self, **kwargs):
         kwargs['failed'] = True
         if 'msg' not in kwargs: kwargs['msg'] = 'Module failed'
         print(json.dumps(kwargs))
         sys.exit(1)
+    def warn(self, msg): pass
+    def debug(self, msg): pass
     def run_command(self, args, **kwargs):
+        if isinstance(args, list):
+            args = [item.decode('utf-8') if isinstance(item, bytes) else str(item) for item in args]
+        elif isinstance(args, bytes):
+            args = args.decode('utf-8')
+
         conn = _current_task_context['connection_java']
         if conn:
             command = " ".join(args) if isinstance(args, list) else args
             env = dict(_current_task_context['environment_java']) if _current_task_context['environment_java'] is not None else None
             res = conn.execCommand(command, _current_task_context['become_context_java'], env)
             return (res.exitCode(), res.stdout(), res.stderr())
-        return (1, '', 'No connection')
+
+        import subprocess
+        try:
+            p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=isinstance(args, str))
+            stdout, stderr = p.communicate()
+            return (p.returncode, stdout.decode('utf-8'), stderr.decode('utf-8'))
+        except Exception as e:
+            return (1, '', str(e))
     def get_bin_path(self, arg, required=False, opt_dirs=None): return arg
     def sha1(self, path):
         import hashlib
@@ -241,8 +310,10 @@ class AnsibleModule:
             if k in params: res[k] = params[k]
         return res
     def set_fs_attributes_if_different(self, file_args, changed, diff=None, expand=True):
-        self.exit_json(changed=changed, **file_args)
         return changed
+
+    def set_file_attributes_if_different(self, file_args, changed, diff=None, expand=True):
+        return self.set_fs_attributes_if_different(file_args, changed, diff, expand)
 
 # --- Mock Application ---
 
@@ -266,7 +337,8 @@ def apply_mocks():
     create_mock('resource', {'getrlimit': lambda *a, **kw: (1024, 1024), 'RLIMIT_NOFILE': 7}, False)
     for m in ['cryptography', 'yaml._yaml', 'markupsafe._speedups', 'selinux']: create_mock(m)
     create_mock('termios', {'TCSAFLUSH': 1, 'tcgetattr': lambda *a, **kw: [0,0,0,0, ' ', ' ', []], 'tcsetattr': lambda *a, **kw: None})
-    create_mock('syslog', {'openlog': lambda *a, **kw: None, 'syslog': lambda *a, **kw: None, 'closelog': lambda *a, **kw: None, 'setlogmask': lambda *a, **kw: None})
+    create_mock('syslog', {'openlog': lambda *a, **kw: None, 'syslog': lambda *a, **kw: None, 'closelog': lambda *a, **kw: None, 'setlogmask': lambda *a, **kw: None,
+                          'LOG_NOTICE': 5, 'LOG_INFO': 6, 'LOG_DEBUG': 7, 'LOG_ERR': 3, 'LOG_WARNING': 4}, False)
     create_mock('markupsafe', {
         'escape': lambda s, *a, **kw: s, 'soft_str': str, 'soft_unicode': str, 'Markup': str,
         'EscapeFormatter': type('EF', (), {})
@@ -374,16 +446,105 @@ def apply_mocks():
 
     # 8. Module Utils
     create_mock('ansible.module_utils', is_package=True)
-    for m in ['facts', 'urls', 'six', 'compat', 'service', 'pycompat24', 'distro']:
+    for m in ['facts', 'facts.system', 'facts.collector', 'facts.utils', 'facts.packages',
+              'facts.namespace', 'facts.ansible_collector', 'facts.system.chroot',
+              'facts.system.service_mgr', 'facts.system.distribution',
+              'urls', 'six', 'compat', 'compat.version', 'service', 'pycompat24', 'distro', 'yumdnf',
+              'common', 'common.sentinel', 'common.respawn', 'common.file', 'common.locale',
+              'common.collections', 'common.sys_info', 'common.text', 'common.text.converters',
+              'common.process', 'common.validation', 'common.parameters']:
         create_mock(f'ansible.module_utils.{m}')
-    create_mock('ansible.module_utils.common', is_package=True)
-    for m in ['text', 'collections', 'validation', 'parameters', 'process', 'file', 'locale']:
-        create_mock(f'ansible.module_utils.common.{m}')
+
+    import stat as stat_mod
+    create_mock('ansible.module_utils.common.file', {
+        'is_executable': lambda x: os.path.isfile(x) and os.access(x, os.X_OK),
+        'S_IRWXU_RXG_RXO': stat_mod.S_IRWXU | (stat_mod.S_IRGRP | stat_mod.S_IXGRP) | (stat_mod.S_IROTH | stat_mod.S_IXOTH),
+        'S_IRWU_RG_RO': stat_mod.S_IRUSR | stat_mod.S_IWUSR | stat_mod.S_IRGRP | stat_mod.S_IROTH,
+        'S_IRWU_RWG_RWO': stat_mod.S_IRUSR | stat_mod.S_IWUSR | stat_mod.S_IRGRP | stat_mod.S_IWGRP | stat_mod.S_IROTH | stat_mod.S_IWOTH,
+    })
+    create_mock('ansible.module_utils.common.sentinel', {'Sentinel': type('Sentinel', (), {})})
+    create_mock('ansible.module_utils.common.respawn', {
+        'respawn_module': lambda *a, **kw: None,
+        'has_respawned': lambda *a, **kw: False,
+        'probe_interpreters_for_module': lambda *a, **kw: None
+    })
+    create_mock('ansible.module_utils.common.sys_info', {
+        'get_distribution': lambda: 'Linux',
+        'get_distribution_version': lambda: '20.04',
+        'get_platform_subclass': lambda cls: cls
+    })
+    create_mock('ansible.module_utils.common.locale', {'get_best_parsable_locale': lambda *a, **kw: 'C'})
+    create_mock('ansible.module_utils.common.collections', {
+        'is_iterable': lambda x, *a, **kw: hasattr(x, '__iter__') and not isinstance(x, (str, bytes)),
+        'is_sequence': lambda x: isinstance(x, (list, tuple))
+    })
+    create_mock('ansible.module_utils.compat.version', {'LooseVersion': lambda x: x})
+    from urllib.parse import urlparse
+    create_mock('ansible.module_utils.urls', {
+        'fetch_url': lambda *a, **kw: (None, {'status': 404}),
+        'fetch_file': lambda *a, **kw: None,
+        'url_argument_spec': lambda *a, **kw: {},
+        'get_response_filename': lambda *a, **kw: None,
+        'parse_content_type': lambda *a, **kw: (None, {}),
+        'generic_urlparse': lambda *a, **kw: None,
+        'prepare_multipart': lambda *a, **kw: None,
+        'open_url': lambda *a, **kw: None,
+        'url_redirect_argument_spec': lambda *a, **kw: {},
+        'get_user_agent': lambda *a, **kw: 'ansible-agent',
+        'urlparse': urlparse
+    })
+    create_mock('ansible.module_utils.facts.ansible_collector', {'get_ansible_collector': lambda *a, **kw: None})
+    create_mock('ansible.module_utils.facts', {
+        'default_collectors': {'collectors': []},
+        'timeout': type('TO', (), {'TimeoutError': Exception})
+    })
+    create_mock('ansible.module_utils.facts.collector', {
+        'BaseFactCollector': type('BFC', (), {}),
+        'CollectorNotFoundError': Exception,
+        'find_collectors_for_platform': lambda *a, **kw: [],
+        'CycleFoundInFactDeps': Exception,
+        'UnresolvedFactDep': Exception
+    })
+    create_mock('ansible.module_utils.facts.namespace', {'PrefixFactNamespace': type('PFN', (), {})})
+    create_mock('ansible.module_utils.facts.system.chroot', {'is_chroot': lambda: False})
+    create_mock('ansible.module_utils.facts.system.service_mgr', {'ServiceMgrFactCollector': type('SMFC', (), {})})
+    create_mock('ansible.module_utils.facts.utils', {
+        'get_file_content': lambda *a, **kw: None,
+        'get_mount_size': lambda *a, **kw: {}
+    })
+    create_mock('ansible.module_utils.facts.packages', {
+        'CLIMgr': type('CLIMgr', (), {}),
+        'RespawningLibMgr': type('RespawningLibMgr', (), {}),
+        'get_all_pkg_managers': lambda *a, **kw: {}
+    })
+    create_mock('ansible.module_utils.service', {
+        'fail_if_missing': lambda *a, **kw: None,
+        'is_systemd_managed': lambda *a, **kw: False,
+        'sysv_is_enabled': lambda *a, **kw: False,
+        'get_sysv_script': lambda *a, **kw: None,
+        'sysv_exists': lambda *a, **kw: False,
+        'get_ps': lambda *a, **kw: None,
+        'daemonize': lambda *a, **kw: None
+    })
+
     create_mock('ansible.module_utils.common.text', is_package=True)
+
+    def to_bytes(s, encoding='utf-8', errors='surrogate_or_strict', nonstring='simplerepr'):
+        if isinstance(s, bytes): return s
+        if s is None: return None
+        return str(s).encode(encoding, errors)
+
+    def to_text(s, encoding='utf-8', errors='surrogate_or_strict', nonstring='simplerepr'):
+        if isinstance(s, str): return s
+        if s is None: return None
+        if isinstance(s, bytes): return s.decode(encoding, errors)
+        return str(s)
+
     create_mock('ansible.module_utils.common.text.converters', {
-        'to_bytes': lambda s, *a, **kw: str(s).encode('utf-8'),
-        'to_text': lambda s, *a, **kw: str(s),
-        'to_native': lambda s, *a, **kw: str(s)
+        'to_bytes': to_bytes,
+        'to_text': to_text,
+        'to_native': to_text,
+        'to_unicode': to_text
     })
     create_mock('ansible.module_utils.common.validation', {
         '_check_type_str_no_conversion': lambda s, *a, **kw: s,
@@ -394,7 +555,6 @@ def apply_mocks():
     create_mock('ansible.module_utils.common.collections', {
         'is_iterable': lambda x, *a, **kw: hasattr(x, '__iter__') and not isinstance(x, (str, bytes))
     })
-    create_mock('ansible.module_utils.parsing', is_package=True)
     create_mock('ansible.module_utils.parsing.convert_bool', {
         'convert_bool': lambda x, *a, **kw: str(x).lower() in ('yes', 'true', 't', '1'),
         'boolean': lambda x, *a, **kw: str(x).lower() in ('yes', 'true', 't', '1')
@@ -419,7 +579,11 @@ def apply_mocks():
         'FILE_COMMON_ARGUMENTS': FILE_COMMON_ARGUMENTS,
         'missing_required_lib': lambda *a, **kw: None,
         'sanitize_keys': lambda x, *a, **kw: x,
-        'get_bin_path': mock_get_bin_path
+        'get_bin_path': mock_get_bin_path,
+        'is_executable': lambda x: os.path.isfile(x) and os.access(x, os.X_OK),
+        'get_distribution': lambda: 'Linux',
+        'get_distribution_version': lambda: '20.04',
+        'get_distribution_release': lambda: 'focal'
     })
 
     # 9. Password/Group System Mocks
@@ -427,10 +591,6 @@ def apply_mocks():
     passwd, group = collections.namedtuple('passwd', ['pw_name', 'pw_passwd', 'pw_uid', 'pw_gid', 'pw_gecos', 'pw_dir', 'pw_shell']), collections.namedtuple('group', ['gr_name', 'gr_passwd', 'gr_gid', 'gr_mem'])
     create_mock('grp', {'getgrnam': lambda *a, **kw: group('root', 'x', 0, []), 'getgrgid': lambda *a, **kw: group('root', 'x', 0, []), 'getgrall': lambda: []}, False)
     create_mock('pwd', {'getpwnam': lambda *a, **kw: passwd('root', 'x', 0, 0, 'root', '/root', '/bin/bash'), 'getpwuid': lambda *a, **kw: passwd('root', 'x', 0, 0, 'root', '/root', '/bin/bash'), 'getpwall': lambda: []}, False)
-    create_mock('syslog', {
-        'openlog': lambda *a, **kw: None, 'syslog': lambda *a, **kw: None, 'closelog': lambda *a, **kw: None, 'setlogmask': lambda *a, **kw: None,
-        'LOG_NOTICE': 5, 'LOG_INFO': 6, 'LOG_DEBUG': 7, 'LOG_ERR': 3, 'LOG_WARNING': 4
-    }, False)
 
     # 10. JSON handling
     if not hasattr(json, '_graal_ansible_patched'):
@@ -507,8 +667,10 @@ def execute_module(module_name, complex_args, module_code=None):
                 if os.path.exists(cand): path = cand; break
             if not path: return json.dumps({'failed': True, 'msg': f'Module {module_name} not found'})
             with open(path, 'rb') as f:
-                code = compile(f.read(), path, 'exec')
-                exec(code, {'__name__': '__main__', '__file__': path, '__package__': 'ansible.modules'})
+                content = f.read()
+                path_str = str(path)
+                code = compile(content, path_str, 'exec')
+                exec(code, {'__name__': '__main__', '__file__': path_str, '__package__': 'ansible.modules'})
         return sys.stdout.getvalue()
     except SystemExit:
         return sys.stdout.getvalue()

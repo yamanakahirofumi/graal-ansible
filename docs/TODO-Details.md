@@ -8,8 +8,8 @@
 ### [ ] 実際の Ansible コレクションを使ったテストの実施
 - **概要**: [実際のコレクションを使ったテスト方法の設計](tech/Actual-Collection-Testing.md) に基づき、主要なモジュールのテストを統合。
 - **進捗**:
-    - `ansible.builtin.ping`, `copy`, `file`, `stat`, `template` の統合テストを CI 環境へ統合済み。
-    - `command`, `shell`, `setup`, `lineinfile` 等のテスト統合が進行中。
+    - `ansible.builtin.ping`, `copy`, `file`, `stat`, `template`, `lineinfile`, `replace` の統合テストを CI 環境へ統合済み。
+    - `command`, `shell`, `setup` 等のテスト統合が進行中。
     - GraalPy および `ansible-core` のセットアップを GitHub Actions 上で自動化済み。
 
 ### [ ] CI における Native Image ビルドの安定化
