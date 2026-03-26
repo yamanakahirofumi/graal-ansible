@@ -214,9 +214,15 @@ class AnsibleModule:
         if '_raw_params' in input_args: self.params['_raw_params'] = input_args['_raw_params']
         self.params['_uses_shell'] = input_args.get('_uses_shell', False)
         self.check_mode = self._debug = self._diff = False
+        import tempfile
+        self.tmpdir = tempfile.gettempdir()
+    def debug(self, msg):
+        pass
     def exit_json(self, **kwargs):
         if 'changed' not in kwargs: kwargs['changed'] = False
-        print(json.dumps(kwargs)); sys.exit(0)
+        res = self.params.copy()
+        res.update(kwargs)
+        print(json.dumps(res)); sys.exit(0)
     def fail_json(self, **kwargs):
         kwargs['failed'] = True
         if 'msg' not in kwargs: kwargs['msg'] = 'Module failed'
@@ -255,7 +261,10 @@ class AnsibleModule:
             if k in params: res[k] = params[k]
         return res
     def set_fs_attributes_if_different(self, file_args, changed, diff=None, expand=True):
-        self.exit_json(changed=changed, **file_args)
+        self.params.update(file_args)
+        return changed
+    def set_file_attributes_if_different(self, file_args, changed, diff=None, expand=True):
+        self.params.update(file_args)
         return changed
 
 # --- Mock Application ---
