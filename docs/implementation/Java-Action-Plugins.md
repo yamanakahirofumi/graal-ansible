@@ -2,13 +2,19 @@
 
 本ドキュメントでは、`graal-ansible` において Java で実装される「軽量 Action Plugin エミュレータ」の設計パターンと実装方法について解説します。
 
+> [!WARNING]
+> **重要: 開発方針の変更**
+> 現在、プロジェクトは **「Python-first」** アーキテクチャに移行しました。主要なコアモジュール（`copy`, `template`, `debug`, `setup` 等）の以前の Java エミュレータ実装は、本家 Ansible との完全な互換性を確保するために**すべて削除され、本物の Python コード実行に置き換えられました。**
+>
+> Java による新規エミュレータの実装は、以下の極めて限定的なケースにのみ検討してください：
+> 1. Python 実装の実行が GraalPy の技術的な制限によりどうしても不可能な場合。
+> 2. 実行速度がボトルネックとなり、Java による再実装が劇的な改善をもたらすことが証明された場合。
+
 ## 1. 概要
 
 [Action Plugin 実行ロジックの実装調査報告](Action-Plugins-Investigation.md) で述べた通り、Ansible Core の重厚な依存関係を GraalPy 上で完全に解決することは困難です。
 
-本プロジェクトの基本方針は「本物の Python プラグインを動かす」ことですが、以下のケースに限り Java による軽量エミュレータを導入します。
-- **高パフォーマンス要件**: `debug` や `set_fact` のように、頻繁に呼び出され、Python インタプリタのオーバーヘッドを避けたい場合。
-- **依存解決の困難性**: 依存ライブラリのスタブ化が極めて困難で、Java で再実装したほうが安定性が高い場合。
+本プロジェクトの基本方針は「本物の Python プラグインを動かす」ことですが、上記の警告に該当するケースに限り Java による軽量エミュレータを導入する可能性があります。
 
 Java で実装することで、以下のメリットが得られます。
 - **高速な起動**: Python インタプリタの初期化や大量のライブラリロードを回避。
@@ -87,13 +93,13 @@ connection.putFile(localPath, remotePath);
 
 ## 5. 登録方法
 
-実装したプラグインは、`TaskExecutor` のコンストラクタで `builtInActionPlugins` マップに登録します。
+実装したプラグインは、`TaskExecutor` のコンストラクタ内で `builtInActionPlugins` マップに登録することで有効になります。
+（注: 現在、標準のアクションプラグインはすべて Python で実行されているため、このマップは原則として空です。）
 
 ```java
 public TaskExecutor(...) {
     // ...
-    this.builtInActionPlugins.put("copy", new CopyAction());
-    this.builtInActionPlugins.put("template", new TemplateAction());
+    // 例: this.builtInActionPlugins.put("my_custom_action", new MyCustomAction());
 }
 ```
 
