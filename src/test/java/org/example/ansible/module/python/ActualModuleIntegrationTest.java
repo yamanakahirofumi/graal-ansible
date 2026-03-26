@@ -236,4 +236,70 @@ class ActualModuleIntegrationTest {
         var execResult = connection.execCommand("cat " + remotePath, BecomeContext.empty(), null);
         assertEquals("Hello Ansible", execResult.stdout().trim());
     }
+
+    @Test
+    void testActualUserModule() {
+        taskExecutor.registerModule("user", new PythonModule("user"));
+
+        String userName = "testuser-ansible";
+        Task task = new Task("test_user", "user", Map.of(
+                "name", userName,
+                "state", "present"
+        ));
+        TaskResult result = taskExecutor.execute(task, new BecomeContext(true, "sudo", "root", ""), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+
+        var execResult = connection.execCommand("id " + userName, BecomeContext.empty(), null);
+        assertEquals(0, execResult.exitCode(), "User should be created in container: " + execResult.stderr());
+    }
+
+    @Test
+    void testActualGroupModule() {
+        taskExecutor.registerModule("group", new PythonModule("group"));
+
+        String groupName = "testgroup-ansible";
+        Task task = new Task("test_group", "group", Map.of(
+                "name", groupName,
+                "state", "present"
+        ));
+        TaskResult result = taskExecutor.execute(task, new BecomeContext(true, "sudo", "root", ""), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+
+        var execResult = connection.execCommand("getent group " + groupName, BecomeContext.empty(), null);
+        assertEquals(0, execResult.exitCode(), "Group should be created in container: " + execResult.stderr());
+    }
+
+    @Test
+    void testActualFindModule() {
+        taskExecutor.registerModule("find", new PythonModule("find"));
+
+        Task task = new Task("test_find", "find", Map.of(
+                "paths", "/tmp",
+                "patterns", "*-test.txt"
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        assertTrue(result.data().containsKey("files"), "Result should contain 'files' key");
+    }
+
+    @Test
+    void testActualTempfileModule() {
+        taskExecutor.registerModule("tempfile", new PythonModule("tempfile"));
+
+        Task task = new Task("test_tempfile", "tempfile", Map.of(
+                "state", "directory",
+                "suffix", "ansibletest"
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        String path = (String) result.data().get("path");
+        assertNotNull(path);
+
+        var execResult = connection.execCommand("ls -d " + path, BecomeContext.empty(), null);
+        assertEquals(0, execResult.exitCode(), "Temp directory should exist: " + execResult.stderr());
+    }
 }
