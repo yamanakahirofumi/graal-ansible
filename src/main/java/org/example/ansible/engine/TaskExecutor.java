@@ -466,13 +466,6 @@ public class TaskExecutor implements ITaskExecutor {
             actionName = actionName.substring("ansible.legacy.".length());
         }
 
-        // Try Action Plugin first - but only if not already in an action plugin context
-        // We use the presence of task_executor_java in Python as a hint, but cleaner is to
-        // rely on the entry point being executeSingleTask.
-        if (isActionPlugin(task.action()) && getCurrentConnection() != null) {
-             return executeActionPlugin(task, becomeContext, getCurrentConnection(), environment, Map.of());
-        }
-
         org.example.ansible.module.Module module = modules.get(actionName);
         if (module == null) {
             module = new PythonModule(task.action());
@@ -581,7 +574,8 @@ public class TaskExecutor implements ITaskExecutor {
             );
 
             // Execute as a normal module, using the current connection and environment
-            TaskResult result = execute(subTask, getCurrentBecomeContext(), getCurrentConnection(), getCurrentEnvironment());
+            // IMPORTANT: We bypass Action Plugin check here to avoid infinite recursion
+            TaskResult result = executeModuleDirectly(subTask, getCurrentBecomeContext(), getCurrentEnvironment());
             if (result == null) {
                 return Map.of("failed", true, "msg", "Module execution returned null result");
             }
@@ -616,6 +610,29 @@ public class TaskExecutor implements ITaskExecutor {
     public void close() {
         if (context != null) {
             context.close();
+        }
+    }
+
+    /**
+     * Executes a module directly without checking for Action Plugins.
+     * This is used internally by the Action Plugin bridge.
+     */
+    private TaskResult executeModuleDirectly(Task task, BecomeContext becomeContext, Map<String, String> environment) {
+        String actionName = task.action();
+        if (actionName.startsWith("ansible.builtin.")) {
+            actionName = actionName.substring("ansible.builtin.".length());
+        } else if (actionName.startsWith("ansible.legacy.")) {
+            actionName = actionName.substring("ansible.legacy.".length());
+        }
+
+        org.example.ansible.module.Module module = modules.get(actionName);
+        if (module == null) {
+            module = new PythonModule(task.action());
+        }
+        try {
+            return module.execute(task.args(), becomeContext, context);
+        } catch (Exception e) {
+            return TaskResult.failure("Execution failed: " + e.getMessage());
         }
     }
 }
