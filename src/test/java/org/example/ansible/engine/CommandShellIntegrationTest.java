@@ -105,7 +105,7 @@ class CommandShellIntegrationTest {
 
         TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
 
-        assertTrue(result.success(), result.message());
+        assertTrue(result.success(), "Task failed: " + result.message() + " (Data: " + result.data() + ")");
         assertFalse(result.changed(), "Should not be changed due to changed_when: false");
     }
 

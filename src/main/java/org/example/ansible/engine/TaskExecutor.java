@@ -459,17 +459,6 @@ public class TaskExecutor implements ITaskExecutor {
 
     @Override
     public TaskResult execute(Task task, BecomeContext becomeContext, Map<String, String> environment) {
-        setCurrentBecomeContext(becomeContext);
-        setCurrentEnvironment(environment);
-        try {
-            return executeInternal(task, becomeContext, environment);
-        } finally {
-            clearCurrentBecomeContext();
-            clearCurrentEnvironment();
-        }
-    }
-
-    private TaskResult executeInternal(Task task, BecomeContext becomeContext, Map<String, String> environment) {
         String actionName = task.action();
         if (actionName.startsWith("ansible.builtin.")) {
             actionName = actionName.substring("ansible.builtin.".length());
@@ -477,9 +466,11 @@ public class TaskExecutor implements ITaskExecutor {
             actionName = actionName.substring("ansible.legacy.".length());
         }
 
-        // Try Action Plugin first
-        if (isActionPlugin(task.action())) {
-            return executeActionPlugin(task, becomeContext, getCurrentConnection(), environment, Map.of());
+        // Try Action Plugin first - but only if not already in an action plugin context
+        // We use the presence of task_executor_java in Python as a hint, but cleaner is to
+        // rely on the entry point being executeSingleTask.
+        if (isActionPlugin(task.action()) && getCurrentConnection() != null) {
+             return executeActionPlugin(task, becomeContext, getCurrentConnection(), environment, Map.of());
         }
 
         org.example.ansible.module.Module module = modules.get(actionName);
