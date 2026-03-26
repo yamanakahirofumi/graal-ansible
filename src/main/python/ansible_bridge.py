@@ -41,6 +41,23 @@ def setup_sys_path(site_packages):
         for p in site_packages:
             p_str = str(p)
             if p_str not in sys.path: sys.path.append(p_str)
+            # Link mocked packages to disk paths to allow loading non-mocked submodules
+            for mname in ['ansible', 'ansible.module_utils', 'ansible.module_utils.common', 'ansible.module_utils.compat', 'ansible.module_utils._internal', 'ansible.module_utils.parsing']:
+                if mname in sys.modules:
+                    m = sys.modules[mname]
+                    if hasattr(m, '__path__') and isinstance(m.__path__, list):
+                        rel_path = mname.replace('.', '/')
+                        cand = os.path.join(p_str, rel_path)
+                        if os.path.exists(cand):
+                            if cand not in m.__path__:
+                                m.__path__.insert(0, cand)
+                            # Update __file__ if it's missing or points to wrong place
+                            target_file = os.path.join(cand, '__init__.py')
+                            if not hasattr(m, '__file__') or not m.__file__ or not os.path.exists(str(m.__file__)):
+                                try:
+                                    m.__file__ = target_file
+                                    m.__dict__['__file__'] = target_file
+                                except: pass
 
 def setup_env(env_vars):
     if env_vars:
@@ -68,7 +85,8 @@ class MockLoader:
 
 class MockShell:
     def __init__(self):
-        self.tmpdir = "/tmp"
+        import tempfile
+        self.tmpdir = tempfile.gettempdir()
     def path_has_trailing_slash(self, path):
         return path.endswith('/') or path.endswith('\\')
     def join_path(self, *args):
@@ -191,7 +209,6 @@ class Templar:
             t = Template(msg)
             return t.render(**self.available_variables)
         except Exception:
-            # Simple Jinja2-like substitution for tests
             import re
             def repl(match):
                 var_name = match.group(1).strip()
@@ -318,15 +335,28 @@ class AnsibleModule:
 # --- Mock Application ---
 
 def apply_mocks():
-    if getattr(sys, '_ansible_bridge_mocks_applied', False): return
+    mocks_applied = getattr(sys, '_ansible_bridge_mocks_applied', False)
 
     def create_mock(mname, attributes=None, is_package=True):
-        if mname in sys.modules and sys.modules[mname] is not None:
-            m = sys.modules[mname]
-        else:
-            m = types.ModuleType(mname)
-            if is_package: m.__path__ = []
-            sys.modules[mname] = m
+        parts = mname.split('.')
+        for i in range(len(parts)):
+            parent_name = '.'.join(parts[:i+1])
+            if parent_name not in sys.modules:
+                m = types.ModuleType(parent_name)
+                if is_package or i < len(parts) - 1:
+                    m.__path__ = []
+                sys.modules[parent_name] = m
+            if i > 0:
+                setattr(sys.modules['.'.join(parts[:i])], parts[i], sys.modules[parent_name])
+
+        m = sys.modules[mname]
+        if is_package:
+            if not hasattr(m, '__path__') or not isinstance(m.__path__, list):
+                m.__path__ = []
+            if not hasattr(m, '__file__') or not m.__file__:
+                placeholder_file = os.path.join(os.getcwd(), mname.replace('.', '/'), '__init__.py')
+                setattr(m, '__file__', placeholder_file)
+                m.__dict__['__file__'] = placeholder_file
         if attributes:
             for k, v in attributes.items(): setattr(m, k, v)
         return m
@@ -345,8 +375,9 @@ def apply_mocks():
     })
 
     # 2. Display & PlayContext
+    import tempfile
     create_mock('ansible')
-    create_mock('ansible.constants', {'DEFAULT_REMOTE_TMP': '/tmp', 'DEFAULT_LOCAL_TMP': '/tmp'})
+    create_mock('ansible.constants', {'DEFAULT_REMOTE_TMP': '/tmp', 'DEFAULT_LOCAL_TMP': tempfile.gettempdir()})
     create_mock('ansible.config', {'ConfigManager': type('CM', (), {'get_config_value': lambda *a, **kw: None})})
     create_mock('ansible.config.manager', {'ConfigManager': type('CM', (), {'get_config_value': lambda *a, **kw: None}), 'ensure_type': lambda x, t: x})
     create_mock('ansible.utils')
@@ -369,10 +400,6 @@ def apply_mocks():
     })
 
     # 3. Utils
-    def merge_hash(a, b):
-        res = a.copy()
-        res.update(b or {})
-        return res
     create_mock('ansible.utils.path', {
         'unquote': lambda s, *a, **kw: s, 'cleanup_tmp_file': lambda s, *a, **kw: None,
         'makedirs_safe': lambda s, *a, **kw: None, 'unfrackpath': lambda s, *a, **kw: s,
@@ -381,12 +408,14 @@ def apply_mocks():
     create_mock('ansible.utils.fqcn', {'add_internal_fqcns': lambda *a, **kw: None})
     create_mock('ansible.utils.vars', {
         'isidentifier': lambda s, *a, **kw: True, 'validate_variable_name': lambda s, *a, **kw: True,
-        'merge_hash': merge_hash
+        'merge_hash': lambda a, b: dict(a, **(b or {}))
     })
 
     # 4. Errors
     class AnsibleError(Exception):
-        def __init__(self, message="", obj=None, show_content=True, suppress_extended_error=False, orig_exception=None): super().__init__(message)
+        def __init__(self, message="", obj=None, show_content=True, suppress_extended_error=False, orig_exception=None, **kwargs):
+            super().__init__(message)
+            for k, v in kwargs.items(): setattr(self, k, v)
     class AnsibleValueOmittedError(AnsibleError): pass
     class AnsibleActionFail(AnsibleError): pass
     class AnsibleActionSkip(AnsibleError): pass
@@ -423,12 +452,11 @@ def apply_mocks():
     create_mock('ansible.playbook.play_context', {'PlayContext': PlayContext})
 
     # 7. Templating
-    def trust_as_template(data):
-        if isinstance(data, (tuple, list)): return data[0]
-        return data
-    create_mock('ansible.template', {'Templar': Templar, 'trust_as_template': trust_as_template})
+    create_mock('ansible.template', {'Templar': Templar, 'trust_as_template': lambda x: x})
 
-    create_mock('ansible._internal')
+    create_mock('ansible._internal', {
+        'get_controller_serialize_map': lambda: {}
+    })
     create_mock('ansible._internal._templating', {
         '_template_vars': types.SimpleNamespace(generate_ansible_template_vars=lambda *a, **kw: {}),
         'get_text_file_contents': lambda x, *a, **kw: (open(x, 'r').read() if x and os.path.exists(x) else "mock_content", True)
@@ -445,7 +473,16 @@ def apply_mocks():
             m.RoutingMarkerBehavior = type('RoMB', (), {'__init__': lambda *a, **kw: None})
 
     # 8. Module Utils
-    create_mock('ansible.module_utils', is_package=True)
+    # Mock core packages as base for hybrid loading
+    for mname in ['ansible', 'ansible.module_utils', 'ansible.module_utils.common', 'ansible.module_utils.compat', 'ansible.module_utils._internal', 'ansible.module_utils.parsing']:
+        attrs = {}
+        if mname == 'ansible.module_utils._internal':
+            attrs['get_controller_serialize_map'] = lambda: {}
+        create_mock(mname, attributes=attrs, is_package=True)
+
+    if mocks_applied: return
+
+    # New mocks for lineinfile/replace and other standard modules
     for m in ['facts', 'facts.system', 'facts.collector', 'facts.utils', 'facts.packages',
               'facts.namespace', 'facts.ansible_collector', 'facts.system.chroot',
               'facts.system.service_mgr', 'facts.system.distribution',
@@ -454,6 +491,12 @@ def apply_mocks():
               'common.collections', 'common.sys_info', 'common.text', 'common.text.converters',
               'common.process', 'common.validation', 'common.parameters']:
         create_mock(f'ansible.module_utils.{m}')
+
+    create_mock('ansible.module_utils.yumdnf', {
+        'YumDnf': type('YumDnf', (), {}),
+        'yumdnf_argument_spec': lambda *a, **kw: {}
+    })
+    create_mock('ansible.module_utils.common.process', {'get_bin_path': lambda x, *a, **kw: x})
 
     import stat as stat_mod
     create_mock('ansible.module_utils.common.file', {
@@ -478,7 +521,7 @@ def apply_mocks():
         'is_iterable': lambda x, *a, **kw: hasattr(x, '__iter__') and not isinstance(x, (str, bytes)),
         'is_sequence': lambda x: isinstance(x, (list, tuple))
     })
-    create_mock('ansible.module_utils.compat.version', {'LooseVersion': lambda x: x})
+    create_mock('ansible.module_utils.compat.version', {'LooseVersion': lambda x: x, 'StrictVersion': lambda x: x})
     from urllib.parse import urlparse
     create_mock('ansible.module_utils.urls', {
         'fetch_url': lambda *a, **kw: (None, {'status': 404}),
@@ -510,7 +553,8 @@ def apply_mocks():
     create_mock('ansible.module_utils.facts.system.service_mgr', {'ServiceMgrFactCollector': type('SMFC', (), {})})
     create_mock('ansible.module_utils.facts.utils', {
         'get_file_content': lambda *a, **kw: None,
-        'get_mount_size': lambda *a, **kw: {}
+        'get_mount_size': lambda *a, **kw: {},
+        'get_file_lines': lambda *a, **kw: []
     })
     create_mock('ansible.module_utils.facts.packages', {
         'CLIMgr': type('CLIMgr', (), {}),
@@ -552,14 +596,13 @@ def apply_mocks():
         'check_type_bool': lambda x: str(x).lower() in ('yes', 'true', 't', '1'),
         'check_type_list': lambda x: x if isinstance(x, list) else [x]
     })
-    create_mock('ansible.module_utils.common.collections', {
-        'is_iterable': lambda x, *a, **kw: hasattr(x, '__iter__') and not isinstance(x, (str, bytes))
-    })
+
     create_mock('ansible.module_utils.parsing.convert_bool', {
         'convert_bool': lambda x, *a, **kw: str(x).lower() in ('yes', 'true', 't', '1'),
         'boolean': lambda x, *a, **kw: str(x).lower() in ('yes', 'true', 't', '1')
     })
     FILE_COMMON_ARGUMENTS = {
+        'path': dict(type='str', aliases=['dest', 'name']),
         'mode': dict(type='raw'),
         'owner': dict(type='str'),
         'group': dict(type='str'),
@@ -639,7 +682,6 @@ def _create_action_plugin(action_name, task, connection, play_context, loader, t
 
     l = loader or MockLoader()
 
-    # Ensure connection has _shell and path_has_trailing_slash
     c = connection
     if not hasattr(c, '_shell') or not hasattr(c._shell, 'path_has_trailing_slash'):
         class Proxy:

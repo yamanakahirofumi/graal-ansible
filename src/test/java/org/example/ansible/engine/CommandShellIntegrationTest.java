@@ -85,7 +85,9 @@ class CommandShellIntegrationTest {
         TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
 
         assertFalse(result.success(), "Should be failed due to failed_when");
-        assertEquals("success", ((String)result.data().get("stdout")).trim());
+        String stdout = (String) result.data().get("stdout");
+        assertNotNull(stdout, "stdout should not be null");
+        assertEquals("success", stdout.trim());
     }
 
     @Test
