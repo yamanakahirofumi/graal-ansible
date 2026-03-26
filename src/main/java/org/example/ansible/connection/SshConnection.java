@@ -51,11 +51,28 @@ public class SshConnection implements Connection {
 
     @Override
     public ConnectionResult execCommand(String command, BecomeContext becomeContext, java.util.Map<String, String> environment) {
-        // Simple sudo implementation for now if needed, but ActualModuleIntegrationTest 
-        // usually doesn't need become for basic modules if running as root in container.
+        String effectiveCommand = command;
         if (becomeContext != null && becomeContext.become()) {
-             // In a real implementation, we would wrap the command with sudo/su
-             // command = "sudo " + command; 
+            String method = becomeContext.becomeMethod();
+            if (method == null || "sudo".equals(method)) {
+                StringBuilder sb = new StringBuilder("sudo -H -S -n -p BECOME-PROMPT ");
+                if (becomeContext.becomeUser() != null) {
+                    sb.append("-u ").append(becomeContext.becomeUser()).append(" ");
+                }
+                if (becomeContext.becomeFlags() != null && !becomeContext.becomeFlags().isEmpty()) {
+                    sb.append(becomeContext.becomeFlags()).append(" ");
+                }
+                // Wrap original command in single quotes to pass as a single argument to shell
+                sb.append("/bin/sh -c '").append(command.replace("'", "'\\''")).append("'");
+                effectiveCommand = sb.toString();
+            } else if ("su".equals(method)) {
+                StringBuilder sb = new StringBuilder("su ");
+                if (becomeContext.becomeUser() != null) {
+                    sb.append(becomeContext.becomeUser()).append(" ");
+                }
+                sb.append("-c '").append(command.replace("'", "'\\''")).append("'");
+                effectiveCommand = sb.toString();
+            }
         }
 
         if (session == null || !session.isOpen()) {
@@ -64,8 +81,8 @@ public class SshConnection implements Connection {
 
         try (ByteArrayOutputStream out = new ByteArrayOutputStream();
              ByteArrayOutputStream err = new ByteArrayOutputStream();
-             ChannelExec channel = session.createExecChannel(command)) {
-            
+             ChannelExec channel = session.createExecChannel(effectiveCommand)) {
+
             if (environment != null) {
                 for (java.util.Map.Entry<String, String> entry : environment.entrySet()) {
                     channel.setEnv(entry.getKey(), entry.getValue());
