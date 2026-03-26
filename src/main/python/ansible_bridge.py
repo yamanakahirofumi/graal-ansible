@@ -536,9 +536,9 @@ def apply_mocks():
         'get_user_agent': lambda *a, **kw: 'ansible-agent',
         'urlparse': urlparse
     })
-    create_mock('ansible.module_utils.facts.ansible_collector', {'get_ansible_collector': lambda *a, **kw: None})
-    create_mock('ansible.module_utils.facts', {
-        'default_collectors': {'collectors': []},
+    create_mock('ansible.module_utils.facts.ansible_collector', {'get_ansible_collector': lambda *a, **kw: type('AC', (), {'collect': lambda *a, **kw: {'ansible_os_family': 'Linux', 'ansible_system': 'Linux'}})})
+    facts_mod = create_mock('ansible.module_utils.facts', {
+        'default_collectors': type('DC', (), {'collectors': []}),
         'timeout': type('TO', (), {'TimeoutError': Exception})
     })
     create_mock('ansible.module_utils.facts.collector', {
@@ -548,7 +548,7 @@ def apply_mocks():
         'CycleFoundInFactDeps': Exception,
         'UnresolvedFactDep': Exception
     })
-    create_mock('ansible.module_utils.facts.namespace', {'PrefixFactNamespace': type('PFN', (), {})})
+    create_mock('ansible.module_utils.facts.namespace', {'PrefixFactNamespace': type('PFN', (), {'__init__': lambda *a, **kw: None})})
     create_mock('ansible.module_utils.facts.system.chroot', {'is_chroot': lambda: False})
     create_mock('ansible.module_utils.facts.system.service_mgr', {'ServiceMgrFactCollector': type('SMFC', (), {})})
     create_mock('ansible.module_utils.facts.utils', {
