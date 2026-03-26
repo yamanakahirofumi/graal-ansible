@@ -165,7 +165,7 @@ Windows 管理ノード対応などのため、Linux 固有のモジュール（
 | `template` | Python (Actual) | 標準。Java エミュレータも選択可能。 |
 | その他 | Python (Actual) | `ansible_action_launcher.py` 経由での実行。 |
 
-※ パフォーマンス上の理由から Java エミュレータを使用する場合は、システムプロパティ `ansible.action_plugins.enabled` 等で制御可能です。
+※ 本家 `ansible-core` への依存や実行時エラーの回避のために Java エミュレータを使用する場合は、システムプロパティ `ansible.action_plugins.enabled` 等で制御可能です。
 
 ## 9. 標準モジュールの実行 (Module Execution Strategy)
 
