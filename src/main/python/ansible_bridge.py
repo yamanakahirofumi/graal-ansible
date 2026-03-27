@@ -27,8 +27,11 @@ def setup_sys_path(site_packages):
             if p_str not in sys.path: sys.path.append(p_str)
 
             # Link all mocked packages and modules to disk paths
+            # Skip those that are supposed to be purely mocked to avoid re-evaluation of missing names
+            pure_mocks = ['ansible.errors', 'ansible.plugins', 'ansible.constants', 'ansible.utils.display']
             for mname, m in list(sys.modules.items()):
                 if not mname.startswith('ansible'): continue
+                if any(mname == pm or mname.startswith(pm + '.') for pm in pure_mocks): continue
 
                 # Check if it's a package (has __path__) or a module
                 rel_path = mname.replace('.', '/')
@@ -381,7 +384,10 @@ def apply_mocks():
     })
 
     # 5. Plugins & Loader
-    create_mock('ansible.plugins')
+    create_mock('ansible.plugins', {
+        'AnsiblePlugin': type('AnsiblePlugin', (), {}),
+        'PluginLoader': type('PluginLoader', (), {})
+    })
     create_mock('ansible.plugins.action', {'ActionBase': ActionBase})
 
     action_loader_obj = types.SimpleNamespace()
@@ -428,8 +434,10 @@ def apply_mocks():
             m.UndefinedMarker = type('UM', (), {})
             m.TruncationMarker = type('TM', (), {})
             m.CapturedExceptionMarker = type('CEM', (), {})
+            m.CapturedException = type('CapturedException', (Exception,), {})
             m.Marker = type('Marker', (), {})
             m.MarkerError = type('MarkerError', (Exception,), {})
+            m._TemplateConfig = type('_TemplateConfig', (), {})
         elif mname.endswith('_utils'):
             m.Omit = type('Omit', (), {})
             m.TemplateContext = type('TemplateContext', (), {})
@@ -540,7 +548,9 @@ def apply_mocks():
             orig_cls = kw.get('cls', json.JSONEncoder)
             class WrappedEncoder(orig_cls):
                 def default(self, o):
-                    if isinstance(o, (bytes, bytearray, memoryview)): return o.decode('latin-1') if hasattr(o, 'decode') else str(o)
+                    if hasattr(o, 'decode') and callable(o.decode):
+                        try: return o.decode('latin-1')
+                        except: pass
                     if isinstance(o, (set, frozenset, range)): return list(o)
                     try:
                         if hasattr(o, '__iter__') and not isinstance(o, (str, bytes)):
@@ -556,8 +566,9 @@ def apply_mocks():
                     except Exception:
                         try:
                             s = str(o)
-                            return s if not s.startswith('<') else str(type(o))
-                        except: return "UnknownObject"
+                            if not s.startswith('<'): return s
+                            return "{0!r}".format(o)
+                        except: return "SerializationError"
             kw['cls'] = WrappedEncoder
             return _orig_dumps(obj, **kw)
         json.dumps = robust_dumps
