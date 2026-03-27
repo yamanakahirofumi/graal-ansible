@@ -2,9 +2,11 @@ package org.example.ansible.module.python;
 
 import org.example.ansible.connection.BecomeContext;
 import org.example.ansible.connection.SshConnection;
+import org.example.ansible.engine.Play;
 import org.example.ansible.engine.Task;
 import org.example.ansible.engine.TaskExecutor;
 import org.example.ansible.engine.TaskResult;
+import org.example.ansible.engine.VariableManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,9 +22,11 @@ import org.testcontainers.utility.DockerImageName;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -305,5 +309,87 @@ class ActualModuleIntegrationTest {
         // It might fail because Docker containers don't always allow changing hostname easily
         // but we check if it didn't fail due to bridge/launcher issues.
         assertNotNull(result);
+    }
+
+    @Test
+    void testActualSlurpModule() {
+        String remotePath = "/tmp/slurp-test.txt";
+        String content = "Hello Slurp";
+        connection.execCommand("echo -n \"" + content + "\" > " + remotePath, BecomeContext.empty(), null);
+
+        Task task = new Task("test_slurp", "slurp", Map.of(
+                "src", remotePath
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        String encodedContent = (String) result.data().get("content");
+        assertNotNull(encodedContent);
+        String decoded = new String(java.util.Base64.getDecoder().decode(encodedContent));
+        assertEquals(content, decoded);
+    }
+
+    @Test
+    void testActualSetFactModule() {
+        // set_fact is an Action Plugin.
+        Task task = new Task("test_set_fact", "set_fact", Map.of(
+                "my_custom_fact", "fact_value"
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
+        assertNotNull(facts);
+        assertEquals("fact_value", facts.get("my_custom_fact"));
+    }
+
+    @Test
+    void testActualAssertModule() {
+        // assert is an Action Plugin.
+        // It requires task_vars for evaluation.
+        Map<String, Object> taskVars = Map.of("test_var", 100);
+        Task task = new Task("test_assert", "assert", Map.of(
+                "that", List.of("test_var == 100")
+        ));
+
+        // We need to provide taskVars for the Action Plugin to evaluate expressions.
+        // TaskExecutor.executeActionPlugin uses these variables.
+        // However, in this test setup, we usually call taskExecutor.execute(task, ...).
+        // Let's see how TaskExecutor handles variables.
+
+        // Setup a VariableManager to hold the variable.
+        org.example.ansible.inventory.Inventory inventory = new org.example.ansible.inventory.Inventory(
+                new org.example.ansible.inventory.Group("all", List.of(new org.example.ansible.inventory.Host("target")), List.of(), Map.of())
+        );
+        VariableManager vm = new VariableManager(inventory, Map.of("test_var", 100));
+        Play play = new Play("test play", "all", List.of(), Map.of(), List.of(), List.of(), null, null, null, null, null, Map.of());
+
+        TaskResult result = taskExecutor.execute(play, new org.example.ansible.inventory.Host("target"), task, vm, false, null, connection, null);
+
+        assertTrue(result.success(), "Assertion failed: " + result.message());
+        assertEquals("All assertions passed", result.data().get("msg"));
+    }
+
+    @Test
+    void testActualFailModule() {
+        Task task = new Task("test_fail", "fail", Map.of(
+                "msg", "Expected failure"
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertFalse(result.success(), "Module should have failed");
+        assertEquals("Expected failure", result.data().get("msg"));
+    }
+
+    @Test
+    void testActualGatherFactsModule() {
+        // gather_facts is an Action Plugin that usually delegates to setup.
+        Task task = new Task("test_gather_facts", "gather_facts", Map.of());
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
+        assertNotNull(facts);
+        assertTrue(facts.containsKey("ansible_os_family"));
     }
 }
