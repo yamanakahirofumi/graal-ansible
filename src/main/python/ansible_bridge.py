@@ -26,7 +26,14 @@ def setup_sys_path(site_packages):
             p_str = str(p)
             if p_str not in sys.path: sys.path.append(p_str)
             # Link mocked packages to disk paths to allow loading non-mocked submodules
-            for mname in ['ansible', 'ansible.module_utils', 'ansible.module_utils.common', 'ansible.module_utils.compat', 'ansible.module_utils._internal', 'ansible.module_utils.parsing', 'ansible.plugins', 'ansible.plugins.action']:
+            link_list = [
+                'ansible', 'ansible.module_utils', 'ansible.module_utils.common',
+                'ansible.module_utils.compat', 'ansible.module_utils._internal',
+                'ansible.module_utils._internal._ansiballz', 'ansible.module_utils.parsing',
+                'ansible.plugins', 'ansible.plugins.action', 'ansible._internal',
+                'ansible._internal._templating', 'ansible._internal._ansiballz', 'ansible.executor'
+            ]
+            for mname in link_list:
                 if mname in sys.modules:
                     m = sys.modules[mname]
                     if hasattr(m, '__path__') and isinstance(m.__path__, list):
@@ -417,7 +424,14 @@ def apply_mocks():
 
     # 8. Module Utils
     # Mock core packages as base for hybrid loading
-    for mname in ['ansible', 'ansible.module_utils', 'ansible.module_utils.common', 'ansible.module_utils.compat', 'ansible.module_utils._internal', 'ansible.module_utils.parsing', 'ansible.plugins', 'ansible.plugins.action']:
+    mock_list = [
+        'ansible', 'ansible.module_utils', 'ansible.module_utils.common',
+        'ansible.module_utils.compat', 'ansible.module_utils._internal',
+        'ansible.module_utils._internal._ansiballz', 'ansible.module_utils.parsing',
+        'ansible.plugins', 'ansible.plugins.action', 'ansible._internal',
+        'ansible._internal._templating', 'ansible._internal._ansiballz', 'ansible.executor'
+    ]
+    for mname in mock_list:
         attrs = {}
         if mname == 'ansible.module_utils._internal':
             attrs['get_controller_serialize_map'] = lambda: {}
@@ -487,20 +501,28 @@ def apply_mocks():
 
     # 10. JSON handling
     if not hasattr(json, '_graal_ansible_patched'):
-        class AnsibleEncoder(json.JSONEncoder):
-            def default(self, o):
-                if isinstance(o, (set, frozenset, range)): return list(o)
-                try:
-                    if hasattr(o, '__iter__') and not isinstance(o, (str, bytes)):
-                        if hasattr(o, 'keys'): return dict(o)
-                        if hasattr(o, 'size') and hasattr(o, 'get'):
-                            try: return [o.get(i) for i in range(o.size())]
-                            except: pass
-                        return list(o)
-                except Exception: pass
-                return str(o)
         _orig_dumps = json.dumps
-        json.dumps = lambda obj, **kw: _orig_dumps(obj, **(dict({'cls': AnsibleEncoder}, **kw)))
+        def robust_dumps(obj, **kw):
+            orig_cls = kw.get('cls', json.JSONEncoder)
+            class WrappedEncoder(orig_cls):
+                def default(self, o):
+                    if isinstance(o, bytes): return o.decode('utf-8', errors='surrogateescape')
+                    if isinstance(o, (set, frozenset, range)): return list(o)
+                    try:
+                        if hasattr(o, '__iter__') and not isinstance(o, (str, bytes)):
+                            if hasattr(o, 'keys'): return dict(o)
+                            if hasattr(o, 'size') and hasattr(o, 'get'):
+                                try: return [o.get(i) for i in range(o.size())]
+                                except: pass
+                            return list(o)
+                    except Exception: pass
+                    try:
+                        return super().default(o)
+                    except Exception:
+                        return str(o)
+            kw['cls'] = WrappedEncoder
+            return _orig_dumps(obj, **kw)
+        json.dumps = robust_dumps
         json._graal_ansible_patched = True
 
     sys._ansible_bridge_mocks_applied = True

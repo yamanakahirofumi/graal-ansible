@@ -220,6 +220,17 @@ public class PythonModule implements Module {
         sb.append("    ansible.module_utils.basic._ANSIBLE_PROFILE = 'modern'\n");
         sb.append("    def mocked_load_params(self): self.params = complex_args\n");
         sb.append("    ansible.module_utils.basic.AnsibleModule._load_params = mocked_load_params\n");
+        sb.append("    _orig_dumps = json.dumps\n");
+        sb.append("    def robust_dumps(obj, **kw):\n");
+        sb.append("        orig_cls = kw.get('cls', json.JSONEncoder)\n");
+        sb.append("        class WrappedEncoder(orig_cls):\n");
+        sb.append("            def default(self, o):\n");
+        sb.append("                if isinstance(o, bytes): return o.decode('utf-8', errors='surrogateescape')\n");
+        sb.append("                try: return super().default(o)\n");
+        sb.append("                except Exception: return str(o)\n");
+        sb.append("        kw['cls'] = WrappedEncoder\n");
+        sb.append("        return _orig_dumps(obj, **kw)\n");
+        sb.append("    json.dumps = robust_dumps\n");
         sb.append("except Exception: pass\n");
         sb.append("module_code = base64.b64decode('").append(base64ModuleCode).append("').decode('utf-8')\n");
         sb.append("if __name__ == '__main__':\n");
