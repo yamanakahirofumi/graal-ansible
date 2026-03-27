@@ -86,6 +86,11 @@ public class TaskExecutor implements ITaskExecutor {
         currentVariableManager.remove();
     }
 
+    private static final List<String> WELL_KNOWN_ACTION_PLUGINS = List.of(
+            "debug", "set_fact", "copy", "template", "assemble", "group_by",
+            "include_vars", "fetch", "pause", "wait_for_connection", "gather_facts",
+            "unarchive", "uri", "script", "reboot", "async_status", "add_host", "assert"
+    );
     private final Map<String, org.example.ansible.module.Module> modules = new HashMap<>();
     private final Map<String, ActionPlugin> builtInActionPlugins = new HashMap<>();
     private final Map<String, Boolean> actionPluginCache = new ConcurrentHashMap<>();
@@ -310,7 +315,7 @@ public class TaskExecutor implements ITaskExecutor {
         }
 
         final String finalBaseName = baseName;
-        if (builtInActionPlugins.containsKey(finalBaseName)) {
+        if (builtInActionPlugins.containsKey(finalBaseName) || WELL_KNOWN_ACTION_PLUGINS.contains(finalBaseName)) {
             return true;
         }
         return actionPluginCache.computeIfAbsent(finalBaseName, a -> {
@@ -557,19 +562,33 @@ public class TaskExecutor implements ITaskExecutor {
 
     @Override
     public Map<String, Object> execute_from_python(String moduleName, Map<String, Object> moduleArgs, Map<String, Object> taskVars) {
-        // Create a temporary task for the module execution
-        Task subTask = new Task(
-                "execute_from_python",
-                moduleName,
-                moduleArgs,
-                null, null, null, null, null, null, null, false,
-                null, 0, 0, null, false, false, false, null, null, null,
-                null, null, null, null, null, null
-        );
+        try {
+            // Create a temporary task for the module execution
+            Task subTask = new Task(
+                    "execute_from_python",
+                    moduleName,
+                    moduleArgs,
+                    null, null, null, null, null, null, null, false,
+                    null, 0, 0, null, false, false, false, null, null, null,
+                    null, null, null, null, null, null
+            );
 
-        // Execute as a normal module, using the current connection and environment
-        TaskResult result = execute(subTask, getCurrentBecomeContext(), getCurrentConnection(), getCurrentEnvironment());
-        return result.data();
+            // Execute as a normal module, using the current connection and environment
+            // IMPORTANT: We bypass Action Plugin check here to avoid infinite recursion
+            TaskResult result = executeModuleDirectly(subTask, getCurrentBecomeContext(), getCurrentEnvironment());
+            if (result == null) {
+                return Map.of("failed", true, "msg", "Module execution returned null result");
+            }
+            Map<String, Object> data = new HashMap<>(result.data());
+            data.put("failed", !result.success());
+            data.put("changed", result.changed());
+            if (result.message() != null && !result.message().isEmpty()) {
+                data.put("msg", result.message());
+            }
+            return data;
+        } catch (Throwable t) {
+            return Map.of("failed", true, "msg", "Execution from Python failed: " + t.getMessage());
+        }
     }
 
     private Source loadResource(String name) throws java.io.IOException {
@@ -591,6 +610,29 @@ public class TaskExecutor implements ITaskExecutor {
     public void close() {
         if (context != null) {
             context.close();
+        }
+    }
+
+    /**
+     * Executes a module directly without checking for Action Plugins.
+     * This is used internally by the Action Plugin bridge.
+     */
+    private TaskResult executeModuleDirectly(Task task, BecomeContext becomeContext, Map<String, String> environment) {
+        String actionName = task.action();
+        if (actionName.startsWith("ansible.builtin.")) {
+            actionName = actionName.substring("ansible.builtin.".length());
+        } else if (actionName.startsWith("ansible.legacy.")) {
+            actionName = actionName.substring("ansible.legacy.".length());
+        }
+
+        org.example.ansible.module.Module module = modules.get(actionName);
+        if (module == null) {
+            module = new PythonModule(task.action());
+        }
+        try {
+            return module.execute(task.args(), becomeContext, context);
+        } catch (Exception e) {
+            return TaskResult.failure("Execution failed: " + e.getMessage());
         }
     }
 }

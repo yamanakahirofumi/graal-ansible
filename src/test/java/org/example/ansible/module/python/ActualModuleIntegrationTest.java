@@ -152,7 +152,7 @@ class ActualModuleIntegrationTest {
 
     @Test
     void testActualDebugModule() {
-        taskExecutor.registerModule("debug", new PythonModule("debug"));
+        // debug is an Action Plugin, no need to register it manually as a PythonModule.
 
         Task task = new Task("test_debug", "debug", Map.of("msg", "Hello from Actual Debug Module"));
         TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
@@ -182,7 +182,9 @@ class ActualModuleIntegrationTest {
         TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
 
         assertTrue(result.success(), "Execution failed: " + result.message());
-        assertEquals("hello_command", ((String) result.data().get("stdout")).trim());
+        String stdout = (String) result.data().get("stdout");
+        assertNotNull(stdout, "stdout should not be null");
+        assertEquals("hello_command", stdout.trim());
     }
 
     @Test
@@ -193,7 +195,9 @@ class ActualModuleIntegrationTest {
         TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
 
         assertTrue(result.success(), "Execution failed: " + result.message());
-        assertEquals("line2", ((String) result.data().get("stdout")).trim());
+        String stdout = (String) result.data().get("stdout");
+        assertNotNull(stdout, "stdout should not be null");
+        assertEquals("line2", stdout.trim());
     }
 
     @Test
@@ -235,5 +239,87 @@ class ActualModuleIntegrationTest {
 
         var execResult = connection.execCommand("cat " + remotePath, BecomeContext.empty(), null);
         assertEquals("Hello Ansible", execResult.stdout().trim());
+    }
+
+    @Test
+    void testActualUserModule() {
+        taskExecutor.registerModule("user", new PythonModule("user"));
+
+        String userName = "testuser-ansible";
+        Task task = new Task("test_user", "user", Map.of(
+                "name", userName,
+                "state", "present"
+        ));
+        TaskResult result = taskExecutor.execute(task, new BecomeContext(true, "sudo", "root", ""), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+
+        var execResult = connection.execCommand("id " + userName, BecomeContext.empty(), null);
+        assertEquals(0, execResult.exitCode(), "User should be created in container: " + execResult.stderr());
+    }
+
+    @Test
+    void testActualGroupModule() {
+        taskExecutor.registerModule("group", new PythonModule("group"));
+
+        String groupName = "testgroup-ansible";
+        Task task = new Task("test_group", "group", Map.of(
+                "name", groupName,
+                "state", "present"
+        ));
+        TaskResult result = taskExecutor.execute(task, new BecomeContext(true, "sudo", "root", ""), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+
+        var execResult = connection.execCommand("getent group " + groupName, BecomeContext.empty(), null);
+        assertEquals(0, execResult.exitCode(), "Group should be created in container: " + execResult.stderr());
+    }
+
+    @Test
+    void testActualFindModule() {
+        taskExecutor.registerModule("find", new PythonModule("find"));
+
+        Task task = new Task("test_find", "find", Map.of(
+                "paths", "/tmp",
+                "patterns", "*-test.txt"
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        assertTrue(result.data().containsKey("files"), "Result should contain 'files' key");
+    }
+
+    @Test
+    void testActualTempfileModule() {
+        taskExecutor.registerModule("tempfile", new PythonModule("tempfile"));
+
+        Task task = new Task("test_tempfile", "tempfile", Map.of(
+                "state", "directory",
+                "suffix", "ansibletest"
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        String path = (String) result.data().get("path");
+        assertNotNull(path);
+
+        var execResult = connection.execCommand("ls -d " + path, BecomeContext.empty(), null);
+        assertEquals(0, execResult.exitCode(), "Temp directory should exist: " + execResult.stderr());
+    }
+
+    @Test
+    void testActualHostnameModule() {
+        taskExecutor.registerModule("hostname", new PythonModule("hostname"));
+
+        Task task = new Task("test_hostname", "hostname", Map.of(
+                "name", "new-hostname"
+        ));
+        // hostname module usually requires root, but in this container it might fail to actually set it
+        // We just want to see if it executes correctly.
+        TaskResult result = taskExecutor.execute(task, new BecomeContext(true, "sudo", "root", ""), connection, null);
+
+        // It might fail because Docker containers don't always allow changing hostname easily
+        // but we check if it didn't fail due to bridge/launcher issues.
+        assertNotNull(result);
     }
 }

@@ -26,6 +26,8 @@ def run_action_plugin():
 
         mock_task = Task()
         mock_task.action, mock_task.args = action_name, module_args
+        # Initialize internal fields required by some Action Plugins (like copy)
+        mock_task._original_basename = os.path.basename(module_args.get('src', ''))
 
         class MockShell:
             def __init__(self): self.tmpdir = None
