@@ -104,24 +104,7 @@ public class PythonModule implements Module {
             }
             final String output = pythonResult.asString();
 
-            if (output == null || output.isBlank()) {
-                return TaskResult.failure("Module produced no output");
-            }
-
-            String jsonOutput = output;
-            if (output.contains("{") && output.contains("}")) {
-                jsonOutput = output.substring(output.indexOf("{"), output.lastIndexOf("}") + 1);
-            }
-
-            @SuppressWarnings("unchecked")
-            final Map<String, Object> resultMap = objectMapper.readValue(jsonOutput, Map.class);
-
-            final boolean failed = Boolean.TRUE.equals(resultMap.get("failed"));
-            if (failed) {
-                return new TaskResult(false, false, resultMap.getOrDefault("msg", "Module failed").toString(), resultMap);
-            }
-
-            return TaskResult.success(resultMap);
+            return parseModuleOutput(output);
 
         } catch (PolyglotException e) {
             return TaskResult.failure("GraalPy execution failed (PolyglotException): " + e.getMessage());
@@ -171,26 +154,7 @@ public class PythonModule implements Module {
 
             // Execute remotely
             var execRes = connection.execCommand("python3 " + remoteModulePath, becomeContext, TaskExecutor.getCurrentEnvironment());
-            String output = execRes.stdout();
-
-            if (output == null || output.isBlank()) {
-                return TaskResult.failure("Module produced no output (exit code " + execRes.exitCode() + "): " + execRes.stderr());
-            }
-
-            String jsonOutput = output;
-            if (output.contains("{") && output.contains("}")) {
-                jsonOutput = output.substring(output.indexOf("{"), output.lastIndexOf("}") + 1);
-            }
-
-            @SuppressWarnings("unchecked")
-            final Map<String, Object> resultMap = objectMapper.readValue(jsonOutput, Map.class);
-
-            final boolean failed = Boolean.TRUE.equals(resultMap.get("failed"));
-            if (failed) {
-                return new TaskResult(false, false, resultMap.getOrDefault("msg", "Module failed").toString(), resultMap);
-            }
-
-            return TaskResult.success(resultMap);
+            return parseModuleOutput(execRes.stdout());
         } catch (IOException e) {
             return TaskResult.failure("Failed to prepare module: " + e.getMessage());
         } finally {
@@ -226,11 +190,19 @@ public class PythonModule implements Module {
         sb.append("        class WrappedEncoder(orig_cls):\n");
         sb.append("            def default(self, o):\n");
         sb.append("                if isinstance(o, bytes): return o.decode('latin-1')\n");
+        sb.append("                if isinstance(o, (set, frozenset, range)): return list(o)\n");
+        sb.append("                try:\n");
+        sb.append("                    if hasattr(o, '__iter__') and not isinstance(o, (str, bytes)):\n");
+        sb.append("                        if hasattr(o, 'keys'): return dict(o)\n");
+        sb.append("                        return list(o)\n");
+        sb.append("                except: pass\n");
         sb.append("                try: return super().default(o)\n");
         sb.append("                except Exception:\n");
+        sb.append("                    try:\n");
+        sb.append("                        if 'AnsibleError' in str(type(o)): return {'msg': str(o), 'failed': True}\n");
+        sb.append("                    except: pass\n");
         sb.append("                    s = str(o)\n");
-        sb.append("                    if s.startswith('<'): return 'Object'\n");
-        sb.append("                    return s\n");
+        sb.append("                    return 'Object' if s.startswith('<') else s\n");
         sb.append("        kw['cls'] = WrappedEncoder\n");
         sb.append("        return _orig_dumps(obj, **kw)\n");
         sb.append("    json.dumps = robust_dumps\n");
@@ -289,6 +261,33 @@ public class PythonModule implements Module {
 
         dependencyZipCache.put(key, zipPath);
         return zipPath;
+    }
+
+    private TaskResult parseModuleOutput(String output) throws IOException {
+        if (output == null || output.isBlank()) {
+            return TaskResult.failure("Module produced no output");
+        }
+
+        String jsonOutput = output;
+        int start = output.indexOf("{");
+        int end = output.lastIndexOf("}");
+        if (start != -1 && end != -1 && start < end) {
+            jsonOutput = output.substring(start, end + 1);
+        }
+
+        try {
+            @SuppressWarnings("unchecked")
+            final Map<String, Object> resultMap = objectMapper.readValue(jsonOutput, Map.class);
+
+            final boolean failed = Boolean.TRUE.equals(resultMap.get("failed"));
+            if (failed) {
+                return new TaskResult(false, false, resultMap.getOrDefault("msg", "Module failed").toString(), resultMap);
+            }
+
+            return TaskResult.success(resultMap);
+        } catch (Exception e) {
+            return TaskResult.failure("Failed to parse module output as JSON: " + e.getMessage() + ". Raw output: " + output);
+        }
     }
 
     private static void addFileToZip(ZipOutputStream zos, Path file, String zipPath) throws IOException {

@@ -417,13 +417,13 @@ def apply_mocks():
         'Origin': type('Origin', (), {}),
         'TrustedAsTemplate': type('TrustedAsTemplate', (), {}),
     }, is_package=False)
-    create_mock('ansible._internal._datatag._utils')
+    create_mock('ansible._internal._datatag._utils', is_package=False)
     create_mock('ansible._internal._templating', {
         '_template_vars': types.SimpleNamespace(generate_ansible_template_vars=lambda *a, **kw: {}),
         'get_text_file_contents': lambda x, *a, **kw: (open(x, 'r').read() if x and os.path.exists(x) else "mock_content", True)
     })
     for mname in ['ansible._internal._templating._jinja_common', 'ansible._internal._templating._utils', 'ansible._internal._templating._marker_behaviors']:
-        m = create_mock(mname)
+        m = create_mock(mname, is_package=False)
         if mname.endswith('_jinja_common'):
             m.UndefinedMarker = type('UM', (), {})
             m.TruncationMarker = type('TM', (), {})
@@ -431,6 +431,7 @@ def apply_mocks():
             m.Omit = type('Omit', (), {})
             m.TemplateContext = type('TemplateContext', (), {})
             m.TemplateData = type('TemplateData', (), {})
+            m.LazyOptions = type('LazyOptions', (), {'DEFAULT': type('LazyOptions', (), {})})
         elif mname.endswith('_marker_behaviors'):
             m.ReplacingMarkerBehavior = type('RMB', (), {'emit_warnings': lambda *a: None})
             m.RoutingMarkerBehavior = type('RoMB', (), {'__init__': lambda *a, **kw: None})
@@ -445,13 +446,19 @@ def apply_mocks():
         'ansible._internal._templating', 'ansible._internal._ansiballz', 'ansible.executor',
         'ansible.errors', 'ansible.parsing', 'ansible.utils', 'ansible._internal._datatag',
         'ansible._internal._datatag._tags', 'ansible.parsing.yaml',
-        'ansible._internal._datatag._utils'
+        'ansible._internal._datatag._utils', 'ansible.module_utils.datatag',
+        'ansible._internal._templating._utils'
+    ]
+    not_package_list = [
+        'ansible.constants', 'ansible._internal._datatag._tags',
+        'ansible._internal._datatag._utils', 'ansible._internal._templating._utils',
+        'ansible.parsing.yaml', 'ansible.module_utils.datatag'
     ]
     for mname in mock_list:
         attrs = {}
         if mname == 'ansible.module_utils._internal':
             attrs['get_controller_serialize_map'] = lambda: {}
-        is_pkg = not mname.endswith('_tags') and not mname.endswith('constants') and not mname.endswith('_utils')
+        is_pkg = mname not in not_package_list
         create_mock(mname, attributes=attrs, is_package=is_pkg)
 
     if mocks_applied: return
