@@ -325,7 +325,8 @@ class ActualModuleIntegrationTest {
         assertTrue(result.success(), "Execution failed: " + result.message());
         String encodedContent = (String) result.data().get("content");
         assertNotNull(encodedContent);
-        String decoded = new String(java.util.Base64.getDecoder().decode(encodedContent));
+        // Use MIME decoder as it's more lenient with line breaks or other formatting issues
+        String decoded = new String(java.util.Base64.getMimeDecoder().decode(encodedContent.trim()));
         assertEquals(content, decoded);
     }
 

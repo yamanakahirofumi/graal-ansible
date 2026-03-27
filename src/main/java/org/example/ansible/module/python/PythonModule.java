@@ -109,8 +109,8 @@ public class PythonModule implements Module {
             }
 
             String jsonOutput = output;
-            if (output.contains("{")) {
-                jsonOutput = output.substring(output.indexOf("{"));
+            if (output.contains("{") && output.contains("}")) {
+                jsonOutput = output.substring(output.indexOf("{"), output.lastIndexOf("}") + 1);
             }
 
             @SuppressWarnings("unchecked")
@@ -178,8 +178,8 @@ public class PythonModule implements Module {
             }
 
             String jsonOutput = output;
-            if (output.contains("{")) {
-                jsonOutput = output.substring(output.indexOf("{"));
+            if (output.contains("{") && output.contains("}")) {
+                jsonOutput = output.substring(output.indexOf("{"), output.lastIndexOf("}") + 1);
             }
 
             @SuppressWarnings("unchecked")
@@ -227,7 +227,10 @@ public class PythonModule implements Module {
         sb.append("            def default(self, o):\n");
         sb.append("                if isinstance(o, bytes): return o.decode('latin-1')\n");
         sb.append("                try: return super().default(o)\n");
-        sb.append("                except Exception: return str(o)\n");
+        sb.append("                except Exception:\n");
+        sb.append("                    s = str(o)\n");
+        sb.append("                    if s.startswith('<'): return 'Object'\n");
+        sb.append("                    return s\n");
         sb.append("        kw['cls'] = WrappedEncoder\n");
         sb.append("        return _orig_dumps(obj, **kw)\n");
         sb.append("    json.dumps = robust_dumps\n");

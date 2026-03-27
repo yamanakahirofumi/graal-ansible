@@ -25,31 +25,26 @@ def setup_sys_path(site_packages):
         for p in site_packages:
             p_str = str(p)
             if p_str not in sys.path: sys.path.append(p_str)
-            # Link mocked packages to disk paths to allow loading non-mocked submodules
-            link_list = [
-                'ansible', 'ansible.module_utils', 'ansible.module_utils.common',
-                'ansible.module_utils.compat', 'ansible.module_utils._internal',
-                'ansible.module_utils._internal._ansiballz', 'ansible.module_utils.parsing',
-                'ansible.plugins', 'ansible.plugins.action', 'ansible._internal',
-                'ansible._internal._templating', 'ansible._internal._ansiballz', 'ansible.executor',
-                'ansible.errors', 'ansible.constants', 'ansible.parsing', 'ansible.utils'
-            ]
-            for mname in link_list:
-                if mname in sys.modules:
-                    m = sys.modules[mname]
+
+            # Link all mocked packages and modules to disk paths
+            for mname, m in list(sys.modules.items()):
+                if not mname.startswith('ansible'): continue
+
+                # Check if it's a package (has __path__) or a module
+                rel_path = mname.replace('.', '/')
+                pkg_cand = os.path.join(p_str, rel_path)
+                mod_cand = pkg_cand + '.py'
+
+                if os.path.isdir(pkg_cand):
                     if hasattr(m, '__path__') and isinstance(m.__path__, list):
-                        rel_path = mname.replace('.', '/')
-                        cand = os.path.join(p_str, rel_path)
-                        if os.path.exists(cand):
-                            if cand not in m.__path__:
-                                m.__path__.insert(0, cand)
-                            # Update __file__ if it's missing or points to wrong place
-                            target_file = os.path.join(cand, '__init__.py')
-                            if not hasattr(m, '__file__') or not m.__file__ or not os.path.exists(str(m.__file__)):
-                                try:
-                                    m.__file__ = target_file
-                                    m.__dict__['__file__'] = target_file
-                                except: pass
+                        if pkg_cand not in m.__path__: m.__path__.insert(0, pkg_cand)
+                    init_py = os.path.join(pkg_cand, '__init__.py')
+                    if os.path.exists(init_py):
+                        m.__file__ = init_py
+                        m.__dict__['__file__'] = init_py
+                elif os.path.exists(mod_cand):
+                    m.__file__ = mod_cand
+                    m.__dict__['__file__'] = mod_cand
 
 def setup_env(env_vars):
     if env_vars:
@@ -289,10 +284,6 @@ def apply_mocks():
         if is_package:
             if not hasattr(m, '__path__') or not isinstance(m.__path__, list):
                 m.__path__ = []
-            if not hasattr(m, '__file__') or not m.__file__:
-                placeholder_file = os.path.join(os.getcwd(), mname.replace('.', '/'), '__init__.py')
-                setattr(m, '__file__', placeholder_file)
-                m.__dict__['__file__'] = placeholder_file
         if attributes:
             for k, v in attributes.items(): setattr(m, k, v)
         return m
@@ -318,7 +309,7 @@ def apply_mocks():
         'DEFAULT_REMOTE_TMP': '/tmp',
         'DEFAULT_LOCAL_TMP': tempfile.gettempdir(),
         'config': types.SimpleNamespace(get_config_value=lambda *a, **kw: None)
-    })
+    }, is_package=False)
     create_mock('ansible.config', {'ConfigManager': type('CM', (), {'get_config_value': lambda *a, **kw: None})})
     create_mock('ansible.config.manager', {'ConfigManager': type('CM', (), {'get_config_value': lambda *a, **kw: None}), 'ensure_type': lambda x, t: x})
     create_mock('ansible.utils')
@@ -376,9 +367,11 @@ def apply_mocks():
         'AnsibleParserError': AnsibleParserError,
         'AnsiblePromptInterrupt': AnsiblePromptInterrupt,
         'AnsiblePromptNoninteractive': AnsiblePromptNoninteractive,
+        'AnsibleRuntimeError': type('AnsibleRuntimeError', (AnsibleError,), {}),
         'AnsibleVariableTypeError': type('AnsibleVariableTypeError', (AnsibleError,), {}),
         'AnsibleTemplateSyntaxError': type('AnsibleTemplateSyntaxError', (AnsibleError,), {}),
-        'AnsibleTemplateError': type('AnsibleTemplateError', (AnsibleError,), {})
+        'AnsibleTemplateError': type('AnsibleTemplateError', (AnsibleError,), {}),
+        'AnsibleUndefinedVariable': type('AnsibleUndefinedVariable', (AnsibleError,), {}),
     })
 
     # 5. Plugins & Loader
@@ -413,8 +406,11 @@ def apply_mocks():
         'get_controller_serialize_map': lambda: {}
     })
     create_mock('ansible._internal._locking')
-    create_mock('ansible._internal._datatag', {'SourceWasEncrypted': type('SWE', (Exception,), {})})
-    create_mock('ansible._internal._datatag._tags', {'SourceWasEncrypted': type('SWE', (Exception,), {})})
+    create_mock('ansible._internal._datatag')
+    create_mock('ansible._internal._datatag._tags', {
+        'Origin': type('Origin', (), {}),
+        'TrustedAsTemplate': type('TrustedAsTemplate', (), {})
+    }, is_package=False)
     create_mock('ansible._internal._templating', {
         '_template_vars': types.SimpleNamespace(generate_ansible_template_vars=lambda *a, **kw: {}),
         'get_text_file_contents': lambda x, *a, **kw: (open(x, 'r').read() if x and os.path.exists(x) else "mock_content", True)
@@ -438,13 +434,15 @@ def apply_mocks():
         'ansible.module_utils._internal._ansiballz', 'ansible.module_utils.parsing',
         'ansible.plugins', 'ansible.plugins.action', 'ansible._internal',
         'ansible._internal._templating', 'ansible._internal._ansiballz', 'ansible.executor',
-        'ansible.errors', 'ansible.constants', 'ansible.parsing', 'ansible.utils'
+        'ansible.errors', 'ansible.parsing', 'ansible.utils', 'ansible._internal._datatag',
+        'ansible._internal._datatag._tags', 'ansible.parsing.yaml'
     ]
     for mname in mock_list:
         attrs = {}
         if mname == 'ansible.module_utils._internal':
             attrs['get_controller_serialize_map'] = lambda: {}
-        create_mock(mname, attributes=attrs, is_package=True)
+        is_pkg = not mname.endswith('_tags') and not mname.endswith('constants')
+        create_mock(mname, attributes=attrs, is_package=is_pkg)
 
     if mocks_applied: return
 
@@ -525,10 +523,11 @@ def apply_mocks():
                                 except: pass
                             return list(o)
                     except Exception: pass
-                    try:
-                        return super().default(o)
+                    try: return super().default(o)
                     except Exception:
-                        return str(o)
+                        s = str(o)
+                        if s.startswith('<'): return "Object"
+                        return s
             kw['cls'] = WrappedEncoder
             return _orig_dumps(obj, **kw)
         json.dumps = robust_dumps
