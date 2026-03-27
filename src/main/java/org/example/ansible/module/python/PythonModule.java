@@ -189,7 +189,7 @@ public class PythonModule implements Module {
         sb.append("        orig_cls = kw.get('cls', json.JSONEncoder)\n");
         sb.append("        class WrappedEncoder(orig_cls):\n");
         sb.append("            def default(self, o):\n");
-        sb.append("                if isinstance(o, bytes): return o.decode('latin-1')\n");
+        sb.append("                if isinstance(o, (bytes, bytearray, memoryview)): return o.decode('latin-1') if hasattr(o, 'decode') else str(o)\n");
         sb.append("                if isinstance(o, (set, frozenset, range)): return list(o)\n");
         sb.append("                try:\n");
         sb.append("                    if hasattr(o, '__iter__') and not isinstance(o, (str, bytes)):\n");

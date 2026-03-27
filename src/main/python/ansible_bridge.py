@@ -427,6 +427,7 @@ def apply_mocks():
         if mname.endswith('_jinja_common'):
             m.UndefinedMarker = type('UM', (), {})
             m.TruncationMarker = type('TM', (), {})
+            m.CapturedExceptionMarker = type('CEM', (), {})
             m.Marker = type('Marker', (), {})
             m.MarkerError = type('MarkerError', (Exception,), {})
         elif mname.endswith('_utils'):
@@ -463,6 +464,10 @@ def apply_mocks():
             attrs['get_controller_serialize_map'] = lambda: {}
         if mname == 'ansible.module_utils.datatag':
             attrs['deprecator_from_collection_name'] = lambda *a, **kw: (lambda f: f)
+        if mname == 'ansible.parsing.yaml.loader':
+            attrs['AnsibleLoader'] = type('AnsibleLoader', (), {})
+        if mname == 'ansible.parsing.yaml.objects':
+            attrs['AnsibleVaultEncryptedUnicode'] = type('AnsibleVaultEncryptedUnicode', (), {})
         is_pkg = mname not in not_package_list
         create_mock(mname, attributes=attrs, is_package=is_pkg)
 
@@ -535,7 +540,7 @@ def apply_mocks():
             orig_cls = kw.get('cls', json.JSONEncoder)
             class WrappedEncoder(orig_cls):
                 def default(self, o):
-                    if isinstance(o, bytes): return o.decode('latin-1')
+                    if isinstance(o, (bytes, bytearray, memoryview)): return o.decode('latin-1') if hasattr(o, 'decode') else str(o)
                     if isinstance(o, (set, frozenset, range)): return list(o)
                     try:
                         if hasattr(o, '__iter__') and not isinstance(o, (str, bytes)):
@@ -545,14 +550,14 @@ def apply_mocks():
                                 except: pass
                             return list(o)
                     except Exception: pass
-                    if isinstance(o, AnsibleError):
+                    if 'AnsibleError' in str(type(o)):
                         return {'msg': str(o), 'failed': True}
                     try: return super().default(o)
                     except Exception:
                         try:
                             s = str(o)
-                            return s if not s.startswith('<') else "Object"
-                        except: return "Object"
+                            return s if not s.startswith('<') else str(type(o))
+                        except: return "UnknownObject"
             kw['cls'] = WrappedEncoder
             return _orig_dumps(obj, **kw)
         json.dumps = robust_dumps
