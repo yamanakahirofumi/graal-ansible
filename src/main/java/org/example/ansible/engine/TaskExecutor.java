@@ -459,6 +459,10 @@ public class TaskExecutor implements ITaskExecutor {
 
     @Override
     public TaskResult execute(Task task, BecomeContext becomeContext, Map<String, String> environment) {
+        if (isActionPlugin(task.action())) {
+            return executeActionPlugin(task, becomeContext, getCurrentConnection(), environment, Map.of());
+        }
+
         String actionName = task.action();
         if (actionName.startsWith("ansible.builtin.")) {
             actionName = actionName.substring("ansible.builtin.".length());
