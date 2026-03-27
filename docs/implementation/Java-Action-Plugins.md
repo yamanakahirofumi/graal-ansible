@@ -1,6 +1,14 @@
-# Java Action Plugin 実装ガイド
+# Java Action Plugin 実装ガイド (非推奨)
 
-本ドキュメントでは、`graal-ansible` において Java で実装される「軽量 Action Plugin エミュレータ」の設計パターンと実装方法について解説します。
+> [!CAUTION]
+> **非推奨通知: Python-first アーキテクチャへの完全移行**
+> `graal-ansible` プロジェクトは、本家 Ansible との完全な互換性を維持するため、**Python-first** アーキテクチャへ完全に移行しました。
+>
+> 以前存在した Java による Action Plugin エミュレータ（`copy`, `template`, `debug`, `set_fact` 等）は、オリジナルの Python コード実行が安定したことにより、**すべて削除されました。**
+>
+> 今後、新しいアクションやモジュールのサポートを追加する場合は、Java で再実装するのではなく、`ansible_bridge.py` に必要なモックを追加してオリジナルの Python コードを動かす **Dependency Emulation Strategy** を採用してください。
+
+本ドキュメントでは、歴史的経緯および極めて限定的な例外ケース（パフォーマンス上の致命的な問題など）のために、Java で実装される「軽量 Action Plugin エミュレータ」の設計パターンを参考として残しています。
 
 > [!WARNING]
 > **重要: 開発方針の変更**
