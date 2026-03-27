@@ -438,6 +438,7 @@ def apply_mocks():
             m.Marker = type('Marker', (), {})
             m.MarkerError = type('MarkerError', (Exception,), {})
             m._TemplateConfig = type('_TemplateConfig', (), {})
+            m.validate_arg_type = lambda *a, **kw: None
         elif mname.endswith('_utils'):
             m.Omit = type('Omit', (), {})
             m.TemplateContext = type('TemplateContext', (), {})
@@ -453,7 +454,7 @@ def apply_mocks():
         'ansible', 'ansible.module_utils', 'ansible.module_utils.common',
         'ansible.module_utils.compat', 'ansible.module_utils._internal',
         'ansible.module_utils._internal._ansiballz', 'ansible.module_utils.parsing',
-        'ansible.plugins', 'ansible.plugins.action', 'ansible._internal',
+        'ansible.plugins', 'ansible.plugins.action', 'ansible.plugins.become', 'ansible._internal',
         'ansible._internal._templating', 'ansible._internal._ansiballz', 'ansible.executor',
         'ansible.errors', 'ansible.parsing', 'ansible.utils', 'ansible._internal._datatag',
         'ansible._internal._datatag._tags', 'ansible.parsing.yaml', 'ansible.parsing.yaml.loader',
