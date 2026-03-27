@@ -359,19 +359,25 @@ def apply_mocks():
 
     create_mock('ansible.errors', {
         'AnsibleError': AnsibleError,
+        'AnsibleOptionsError': type('AnsibleOptionsError', (AnsibleError,), {}),
+        'AnsibleParserError': AnsibleParserError,
+        'AnsibleRuntimeError': type('AnsibleRuntimeError', (AnsibleError,), {}),
+        'AnsibleModuleError': type('AnsibleModuleError', (AnsibleError,), {}),
+        'AnsiblePluginError': type('AnsiblePluginError', (AnsibleError,), {}),
+        'AnsiblePluginNotFound': type('AnsiblePluginNotFound', (AnsibleError,), {}),
+        'AnsibleVariableTypeError': type('AnsibleVariableTypeError', (AnsibleError,), {}),
+        'AnsibleUndefinedVariable': type('AnsibleUndefinedVariable', (AnsibleError,), {}),
+        'AnsibleTemplateError': type('AnsibleTemplateError', (AnsibleError,), {}),
+        'AnsibleTemplateSyntaxError': type('AnsibleTemplateSyntaxError', (AnsibleError,), {}),
+        'AnsibleTemplateRuntimeError': type('AnsibleTemplateRuntimeError', (AnsibleError,), {}),
+        'AnsibleAssertionError': type('AnsibleAssertionError', (AnsibleError,), {}),
         'AnsibleValueOmittedError': AnsibleValueOmittedError,
         'AnsibleActionFail': AnsibleActionFail,
         'AnsibleActionSkip': AnsibleActionSkip,
         'AnsibleFileNotFound': AnsibleFileNotFound,
         'AnsibleConnectionFailure': AnsibleConnectionFailure,
-        'AnsibleParserError': AnsibleParserError,
         'AnsiblePromptInterrupt': AnsiblePromptInterrupt,
         'AnsiblePromptNoninteractive': AnsiblePromptNoninteractive,
-        'AnsibleRuntimeError': type('AnsibleRuntimeError', (AnsibleError,), {}),
-        'AnsibleVariableTypeError': type('AnsibleVariableTypeError', (AnsibleError,), {}),
-        'AnsibleTemplateSyntaxError': type('AnsibleTemplateSyntaxError', (AnsibleError,), {}),
-        'AnsibleTemplateError': type('AnsibleTemplateError', (AnsibleError,), {}),
-        'AnsibleUndefinedVariable': type('AnsibleUndefinedVariable', (AnsibleError,), {}),
     })
 
     # 5. Plugins & Loader
@@ -409,8 +415,9 @@ def apply_mocks():
     create_mock('ansible._internal._datatag')
     create_mock('ansible._internal._datatag._tags', {
         'Origin': type('Origin', (), {}),
-        'TrustedAsTemplate': type('TrustedAsTemplate', (), {})
+        'TrustedAsTemplate': type('TrustedAsTemplate', (), {}),
     }, is_package=False)
+    create_mock('ansible._internal._datatag._utils')
     create_mock('ansible._internal._templating', {
         '_template_vars': types.SimpleNamespace(generate_ansible_template_vars=lambda *a, **kw: {}),
         'get_text_file_contents': lambda x, *a, **kw: (open(x, 'r').read() if x and os.path.exists(x) else "mock_content", True)
@@ -422,6 +429,8 @@ def apply_mocks():
             m.TruncationMarker = type('TM', (), {})
         elif mname.endswith('_utils'):
             m.Omit = type('Omit', (), {})
+            m.TemplateContext = type('TemplateContext', (), {})
+            m.TemplateData = type('TemplateData', (), {})
         elif mname.endswith('_marker_behaviors'):
             m.ReplacingMarkerBehavior = type('RMB', (), {'emit_warnings': lambda *a: None})
             m.RoutingMarkerBehavior = type('RoMB', (), {'__init__': lambda *a, **kw: None})
@@ -435,13 +444,14 @@ def apply_mocks():
         'ansible.plugins', 'ansible.plugins.action', 'ansible._internal',
         'ansible._internal._templating', 'ansible._internal._ansiballz', 'ansible.executor',
         'ansible.errors', 'ansible.parsing', 'ansible.utils', 'ansible._internal._datatag',
-        'ansible._internal._datatag._tags', 'ansible.parsing.yaml'
+        'ansible._internal._datatag._tags', 'ansible.parsing.yaml',
+        'ansible._internal._datatag._utils'
     ]
     for mname in mock_list:
         attrs = {}
         if mname == 'ansible.module_utils._internal':
             attrs['get_controller_serialize_map'] = lambda: {}
-        is_pkg = not mname.endswith('_tags') and not mname.endswith('constants')
+        is_pkg = not mname.endswith('_tags') and not mname.endswith('constants') and not mname.endswith('_utils')
         create_mock(mname, attributes=attrs, is_package=is_pkg)
 
     if mocks_applied: return
@@ -523,6 +533,8 @@ def apply_mocks():
                                 except: pass
                             return list(o)
                     except Exception: pass
+                    if isinstance(o, AnsibleError):
+                        return {'msg': str(o), 'failed': True}
                     try: return super().default(o)
                     except Exception:
                         s = str(o)
