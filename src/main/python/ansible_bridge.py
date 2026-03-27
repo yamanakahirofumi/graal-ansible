@@ -439,6 +439,7 @@ def apply_mocks():
             m.MarkerError = type('MarkerError', (Exception,), {})
             m._TemplateConfig = type('_TemplateConfig', (), {})
             m.validate_arg_type = lambda *a, **kw: None
+            m.JinjaCallContext = type('JinjaCallContext', (), {})
         elif mname.endswith('_utils'):
             m.Omit = type('Omit', (), {})
             m.TemplateContext = type('TemplateContext', (), {})
@@ -473,6 +474,8 @@ def apply_mocks():
             attrs['get_controller_serialize_map'] = lambda: {}
         if mname == 'ansible.module_utils.datatag':
             attrs['deprecator_from_collection_name'] = lambda *a, **kw: (lambda f: f)
+        if mname == 'ansible.plugins.become':
+            attrs['BecomeBase'] = type('BecomeBase', (), {})
         if mname == 'ansible.parsing.yaml.loader':
             attrs['AnsibleLoader'] = type('AnsibleLoader', (), {})
         if mname == 'ansible.parsing.yaml.objects':
