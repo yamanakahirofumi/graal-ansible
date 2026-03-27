@@ -225,7 +225,7 @@ public class PythonModule implements Module {
         sb.append("        orig_cls = kw.get('cls', json.JSONEncoder)\n");
         sb.append("        class WrappedEncoder(orig_cls):\n");
         sb.append("            def default(self, o):\n");
-        sb.append("                if isinstance(o, bytes): return o.decode('utf-8', errors='surrogateescape')\n");
+        sb.append("                if isinstance(o, bytes): return o.decode('latin-1')\n");
         sb.append("                try: return super().default(o)\n");
         sb.append("                except Exception: return str(o)\n");
         sb.append("        kw['cls'] = WrappedEncoder\n");

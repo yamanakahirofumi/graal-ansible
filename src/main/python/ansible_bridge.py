@@ -31,7 +31,8 @@ def setup_sys_path(site_packages):
                 'ansible.module_utils.compat', 'ansible.module_utils._internal',
                 'ansible.module_utils._internal._ansiballz', 'ansible.module_utils.parsing',
                 'ansible.plugins', 'ansible.plugins.action', 'ansible._internal',
-                'ansible._internal._templating', 'ansible._internal._ansiballz', 'ansible.executor'
+                'ansible._internal._templating', 'ansible._internal._ansiballz', 'ansible.executor',
+                'ansible.errors', 'ansible.constants', 'ansible.parsing', 'ansible.utils'
             ]
             for mname in link_list:
                 if mname in sys.modules:
@@ -313,7 +314,11 @@ def apply_mocks():
     # 2. Display & PlayContext
     import tempfile
     create_mock('ansible')
-    create_mock('ansible.constants', {'DEFAULT_REMOTE_TMP': '/tmp', 'DEFAULT_LOCAL_TMP': tempfile.gettempdir()})
+    create_mock('ansible.constants', {
+        'DEFAULT_REMOTE_TMP': '/tmp',
+        'DEFAULT_LOCAL_TMP': tempfile.gettempdir(),
+        'config': types.SimpleNamespace(get_config_value=lambda *a, **kw: None)
+    })
     create_mock('ansible.config', {'ConfigManager': type('CM', (), {'get_config_value': lambda *a, **kw: None})})
     create_mock('ansible.config.manager', {'ConfigManager': type('CM', (), {'get_config_value': lambda *a, **kw: None}), 'ensure_type': lambda x, t: x})
     create_mock('ansible.utils')
@@ -370,7 +375,10 @@ def apply_mocks():
         'AnsibleConnectionFailure': AnsibleConnectionFailure,
         'AnsibleParserError': AnsibleParserError,
         'AnsiblePromptInterrupt': AnsiblePromptInterrupt,
-        'AnsiblePromptNoninteractive': AnsiblePromptNoninteractive
+        'AnsiblePromptNoninteractive': AnsiblePromptNoninteractive,
+        'AnsibleVariableTypeError': type('AnsibleVariableTypeError', (AnsibleError,), {}),
+        'AnsibleTemplateSyntaxError': type('AnsibleTemplateSyntaxError', (AnsibleError,), {}),
+        'AnsibleTemplateError': type('AnsibleTemplateError', (AnsibleError,), {})
     })
 
     # 5. Plugins & Loader
@@ -429,7 +437,8 @@ def apply_mocks():
         'ansible.module_utils.compat', 'ansible.module_utils._internal',
         'ansible.module_utils._internal._ansiballz', 'ansible.module_utils.parsing',
         'ansible.plugins', 'ansible.plugins.action', 'ansible._internal',
-        'ansible._internal._templating', 'ansible._internal._ansiballz', 'ansible.executor'
+        'ansible._internal._templating', 'ansible._internal._ansiballz', 'ansible.executor',
+        'ansible.errors', 'ansible.constants', 'ansible.parsing', 'ansible.utils'
     ]
     for mname in mock_list:
         attrs = {}
@@ -506,7 +515,7 @@ def apply_mocks():
             orig_cls = kw.get('cls', json.JSONEncoder)
             class WrappedEncoder(orig_cls):
                 def default(self, o):
-                    if isinstance(o, bytes): return o.decode('utf-8', errors='surrogateescape')
+                    if isinstance(o, bytes): return o.decode('latin-1')
                     if isinstance(o, (set, frozenset, range)): return list(o)
                     try:
                         if hasattr(o, '__iter__') and not isinstance(o, (str, bytes)):
