@@ -427,6 +427,7 @@ def apply_mocks():
         if mname.endswith('_jinja_common'):
             m.UndefinedMarker = type('UM', (), {})
             m.TruncationMarker = type('TM', (), {})
+            m.Marker = type('Marker', (), {})
             m.MarkerError = type('MarkerError', (Exception,), {})
         elif mname.endswith('_utils'):
             m.Omit = type('Omit', (), {})
@@ -446,14 +447,15 @@ def apply_mocks():
         'ansible.plugins', 'ansible.plugins.action', 'ansible._internal',
         'ansible._internal._templating', 'ansible._internal._ansiballz', 'ansible.executor',
         'ansible.errors', 'ansible.parsing', 'ansible.utils', 'ansible._internal._datatag',
-        'ansible._internal._datatag._tags', 'ansible.parsing.yaml',
+        'ansible._internal._datatag._tags', 'ansible.parsing.yaml', 'ansible.parsing.yaml.loader',
+        'ansible.parsing.yaml.objects', 'ansible.utils.unsafe_proxy',
         'ansible._internal._datatag._utils', 'ansible.module_utils.datatag',
         'ansible._internal._templating._utils'
     ]
     not_package_list = [
         'ansible.constants', 'ansible._internal._datatag._tags',
         'ansible._internal._datatag._utils', 'ansible._internal._templating._utils',
-        'ansible.parsing.yaml', 'ansible.module_utils.datatag'
+        'ansible.module_utils.datatag'
     ]
     for mname in mock_list:
         attrs = {}
@@ -547,9 +549,10 @@ def apply_mocks():
                         return {'msg': str(o), 'failed': True}
                     try: return super().default(o)
                     except Exception:
-                        s = str(o)
-                        if s.startswith('<'): return "Object"
-                        return s
+                        try:
+                            s = str(o)
+                            return s if not s.startswith('<') else "Object"
+                        except: return "Object"
             kw['cls'] = WrappedEncoder
             return _orig_dumps(obj, **kw)
         json.dumps = robust_dumps

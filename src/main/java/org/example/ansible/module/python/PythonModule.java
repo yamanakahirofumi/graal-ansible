@@ -239,7 +239,7 @@ public class PythonModule implements Module {
                     addFileToZip(zos, ansibleBase.resolve("modules/__init__.py"), "ansible/modules/__init__.py");
 
                     // Add core directories recursively
-                    String[] coreDirs = {"module_utils", "_vendor", "_internal", "compat"};
+                    String[] coreDirs = {"module_utils", "_vendor", "_internal", "compat", "parsing", "utils"};
                     for (String dirName : coreDirs) {
                         Path dirPath = ansibleBase.resolve(dirName);
                         if (Files.exists(dirPath) && Files.isDirectory(dirPath)) {
