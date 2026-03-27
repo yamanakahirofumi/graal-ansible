@@ -149,7 +149,9 @@ public class PythonModule implements Module {
             String wrappedScript = wrapModule(moduleFile, args, "ansible_lib.zip");
 
             // Create remote temp dir
-            var mkdirRes = connection.execCommand("mkdir -p " + remoteTmpDir, becomeContext, null);
+            // Use an empty BecomeContext to ensure the directory is owned by the SSH user,
+            // allowing the subsequent SCP upload to succeed.
+            var mkdirRes = connection.execCommand("mkdir -p " + remoteTmpDir, BecomeContext.empty(), null);
             if (mkdirRes.exitCode() != 0) {
                 return TaskResult.failure("Failed to create remote temp dir: " + mkdirRes.stderr());
             }

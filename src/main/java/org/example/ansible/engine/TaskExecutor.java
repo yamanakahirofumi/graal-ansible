@@ -89,7 +89,8 @@ public class TaskExecutor implements ITaskExecutor {
     private static final List<String> WELL_KNOWN_ACTION_PLUGINS = List.of(
             "debug", "set_fact", "copy", "template", "assemble", "group_by",
             "include_vars", "fetch", "pause", "wait_for_connection", "gather_facts",
-            "unarchive", "uri", "script", "reboot", "async_status", "add_host", "assert"
+            "unarchive", "uri", "script", "reboot", "async_status", "add_host", "assert",
+            "command", "shell"
     );
     private final Map<String, org.example.ansible.module.Module> modules = new HashMap<>();
     private final Map<String, ActionPlugin> builtInActionPlugins = new HashMap<>();
@@ -464,6 +465,10 @@ public class TaskExecutor implements ITaskExecutor {
             actionName = actionName.substring("ansible.builtin.".length());
         } else if (actionName.startsWith("ansible.legacy.")) {
             actionName = actionName.substring("ansible.legacy.".length());
+        }
+
+        if (isActionPlugin(task.action()) && !modules.containsKey(actionName)) {
+            return executeActionPlugin(task, becomeContext, getCurrentConnection(), environment, Map.of());
         }
 
         org.example.ansible.module.Module module = modules.get(actionName);
