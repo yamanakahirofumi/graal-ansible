@@ -427,6 +427,7 @@ def apply_mocks():
         if mname.endswith('_jinja_common'):
             m.UndefinedMarker = type('UM', (), {})
             m.TruncationMarker = type('TM', (), {})
+            m.MarkerError = type('MarkerError', (Exception,), {})
         elif mname.endswith('_utils'):
             m.Omit = type('Omit', (), {})
             m.TemplateContext = type('TemplateContext', (), {})
@@ -458,6 +459,8 @@ def apply_mocks():
         attrs = {}
         if mname == 'ansible.module_utils._internal':
             attrs['get_controller_serialize_map'] = lambda: {}
+        if mname == 'ansible.module_utils.datatag':
+            attrs['deprecator_from_collection_name'] = lambda *a, **kw: (lambda f: f)
         is_pkg = mname not in not_package_list
         create_mock(mname, attributes=attrs, is_package=is_pkg)
 

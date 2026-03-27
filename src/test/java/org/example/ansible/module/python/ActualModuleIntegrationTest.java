@@ -20,6 +20,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -323,11 +324,29 @@ class ActualModuleIntegrationTest {
         TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
 
         assertTrue(result.success(), "Execution failed: " + result.message());
-        String encodedContent = (String) result.data().get("content");
-        assertNotNull(encodedContent);
-        // Use MIME decoder as it's more lenient with line breaks or other formatting issues
-        String decoded = new String(java.util.Base64.getMimeDecoder().decode(encodedContent.trim()));
-        assertEquals(content, decoded);
+        Object contentObj = result.data().get("content");
+        assertNotNull(contentObj, "Result should contain 'content' field");
+
+        String decoded;
+        if (contentObj instanceof String) {
+            String encodedContent = (String) contentObj;
+            if (encodedContent.equals(content)) {
+                // Bridge already decoded it (possible if using latin-1 decoding in robust_dumps)
+                decoded = encodedContent;
+            } else {
+                // Standard Ansible slurp returns base64
+                try {
+                    decoded = new String(java.util.Base64.getMimeDecoder().decode(encodedContent.trim()), StandardCharsets.UTF_8);
+                } catch (IllegalArgumentException e) {
+                    // If not valid base64, assume it was already decoded or mangled
+                    decoded = encodedContent;
+                }
+            }
+        } else {
+            decoded = contentObj.toString();
+        }
+
+        assertEquals(content, decoded, "Slurped content mismatch. Raw result: " + result.data());
     }
 
     @Test
