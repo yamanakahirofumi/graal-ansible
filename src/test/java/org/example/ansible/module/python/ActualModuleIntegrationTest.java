@@ -74,7 +74,6 @@ class ActualModuleIntegrationTest {
 
     @Test
     void testActualPingModule() {
-        taskExecutor.registerModule("ping", new PythonModule("ping"));
 
         Task task = new Task("test_ping", "ping", Map.of());
         TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
@@ -85,7 +84,6 @@ class ActualModuleIntegrationTest {
 
     @Test
     void testActualFileModule() {
-        taskExecutor.registerModule("file", new PythonModule("file"));
 
         String remotePath = "/tmp/touch-test.txt";
         Task task = new Task("test_file", "file", Map.of(
@@ -106,7 +104,6 @@ class ActualModuleIntegrationTest {
 
     @Test
     void testActualStatModule() {
-        taskExecutor.registerModule("stat", new PythonModule("stat"));
 
         String remotePath = "/tmp/stat-test.txt";
         // Setup state using SSH
@@ -125,7 +122,6 @@ class ActualModuleIntegrationTest {
 
     @Test
     void testActualCopyModule() throws IOException {
-        taskExecutor.registerModule("copy", new PythonModule("copy"));
 
         Path localSrcFile = tempDir.resolve("copy-src.txt");
         String content = "Hello from Actual Copy Module (src)";
@@ -163,7 +159,6 @@ class ActualModuleIntegrationTest {
 
     @Test
     void testActualSetupModule() {
-        taskExecutor.registerModule("setup", new PythonModule("setup"));
 
         Task task = new Task("test_setup", "setup", Map.of());
         TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
@@ -176,8 +171,6 @@ class ActualModuleIntegrationTest {
 
     @Test
     void testActualCommandModule() {
-        taskExecutor.registerModule("command", new PythonModule("command"));
-
         Task task = new Task("test_command", "command", Map.of("_raw_params", "echo hello_command"));
         TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
 
@@ -189,8 +182,6 @@ class ActualModuleIntegrationTest {
 
     @Test
     void testActualShellModule() {
-        taskExecutor.registerModule("shell", new PythonModule("shell"));
-
         Task task = new Task("test_shell", "shell", Map.of("_raw_params", "echo 'line1\nline2' | grep line2"));
         TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
 
@@ -202,7 +193,6 @@ class ActualModuleIntegrationTest {
 
     @Test
     void testActualLineInFileModule() {
-        taskExecutor.registerModule("lineinfile", new PythonModule("lineinfile"));
 
         String remotePath = "/tmp/lineinfile-test.txt";
         connection.execCommand("echo \"initial line\" > " + remotePath, BecomeContext.empty(), null);
@@ -222,7 +212,6 @@ class ActualModuleIntegrationTest {
 
     @Test
     void testActualReplaceModule() {
-        taskExecutor.registerModule("replace", new PythonModule("replace"));
 
         String remotePath = "/tmp/replace-test.txt";
         connection.execCommand("echo \"Hello World\" > " + remotePath, BecomeContext.empty(), null);
@@ -243,7 +232,6 @@ class ActualModuleIntegrationTest {
 
     @Test
     void testActualUserModule() {
-        taskExecutor.registerModule("user", new PythonModule("user"));
 
         String userName = "testuser-ansible";
         Task task = new Task("test_user", "user", Map.of(
@@ -260,7 +248,6 @@ class ActualModuleIntegrationTest {
 
     @Test
     void testActualGroupModule() {
-        taskExecutor.registerModule("group", new PythonModule("group"));
 
         String groupName = "testgroup-ansible";
         Task task = new Task("test_group", "group", Map.of(
@@ -277,7 +264,6 @@ class ActualModuleIntegrationTest {
 
     @Test
     void testActualFindModule() {
-        taskExecutor.registerModule("find", new PythonModule("find"));
 
         Task task = new Task("test_find", "find", Map.of(
                 "paths", "/tmp",
@@ -291,7 +277,6 @@ class ActualModuleIntegrationTest {
 
     @Test
     void testActualTempfileModule() {
-        taskExecutor.registerModule("tempfile", new PythonModule("tempfile"));
 
         Task task = new Task("test_tempfile", "tempfile", Map.of(
                 "state", "directory",
@@ -309,7 +294,6 @@ class ActualModuleIntegrationTest {
 
     @Test
     void testActualHostnameModule() {
-        taskExecutor.registerModule("hostname", new PythonModule("hostname"));
 
         Task task = new Task("test_hostname", "hostname", Map.of(
                 "name", "new-hostname"

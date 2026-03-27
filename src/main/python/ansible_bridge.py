@@ -26,7 +26,7 @@ def setup_sys_path(site_packages):
             p_str = str(p)
             if p_str not in sys.path: sys.path.append(p_str)
             # Link mocked packages to disk paths to allow loading non-mocked submodules
-            for mname in ['ansible', 'ansible.module_utils', 'ansible.module_utils.common', 'ansible.module_utils.compat', 'ansible.module_utils._internal', 'ansible.module_utils.parsing']:
+            for mname in ['ansible', 'ansible.module_utils', 'ansible.module_utils.common', 'ansible.module_utils.compat', 'ansible.module_utils._internal', 'ansible.module_utils.parsing', 'ansible.plugins', 'ansible.plugins.action']:
                 if mname in sys.modules:
                     m = sys.modules[mname]
                     if hasattr(m, '__path__') and isinstance(m.__path__, list):
@@ -417,7 +417,7 @@ def apply_mocks():
 
     # 8. Module Utils
     # Mock core packages as base for hybrid loading
-    for mname in ['ansible', 'ansible.module_utils', 'ansible.module_utils.common', 'ansible.module_utils.compat', 'ansible.module_utils._internal', 'ansible.module_utils.parsing']:
+    for mname in ['ansible', 'ansible.module_utils', 'ansible.module_utils.common', 'ansible.module_utils.compat', 'ansible.module_utils._internal', 'ansible.module_utils.parsing', 'ansible.plugins', 'ansible.plugins.action']:
         attrs = {}
         if mname == 'ansible.module_utils._internal':
             attrs['get_controller_serialize_map'] = lambda: {}
@@ -507,6 +507,7 @@ def apply_mocks():
 
 def _create_action_plugin(action_name, task, connection, play_context, loader, templar, shared_loader_obj):
     import importlib.util
+    import __main__
     base_name = action_name
     if base_name.startswith('ansible.builtin.'): base_name = base_name[16:]
     elif base_name.startswith('ansible.legacy.'): base_name = base_name[15:]
@@ -525,10 +526,14 @@ def _create_action_plugin(action_name, task, connection, play_context, loader, t
 
     if not path: raise Exception(f"Action plugin {action_name} not found")
 
-    spec = importlib.util.spec_from_file_location("ansible.plugins.action." + base_name, path)
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = mod
-    spec.loader.exec_module(mod)
+    fqcn = "ansible.plugins.action." + base_name
+    if fqcn in sys.modules:
+        mod = sys.modules[fqcn]
+    else:
+        spec = importlib.util.spec_from_file_location(fqcn, path)
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = mod
+        spec.loader.exec_module(mod)
 
     l = loader or MockLoader()
 
