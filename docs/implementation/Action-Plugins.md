@@ -22,12 +22,13 @@ Ansible のタスク実行には、大きく分けて以下の 2 種類があり
 
 Worker Process (`TaskExecutor`) は、タスクの `action` 名に基づき、以下の優先順位で実行方式を選択します。
 
-1.  **Python 実装の実行 (最優先)**:
-    - `ansible-core` コレクションの `plugins/action/` 配下にある本物の Python スクリプトを、実行ブリッジ（`ansible_action_launcher.py`）を介して実行します。
-    - プラグインが依存する `ansible.plugins.action.ActionBase` などのクラスについて、**動かない（インポートエラーになる）部分のみを Java/Python で再実装・モック化** して提供します。
-2.  **Java による軽量エミュレータ (特定用途)**:
-    - `debug`, `set_fact` など、頻繁に呼び出されパフォーマンスが重視されるものや、依存解決が極めて複雑なものについて、Java で実装されたエミュレータを使用します。
-    - 実装方法は [Java Action Plugin 実装ガイド](Java-Action-Plugins.md) を参照してください。
+1.  **Python 実装の実行 (最優先・標準方針)**:
+    - `ansible-core` コレクションの `plugins/action/` 配下にある本物の Python スクリプトを、実行ブリッジ（`ansible_bridge.py`）を介して直接実行します。
+    - プラグインが依存する `ansible.plugins.action.ActionBase` などのクラスについて、**動かない（インポートエラーになる）部分のみを Java/Python で再実装・モック化**（Dependency Emulation）して提供します。
+    - `copy`, `template`, `debug`, `setup` などの主要なアクションは、この方式で動作検証済みです。
+2.  **Java による軽量エミュレータ (限定的利用)**:
+    - パフォーマンス上の極めて強い制約がある場合や、Python 実装の依存解決が不可能な場合に限り、Java で実装されたエミュレータを使用する可能性があります。
+    - **現在は、主要なコアモジュールを含め、原則として Python 実装の実行を優先しています。**
 3.  **通常のモジュール実行**:
     - Action Plugin が存在しない場合、通常のモジュール実行フロー（ターゲットノードへの転送・実行）に移行します。
 
@@ -155,27 +156,27 @@ Windows 管理ノード対応などのため、Linux 固有のモジュール（
 
 ## 8. 実装済みの Action Plugin
 
+主要なアクションプラグインは、すべて **Python (Actual)** 方式、すなわち本家 Ansible のソースコードをそのまま実行する方式で検証されています。
+
 | プラグイン名 | 実装方式 | 備考 |
 | :--- | :--- | :--- |
-| `debug` | Java Emulator | 高速な変数表示。 |
-| `set_fact` | Java Emulator | 変数の動的登録。 |
-| `copy` | Java Emulator | ファイル転送、パーミッション設定（`file` モジュールへの委譲を含む）。 |
-| `template` | Java Emulator | Jinja2 テンプレートのレンダリングと転送。 |
-| その他 | Python (Actual) | `ansible_action_launcher.py` 経由での実行。 |
+| `debug` | Python (Actual) | 変数の表示。 |
+| `set_fact` | Python (Actual) | 変数の動的登録。 |
+| `copy` | Python (Actual) | `ansible_bridge.py` による `ActionBase` の高度なモックにより動作。 |
+| `template` | Python (Actual) | 管理ノード側での Jinja2 レンダリングを含む。 |
+| `setup` | Python (Actual) | ファクト収集。 |
+| その他 | Python (Actual) | `ansible_bridge.py` 経由での実行。 |
 
-## 9. 標準モジュールの Java による最適化 (Built-in Module Optimizations)
+## 9. 標準モジュールの Python-first への移行 (Migration to Python-first)
 
-> [!NOTE]
-> **暫定的な実装方針**:
-> `command` や `shell` などの頻繁に使用される標準モジュールの Java による実装は、現フェーズにおける **「多くのモジュールを早期に動作させるための暫定的な対策」** です。
-> プロジェクトの最終的な目標は、**「Windows を管理ノードにすること」** および **「本家 Ansible の Python モジュールをそのまま再利用すること」** です。
+> [!IMPORTANT]
+> **アーキテクチャの更新**:
+> 以前は `command` や `shell` などの頻繁に使用されるモジュールについて、Java による暫定的な再実装（Built-in Module）を行っていましたが、現在は **「本家 Ansible の Python モジュールをそのまま再利用する」** というプロジェクトの最終目標に基づき、すべて Python 実行方式に統一されました。
 
-Action Plugin 以外にも、一部の標準モジュールについては、以下の理由から Java 側で直接実行する最適化（Built-in Module）を行っています。
-
-- **パフォーマンス**: 管理ノードからターゲットノードへの転送を伴わずに、コネクションプラグインを介して直接コマンドを実行するため高速です。
-- **互換性の回避**: 現時点の GraalPy 環境において、Python 版 `command` モジュールが依存する `ansible.module_utils` 等のロードに伴う互換性問題を回避し、安定した実行を優先しています。
-
-これらのモジュールは、`TaskExecutor` 内で登録され、通常の Python モジュール実行フローよりも優先して呼び出されます。
+これにより、以下のメリットが得られています：
+- **完全な互換性**: 本家 Ansible と全く同じロジックが実行されます。
+- **メンテナンス性の向上**: Java 側での重複した再実装が不要になります。
+- **Dependency Emulation の洗練**: `ansible_bridge.py` によるエミュレーション技術の向上により、重厚な `ansible-core` のロードと実行が GraalPy 上で安定して行えるようになりました。
 
 ## 10. 関連ドキュメント
 - [GraalPy 互換性テクニカルリファレンス](Action-Plugins-Investigation.md)
