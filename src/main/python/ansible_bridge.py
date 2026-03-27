@@ -31,7 +31,19 @@ def setup_sys_path(site_packages):
             pure_mocks = ['ansible.errors', 'ansible.plugins', 'ansible.constants', 'ansible.utils.display']
             for mname, m in list(sys.modules.items()):
                 if not mname.startswith('ansible'): continue
-                if any(mname == pm or mname.startswith(pm + '.') for pm in pure_mocks): continue
+
+                # Special handling for pure mocks: we don't want to load them from disk
+                # BUT we might want to load sub-packages that are NOT mocked.
+                is_pure = False
+                for pm in pure_mocks:
+                    if mname == pm:
+                        is_pure = True; break
+                    if mname.startswith(pm + '.'):
+                        # Allow become and runas subpackages to be discovered on disk
+                        if not mname.startswith('ansible.plugins.become'):
+                            is_pure = True; break
+
+                if is_pure: continue
 
                 # Check if it's a package (has __path__) or a module
                 rel_path = mname.replace('.', '/')
@@ -440,6 +452,7 @@ def apply_mocks():
             m._TemplateConfig = type('_TemplateConfig', (), {})
             m.validate_arg_type = lambda *a, **kw: None
             m.JinjaCallContext = type('JinjaCallContext', (), {})
+            m._SandboxMode = type('_SandboxMode', (), {})
         elif mname.endswith('_utils'):
             m.Omit = type('Omit', (), {})
             m.TemplateContext = type('TemplateContext', (), {})
@@ -455,7 +468,8 @@ def apply_mocks():
         'ansible', 'ansible.module_utils', 'ansible.module_utils.common',
         'ansible.module_utils.compat', 'ansible.module_utils._internal',
         'ansible.module_utils._internal._ansiballz', 'ansible.module_utils.parsing',
-        'ansible.plugins', 'ansible.plugins.action', 'ansible.plugins.become', 'ansible._internal',
+        'ansible.plugins', 'ansible.plugins.action', 'ansible.plugins.become',
+        'ansible.plugins.become.runas', 'ansible._internal',
         'ansible._internal._templating', 'ansible._internal._ansiballz', 'ansible.executor',
         'ansible.errors', 'ansible.parsing', 'ansible.utils', 'ansible._internal._datatag',
         'ansible._internal._datatag._tags', 'ansible.parsing.yaml', 'ansible.parsing.yaml.loader',
@@ -476,6 +490,8 @@ def apply_mocks():
             attrs['deprecator_from_collection_name'] = lambda *a, **kw: (lambda f: f)
         if mname == 'ansible.plugins.become':
             attrs['BecomeBase'] = type('BecomeBase', (), {})
+        if mname == 'ansible.plugins.become.runas':
+            attrs['BecomeModule'] = type('BecomeModule', (), {})
         if mname == 'ansible.parsing.yaml.loader':
             attrs['AnsibleLoader'] = type('AnsibleLoader', (), {})
         if mname == 'ansible.parsing.yaml.objects':
@@ -555,6 +571,8 @@ def apply_mocks():
                     if hasattr(o, 'decode') and callable(o.decode):
                         try: return o.decode('latin-1')
                         except: pass
+                    if hasattr(o, 'value'): return o.value
+                    if hasattr(o, '_value'): return o._value
                     if isinstance(o, (set, frozenset, range)): return list(o)
                     try:
                         if hasattr(o, '__iter__') and not isinstance(o, (str, bytes)):
