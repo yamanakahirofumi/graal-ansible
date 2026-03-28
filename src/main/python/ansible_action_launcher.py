@@ -5,8 +5,8 @@ import ansible_bridge
 import types
 
 # Convert Java Map to native Python dict
-task_vars = dict(task_vars_java) if task_vars_java is not None else {}
-module_args = dict(module_args_java) if module_args_java is not None else {}
+task_vars = ansible_bridge._deep_convert(task_vars_java) if task_vars_java is not None else {}
+module_args = ansible_bridge._deep_convert(module_args_java) if module_args_java is not None else {}
 env = environment_java if 'environment_java' in globals() else None
 site_packages = [str(s) for s in site_packages_java] if 'site_packages_java' in globals() and site_packages_java is not None else []
 

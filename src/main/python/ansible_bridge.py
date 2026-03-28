@@ -2,6 +2,7 @@ import json
 import sys
 import os
 import types
+import re
 from io import StringIO
 
 # Global context to hold current task state
@@ -12,9 +13,28 @@ _current_task_context = {
     'environment_java': None
 }
 
+def _normalize_path(p):
+    if p is None: return None
+    if not isinstance(p, (str, bytes)): return p
+
+    is_bytes = isinstance(p, bytes)
+    s = p.decode('utf-8', errors='replace') if is_bytes else p
+
+    # Remove leading slashes from Windows absolute paths (e.g. /C:\... -> C:\...)
+    # This happens sometimes when paths are passed from Java/URI.
+    new_s = re.sub(r'^[/\\]+([A-Za-z]:[/\\])', r'\1', s)
+    if new_s == s:
+        # Also check for /C: without trailing slash
+        new_s = re.sub(r'^[/\\]+([A-Za-z]:)$', r'\1', s)
+
+    if new_s == s: return p
+    return new_s.encode('utf-8') if is_bytes else new_s
+
 def _deep_convert(obj):
     if obj is None: return None
-    if isinstance(obj, (int, float, bool, str)): return obj
+    if isinstance(obj, str): return _normalize_path(obj)
+    if isinstance(obj, bytes): return _normalize_path(obj)
+    if isinstance(obj, (int, float, bool)): return obj
 
     if hasattr(obj, 'getClass'):
         # It's likely a Java object
@@ -25,16 +45,16 @@ def _deep_convert(obj):
             return [_deep_convert(i) for i in obj]
 
         class_name = obj.getClass().getName()
-        if class_name == 'java.lang.String': return str(obj)
+        if class_name == 'java.lang.String': return _normalize_path(str(obj))
         if class_name == 'java.lang.Boolean': return bool(obj)
         if class_name in ('java.lang.Integer', 'java.lang.Long', 'java.lang.Short', 'java.lang.Byte'): return int(obj)
         if class_name in ('java.lang.Float', 'java.lang.Double'): return float(obj)
-        if 'java.nio.file.Path' in class_name: return str(obj.toString())
-        if 'java.io.File' in class_name: return str(obj.getAbsolutePath())
+        if 'java.nio.file.Path' in class_name: return _normalize_path(str(obj.toString()))
+        if 'java.io.File' in class_name: return _normalize_path(str(obj.getAbsolutePath()))
 
         if 'Proxy' in class_name or 'com.sun.proxy' in class_name:
-            if hasattr(obj, 'substring'): return str(obj)
-            if hasattr(obj, 'toString'): return str(obj.toString())
+            if hasattr(obj, 'substring'): return _normalize_path(str(obj))
+            if hasattr(obj, 'toString'): return _normalize_path(str(obj.toString()))
 
         try: return str(obj)
         except: return obj
@@ -46,8 +66,17 @@ def _deep_convert(obj):
     return obj
 
 def bind_task(complex_args, connection_java, become_context_java, environment_java):
+    # Ensure complex_args is a dict before deep convert if it's a Map proxy
+    args = complex_args
+    if hasattr(complex_args, 'getClass') and 'Map' in complex_args.getClass().getName():
+        from java.util import HashMap
+        args = HashMap(complex_args)
+
+    # Pre-process complex_args to handle Windows paths passed from Java
+    converted_args = _deep_convert(args)
+
     _current_task_context.update({
-        'complex_args': _deep_convert(complex_args),
+        'complex_args': converted_args,
         'connection_java': connection_java,
         'become_context_java': become_context_java,
         'environment_java': environment_java
@@ -56,7 +85,7 @@ def bind_task(complex_args, connection_java, become_context_java, environment_ja
 def setup_sys_path(site_packages):
     if site_packages:
         for p in site_packages:
-            p_str = str(p)
+            p_str = _normalize_path(str(p))
             if p_str not in sys.path: sys.path.append(p_str)
             # Link mocked packages to disk paths to allow loading non-mocked submodules
             for mname in ['ansible', 'ansible.module_utils', 'ansible.module_utils.common', 'ansible.module_utils.compat', 'ansible.module_utils._internal', 'ansible.module_utils.parsing', 'ansible.plugins', 'ansible.plugins.action']:
@@ -93,8 +122,9 @@ class MockLoader:
     def get_real_file(self, file_path, decrypt=True):
         return file_path
     def get_text_file_contents(self, file_path, loader=None):
-        if file_path and os.path.exists(file_path):
-            with open(file_path, 'r', encoding='utf-8', errors='surrogateescape') as f:
+        fp = _normalize_path(file_path)
+        if fp and os.path.exists(fp):
+            with open(fp, 'r', encoding='utf-8', errors='surrogateescape') as f:
                 return f.read(), True
         return "", False
     def cleanup_tmp_file(self, *args, **kwargs):
@@ -164,23 +194,25 @@ class ActionBase:
     def _find_needle(self, name, needle, *args, **kwargs):
         if needle and 'task_executor_java' in globals():
             res = task_executor_java.resolveLocalPath(needle)
-            if res: return str(res)
-        return needle
+            if res: return _normalize_path(str(res))
+        return _normalize_path(needle)
     def _remote_expand_user(self, path, *args, **kwargs): return path
     def _execute_remote_stat(self, path, all_vars, follow=False, *args, **kwargs):
         import hashlib
-        if os.path.exists(path):
-            with open(path, 'rb') as f:
+        p = _normalize_path(path)
+        if os.path.exists(p):
+            with open(p, 'rb') as f:
                 csum = hashlib.sha1(f.read()).hexdigest()
-            return {'exists': True, 'checksum': csum, 'isdir': os.path.isdir(path), 'isreg': os.path.isfile(path), 'islnk': os.path.islink(path)}
+            return {'exists': True, 'checksum': csum, 'isdir': os.path.isdir(p), 'isreg': os.path.isfile(p), 'islnk': os.path.islink(p)}
         return {'exists': False, 'checksum': None, 'isdir': False, 'isreg': False, 'islnk': False}
     def _transfer_file(self, local_path, remote_path):
         conn = _current_task_context['connection_java']
+        lp, rp = _normalize_path(local_path), _normalize_path(remote_path)
         if conn:
             from java.nio.file import Paths
-            conn.putFile(Paths.get(str(local_path)), str(remote_path))
+            conn.putFile(Paths.get(str(lp)), str(rp))
         import hashlib
-        return hashlib.sha1(open(local_path, 'rb').read()).hexdigest()
+        return hashlib.sha1(open(lp, 'rb').read()).hexdigest()
     def _fixup_perms2(self, *args, **kwargs): pass
 
 class Task:
@@ -267,8 +299,9 @@ class AnsibleModule:
                 if t == 'list':
                     if not isinstance(v, (list, tuple)): val = [v]
                 elif t == 'str' or t == 'path':
-                    if isinstance(v, (list, tuple)) and len(v) > 0: val = str(v[0])
-                    else: val = str(v)
+                    if isinstance(v, (list, tuple)) and len(v) > 0: p = str(v[0])
+                    else: p = str(v)
+                    val = _normalize_path(p)
                 elif t == 'bool':
                     val = str(v).lower() in ('yes', 'true', 't', '1', 'on')
                 elif t == 'int':
@@ -282,7 +315,6 @@ class AnsibleModule:
             if 'dest' in self.params and self.params['dest'] is not None: self.params['path'] = self.params['dest']
             elif 'name' in self.params and self.params['name'] is not None: self.params['path'] = self.params['name']
 
-        # Crucial for 'file' module touch action
         # Crucial for 'file' module touch action
         # The file module expects 'path' in the result of load_file_common_arguments
         # which it uses as 'file_args'.
@@ -319,35 +351,41 @@ class AnsibleModule:
     def get_bin_path(self, arg, required=False, opt_dirs=None): return arg
     def sha1(self, path):
         import hashlib
+        p = _normalize_path(path)
         try:
-            with open(path, 'rb') as f: return hashlib.sha1(f.read()).hexdigest()
+            with open(p, 'rb') as f: return hashlib.sha1(f.read()).hexdigest()
         except: return None
     def md5(self, path):
         import hashlib
+        p = _normalize_path(path)
         try:
-            with open(path, 'rb') as f: return hashlib.md5(f.read()).hexdigest()
+            with open(p, 'rb') as f: return hashlib.md5(f.read()).hexdigest()
         except: return None
     def sha256(self, path):
         import hashlib
+        p = _normalize_path(path)
         try:
-            with open(path, 'rb') as f: return hashlib.sha256(f.read()).hexdigest()
+            with open(p, 'rb') as f: return hashlib.sha256(f.read()).hexdigest()
         except: return None
     def atomic_move(self, src, dest, unsafe_writes=False, **kwargs):
         import os, shutil
-        shutil.move(src, dest)
+        shutil.move(_normalize_path(src), _normalize_path(dest))
     def debug(self, msg): pass
     def warn(self, msg): pass
+    def deprecate(self, msg, version=None, date=None, collection_name=None): pass
     def digest_from_file(self, filename, algorithm):
         import hashlib
+        p = _normalize_path(filename)
         h = hashlib.new(algorithm)
-        with open(filename, 'rb') as f:
+        with open(p, 'rb') as f:
             for chunk in iter(lambda: f.read(4096), b""):
                 h.update(chunk)
         return h.hexdigest()
     def get_file_attributes(self, path):
         import os, stat
-        if not os.path.exists(path): return {}
-        st = os.stat(path)
+        p = _normalize_path(path)
+        if not os.path.exists(p): return {}
+        st = os.stat(p)
         return {
             'mode': oct(stat.S_IMODE(st.st_mode))[2:],
             'owner': str(st.st_uid),
@@ -364,9 +402,10 @@ class AnsibleModule:
         actual_path = path or params.get('path') or params.get('dest') or params.get('name')
         if actual_path:
             if isinstance(actual_path, (list, tuple)) and len(actual_path) > 0:
-                res['path'] = str(actual_path[0])
+                p = str(actual_path[0])
             else:
-                res['path'] = str(actual_path)
+                p = str(actual_path)
+            res['path'] = _normalize_path(p)
         return res
     def set_fs_attributes_if_different(self, file_args, changed, diff=None, expand=True):
         if file_args: self._stored_file_args.update(file_args)
@@ -374,6 +413,12 @@ class AnsibleModule:
     def set_file_attributes_if_different(self, file_args, changed, diff=None, expand=True):
         if file_args: self._stored_file_args.update(file_args)
         return changed
+    def makedirs_safe(self, path, mode=None):
+        import os
+        p = _normalize_path(path)
+        if not os.path.exists(p):
+            try: os.makedirs(p, mode=mode if mode is not None else 0o777)
+            except: pass
 
 # --- Mock Application ---
 
@@ -426,8 +471,9 @@ def apply_mocks():
 
     def real_checksum(path, *args, **kwargs):
         import hashlib
-        if not os.path.exists(path): return None
-        with open(path, 'rb') as f: return hashlib.sha1(f.read()).hexdigest()
+        p = _normalize_path(path)
+        if not os.path.exists(p): return None
+        with open(p, 'rb') as f: return hashlib.sha1(f.read()).hexdigest()
     def real_checksum_s(s, *args, **kwargs):
         import hashlib
         if isinstance(s, str): s = s.encode('utf-8')
@@ -442,13 +488,14 @@ def apply_mocks():
 
     # 3. Utils
     def mock_makedirs_safe(path, mode=None, *args, **kwargs):
-        if not os.path.exists(path):
-            try: os.makedirs(path, mode=mode if mode is not None else 0o777)
+        p = _normalize_path(path)
+        if not os.path.exists(p):
+            try: os.makedirs(p, mode=mode if mode is not None else 0o777)
             except: pass
 
     create_mock('ansible.utils.path', {
         'unquote': lambda s, *a, **kw: s, 'cleanup_tmp_file': lambda s, *a, **kw: None,
-        'makedirs_safe': mock_makedirs_safe, 'unfrackpath': lambda s, *a, **kw: s,
+        'makedirs_safe': mock_makedirs_safe, 'unfrackpath': _normalize_path,
         'get_real_file': lambda s, *a, **kw: s
     })
     create_mock('ansible.utils.fqcn', {'add_internal_fqcns': lambda *a, **kw: None})
@@ -519,7 +566,7 @@ def apply_mocks():
     create_mock('ansible._internal._datatag._tags', {'SourceWasEncrypted': type('SWE', (Exception,), {})})
     create_mock('ansible._internal._templating', {
         '_template_vars': types.SimpleNamespace(generate_ansible_template_vars=lambda *a, **kw: {}),
-        'get_text_file_contents': lambda x, *a, **kw: (open(x, 'r').read() if x and os.path.exists(x) else "mock_content", True)
+        'get_text_file_contents': lambda x, *a, **kw: (open(_normalize_path(x), 'r').read() if x and os.path.exists(_normalize_path(x)) else "mock_content", True)
     })
     for mname in ['ansible._internal._templating._jinja_common', 'ansible._internal._templating._utils', 'ansible._internal._templating._marker_behaviors']:
         m = create_mock(mname)
@@ -645,7 +692,7 @@ def _create_action_plugin(action_name, task, connection, play_context, loader, t
     site_pkgs = globals().get('site_packages_java')
     if site_pkgs:
         for p in site_pkgs:
-            cand = os.path.join(str(p), 'ansible/plugins/action', base_name + '.py')
+            cand = os.path.join(_normalize_path(str(p)), 'ansible/plugins/action', base_name + '.py')
             if os.path.exists(cand): path = cand; break
 
     if not path:
