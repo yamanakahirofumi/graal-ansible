@@ -306,16 +306,19 @@ public class TaskExecutor implements ITaskExecutor {
         }
     }
 
+    private String getNormalizedActionName(String action) {
+        if (action == null) return null;
+        if (action.startsWith("ansible.builtin.")) {
+            return action.substring("ansible.builtin.".length());
+        } else if (action.startsWith("ansible.legacy.")) {
+            return action.substring("ansible.legacy.".length());
+        }
+        return action;
+    }
+
     private boolean isActionPlugin(String action) {
         if (action == null) return false;
-        String baseName = action;
-        if (baseName.startsWith("ansible.builtin.")) {
-            baseName = baseName.substring("ansible.builtin.".length());
-        } else if (baseName.startsWith("ansible.legacy.")) {
-            baseName = baseName.substring("ansible.legacy.".length());
-        }
-
-        final String finalBaseName = baseName;
+        final String finalBaseName = getNormalizedActionName(action);
         if (builtInActionPlugins.containsKey(finalBaseName) || WELL_KNOWN_ACTION_PLUGINS.contains(finalBaseName)) {
             return true;
         }
@@ -460,14 +463,9 @@ public class TaskExecutor implements ITaskExecutor {
 
     @Override
     public TaskResult execute(Task task, BecomeContext becomeContext, Map<String, String> environment) {
-        String actionName = task.action();
-        if (actionName.startsWith("ansible.builtin.")) {
-            actionName = actionName.substring("ansible.builtin.".length());
-        } else if (actionName.startsWith("ansible.legacy.")) {
-            actionName = actionName.substring("ansible.legacy.".length());
-        }
+        String actionName = getNormalizedActionName(task.action());
 
-        if (isActionPlugin(task.action()) && !modules.containsKey(actionName)) {
+        if (isActionPlugin(task.action()) && (actionName == null || !modules.containsKey(actionName))) {
             return executeActionPlugin(task, becomeContext, getCurrentConnection(), environment, Map.of());
         }
 
@@ -497,12 +495,7 @@ public class TaskExecutor implements ITaskExecutor {
     }
 
     protected TaskResult executeActionPlugin(Task task, BecomeContext becomeContext, Connection connection, Map<String, String> environment, Map<String, Object> taskVars) {
-        String actionName = task.action();
-        if (actionName.startsWith("ansible.builtin.")) {
-            actionName = actionName.substring("ansible.builtin.".length());
-        } else if (actionName.startsWith("ansible.legacy.")) {
-            actionName = actionName.substring("ansible.legacy.".length());
-        }
+        String actionName = getNormalizedActionName(task.action());
 
         ActionPlugin builtInPlugin = builtInActionPlugins.get(actionName);
         if (builtInPlugin != null) {
@@ -623,12 +616,7 @@ public class TaskExecutor implements ITaskExecutor {
      * This is used internally by the Action Plugin bridge.
      */
     private TaskResult executeModuleDirectly(Task task, BecomeContext becomeContext, Map<String, String> environment) {
-        String actionName = task.action();
-        if (actionName.startsWith("ansible.builtin.")) {
-            actionName = actionName.substring("ansible.builtin.".length());
-        } else if (actionName.startsWith("ansible.legacy.")) {
-            actionName = actionName.substring("ansible.legacy.".length());
-        }
+        String actionName = getNormalizedActionName(task.action());
 
         org.example.ansible.module.Module module = modules.get(actionName);
         if (module == null) {

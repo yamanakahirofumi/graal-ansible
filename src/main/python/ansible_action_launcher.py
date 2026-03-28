@@ -41,11 +41,12 @@ def run_action_plugin():
             base_dir = task_executor_java.resolveLocalPath(".")
             if base_dir: l.set_basedir(str(base_dir))
 
+        check_mode = module_args.get('_ansible_check_mode', False)
         plugin = ansible_bridge._create_action_plugin(
             action_name,
             task=mock_task,
             connection=ConnectionProxy(connection_java),
-            play_context=PlayContext(),
+            play_context=PlayContext(check_mode=check_mode),
             loader=l,
             templar=Templar(variables=task_vars),
             shared_loader_obj=sys.modules['ansible.plugins.loader'].action_loader

@@ -193,9 +193,9 @@ class Display:
 Display.verbosity = 10
 
 class PlayContext:
-    def __init__(self):
+    def __init__(self, check_mode=False):
         self.verbosity = 10
-        self.check_mode = False
+        self.check_mode = check_mode
         self.diff = False
 
 class ActionBase:
@@ -365,7 +365,8 @@ class AnsibleModule:
 
         if '_raw_params' in input_args: self.params['_raw_params'] = input_args['_raw_params']
         self.params['_uses_shell'] = input_args.get('_uses_shell', False)
-        self.check_mode = self._debug = self._diff = False
+        self.check_mode = input_args.get('_ansible_check_mode', False)
+        self._debug = self._diff = False
 
     @property
     def tmpdir(self):
