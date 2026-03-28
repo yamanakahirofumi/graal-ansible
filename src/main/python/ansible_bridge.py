@@ -25,17 +25,48 @@ def _normalize_path(p):
         except: return p
 
     # Remove leading slashes from Windows absolute paths (e.g. /C:\... -> C:\...)
-    # This happens sometimes when paths are passed from Java/URI.
-    # We use a loop to handle multiple leading slashes.
+    # We use a loop to handle multiple leading slashes and ensure we don't accidentally
+    # strip valid UNC paths (which start with \\ but not with a drive letter)
     temp_s = s
-    for _ in range(5):
-        if len(temp_s) > 3 and temp_s[0] in ('/', '\\') and temp_s[2] == ':':
+    while True:
+        if len(temp_s) > 3 and temp_s[0] in ('/', '\\') and temp_s[2] == ':' and temp_s[1].isalpha():
             temp_s = temp_s[1:]
-        elif len(temp_s) > 1 and temp_s[0] in ('/', '\\') and temp_s[1] in ('/', '\\'):
-            temp_s = temp_s[1:]
+        elif len(temp_s) > 2 and temp_s[0] in ('/', '\\') and temp_s[1] in ('/', '\\') and temp_s[2] != '\\':
+            # This handles //server or similar by NOT stripping if it looks like a UNC root,
+            # but usually in this bridge we get /C: which is what we want to fix.
+            if len(temp_s) > 3 and temp_s[3] == ':': # Case like //C:
+                temp_s = temp_s[1:]
+            else:
+                break
         else:
             break
+
+    # Fix backslashes for Windows if we are on Windows
+    if os.name == 'nt' and ':' in temp_s:
+        temp_s = temp_s.replace('/', '\\')
+
     return temp_s
+
+# Override os functions to automatically normalize paths
+_orig_os_makedirs = os.makedirs
+def _mock_os_makedirs(name, mode=0o777, exist_ok=False):
+    return _orig_os_makedirs(_normalize_path(name), mode, exist_ok)
+os.makedirs = _mock_os_makedirs
+
+_orig_os_mkdir = os.mkdir
+def _mock_os_mkdir(path, mode=0o777):
+    return _orig_os_mkdir(_normalize_path(path), mode)
+os.mkdir = _mock_os_mkdir
+
+_orig_os_path_exists = os.path.exists
+def _mock_os_path_exists(path):
+    return _orig_os_path_exists(_normalize_path(path))
+os.path.exists = _mock_os_path_exists
+
+_orig_os_stat = os.stat
+def _mock_os_stat(path, *args, **kwargs):
+    return _orig_os_stat(_normalize_path(path), *args, **kwargs)
+os.stat = _mock_os_stat
 
 def _deep_convert(obj):
     if obj is None: return None
@@ -344,6 +375,8 @@ class AnsibleModule:
     def fail_json(self, **kwargs):
         kwargs['failed'] = True
         if 'msg' not in kwargs: kwargs['msg'] = 'Module failed'
+        kwargs['diagnostic_os_name'] = os.name
+        kwargs['diagnostic_sys_platform'] = sys.platform
         print(json.dumps(kwargs))
         sys.exit(1)
     def run_command(self, args, **kwargs):
