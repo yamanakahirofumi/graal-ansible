@@ -72,8 +72,12 @@ class FileModulesIntegrationTest {
         ));
         TaskResult resultDir = taskExecutor.execute(play, host, taskDir, variableManager, false, null, new LocalConnection(), null);
 
-        assertTrue(resultDir.success());
-        assertTrue(Files.isDirectory(targetDir));
+        if (!resultDir.success()) {
+            System.err.println("Directory creation failed: " + resultDir.message());
+            System.err.println("Data: " + resultDir.data());
+        }
+        assertTrue(resultDir.success(), "Directory creation failed: " + resultDir.message() + ". Data: " + resultDir.data());
+        assertTrue(Files.isDirectory(targetDir), "Target directory was not created: " + targetDir);
 
         // 3. absent
         Task taskAbsent = new Task("Remove file", "file", Map.of(

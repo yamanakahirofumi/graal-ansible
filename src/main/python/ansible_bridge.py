@@ -400,6 +400,10 @@ def apply_mocks():
     # 1. Native & System Mocks
     if not hasattr(os, 'geteuid'): os.geteuid = lambda: 0
     if not hasattr(os, 'getuid'): os.getuid = lambda: 0
+    # Mock other POSIX-only functions to be no-ops on non-POSIX
+    for func in ['chown', 'lchown', 'lchmod', 'setegid', 'seteuid', 'setgid', 'setuid']:
+        if not hasattr(os, func): setattr(os, func, lambda *a, **kw: None)
+
     create_mock('_posixsubprocess', {'fork_exec': lambda *a, **kw: 0, 'cloexec_pipe': lambda: (0, 0)}, False)
     create_mock('fcntl', {'fcntl': lambda *a, **kw: 0, 'ioctl': lambda *a, **kw: 0, 'flock': lambda *a, **kw: 0, 'lockf': lambda *a, **kw: 0}, False)
     create_mock('resource', {'getrlimit': lambda *a, **kw: (1024, 1024), 'RLIMIT_NOFILE': 7}, False)
@@ -437,9 +441,14 @@ def apply_mocks():
     })
 
     # 3. Utils
+    def mock_makedirs_safe(path, mode=None, *args, **kwargs):
+        if not os.path.exists(path):
+            try: os.makedirs(path, mode=mode if mode is not None else 0o777)
+            except: pass
+
     create_mock('ansible.utils.path', {
         'unquote': lambda s, *a, **kw: s, 'cleanup_tmp_file': lambda s, *a, **kw: None,
-        'makedirs_safe': lambda s, *a, **kw: None, 'unfrackpath': lambda s, *a, **kw: s,
+        'makedirs_safe': mock_makedirs_safe, 'unfrackpath': lambda s, *a, **kw: s,
         'get_real_file': lambda s, *a, **kw: s
     })
     create_mock('ansible.utils.fqcn', {'add_internal_fqcns': lambda *a, **kw: None})
@@ -534,8 +543,15 @@ def apply_mocks():
     if mocks_applied: return
 
     create_mock('ansible.module_utils.common.sentinel', {'Sentinel': type('Sentinel', (), {})})
+    def mock_get_distribution():
+        import platform
+        sys_type = platform.system()
+        if sys_type == 'Windows': return 'Windows'
+        if sys_type == 'Darwin': return 'MacOS'
+        return 'Linux'
+
     create_mock('ansible.module_utils.common.sys_info', {
-        'get_distribution': lambda: 'Linux',
+        'get_distribution': mock_get_distribution,
         'get_distribution_version': lambda: 'Any',
         'get_distribution_codename': lambda: 'Any',
         'get_platform_subclass': lambda cls: cls
@@ -570,7 +586,7 @@ def apply_mocks():
         'missing_required_lib': lambda *a, **kw: None,
         'sanitize_keys': lambda x, *a, **kw: x,
         'get_bin_path': mock_get_bin_path,
-        'get_distribution': lambda: 'Linux',
+        'get_distribution': mock_get_distribution,
         'is_executable': lambda x: True
     })
 
