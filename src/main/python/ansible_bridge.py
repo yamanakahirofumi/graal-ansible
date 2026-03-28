@@ -12,9 +12,42 @@ _current_task_context = {
     'environment_java': None
 }
 
+def _deep_convert(obj):
+    if obj is None: return None
+    if isinstance(obj, (int, float, bool, str)): return obj
+
+    if hasattr(obj, 'getClass'):
+        # It's likely a Java object
+        from java.util import Map, List, Set
+        if isinstance(obj, Map):
+            return {str(k): _deep_convert(v) for k, v in obj.items()}
+        if isinstance(obj, (List, Set)):
+            return [_deep_convert(i) for i in obj]
+
+        class_name = obj.getClass().getName()
+        if class_name == 'java.lang.String': return str(obj)
+        if class_name == 'java.lang.Boolean': return bool(obj)
+        if class_name in ('java.lang.Integer', 'java.lang.Long', 'java.lang.Short', 'java.lang.Byte'): return int(obj)
+        if class_name in ('java.lang.Float', 'java.lang.Double'): return float(obj)
+        if 'java.nio.file.Path' in class_name: return str(obj.toString())
+        if 'java.io.File' in class_name: return str(obj.getAbsolutePath())
+
+        if 'Proxy' in class_name or 'com.sun.proxy' in class_name:
+            if hasattr(obj, 'substring'): return str(obj)
+            if hasattr(obj, 'toString'): return str(obj.toString())
+
+        try: return str(obj)
+        except: return obj
+
+    if isinstance(obj, dict):
+        return {str(k): _deep_convert(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple, set, frozenset)):
+        return [_deep_convert(i) for i in obj]
+    return obj
+
 def bind_task(complex_args, connection_java, become_context_java, environment_java):
     _current_task_context.update({
-        'complex_args': complex_args,
+        'complex_args': _deep_convert(complex_args),
         'connection_java': connection_java,
         'become_context_java': become_context_java,
         'environment_java': environment_java
@@ -208,16 +241,61 @@ class AnsibleModule:
         input_args = _current_task_context['complex_args'] or {}
         effective_spec = argument_spec.copy() if argument_spec else {}
         if kwargs.get('add_file_common_args'):
-            effective_spec.update(sys.modules['ansible.module_utils.basic'].FILE_COMMON_ARGUMENTS)
+            import sys
+            basic = sys.modules.get('ansible.module_utils.basic')
+            if basic and hasattr(basic, 'FILE_COMMON_ARGUMENTS'):
+                effective_spec.update(basic.FILE_COMMON_ARGUMENTS)
+
         for k, v in effective_spec.items():
-            if k in input_args: self.params[k] = input_args[k]
-            elif isinstance(v, dict) and 'default' in v: self.params[k] = v['default']
-            else: self.params[k] = None
-        for k, v in input_args.items():
-            if k not in self.params: self.params[k] = v
+            if isinstance(v, dict) and 'aliases' in v:
+                for alias in v['aliases']: self.aliases[alias] = k
+
+        for k, v in effective_spec.items():
+            if isinstance(v, dict) and 'default' in v:
+                self.params[k] = v['default']
+            else:
+                self.params[k] = None
+
+        for k, v in dict(input_args).items():
+            target_key = k
+            if k in self.aliases: target_key = self.aliases[k]
+
+            val = v
+            spec_entry = effective_spec.get(target_key)
+            if isinstance(spec_entry, dict):
+                t = spec_entry.get('type')
+                if t == 'list':
+                    if not isinstance(v, (list, tuple)): val = [v]
+                elif t == 'str' or t == 'path':
+                    if isinstance(v, (list, tuple)) and len(v) > 0: val = str(v[0])
+                    else: val = str(v)
+                elif t == 'bool':
+                    val = str(v).lower() in ('yes', 'true', 't', '1', 'on')
+                elif t == 'int':
+                    try: val = int(v)
+                    except: pass
+
+            self.params[target_key] = val
+            if target_key != k: self.params[k] = val
+
+        if 'path' in self.params and self.params['path'] is None:
+            if 'dest' in self.params and self.params['dest'] is not None: self.params['path'] = self.params['dest']
+            elif 'name' in self.params and self.params['name'] is not None: self.params['path'] = self.params['name']
+
+        # Crucial for 'file' module touch action
+        # Crucial for 'file' module touch action
+        # The file module expects 'path' in the result of load_file_common_arguments
+        # which it uses as 'file_args'.
+        # We need to make sure that 'path' is correctly handled in params.
+
         if '_raw_params' in input_args: self.params['_raw_params'] = input_args['_raw_params']
         self.params['_uses_shell'] = input_args.get('_uses_shell', False)
         self.check_mode = self._debug = self._diff = False
+
+    @property
+    def tmpdir(self):
+        import tempfile
+        return tempfile.gettempdir()
     def exit_json(self, **kwargs):
         if 'changed' not in kwargs: kwargs['changed'] = False
         # Inject stored file attributes if they were requested but missing from result
@@ -258,12 +336,42 @@ class AnsibleModule:
         import os, shutil
         shutil.move(src, dest)
     def debug(self, msg): pass
+    def warn(self, msg): pass
+    def digest_from_file(self, filename, algorithm):
+        import hashlib
+        h = hashlib.new(algorithm)
+        with open(filename, 'rb') as f:
+            for chunk in iter(lambda: f.read(4096), b""):
+                h.update(chunk)
+        return h.hexdigest()
+    def get_file_attributes(self, path):
+        import os, stat
+        if not os.path.exists(path): return {}
+        st = os.stat(path)
+        return {
+            'mode': oct(stat.S_IMODE(st.st_mode))[2:],
+            'owner': str(st.st_uid),
+            'group': str(st.st_gid),
+            'size': st.st_size,
+            'uid': st.st_uid,
+            'gid': st.st_gid
+        }
     def load_file_common_arguments(self, params, path=None):
         res = {}
         for k in ['mode', 'owner', 'group', 'seuser', 'serole', 'setype', 'selevel', 'attributes', 'unsafe_writes']:
             if k in params: res[k] = params[k]
+        # Very important for modules like 'file' that use these results to identify the target
+        actual_path = path or params.get('path') or params.get('dest') or params.get('name')
+        if actual_path:
+            if isinstance(actual_path, (list, tuple)) and len(actual_path) > 0:
+                res['path'] = str(actual_path[0])
+            else:
+                res['path'] = str(actual_path)
         return res
     def set_fs_attributes_if_different(self, file_args, changed, diff=None, expand=True):
+        if file_args: self._stored_file_args.update(file_args)
+        return changed
+    def set_file_attributes_if_different(self, file_args, changed, diff=None, expand=True):
         if file_args: self._stored_file_args.update(file_args)
         return changed
 
@@ -489,7 +597,12 @@ def apply_mocks():
     if not hasattr(json, '_graal_ansible_patched'):
         class AnsibleEncoder(json.JSONEncoder):
             def default(self, o):
+                if isinstance(o, bytes):
+                    try: return o.decode('utf-8')
+                    except: return o.decode('latin-1')
                 if isinstance(o, (set, frozenset, range)): return list(o)
+                if isinstance(o, Exception):
+                    return {'failed': True, 'msg': str(o), 'exception': str(o)}
                 try:
                     if hasattr(o, '__iter__') and not isinstance(o, (str, bytes)):
                         if hasattr(o, 'keys'): return dict(o)
