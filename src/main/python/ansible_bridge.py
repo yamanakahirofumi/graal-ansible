@@ -301,6 +301,12 @@ class Templar:
                 var_name = match.group(1).strip()
                 return str(self.available_variables.get(var_name, match.group(0)))
             return re.sub(r'\{\{\s*(.*?)\s*\}\}', repl, msg)
+    def evaluate_conditional(self, conditional, *args, **kwargs):
+        # Basic implementation for mock
+        try:
+            return eval(str(conditional), {}, self.available_variables)
+        except:
+            return False
     def copy_with_new_env(self, *args, **kwargs): return self
 
 class AnsibleModule:
@@ -548,6 +554,7 @@ def apply_mocks():
     class AnsibleValueOmittedError(AnsibleError): pass
     class AnsibleActionFail(AnsibleError): pass
     class AnsibleActionSkip(AnsibleError): pass
+    class AnsibleTemplateError(AnsibleError): pass
     class AnsibleFileNotFound(AnsibleError): pass
     class AnsibleConnectionFailure(AnsibleError): pass
     class AnsibleParserError(AnsibleError): pass
@@ -559,6 +566,7 @@ def apply_mocks():
         'AnsibleValueOmittedError': AnsibleValueOmittedError,
         'AnsibleActionFail': AnsibleActionFail,
         'AnsibleActionSkip': AnsibleActionSkip,
+        'AnsibleTemplateError': AnsibleTemplateError,
         'AnsibleFileNotFound': AnsibleFileNotFound,
         'AnsibleConnectionFailure': AnsibleConnectionFailure,
         'AnsibleParserError': AnsibleParserError,
@@ -604,9 +612,11 @@ def apply_mocks():
         '_template_vars': types.SimpleNamespace(generate_ansible_template_vars=lambda *a, **kw: {}),
         'get_text_file_contents': lambda x, *a, **kw: (open(_normalize_path(x), 'r').read() if x and os.path.exists(_normalize_path(x)) else "mock_content", True)
     })
-    for mname in ['ansible._internal._templating._jinja_common', 'ansible._internal._templating._utils', 'ansible._internal._templating._marker_behaviors']:
+    for mname in ['ansible._internal._templating._engine', 'ansible._internal._templating._jinja_bits', 'ansible._internal._templating._jinja_common', 'ansible._internal._templating._utils', 'ansible._internal._templating._marker_behaviors']:
         m = create_mock(mname)
-        if mname.endswith('_jinja_common'):
+        if mname.endswith('_engine'):
+            m.TemplateEngine = type('TE', (), {})
+        elif mname.endswith('_jinja_common'):
             m.UndefinedMarker = type('UM', (), {})
             m.TruncationMarker = type('TM', (), {})
         elif mname.endswith('_utils'):
