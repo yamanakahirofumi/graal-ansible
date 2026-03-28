@@ -64,4 +64,19 @@ class ActionPluginTest {
         assertNotNull(facts);
         assertEquals("new_value", facts.get("new_fact"));
     }
+
+    @Test
+    void testAssertActionPluginSuccess() {
+        Task task = new Task("Test Assert Success", "assert", Map.of("that", List.of("1 == 1")));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
+        assertTrue(result.success(), result.message());
+    }
+
+    @Test
+    void testAssertActionPluginFailure() {
+        Task task = new Task("Test Assert Failure", "assert", Map.of("that", List.of("1 == 2")));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
+        assertFalse(result.success());
+        // assert module usually returns evaluated results in 'assertion' or similar
+    }
 }
