@@ -15,20 +15,27 @@ _current_task_context = {
 
 def _normalize_path(p):
     if p is None: return None
-    if not isinstance(p, (str, bytes)): return p
-
-    is_bytes = isinstance(p, bytes)
-    s = p.decode('utf-8', errors='replace') if is_bytes else p
+    if isinstance(p, bytes):
+        try: s = p.decode('utf-8')
+        except: s = p.decode('latin-1', errors='replace')
+    elif isinstance(p, str):
+        s = p
+    else:
+        try: s = str(p)
+        except: return p
 
     # Remove leading slashes from Windows absolute paths (e.g. /C:\... -> C:\...)
     # This happens sometimes when paths are passed from Java/URI.
-    new_s = re.sub(r'^[/\\]+([A-Za-z]:[/\\])', r'\1', s)
-    if new_s == s:
-        # Also check for /C: without trailing slash
-        new_s = re.sub(r'^[/\\]+([A-Za-z]:)$', r'\1', s)
-
-    if new_s == s: return p
-    return new_s.encode('utf-8') if is_bytes else new_s
+    # We use a loop to handle multiple leading slashes.
+    temp_s = s
+    for _ in range(5):
+        if len(temp_s) > 3 and temp_s[0] in ('/', '\\') and temp_s[2] == ':':
+            temp_s = temp_s[1:]
+        elif len(temp_s) > 1 and temp_s[0] in ('/', '\\') and temp_s[1] in ('/', '\\'):
+            temp_s = temp_s[1:]
+        else:
+            break
+    return temp_s
 
 def _deep_convert(obj):
     if obj is None: return None
@@ -85,7 +92,7 @@ def bind_task(complex_args, connection_java, become_context_java, environment_ja
 def setup_sys_path(site_packages):
     if site_packages:
         for p in site_packages:
-            p_str = _normalize_path(str(p))
+            p_str = _normalize_path(p)
             if p_str not in sys.path: sys.path.append(p_str)
             # Link mocked packages to disk paths to allow loading non-mocked submodules
             for mname in ['ansible', 'ansible.module_utils', 'ansible.module_utils.common', 'ansible.module_utils.compat', 'ansible.module_utils._internal', 'ansible.module_utils.parsing', 'ansible.plugins', 'ansible.plugins.action']:
@@ -194,7 +201,7 @@ class ActionBase:
     def _find_needle(self, name, needle, *args, **kwargs):
         if needle and 'task_executor_java' in globals():
             res = task_executor_java.resolveLocalPath(needle)
-            if res: return _normalize_path(str(res))
+            if res: return _normalize_path(res)
         return _normalize_path(needle)
     def _remote_expand_user(self, path, *args, **kwargs): return path
     def _execute_remote_stat(self, path, all_vars, follow=False, *args, **kwargs):
@@ -299,9 +306,8 @@ class AnsibleModule:
                 if t == 'list':
                     if not isinstance(v, (list, tuple)): val = [v]
                 elif t == 'str' or t == 'path':
-                    if isinstance(v, (list, tuple)) and len(v) > 0: p = str(v[0])
-                    else: p = str(v)
-                    val = _normalize_path(p)
+                    item = v[0] if isinstance(v, (list, tuple)) and len(v) > 0 else v
+                    val = _normalize_path(item)
                 elif t == 'bool':
                     val = str(v).lower() in ('yes', 'true', 't', '1', 'on')
                 elif t == 'int':
@@ -401,11 +407,8 @@ class AnsibleModule:
         # Very important for modules like 'file' that use these results to identify the target
         actual_path = path or params.get('path') or params.get('dest') or params.get('name')
         if actual_path:
-            if isinstance(actual_path, (list, tuple)) and len(actual_path) > 0:
-                p = str(actual_path[0])
-            else:
-                p = str(actual_path)
-            res['path'] = _normalize_path(p)
+            item = actual_path[0] if isinstance(actual_path, (list, tuple)) and len(actual_path) > 0 else actual_path
+            res['path'] = _normalize_path(item)
         return res
     def set_fs_attributes_if_different(self, file_args, changed, diff=None, expand=True):
         if file_args: self._stored_file_args.update(file_args)
@@ -692,7 +695,7 @@ def _create_action_plugin(action_name, task, connection, play_context, loader, t
     site_pkgs = globals().get('site_packages_java')
     if site_pkgs:
         for p in site_pkgs:
-            cand = os.path.join(_normalize_path(str(p)), 'ansible/plugins/action', base_name + '.py')
+            cand = os.path.join(_normalize_path(p), 'ansible/plugins/action', base_name + '.py')
             if os.path.exists(cand): path = cand; break
 
     if not path:
