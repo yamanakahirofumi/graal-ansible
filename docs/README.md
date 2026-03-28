@@ -59,8 +59,8 @@
 - [YAML解析エンジン](implementation/YAML-Parser.md)：SnakeYAML等を用いたPlaybook解析の実装
 - [インベントリシステム実装](implementation/Inventory-System.md)：静的インベントリの解析と管理
 - [タスク実行エンジン](implementation/Task-Executor.md)：マルチスレッド実行と順序制御
-- [Action Plugin 実装仕様](implementation/Action-Plugins.md)：制御ノード側で動作するプラグインの実行メカニズム
-- [Java Action Plugin 実装ガイド](implementation/Java-Action-Plugins.md)：Java による Action Plugin エミュレータの実装方法
+- [Action Plugin 実装仕様](implementation/Action-Plugins.md)：制御ノード側で動作するプラグインの実行メカニズム (Python-first)
+- [Java Action Plugin 実装ガイド](implementation/Java-Action-Plugins.md)：Java による Action Plugin エミュレータの実装方法 (Legacy)
 - [タスク制御の実装詳細](implementation/Task-Control.md)：when, loop, register, block, retry等の制御ロジック
 - [Ansible モジュールの初期化と設定](implementation/Ansible-Module-Initialization.md)：AnsibleModule のインスタンス構成、引数の受け渡し、モンキーパッチの詳細
 - [接続プラグイン実装](implementation/Connection-Plugins.md)：Local, SSH(JSch/Apache MINA SSHD)の実装

@@ -1,4 +1,4 @@
-# Java Action Plugin 実装ガイド (非推奨)
+# Java Action Plugin 実装ガイド (Legacy / 非推奨)
 
 > [!CAUTION]
 > **非推奨通知: Python-first アーキテクチャへの完全移行**
@@ -7,6 +7,7 @@
 > 以前存在した Java による Action Plugin エミュレータ（`copy`, `template`, `debug`, `set_fact` 等）は、オリジナルの Python コード実行が安定したことにより、**すべて削除されました。**
 >
 > 今後、新しいアクションやモジュールのサポートを追加する場合は、Java で再実装するのではなく、`ansible_bridge.py` に必要なモックを追加してオリジナルの Python コードを動かす **Dependency Emulation Strategy** を採用してください。
+> 詳細は [Action Plugin 実装仕様](Action-Plugins.md) を参照してください。
 
 本ドキュメントでは、歴史的経緯および極めて限定的な例外ケース（パフォーマンス上の致命的な問題など）のために、Java で実装される「軽量 Action Plugin エミュレータ」の設計パターンを参考として残しています。
 
