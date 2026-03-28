@@ -3,7 +3,7 @@ import sys
 import ansible_bridge
 
 # Convert Java Map to native Python dict
-complex_args = dict(complex_args_java) if complex_args_java is not None else {}
+complex_args = ansible_bridge._deep_convert(complex_args_java) if complex_args_java is not None else {}
 env = environment_java if 'environment_java' in globals() else None
 
 try:
