@@ -366,6 +366,9 @@ class AnsibleModule:
         if '_raw_params' in input_args: self.params['_raw_params'] = input_args['_raw_params']
         self.params['_uses_shell'] = input_args.get('_uses_shell', False)
         self.check_mode = self._debug = self._diff = False
+        def mock_boolean(x, *a, **kw):
+            return str(x).lower() in ('yes', 'true', 't', '1', 'on', 'y')
+        self.boolean = mock_boolean
 
     @property
     def tmpdir(self):
@@ -521,11 +524,18 @@ def apply_mocks():
         if isinstance(s, str): s = s.encode('utf-8')
         return hashlib.sha1(s).hexdigest()
 
+    def real_md5(path, *args, **kwargs):
+        import hashlib
+        p = _normalize_path(path)
+        if not os.path.exists(p): return None
+        with open(p, 'rb') as f: return hashlib.md5(f.read()).hexdigest()
+
     create_mock('ansible.utils.hashing', {
         'checksum_s': real_checksum_s,
         'checksum': real_checksum,
         'secure_hash': real_checksum,
-        'secure_hash_s': real_checksum_s
+        'secure_hash_s': real_checksum_s,
+        'md5': real_md5
     })
 
     # 3. Utils
@@ -535,10 +545,15 @@ def apply_mocks():
             try: os.makedirs(p, mode=mode if mode is not None else 0o777)
             except: pass
 
+    def mock_is_subpath(path, base, *args, **kwargs):
+        p, b = _normalize_path(path), _normalize_path(base)
+        return os.path.abspath(p).startswith(os.path.abspath(b))
+
     create_mock('ansible.utils.path', {
         'unquote': lambda s, *a, **kw: s, 'cleanup_tmp_file': lambda s, *a, **kw: None,
         'makedirs_safe': mock_makedirs_safe, 'unfrackpath': _normalize_path,
-        'get_real_file': lambda s, *a, **kw: s
+        'get_real_file': lambda s, *a, **kw: s,
+        'is_subpath': mock_is_subpath
     })
     create_mock('ansible.utils.fqcn', {'add_internal_fqcns': lambda *a, **kw: None})
     create_mock('ansible.utils.vars', {
@@ -671,9 +686,14 @@ def apply_mocks():
     def mock_get_bin_path(arg, required=False, opt_dirs=None):
         if arg == 'python': return sys.executable
         return arg
+    def mock_load_params():
+        args = _current_task_context['complex_args']
+        if not args: return {}, 'main'
+        return args, 'main'
+
     create_mock('ansible.module_utils.basic', {
         'AnsibleModule': AnsibleModule,
-        '_load_params': lambda: (_current_task_context['complex_args'], 'main'),
+        '_load_params': mock_load_params,
         '_ANSIBLE_PROFILE': 'modern',
         'FILE_COMMON_ARGUMENTS': FILE_COMMON_ARGUMENTS,
         'missing_required_lib': lambda *a, **kw: None,
@@ -746,7 +766,12 @@ def _create_action_plugin(action_name, task, connection, play_context, loader, t
             cand = os.path.join(p, 'ansible/plugins/action', base_name + '.py')
             if os.path.exists(cand): path = cand; break
 
-    if not path: raise Exception(f"Action plugin {action_name} not found")
+    if not path:
+        # Fallback to module execution if no action plugin found
+        class ModuleAction(ActionBase):
+            def run(self, tmp=None, task_vars=None):
+                return self._execute_module(module_name=action_name, module_args=self._task.args, task_vars=task_vars)
+        return ModuleAction(task, connection, play_context, loader, templar, shared_loader_obj)
 
     fqcn = "ansible.plugins.action." + base_name
     if fqcn in sys.modules:
@@ -762,8 +787,14 @@ def _create_action_plugin(action_name, task, connection, play_context, loader, t
     c = connection
     if not hasattr(c, '_shell') or not hasattr(c._shell, 'path_has_trailing_slash'):
         class Proxy:
-            def __init__(self, obj): self._obj, self._shell = obj, MockShell()
+            def __init__(self, obj):
+                self._obj, self._shell = obj, MockShell()
+                self.become = False
             def __getattr__(self, name): return getattr(self._obj, name)
+            def fetch_file(self, remote_path, local_path):
+                rp, lp = _normalize_path(remote_path), _normalize_path(local_path)
+                from java.nio.file import Paths
+                self._obj.fetchFile(str(rp), Paths.get(str(lp)))
         c = Proxy(connection)
 
     return mod.ActionModule(task, c, play_context, l, templar, shared_loader_obj)

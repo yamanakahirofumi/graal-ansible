@@ -370,4 +370,64 @@ class ActualModuleIntegrationTest {
         var execResult = connection.execCommand("cat " + remotePath, BecomeContext.empty(), null);
         assertEquals(content, execResult.stdout().trim());
     }
+
+    @Test
+    void testActualBlockInFileModule() {
+        String remotePath = "/tmp/blockinfile-test.txt";
+        connection.execCommand("echo \"line1\" > " + remotePath, BecomeContext.empty(), null);
+
+        Task task = new Task("test_blockinfile", "blockinfile", Map.of(
+                "path", remotePath,
+                "block", "line2\nline3"
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        assertTrue(result.changed());
+
+        var execResult = connection.execCommand("cat " + remotePath, BecomeContext.empty(), null);
+        String stdout = execResult.stdout();
+        assertTrue(stdout.contains("line1"));
+        assertTrue(stdout.contains("line2"));
+        assertTrue(stdout.contains("line3"));
+        assertTrue(stdout.contains("BEGIN ANSIBLE MANAGED BLOCK"));
+    }
+
+    @Test
+    void testActualGetentModule() {
+        Task task = new Task("test_getent", "getent", Map.of(
+                "database", "passwd",
+                "key", "root"
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        Map<String, Object> getent = (Map<String, Object>) result.data().get("getent_passwd");
+        assertNotNull(getent);
+        assertTrue(getent.containsKey("root"));
+    }
+
+    @Test
+    void testActualFetchModule() throws IOException {
+        String remotePath = "/tmp/fetch-test.txt";
+        String content = "fetch test content";
+        connection.execCommand("sh -c \"echo '" + content + "' > " + remotePath + "\"", BecomeContext.empty(), null);
+
+        Path localDestDir = tempDir.resolve("fetch-dest");
+        Files.createDirectories(localDestDir);
+
+        Task task = new Task("test_fetch", "fetch", Map.of(
+                "src", remotePath,
+                "dest", localDestDir.toString() + "/",
+                "flat", true
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        assertTrue(result.changed());
+
+        Path downloadedFile = localDestDir.resolve("fetch-test.txt");
+        assertTrue(Files.exists(downloadedFile), "Downloaded file should exist: " + downloadedFile);
+        assertEquals(content, Files.readString(downloadedFile).trim());
+    }
 }
