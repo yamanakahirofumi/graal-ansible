@@ -325,7 +325,7 @@ class ActualModuleIntegrationTest {
         assertNotNull(encodedContent);
 
         byte[] decodedBytes = Base64.getMimeDecoder().decode(encodedContent);
-        assertEquals(content, new String(decodedBytes), "Slurped content does not match original");
+        assertEquals(content, new String(decodedBytes), "Slurped content does not match original. Raw encoded: " + encodedContent);
     }
 
     @Test

@@ -325,10 +325,21 @@ public class PythonModule implements Module {
     }
 
     /**
-     * Robustly extracts JSON from module output by finding the first '{' and last '}'.
+     * Robustly extracts JSON from module output.
+     * Prefers the last line that looks like a JSON object,
+     * otherwise falls back to the range between the first '{' and last '}'.
      */
     private String parseModuleOutput(String output) {
-        if (output == null) return "{}";
+        if (output == null || output.isBlank()) return "{}";
+
+        String[] lines = output.split("\\r?\\n");
+        for (int i = lines.length - 1; i >= 0; i--) {
+            String line = lines[i].trim();
+            if (line.startsWith("{") && line.endsWith("}")) {
+                return line;
+            }
+        }
+
         int start = output.indexOf('{');
         int end = output.lastIndexOf('}');
         if (start != -1 && end != -1 && start < end) {
