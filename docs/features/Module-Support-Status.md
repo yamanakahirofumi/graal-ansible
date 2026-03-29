@@ -7,6 +7,7 @@
 下表は、自動テスト（ユニットテストおよび統合テスト）によって動作が確認されている状態を示します。
 
 - **◎**: 統合テスト通過済み (Integration Verified) - `ActualModuleIntegrationTest` によるコンテナ環境での動作確認済み。
+- **●**: 異常系・Unicode 検証済み (Negative/Unicode Verified) - `NegativeIntegrationTest` や `UnicodeIntegrationTest` による検証済み。
 - **○**: テスト通過済み (Verified) - 実際のモジュールが GraalPy 上で期待通りに動作することを確認。
 - **△**: ロード確認済み (Loaded) - モジュールのインポート成功を確認（引数エラー等で停止するが、初期化は完了）。
 - **？**: 検証予定 (Planned) - ロードまたは実行に課題がある、あるいは未着手。
@@ -126,7 +127,7 @@
     - 実行エンジンの最適化。
     - 起動スピードの高速化と Native Image のビルド安定化。
 
-- **Coverage**: モジュールごとに「ロード済 (△)」「正常系検証済 (○)」「統合テスト通過済み (◎)」のステータスを `Module-Support-Status.md` で管理。
+- **Coverage**: モジュールごとに「ロード済 (△)」「正常系検証済 (○)」「異常系・Unicode 検証済み (●)」「統合テスト通過済み (◎)」のステータスを `Module-Support-Status.md` で管理。
 
 ## 4. 関連ドキュメント
 - [テストケース拡充戦略](../tech/Test-Expansion-Strategy.md)
