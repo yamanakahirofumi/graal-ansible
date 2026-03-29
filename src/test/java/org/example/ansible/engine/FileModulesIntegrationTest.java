@@ -223,4 +223,74 @@ class FileModulesIntegrationTest {
         String content = Files.readString(targetFile);
         assertEquals("hello ansible", content.trim());
     }
+
+    @Test
+    void testBlockInFileModule() throws IOException {
+        Path targetFile = tempDir.resolve("block-test.txt");
+        Files.writeString(targetFile, "line 1\n");
+
+        Task task = new Task("Add block", "blockinfile", Map.of(
+                "path", targetFile.toString(),
+                "block", "line 2\nline 3"
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
+
+        assertTrue(result.success(), result.message());
+        assertTrue(result.changed());
+
+        String content = Files.readString(targetFile);
+        assertTrue(content.contains("BEGIN ANSIBLE MANAGED BLOCK"));
+        assertTrue(content.contains("line 2"));
+        assertTrue(content.contains("line 3"));
+    }
+
+    @Test
+    void testGetentModule() {
+        // Skip getent test on Windows because the getent utility is typically missing
+        if (System.getProperty("os.name").toLowerCase().contains("win")) {
+            return;
+        }
+
+        Task task = new Task("Getent passwd", "getent", Map.of(
+                "database", "passwd",
+                "key", "root"
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
+
+        if (!result.success()) {
+            System.err.println("Getent failed: " + result.message());
+            System.err.println("Full Data: " + result.data());
+        }
+        assertTrue(result.success(), result.message());
+        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
+        assertNotNull(facts, "ansible_facts should be present");
+        Map<String, Object> getent = (Map<String, Object>) facts.get("getent_passwd");
+        assertNotNull(getent, "getent_passwd should be present in ansible_facts");
+        assertTrue(getent.containsKey("root"));
+    }
+
+    @Test
+    void testFetchModule() throws IOException {
+        Path remoteFile = tempDir.resolve("remote-source.txt");
+        String content = "remote data to fetch";
+        Files.writeString(remoteFile, content);
+
+        Path localDest = tempDir.resolve("local-dest.txt");
+
+        Task task = new Task("Fetch file", "fetch", Map.of(
+                "src", remoteFile.toString(),
+                "dest", localDest.toString(),
+                "flat", true
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
+
+        if (!result.success()) {
+            System.err.println("Fetch failed: " + result.message());
+            System.err.println("Data: " + result.data());
+        }
+        assertTrue(result.success(), result.message());
+        assertTrue(result.changed());
+        assertTrue(Files.exists(localDest));
+        assertEquals(content, Files.readString(localDest).trim());
+    }
 }
