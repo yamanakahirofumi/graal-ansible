@@ -328,10 +328,10 @@ class ActualModuleIntegrationTest {
         try {
             decodedBytes = Base64.getMimeDecoder().decode(encodedContent);
         } catch (IllegalArgumentException e) {
-            throw new AssertionError("Failed to Base64 decode content. " +
-                    "Raw encoded string: '" + encodedContent + "'. " +
-                    "Module output message: " + result.message() + ". " +
-                    "Result data: " + result.data(), e);
+            throw new AssertionError("Failed to Base64 decode 'content' field in module result. " +
+                    "Raw string in result was: '" + encodedContent + "'. " +
+                    "Full result data: " + result.data() + ". " +
+                    "Console output (result.message()): " + result.message(), e);
         }
         String decodedString = new String(decodedBytes);
         assertEquals(content, decodedString, "Slurped content does not match original. " +
