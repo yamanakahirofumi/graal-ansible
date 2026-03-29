@@ -51,7 +51,7 @@ jobs:
       run: mvn -B verify
     - name: Upload test results to Codecov
       if: runner.os == 'Linux'
-      uses: codecov/codecov-action@v4
+      uses: codecov/test-results-action@v1
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
         directory: ./target/surefire-reports/
