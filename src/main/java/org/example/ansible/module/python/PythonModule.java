@@ -108,10 +108,7 @@ public class PythonModule implements Module {
                 return TaskResult.failure("Module produced no output");
             }
 
-            String jsonOutput = output;
-            if (output.contains("{")) {
-                jsonOutput = output.substring(output.indexOf("{"));
-            }
+            String jsonOutput = parseModuleOutput(output);
 
             @SuppressWarnings("unchecked")
             final Map<String, Object> resultMap = objectMapper.readValue(jsonOutput, Map.class);
@@ -177,10 +174,7 @@ public class PythonModule implements Module {
                 return TaskResult.failure("Module produced no output (exit code " + execRes.exitCode() + "): " + execRes.stderr());
             }
 
-            String jsonOutput = output;
-            if (output.contains("{")) {
-                jsonOutput = output.substring(output.indexOf("{"));
-            }
+            String jsonOutput = parseModuleOutput(output);
 
             @SuppressWarnings("unchecked")
             final Map<String, Object> resultMap = objectMapper.readValue(jsonOutput, Map.class);
@@ -208,6 +202,22 @@ public class PythonModule implements Module {
 
         StringBuilder sb = new StringBuilder();
         sb.append("import json, sys, os, base64, __main__, types\n");
+        sb.append("def patched_dumps(obj, **kw):\n");
+        sb.append("    def clean(o):\n");
+        sb.append("        if isinstance(o, (bytes, bytearray)):\n");
+        sb.append("            try: return o.decode('utf-8')\n");
+        sb.append("            except: return o.decode('latin-1')\n");
+        sb.append("        if isinstance(o, (str, int, float, bool, type(None))): return o\n");
+        sb.append("        if 'WrappedValue' in str(type(o)):\n");
+        sb.append("            for attr in ['value', '_value']: \n");
+        sb.append("                if hasattr(o, attr): return clean(getattr(o, attr))\n");
+        sb.append("        if hasattr(o, 'items'): return {str(k): clean(v) for k, v in o.items()}\n");
+        sb.append("        if hasattr(o, '__iter__'): return [clean(i) for i in o]\n");
+        sb.append("        if isinstance(o, Exception): return {'failed': True, 'msg': str(o)}\n");
+        sb.append("        return o\n");
+        sb.append("    return _orig_dumps(clean(obj), **kw)\n");
+        sb.append("_orig_dumps = json.dumps\n");
+        sb.append("json.dumps = patched_dumps\n");
         sb.append("__main__._module_fqn = 'ansible.builtin.").append(moduleName).append("'\n");
         if (zipFileName != null) {
             sb.append("script_dir = os.path.dirname(os.path.abspath(__file__))\n");
@@ -314,5 +324,33 @@ public class PythonModule implements Module {
             String content = new String(is.readAllBytes(), StandardCharsets.UTF_8);
             return Source.newBuilder("python", content, name).build();
         }
+    }
+
+    /**
+     * Robustly extracts JSON from module output.
+     * Prefers the last line that looks like a JSON object,
+     * otherwise falls back to the range between the first '{' and last '}'.
+     */
+    private String parseModuleOutput(String output) {
+        if (output == null || output.isBlank()) return "{}";
+
+        String trimmed = output.trim();
+        String[] lines = trimmed.split("\\r?\\n");
+        for (int i = lines.length - 1; i >= 0; i--) {
+            String line = lines[i].trim();
+            int start = line.indexOf('{');
+            int end = line.lastIndexOf('}');
+            if (start != -1 && end != -1 && start < end) {
+                // Return only the portion within braces to strip noise like 'j'
+                return line.substring(start, end + 1);
+            }
+        }
+
+        int start = trimmed.indexOf('{');
+        int end = trimmed.lastIndexOf('}');
+        if (start != -1 && end != -1 && start < end) {
+            return trimmed.substring(start, end + 1);
+        }
+        return trimmed;
     }
 }
