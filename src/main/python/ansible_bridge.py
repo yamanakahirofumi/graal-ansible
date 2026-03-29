@@ -407,12 +407,57 @@ class AnsibleModule:
         print(json.dumps(kwargs))
         sys.exit(1)
     def run_command(self, args, **kwargs):
+        # 1. Emulator for 'getent' command
+        if isinstance(args, list) and len(args) >= 2 and str(args[0]) == 'getent':
+            db = str(args[1])
+            key = str(args[2]) if len(args) > 2 else None
+            if db == 'passwd':
+                if key == 'root':
+                    return 0, "root:x:0:0:root:/root:/bin/bash\n", ""
+                elif key is None:
+                    return 0, "root:x:0:0:root:/root:/bin/bash\ntestuser:x:1001:1001:testuser:/home/testuser:/bin/bash\n", ""
+            elif db == 'group':
+                if key == 'root':
+                    return 0, "root:x:0:\n", ""
+                elif key is None:
+                    return 0, "root:x:0:\ntestgroup:x:1001:\n", ""
+
+        # 2. Actual command execution via Java connection
         conn = _current_task_context['connection_java']
         if conn:
-            command = " ".join(args) if isinstance(args, list) else args
-            env = dict(_current_task_context['environment_java']) if _current_task_context['environment_java'] is not None else None
-            res = conn.execCommand(command, _current_task_context['become_context_java'], env)
-            return (res.exitCode(), res.stdout(), res.stderr())
+            cmd_str = " ".join(args) if isinstance(args, list) else args
+            env_java = _current_task_context['environment_java']
+            env_dict = None
+            if env_java:
+                try: env_dict = dict(env_java)
+                except: pass
+
+            res = conn.execCommand(cmd_str, _current_task_context['become_context_java'], env_dict)
+
+            # Bridge ConnectionResult record/object to Python tuple
+            # Record field access in GraalPy can be tricky, especially with Record types.
+            # Using str(res) and regex with DOTALL is a very robust fallback for Java objects.
+            s = str(res)
+            if 'exitCode=' in s:
+                try:
+                    ec_m = re.search(r'exitCode=(-?\d+)', s)
+                    exit_code = int(ec_m.group(1)) if ec_m else -1
+                    stdout_m = re.search(r'stdout=(.*?), stderr=', s, re.DOTALL)
+                    stdout = stdout_m.group(1) if stdout_m else ""
+                    stderr_m = re.search(r'stderr=(.*?), exitCode=', s, re.DOTALL)
+                    stderr = stderr_m.group(1) if stderr_m else ""
+                    return (exit_code, stdout, stderr)
+                except: pass
+
+            try:
+                # Direct method calls
+                return (int(res.exitCode()), str(res.stdout()), str(res.stderr()))
+            except:
+                try:
+                    # Attribute access
+                    return (int(res.exitCode), str(res.stdout), str(res.stderr))
+                except:
+                    return (-1, "", "Failed to access ConnectionResult: " + s)
         return (1, '', 'No connection')
     def get_bin_path(self, arg, required=False, opt_dirs=None): return arg
     def sha1(self, path):
@@ -671,7 +716,8 @@ def apply_mocks():
     create_mock('ansible.module_utils.common.sentinel', {'Sentinel': type('Sentinel', (), {})})
     def mock_get_distribution():
         import platform
-        sys_type = platform.system()
+        try: sys_type = platform.system()
+        except: sys_type = 'Linux'
         if sys_type == 'Windows': return 'Windows'
         if sys_type == 'Darwin': return 'MacOS'
         return 'Linux'
@@ -736,63 +782,6 @@ def apply_mocks():
     create_mock('grp', {'getgrnam': mock_getgrnam, 'getgrgid': lambda *a, **kw: group('root', 'x', 0, []), 'getgrall': lambda: []}, False)
     create_mock('pwd', {'getpwnam': mock_getpwnam, 'getpwuid': lambda *a, **kw: passwd('root', 'x', 0, 0, 'root', '/root', '/bin/bash'), 'getpwall': lambda: []}, False)
 
-    def mock_run_command(self, command, *args, **kwargs):
-        # Emulator for 'getent' command used by getent module
-        if isinstance(command, list) and len(command) >= 2 and command[0] == 'getent':
-            db = command[1]
-            key = command[2] if len(command) > 2 else None
-            if db == 'passwd':
-                if key == 'root':
-                    return 0, "root:x:0:0:root:/root:/bin/bash\n", ""
-                elif key is None:
-                    return 0, "root:x:0:0:root:/root:/bin/bash\ntestuser:x:1001:1001:testuser:/home/testuser:/bin/bash\n", ""
-            elif db == 'group':
-                if key == 'root':
-                    return 0, "root:x:0:\n", ""
-                elif key is None:
-                    return 0, "root:x:0:\ntestgroup:x:1001:\n", ""
-
-        # Fallback to existing run_command logic
-        conn = _current_task_context['connection_java']
-        if conn:
-            cmd_str = " ".join(command) if isinstance(command, list) else command
-            # Convert environment Map proxy to dict if needed
-            env_java = _current_task_context['environment_java']
-            env_dict = None
-            if env_java:
-                try: env_dict = dict(env_java)
-                except: pass
-            res = conn.execCommand(cmd_str, _current_task_context['become_context_java'], env_dict)
-
-            # Record field access in GraalPy can be tricky, especially with Record types.
-            # We use multiple strategies to extract fields from the Java ConnectionResult.
-
-            # Strategy 1: String parsing of toString() (Very robust for Records)
-            s = str(res)
-            if 'exitCode=' in s:
-                try:
-                    ec_m = re.search(r'exitCode=(-?\d+)', s)
-                    exit_code = int(ec_m.group(1)) if ec_m else -1
-                    stdout_m = re.search(r'stdout=(.*?), stderr=', s)
-                    stdout = stdout_m.group(1) if stdout_m else ""
-                    stderr_m = re.search(r'stderr=(.*?), exitCode=', s)
-                    stderr = stderr_m.group(1) if stderr_m else ""
-                    return (exit_code, stdout, stderr)
-                except: pass
-
-            # Strategy 2: Direct method/attribute access
-            try:
-                # ActualModuleIntegrationTest uses a proxy that has these as methods
-                return (int(res.exitCode()), str(res.stdout()), str(res.stderr()))
-            except:
-                try:
-                    # In some contexts it might be a Map or a Record exposed as attributes
-                    return (int(res.exitCode), str(res.stdout), str(res.stderr))
-                except:
-                    return (-1, "", "Failed to access ConnectionResult: " + s)
-        return (1, '', 'No connection')
-
-    AnsibleModule.run_command = mock_run_command
     create_mock('syslog', {
         'openlog': lambda *a, **kw: None, 'syslog': lambda *a, **kw: None, 'closelog': lambda *a, **kw: None, 'setlogmask': lambda *a, **kw: None,
         'LOG_NOTICE': 5, 'LOG_INFO': 6, 'LOG_DEBUG': 7, 'LOG_ERR': 3, 'LOG_WARNING': 4
