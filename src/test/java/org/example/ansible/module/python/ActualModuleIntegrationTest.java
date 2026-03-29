@@ -313,7 +313,7 @@ class ActualModuleIntegrationTest {
     void testActualSlurpModule() {
         String remotePath = "/tmp/slurp-test.txt";
         String content = "slurp test data";
-        connection.execCommand("echo -n \"" + content + "\" > " + remotePath, BecomeContext.empty(), null);
+        connection.execCommand("sh -c \"echo -n '" + content + "' > " + remotePath + "\"", BecomeContext.empty(), null);
 
         Task task = new Task("test_slurp", "slurp", Map.of(
                 "src", remotePath
@@ -325,7 +325,7 @@ class ActualModuleIntegrationTest {
         assertNotNull(encodedContent);
 
         byte[] decodedBytes = Base64.getMimeDecoder().decode(encodedContent);
-        assertEquals(content, new String(decodedBytes));
+        assertEquals(content, new String(decodedBytes), "Slurped content does not match original");
     }
 
     @Test

@@ -108,10 +108,7 @@ public class PythonModule implements Module {
                 return TaskResult.failure("Module produced no output");
             }
 
-            String jsonOutput = output;
-            if (output.contains("{")) {
-                jsonOutput = output.substring(output.indexOf("{"));
-            }
+            String jsonOutput = parseModuleOutput(output);
 
             @SuppressWarnings("unchecked")
             final Map<String, Object> resultMap = objectMapper.readValue(jsonOutput, Map.class);
@@ -177,10 +174,7 @@ public class PythonModule implements Module {
                 return TaskResult.failure("Module produced no output (exit code " + execRes.exitCode() + "): " + execRes.stderr());
             }
 
-            String jsonOutput = output;
-            if (output.contains("{")) {
-                jsonOutput = output.substring(output.indexOf("{"));
-            }
+            String jsonOutput = parseModuleOutput(output);
 
             @SuppressWarnings("unchecked")
             final Map<String, Object> resultMap = objectMapper.readValue(jsonOutput, Map.class);
@@ -216,6 +210,7 @@ public class PythonModule implements Module {
         sb.append("                try: return o.decode('utf-8')\n");
         sb.append("                except: return o.decode('latin-1')\n");
         sb.append("            if isinstance(o, (set, frozenset, range)): return list(o)\n");
+        sb.append("            if isinstance(o, Exception): return {'failed': True, 'msg': str(o)}\n");
         sb.append("            try: return super().default(o)\n");
         sb.append("            except Exception: return str(o)\n");
         sb.append("    return _orig_dumps(obj, **dict(kw, cls=RobustEncoder))\n");
@@ -327,5 +322,18 @@ public class PythonModule implements Module {
             String content = new String(is.readAllBytes(), StandardCharsets.UTF_8);
             return Source.newBuilder("python", content, name).build();
         }
+    }
+
+    /**
+     * Robustly extracts JSON from module output by finding the first '{' and last '}'.
+     */
+    private String parseModuleOutput(String output) {
+        if (output == null) return "{}";
+        int start = output.indexOf('{');
+        int end = output.lastIndexOf('}');
+        if (start != -1 && end != -1 && start < end) {
+            return output.substring(start, end + 1);
+        }
+        return output;
     }
 }
