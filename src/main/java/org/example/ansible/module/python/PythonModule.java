@@ -208,6 +208,19 @@ public class PythonModule implements Module {
 
         StringBuilder sb = new StringBuilder();
         sb.append("import json, sys, os, base64, __main__, types\n");
+        sb.append("def patched_dumps(obj, **kw):\n");
+        sb.append("    orig_cls = kw.get('cls', json.JSONEncoder)\n");
+        sb.append("    class RobustEncoder(orig_cls):\n");
+        sb.append("        def default(self, o):\n");
+        sb.append("            if isinstance(o, bytes):\n");
+        sb.append("                try: return o.decode('utf-8')\n");
+        sb.append("                except: return o.decode('latin-1')\n");
+        sb.append("            if isinstance(o, (set, frozenset, range)): return list(o)\n");
+        sb.append("            try: return super().default(o)\n");
+        sb.append("            except Exception: return str(o)\n");
+        sb.append("    return _orig_dumps(obj, **dict(kw, cls=RobustEncoder))\n");
+        sb.append("_orig_dumps = json.dumps\n");
+        sb.append("json.dumps = patched_dumps\n");
         sb.append("__main__._module_fqn = 'ansible.builtin.").append(moduleName).append("'\n");
         if (zipFileName != null) {
             sb.append("script_dir = os.path.dirname(os.path.abspath(__file__))\n");
