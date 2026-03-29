@@ -50,7 +50,7 @@ jobs:
     - name: Build and Test
       run: mvn -B verify
     - name: Upload test results to Codecov
-      if: runner.os == 'Linux'
+      if: always() && runner.os == 'Linux'
       uses: codecov/test-results-action@v1
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
