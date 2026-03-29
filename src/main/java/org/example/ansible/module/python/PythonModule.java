@@ -211,13 +211,27 @@ public class PythonModule implements Module {
         sb.append("                except: return o.decode('latin-1')\n");
         sb.append("            if isinstance(o, (set, frozenset, range)): return list(o)\n");
         sb.append("            if 'WrappedValue' in str(type(o)):\n");
-        sb.append("                for attr in ['value', '_value']:\n");
+        sb.append("                for attr in ['value', '_value']: \n");
         sb.append("                    if hasattr(o, attr): return getattr(o, attr)\n");
         sb.append("            if isinstance(o, Exception): return {'failed': True, 'msg': str(o)}\n");
         sb.append("            return super().default(o)\n");
         sb.append("    return _orig_dumps(obj, **dict(kw, cls=RobustEncoder))\n");
         sb.append("_orig_dumps = json.dumps\n");
         sb.append("json.dumps = patched_dumps\n");
+        sb.append("try:\n");
+        sb.append("    from ansible.module_utils._internal._json._profiles import _Profile\n");
+        sb.append("    _orig_profile_default = _Profile.default\n");
+        sb.append("    def patched_profile_default(self, o):\n");
+        sb.append("        if isinstance(o, bytes):\n");
+        sb.append("            try: return o.decode('utf-8')\n");
+        sb.append("            except: return o.decode('latin-1')\n");
+        sb.append("        if isinstance(o, (set, frozenset, range)): return list(o)\n");
+        sb.append("        if 'WrappedValue' in str(type(o)):\n");
+        sb.append("            for attr in ['value', '_value']: \n");
+        sb.append("                if hasattr(o, attr): return getattr(o, attr)\n");
+        sb.append("        return _orig_profile_default(self, o)\n");
+        sb.append("    _Profile.default = patched_profile_default\n");
+        sb.append("except Exception: pass\n");
         sb.append("__main__._module_fqn = 'ansible.builtin.").append(moduleName).append("'\n");
         if (zipFileName != null) {
             sb.append("script_dir = os.path.dirname(os.path.abspath(__file__))\n");
@@ -341,7 +355,7 @@ public class PythonModule implements Module {
             int start = line.indexOf('{');
             int end = line.lastIndexOf('}');
             if (start != -1 && end != -1 && start < end) {
-                // Return only the portion within braces to strip noise
+                // Return only the portion within braces to strip noise like 'j'
                 return line.substring(start, end + 1);
             }
         }
