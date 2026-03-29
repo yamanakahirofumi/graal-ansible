@@ -20,6 +20,8 @@ import org.testcontainers.utility.DockerImageName;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Base64;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -305,5 +307,55 @@ class ActualModuleIntegrationTest {
         // It might fail because Docker containers don't always allow changing hostname easily
         // but we check if it didn't fail due to bridge/launcher issues.
         assertNotNull(result);
+    }
+
+    @Test
+    void testActualSlurpModule() {
+        String remotePath = "/tmp/slurp-test.txt";
+        String content = "slurp test data";
+        connection.execCommand("echo -n \"" + content + "\" > " + remotePath, BecomeContext.empty(), null);
+
+        Task task = new Task("test_slurp", "slurp", Map.of(
+                "src", remotePath
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        String encodedContent = (String) result.data().get("content");
+        assertNotNull(encodedContent);
+
+        byte[] decodedBytes = Base64.getMimeDecoder().decode(encodedContent);
+        assertEquals(content, new String(decodedBytes));
+    }
+
+    @Test
+    void testActualAssertModule() {
+        Task task = new Task("test_assert", "assert", Map.of(
+                "that", List.of("1 == 1"),
+                "fail_msg", "Assertion failed"
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+        assertTrue(result.success(), "Execution failed: " + result.message());
+    }
+
+    @Test
+    void testActualTemplateModule() throws IOException {
+        Path localTemplate = tempDir.resolve("test.j2");
+        String content = "static template content";
+        Files.writeString(localTemplate, content);
+
+        String remotePath = "/tmp/template-test.txt";
+        Task task = new Task("test_template", "template", Map.of(
+                "src", localTemplate.toString(),
+                "dest", remotePath
+        ));
+
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        assertTrue(result.changed());
+
+        var execResult = connection.execCommand("cat " + remotePath, BecomeContext.empty(), null);
+        assertEquals(content, execResult.stdout().trim());
     }
 }
