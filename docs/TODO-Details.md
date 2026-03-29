@@ -5,13 +5,6 @@
 
 ## 1. 技術面 (Technical)
 
-### [ ] 実際の Ansible コレクションを使ったテストの実施
-- **概要**: [実際のコレクションを使ったテスト方法の設計](tech/Actual-Collection-Testing.md) に基づき、主要なモジュールのテストを統合。
-- **進捗**:
-    - `ansible.builtin.ping`, `copy`, `file`, `stat`, `template` の統合テストを CI 環境へ統合済み。
-    - `command`, `shell`, `setup`, `lineinfile` 等のテスト統合が進行中。
-    - GraalPy および `ansible-core` のセットアップを GitHub Actions 上で自動化済み。
-
 ### [ ] CI における Native Image ビルドの安定化
 - **概要**: 優先度低。GitHub Actions 上での Native Image コンパイル時間の短縮とリソース最適化。
 - **検討内容**:
@@ -37,6 +30,21 @@
 
 ## 3. 完了済みの項目 (Completed)
 
+### [✓] 実際の Ansible コレクションを使ったテストの実施
+- **完了日**: 2026-03-25
+- **概要**: [実際のコレクションを使ったテスト方法の設計](tech/Actual-Collection-Testing.md) に基づき、主要なモジュールのテストを統合。
+- **解決策**:
+    - `ping`, `copy`, `file`, `stat`, `template`, `debug`, `command`, `shell`, `setup`, `lineinfile`, `replace`, `user`, `group`, `find`, `tempfile`, `hostname`, `slurp`, `assert`, `blockinfile`, `getent`, `fetch` の統合テストを CI 環境へ統合済み。
+    - また、`set_fact`, `fail`, `gather_facts` を含む計 24 モジュールの動作を確認済み。
+    - GraalPy および `ansible-core` のセットアップを GitHub Actions 上で自動化済み。
+
+### [✓] Action Plugin の互換性向上 (Python-first)
+- **完了日**: 2026-03-25
+- **概要**: 重厚な Ansible Core への依存を排除し、本物の Action Plugin を GraalPy 上で安定動作させる。
+- **解決策**:
+    - [テクニカルリファレンス](implementation/Action-Plugins-Investigation.md) に基づく Dependency Emulation Strategy の確立。
+    - `ansible_bridge.py` による `ansible.module_utils` 等の徹底的なモック化により、`copy`, `template`, `debug`, `setup`, `command`, `shell` 等の主要モジュールを、Java エミュレータを介さずオリジナルの Python ソースコードで実行することに成功。
+
 ### [✓] Native Image 時のリフレクション設定
 - **完了日**: 2026-03-05
 - **概要**: YAML 解析や動的クラスロードに伴うリフレクション定義の生成。
@@ -49,7 +57,7 @@
 - **概要**: [権限昇格 (become)](implementation/Privilege-Escalation.md) に基づく sudo/su 等の実行サポート。
 - **解決策**:
     - `BecomeContext` レコードを定義し、`Connection` インターフェースの `execCommand` メソッドへ統合。
-    - `LocalConnection` において、`sudo` および `su` によるコマンドのラップ処理を実装.
+    - `LocalConnection` において、`sudo` および `su` によるコマンドのラップ処理を実装。
     - `PlaybookExecutor` にて Playレベルおよび Taskレベルの `become` 設定の解決ロジックを実装済み。
 
 ### [✓] OS 抽象化レイヤー (OSHandler) の実装
@@ -151,13 +159,6 @@
     - **委譲 (delegate_to) の実装**: コネクションの動的な切り替えと、委譲先ホストに応じた変数解決の基盤を実装。
 
 ## 5. 今後のリファクタリング検討事項 (Future Refactoring Items)
-
-### [✓] Action Plugin の互換性向上 (Python-first)
-- **完了日**: 2026-03-25
-- **概要**: 重厚な Ansible Core への依存を排除し、本物の Action Plugin を GraalPy 上で安定動作させる。
-- **解決策**:
-    - [テクニカルリファレンス](implementation/Action-Plugins-Investigation.md) に基づく Dependency Emulation Strategy の確立。
-    - `ansible_bridge.py` による `ansible.module_utils` 等の徹底的なモック化により、`copy`, `template`, `debug`, `setup`, `command`, `shell` 等の主要モジュールを、Java エミュレータを介さずオリジナルの Python ソースコードで実行することに成功。
 
 ### [ ] PlaybookExecutor および実行エンジンのさらなる整理
 - **概要**: `PlaybookExecutor` および `TaskQueueManager`, `TaskExecutor` 内に存在する課題の継続的な改善。
