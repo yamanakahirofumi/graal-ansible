@@ -246,6 +246,11 @@ class FileModulesIntegrationTest {
 
     @Test
     void testGetentModule() {
+        // Skip getent test on Windows because the getent utility is typically missing
+        if (System.getProperty("os.name").toLowerCase().contains("win")) {
+            return;
+        }
+
         Task task = new Task("Getent passwd", "getent", Map.of(
                 "database", "passwd",
                 "key", "root"
@@ -254,7 +259,7 @@ class FileModulesIntegrationTest {
 
         if (!result.success()) {
             System.err.println("Getent failed: " + result.message());
-            System.err.println("Data: " + result.data());
+            System.err.println("Full Data: " + result.data());
         }
         assertTrue(result.success(), result.message());
         Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
