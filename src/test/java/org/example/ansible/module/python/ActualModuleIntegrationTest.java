@@ -402,8 +402,10 @@ class ActualModuleIntegrationTest {
         TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
 
         assertTrue(result.success(), "Execution failed: " + result.message());
-        Map<String, Object> getent = (Map<String, Object>) result.data().get("getent_passwd");
-        assertNotNull(getent);
+        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
+        assertNotNull(facts, "ansible_facts should be present");
+        Map<String, Object> getent = (Map<String, Object>) facts.get("getent_passwd");
+        assertNotNull(getent, "getent_passwd should be present in ansible_facts");
         assertTrue(getent.containsKey("root"));
     }
 

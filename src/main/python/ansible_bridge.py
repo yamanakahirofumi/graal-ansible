@@ -167,6 +167,8 @@ class MockLoader:
         return "", False
     def cleanup_tmp_file(self, *args, **kwargs):
         pass
+    def path_dwim(self, path):
+        return _normalize_path(path)
 
 class MockShell:
     def __init__(self):
