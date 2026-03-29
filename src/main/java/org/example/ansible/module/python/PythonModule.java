@@ -203,16 +203,18 @@ public class PythonModule implements Module {
         StringBuilder sb = new StringBuilder();
         sb.append("import json, sys, os, base64, __main__, types\n");
         sb.append("def patched_dumps(obj, **kw):\n");
-        sb.append("    orig_cls = kw.get('cls', json.JSONEncoder)\n");
+        sb.append("    orig_cls = kw.get('cls') or json.JSONEncoder\n");
         sb.append("    class RobustEncoder(orig_cls):\n");
         sb.append("        def default(self, o):\n");
         sb.append("            if isinstance(o, bytes):\n");
         sb.append("                try: return o.decode('utf-8')\n");
         sb.append("                except: return o.decode('latin-1')\n");
         sb.append("            if isinstance(o, (set, frozenset, range)): return list(o)\n");
+        sb.append("            if 'WrappedValue' in str(type(o)):\n");
+        sb.append("                for attr in ['value', '_value']:\n");
+        sb.append("                    if hasattr(o, attr): return getattr(o, attr)\n");
         sb.append("            if isinstance(o, Exception): return {'failed': True, 'msg': str(o)}\n");
-        sb.append("            try: return super().default(o)\n");
-        sb.append("            except Exception: return str(o)\n");
+        sb.append("            return super().default(o)\n");
         sb.append("    return _orig_dumps(obj, **dict(kw, cls=RobustEncoder))\n");
         sb.append("_orig_dumps = json.dumps\n");
         sb.append("json.dumps = patched_dumps\n");
@@ -332,19 +334,23 @@ public class PythonModule implements Module {
     private String parseModuleOutput(String output) {
         if (output == null || output.isBlank()) return "{}";
 
-        String[] lines = output.split("\\r?\\n");
+        String trimmed = output.trim();
+        String[] lines = trimmed.split("\\r?\\n");
         for (int i = lines.length - 1; i >= 0; i--) {
             String line = lines[i].trim();
-            if (line.startsWith("{") && line.endsWith("}")) {
-                return line;
+            int start = line.indexOf('{');
+            int end = line.lastIndexOf('}');
+            if (start != -1 && end != -1 && start < end) {
+                // Return only the portion within braces to strip noise
+                return line.substring(start, end + 1);
             }
         }
 
-        int start = output.indexOf('{');
-        int end = output.lastIndexOf('}');
+        int start = trimmed.indexOf('{');
+        int end = trimmed.lastIndexOf('}');
         if (start != -1 && end != -1 && start < end) {
-            return output.substring(start, end + 1);
+            return trimmed.substring(start, end + 1);
         }
-        return output;
+        return trimmed;
     }
 }
