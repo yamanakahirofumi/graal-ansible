@@ -1,55 +1,69 @@
-# Action Plugin / Module Mock 実装リファレンス (Reference)
+# Action Plugin / Module Mock 実装リファレンス (Technical Reference)
 
-**※注意: 本ドキュメントは今後の改善に向けた資料であり、プログラムの最新の状態とは必ずしも同期しません。**
-
-本プロジェクトでは、Ansible の Action Plugin やモジュールを GraalPy 上で動作させるため、また Windows 実行環境や Java との相互運用のために、多くのモックやパッチを導入しています。以下にその主要な実装内容を記録します。
+本ドキュメントは、Ansible の Action Plugin やモジュールを GraalPy 上で動作させるため、および Windows 実行環境や Java との相互運用のために導入されている主要なモックとパッチの技術リファレンスです。
 
 ## 1. パス正規化と OS 抽象化 (Path Normalization & OS Abstraction)
 
 Java から渡されるパスや Windows 環境特有の挙動を吸収するための実装です。
 
-- **`_normalize_path`**: Java (特に Windows) から渡される `/C:\path\...` のような先頭スラッシュ付きの絶対パスを、OS が理解できる形式に変換します。
-- **`os` モジュールのパッチ**: `os.makedirs`, `os.mkdir`, `os.path.exists`, `os.stat` をオーバーライドし、引数に `_normalize_path` を自動適用するようにしています。
-- **POSIX 関数のモック**: Windows 環境で欠落している `os.geteuid`, `os.getuid`, `os.chown`, `os.setuid` などの POSIX 固有関数を、No-op (何もしない) または固定値を返すスタブとして実装しています。
+- **`_normalize_path`**:
+  - Java (特に Windows) から渡される `/C:\path\...` や `/\\server\share` のような、先頭に余分なスラッシュが付与された絶対パスを検知し、先頭のスラッシュを削除して OS が正しく認識できる形式に変換します。
+  - Windows 環境（`os.name == 'nt'`）では、スラッシュをバックスラッシュに統一する処理も含まれます。
+- **`os` モジュールのパッチ**:
+  - `os.makedirs`, `os.mkdir`, `os.path.exists`, `os.stat` をオーバーライドし、引数に自動的に `_normalize_path` を適用します。
+- **POSIX 関数のモック**:
+  - Windows 環境で欠落している `os.geteuid`, `os.getuid`, `os.chown`, `os.lchown`, `os.lchmod`, `os.setegid`, `os.seteuid`, `os.setgid`, `os.setuid` などを、No-op (何もしない) または固定値（root 相当の 0 など）を返すスタブとして実装し、Unix 前提のモジュールコードのクラッシュを防ぎます。
 
-## 2. ネイティブ / システムライブラリのモック (Native/System Library Mocks)
+## 2. ハイブリッド・ローディング戦略 (Hybrid Loading Strategy)
 
-GraalPy での C 拡張ロード失敗を回避し、かつ依存関係を満たすための実装です。
+Ansible Core の一部をモック化しつつ、ディスク上のオリジナルのソースコードもロード可能にするための仕組みです。
 
-- **C 拡張のスタブ化**: `cryptography`, `yaml._yaml`, `markupsafe._speedups`, `selinux`, `fcntl`, `termios` などを、インポート時にエラーにならないよう空のモジュールや単純なクラスで置き換えています。
-- **システム情報モック (`grp`, `pwd`, `syslog`)**: ユーザー・グループ情報の取得関数をモック化し、`root` や `testuser` といった固定の情報を返すようにしています。これにより、Unix 固有の管理コマンドに依存するモジュールが Windows 上でも一部動作可能になります。
+- **`setup_sys_path`**:
+  - `ansible`, `ansible.module_utils` 等の主要なパッケージを `sys.modules` にモックとして登録しつつ、それらの `__path__` プロパティに実際のディスクパス（`target/python-packages` 等）を追加します。
+  - これにより、特定のクラス（`AnsibleModule` や `ActionBase`）をプロジェクト独自のモックに差し替えつつ、その配下にある膨大なユーティリティやサブモジュールをオリジナルの Python コードからロードすることを可能にしています。
 
-## 3. Ansible コアエンジン・プラグインのモック (Ansible Core Engine Mocks)
+## 3. データ相互運用とブリッジ (Data Interop & Bridge)
+
+Java と Python の間のデータ受け渡しを円滑にし、型変換の不整合を解消するための実装です。
+
+- **`_deep_convert`**:
+  - Java の `Map`, `List`, `Set`, `String`, `Boolean`, `Integer`, `Long`, `Float`, `Double`, `Path`, `File` などのオブジェクトを、再帰的に Python のネイティブ型（`dict`, `list`, `str`, `bool`, `int`, `float`）に変換します。
+  - GraalPy の Proxy オブジェクトに対しても、`toString()` 等を用いた頑健な文字列化処理を行います。
+- **JSON カスタムエンコーダ (`AnsibleEncoder`)**:
+  - `json.dumps` をパッチし、標準ではシリアライズできない以下の型を自動変換します。
+    - `bytes`: UTF-8（失敗時は latin-1）でデコード。
+    - `set`, `frozenset`, `range`: `list` に変換。
+    - `Exception`: `msg` と `failed: True` を持つ辞書に変換。
+    - Java Proxy/Iterable: 可能な限り `dict` や `list` へ変換。
+
+## 4. Ansible コアエンジン・プラグインのモック (Ansible Core Engine Mocks)
 
 Action Plugin の実行コンテキストを擬似的に構築するための実装です。
 
-- **`ActionBase`**: オリジナルの `ActionBase` を模倣し、`_execute_module` を呼び出した際に Java 側の `TaskExecutor` へ処理をルーティングする機能を備えています。
-- **`Templar`**: Jinja2 テンプレートの評価を模倣します。Jinja2 が利用可能な場合はそれを使用し、不可な場合は単純な正規表現置換で対応します。`evaluate_conditional` による条件分岐の評価もサポートします。
-- **`MockLoader`, `MockShell`**: ファイル読み込みやパス操作など、Action Plugin が内部で利用するユーティリティクラスの最小限の実装を提供します。
-- **`Display`, `PlayContext`, `Task`**: プラグインの初期化に必要なメタデータ保持クラスのモックです。
+- **`ActionBase`**:
+  - `_execute_module` をパッチし、内部からのモジュール実行要求を Java 側の `TaskExecutor.execute_from_python` へルーティングします。
+  - `_transfer_file` や `_execute_remote_stat` を実装し、Java の `Connection` オブジェクトを介した実際のファイル操作と連携します。
+- **`Templar`**:
+  - `template` メソッドにより Jinja2 テンプレートの評価をサポートします。
+  - `evaluate_conditional` は Python の `eval()` を用いて実装されており、`assert` モジュール等の条件評価に対応しています。
+- **`MockLoader`, `MockShell`**:
+  - `path_dwim`（パスの絶対パス化）や `path_has_trailing_slash` など、Action Plugin（特に `fetch` や `copy`）が内部で利用するパス操作ユーティリティを提供します。
 
-## 4. モジュール実行と `AnsibleModule` (Module Execution Mocks)
+## 5. モジュール実行と `AnsibleModule` (Module Execution Mocks)
 
-モジュール内部で利用される `ansible.module_utils.basic.AnsibleModule` のモック実装です。
+モジュール内部で利用される `ansible.module_utils.basic.AnsibleModule` の高度なモック実装です。
 
-- **引数処理**: `argument_spec` に基づく型変換 (bool, int, list, path) を自動で行い、Java から渡された JSON データをモジュールが利用可能な形式に整えます。
+- **引数処理と型変換**:
+  - `argument_spec` に基づき、Java から渡された引数を `list`, `str`, `path`, `bool`, `int` へ自動的にキャストします。
 - **`run_command` エミュレータ**:
-    - 実際のコマンド実行は Java の `Connection` オブジェクトを介してリモート/ローカルで実行されます。
-    - **`getent` エミュレータ**: Linux 環境以外でも `getent passwd root` などのコマンドが期待通り動作するよう、`run_command` 内部にハードコードされたレスポンスを返すロジックが含まれています。
-- **ファイル属性操作**: `set_fs_attributes_if_different` や `set_file_attributes_if_different` をモック化し、属性変更（owner/group/mode）が要求された場合に「変更あり」というステータスだけを返し、実際の OS 操作によるエラーを回避しています。
+  - 実際のコマンド実行は Java の `Connection` オブジェクトを介して行われます。
+  - **`getent` エミュレータ**: Linux 環境以外でも `getent passwd root` などのコマンドが期待通り動作するよう、`run_command` 内部にハードコードされたレスポンスを返すロジックが含まれています。
+  - **Java 結果解析の堅牢化**: Java の `ConnectionResult` オブジェクトから戻り値を取得する際、メソッド呼び出しに失敗した場合は `toString()` の出力を正規表現で解析するフォールバック処理を備えています。
+- **ファイル属性操作**:
+  - `set_fs_attributes_if_different` 等をモック化し、OS の実際の権限（owner/group）操作をスキップしつつ、要求された属性を内部に保持し、実行結果の JSON に反映させます。これにより `changed` ステータスの正確な追跡を可能にしています。
 
-## 5. データ相互運用とシリアライズ (Data Interop & Serialization)
+## 6. 今後の課題と展望
 
-Java と Python の間のデータ受け渡しを円滑にするための実装です。
-
-- **`_deep_convert`**: Java の `Map`, `List`, `Set`, `String`, `Boolean` などのオブジェクトを再帰的に Python のネイティブ型に変換します。
-- **JSON カスタムエンコーダ**: `json.dumps` をパッチし、`bytes`, `set`, `range` や Java の Proxy オブジェクトなどを適切に文字列化・リスト化して JSON 出力できるようにしています。
-- **`ConnectionResult` ブリッジ**: Java 側から返される実行結果オブジェクト (Record) のフィールドを、Python 側で安全に読み取るためのパース処理（正規表現による文字列解析を含む）を実装しています。
-
-## 6. 今後の改善に向けた視点
-
-現在の実装は「動作させること」を最優先したワークアラウンドが多く含まれています。今後の改善において以下の点が検討材料となります。
-
-- **モックの削減**: GraalPy の進化や依存ライブラリの pure-python 化により、スタブ化しているモジュールを本物に戻せる可能性があります。
-- **忠実度の向上**: 現在の `Templar` や `AnsibleModule` のモックは一部の機能を制限しています。より複雑な Playbook をサポートするには、オリジナルの Ansible コードをより多く活用する構成への移行が望まれます。
-- **プラットフォーム依存性の整理**: Windows と Linux での挙動の違いをモックで吸収するのではなく、Java 側の抽象化レイヤーでより洗練された形で処理できる可能性があります。
+- **ネイティブ拡張の制限**: 現在、`cryptography` や `PyYAML` の C 拡張部分は完全に無効化（Pure Python 版または None への差し替え）されています。
+- **モックの動的削減**: GraalPy の互換性向上に伴い、可能な限りオリジナルの Ansible コードへの差し戻しを検討します。
+- **Jinja2 互換性**: 現在の `Templar` モックは Jinja2 の一部の高度な機能やフィルターに制限があるため、継続的な改善が必要です。
