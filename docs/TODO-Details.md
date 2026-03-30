@@ -44,6 +44,7 @@
 - **解決策**:
     - [テクニカルリファレンス](implementation/Action-Plugins-Investigation.md) に基づく Dependency Emulation Strategy の確立。
     - `ansible_bridge.py` による `ansible.module_utils` 等の徹底的なモック化により、`copy`, `template`, `debug`, `setup`, `command`, `shell` 等の主要モジュールを、Java エミュレータを介さずオリジナルの Python ソースコードで実行することに成功。
+    - **注記**: 以前開発されていた Java ベースの Action Plugin エミュレータは、本方針の確立に伴い、完全な互換性確保のためすべて削除・置換されました。
 
 ### [✓] Native Image 時のリフレクション設定
 - **完了日**: 2026-03-05
@@ -142,12 +143,13 @@
     - Java (ITaskExecutor) から Python (Action Plugin) への双方向呼び出しを実現。
     - ※ 互換性の課題については [Action-Plugins-Investigation.md](implementation/Action-Plugins-Investigation.md) を参照。
 
-### [✓] Java による Action Plugin 軽量エミュレータの導入
+### [✓] Java による Action Plugin 軽量エミュレータの導入 (Transitional)
 - **完了日**: 2026-03-20
-- **概要**: GraalPy 上での Ansible Core ロードに伴う互換性問題の回避と高速化。
+- **概要**: GraalPy 上での Ansible Core ロードに伴う互換性問題の回避と高速化のための暫定措置。
 - **解決策**:
     - `ActionPlugin` Java インターフェースを定義し、`TaskExecutor` に組み込みプラグインの検索・実行ロジックを実装。
-    - `debug`, `set_fact`, `copy` の Java 版エミュレータを実装し、Python 版よりも優先して実行するように調整。
+    - `debug`, `set_fact`, `copy` の Java 版エミュレータを実装し、一時的な回避策として運用。
+    - **現状**: 上記「Action Plugin の互換性向上 (Python-first)」の完了により、本エミュレータ群は役割を終え、現在はオリジナルの Python コード実行に完全に置き換えられています。
 
 ### [✓] 実行エンジン（TQM/Worker）のリファクタリングと抽象化
 - **完了日**: 2026-03-20
