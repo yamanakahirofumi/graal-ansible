@@ -416,7 +416,47 @@ class TaskControlTest {
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
 
         assertEquals(3, counter.get());
-        assertEquals(3, ((Map<String, Object>)results.get("host1").get(0).data()).get("count"));
+        Map<String, Object> finalData = (Map<String, Object>) results.get("host1").get(0).data();
+        assertEquals(3, finalData.get("count"));
+        assertEquals(3, finalData.get("attempts"));
+        List<Map<String, Object>> retryResults = (List<Map<String, Object>>) finalData.get("results");
+        assertNotNull(retryResults);
+        assertEquals(3, retryResults.size());
+        assertEquals(1, retryResults.get(0).get("attempts"));
+        assertEquals(2, retryResults.get(1).get("attempts"));
+        assertEquals(3, retryResults.get(2).get("attempts"));
+    }
+
+    @Test
+    void testUntilRegisterResults() {
+        String inventoryIni = "host1";
+        Inventory inventory = new IniInventoryParser().parse(new ByteArrayInputStream(inventoryIni.getBytes(StandardCharsets.UTF_8)));
+
+        String playbookYaml = """
+                - name: test until results in register
+                  hosts: all
+                  tasks:
+                    - name: retry task
+                      test_retry_results:
+                      register: retry_result
+                      until: retry_result.results | length == 3
+                      retries: 5
+                      delay: 0
+                """;
+        Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
+
+        AtomicInteger counter = new AtomicInteger(0);
+        taskExecutor.registerModule("test_retry_results", (args, become, context) -> {
+            int val = counter.incrementAndGet();
+            return TaskResult.success(false, Map.of("count", val));
+        });
+
+        Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
+
+        assertEquals(3, counter.get());
+        Map<String, Object> finalData = (Map<String, Object>) results.get("host1").get(0).data();
+        List<Map<String, Object>> retryResults = (List<Map<String, Object>>) finalData.get("results");
+        assertEquals(3, retryResults.size());
     }
 
     @Test

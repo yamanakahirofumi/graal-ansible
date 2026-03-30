@@ -259,26 +259,37 @@ public class TaskExecutor implements ITaskExecutor {
 
             // Retry logic
             TaskResult lastResult = null;
+            List<Map<String, Object>> resultsList = new ArrayList<>();
+            int attempts = 0;
+
             for (int i = 0; i < task.retries(); i++) {
+                attempts++;
                 lastResult = execute(resolvedTask, becomeContext, effectiveConnection, resolvedEnvironment);
+
+                Map<String, Object> iterationData = new HashMap<>(lastResult.data());
+                iterationData.put("attempts", attempts);
                 if (resolvedDelegateTo != null) {
-                    Map<String, Object> dataWithDelegate = new HashMap<>(lastResult.data());
-                    dataWithDelegate.put("_ansible_delegated_host", resolvedDelegateTo);
-                    lastResult = new TaskResult(lastResult.success(), lastResult.changed(), lastResult.message(), dataWithDelegate);
+                    iterationData.put("_ansible_delegated_host", resolvedDelegateTo);
                 }
+                lastResult = new TaskResult(lastResult.success(), lastResult.changed(), lastResult.message(), iterationData);
+                resultsList.add(iterationData);
 
                 if (task.register() != null && variableManager != null) {
-                variableManager.registerVariable(host.name(), task.register(), lastResult.data());
-                variables = variableManager.getAllVariables(play, host, task);
-            }
+                    Map<String, Object> registeredData = new HashMap<>(iterationData);
+                    registeredData.put("results", new ArrayList<>(resultsList));
+                    variableManager.registerVariable(host.name(), task.register(), registeredData);
+                    variables = variableManager.getAllVariables(play, host, task);
+                }
 
-            Map<String, Object> evalVars = new HashMap<>(variables);
-            evalVars.putAll(lastResult.data());
-            Object untilResult = variableResolver.resolveValue(variableResolver.wrapInJinja(task.until()), evalVars);
+                Map<String, Object> evalVars = new HashMap<>(variables);
+                evalVars.putAll(lastResult.data());
+                Object untilResult = variableResolver.resolveValue(variableResolver.wrapInJinja(task.until()), evalVars);
 
-            if (Truthiness.isTrue(untilResult)) {
-                return lastResult;
-            }
+                if (Truthiness.isTrue(untilResult)) {
+                    Map<String, Object> finalData = new HashMap<>(lastResult.data());
+                    finalData.put("results", resultsList);
+                    return new TaskResult(lastResult.success(), lastResult.changed(), lastResult.message(), finalData);
+                }
 
                 if (i < task.retries() - 1) {
                     try {
@@ -290,8 +301,14 @@ public class TaskExecutor implements ITaskExecutor {
                 }
             }
 
-            if (lastResult != null && lastResult.success()) {
-                return new TaskResult(false, lastResult.changed(), "Until condition not met after " + task.retries() + " retries", lastResult.data());
+            if (lastResult != null) {
+                Map<String, Object> finalData = new HashMap<>(lastResult.data());
+                finalData.put("results", resultsList);
+                finalData.put("attempts", attempts);
+                if (lastResult.success()) {
+                    return new TaskResult(false, lastResult.changed(), "Until condition not met after " + attempts + " retries", finalData);
+                }
+                return new TaskResult(false, lastResult.changed(), lastResult.message(), finalData);
             }
 
             return lastResult;
