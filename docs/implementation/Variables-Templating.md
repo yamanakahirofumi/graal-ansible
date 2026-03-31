@@ -12,27 +12,44 @@ Ansible の Jinja2 テンプレートとの高い互換性を Java で実現す�
     - 独自フィルターやテストの追加が容易。
     - GraalVM Native Image での動作実績がある。
 
-## 2. 変数の解決フローと優先順位
+## 2. 変数の優先順位 (Variable Precedence)
 
-Ansible の複雑な変数の優先順位を簡略化しつつ、主要なレベルをサポートします。本プロジェクトでは以下の順序で変数がマージされ、**後に定義されたものが優先（上書き）**されます。
+Ansible (ansible-core 2.17+) は 22 段階の非常に詳細な優先順位を定義しています。`graal-ansible` では、これらの互換性を維持しつつ、主要なレベルから順次実装を進めています。
 
-1.  **Role Defaults**: ロールの `defaults/main.yml`（将来対応）
-2.  **Inventory Group Vars (all)**: `all` グループ変数（`group_vars/all.yml` 含む）
-3.  **Inventory Group Vars (Parent)**: 親グループの変数
-4.  **Inventory Group Vars (Child)**: 子グループの変数
-5.  **Inventory Host Vars**: ターゲットノード固有の変数（`host_vars/{{ host_name }}.yml` 含む）
-6.  **Play Vars**: Play 定義内の `vars`
-7.  **Play Vars Files**: Play 定義内の `vars_files`
-8.  **Role Vars**: ロールの `vars/main.yml`（将来対応）
-9.  **Task Vars**: Task 定義内の `vars`
-10. **Registered Variables (hostVars)**: `register` によって実行時に保存された変数
-11. **Extra Vars**: コマンドライン引数 `-e` / `--extra-vars`
+下表は、低い順（上が低く、下が最高優先）の優先順位リストと、現在の `graal-ansible` におけるサポート状況です。
 
-### 2.1 インベントリ変数の解決
-ターゲットノードが複数のグループに属している場合、それぞれのグループパスを辿って変数を収集します。この際、**子グループは親グループの変数を上書き**します。最終的にターゲットノード固有の変数がすべてのグループ変数を上書きします。
+- **◎**: 実装済み (Implemented)
+- **△**: 計画中 / 一部対応 (Planned / Partial)
+- **×**: 未着手 (Not yet)
 
-### 2.2 マージ戦略
-- ディクショナリ（Map）型の変数は、デフォルトで「上書き」としますが、設定により「再帰的マージ」を選択可能にすることを検討します。
+| 優先度 | 変数のソース | サポート状況 | 備考 |
+| :--- | :--- | :---: | :--- |
+| 1 | コマンドライン値 (例: `-u user` ※ `-e` 以外) | △ | CLI オプションとして解釈されるが変数としては未統合。 |
+| 2 | ロールデフォルト (`roles/x/defaults/main.yml`) | △ | ロール機能と共に実装予定。 |
+| 3 | インベントリファイル / スクリプトのグループ変数 | ◎ | `Inventory.java` にて解決。 |
+| 4 | インベントリ `group_vars/all` | ◎ | `all` グループとして処理。 |
+| 5 | プレイブック `group_vars/all` | △ | プレイブック相対パスの検索を実装予定。 |
+| 6 | インベントリ `group_vars/*` | ◎ | グループ階層パスに沿って解決。 |
+| 7 | プレイブック `group_vars/*` | △ | プレイブック相対パスの検索を実装予定。 |
+| 8 | インベントリファイル / スクリプトのホスト変数 | ◎ | `host` 定義内の変数。 |
+| 9 | インベントリ `host_vars/*` | △ | 計画中。 |
+| 10 | プレイブック `host_vars/*` | △ | 計画中。 |
+| 11 | ホストファクト / キャッシュされた `set_facts` | ◎ | `VariableManager.addFacts` にて管理。 |
+| 12 | プレイ変数 (`vars`) | ◎ | `Play` レコードに保持。 |
+| 13 | プレイ `vars_prompt` | × | インタラクティブ入力のため優先度低。 |
+| 14 | プレイ変数ファイル (`vars_files`) | ◎ | `VariableManager.loadVarsFile` にて解決。 |
+| 15 | ロール変数 (`roles/x/vars/main.yml`) | △ | ロール機能と共に実装予定。 |
+| 16 | ブロック変数 (`block` 内の `vars`) | △ | 実行エンジンでのスコープ分離を強化中。 |
+| 17 | タスク変数 (`task` 内の `vars`) | ◎ | `Task` レコードに保持。 |
+| 18 | `include_vars` | △ | Action Plugin として実装予定。 |
+| 19 | `set_facts` / `register` 変数 | ◎ | `VariableManager.registerVariable` で実行時に保存。 |
+| 20 | ロールパラメータ | △ | ロール呼び出し時の引数。 |
+| 21 | インクルードパラメータ | △ | `include_tasks` 等の引数。 |
+| 22 | エクストラ変数 (`-e` / `--extra-vars`) | ◎ | **最高優先。** `VariableManager.extraVars` に保持。 |
+
+### 2.1 マージ戦略
+- **原則**: 同じ変数名が異なるレベルで定義されている場合、高い優先度の値が低い優先度の値を完全に上書きします。
+- **ハッシュマージ**: 辞書（Map）型の変数について、Ansible の `hash_behaviour=merge` 相当の再帰的マージをサポートするかは将来の検討事項です。
 
 ## 3. 遅延評価 (Lazy Evaluation)
 
@@ -54,11 +71,6 @@ Ansible 特有のフィルターは、Jinjava の `Filter` インターフェー
 - `ipaddr`: IP アドレスの検証・操作。
 - `to_json`: オブジェクトを JSON 文字列に変換。
 - `to_yaml`: オブジェクトを YAML 文字列に変換。
-
-```java
-// 実装イメージ
-jinjava.getGlobalContext().registerFilter(new CombineFilter());
-```
 
 ## 5. Native Image への対応
 
