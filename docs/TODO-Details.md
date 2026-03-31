@@ -165,5 +165,5 @@
 ### [ ] PlaybookExecutor および実行エンジンのさらなる整理
 - **概要**: `PlaybookExecutor` および `TaskQueueManager`, `TaskExecutor` 内に存在する課題の継続的な改善。
 - **検討内容**:
-    - 複雑な変数の優先順位の完全な実装（現在は主要な 11 段階のみ）。
+    - 変数の優先順位（22 段階）の完全な実装とテスト（詳細は [Variables-Templating.md](implementation/Variables-Templating.md) を参照）。
     - 動的インベントリの完全なサポート。
