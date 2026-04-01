@@ -40,7 +40,7 @@ class ActionPluginTest {
     @Test
     void testDebugActionPluginMsg() {
         Task task = new Task("Test Debug Msg", "debug", Map.of("msg", "Hello from Built-in Action Plugin"));
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
         assertTrue(result.success(), result.message());
         assertEquals("Hello from Built-in Action Plugin", result.data().get("msg"));
     }
@@ -49,7 +49,7 @@ class ActionPluginTest {
     void testDebugActionPluginVar() {
         variableManager.addFacts("localhost", Map.of("my_fact", "fact_value"));
         Task task = new Task("Test Debug Var", "debug", Map.of("var", "my_fact"));
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
         assertTrue(result.success(), result.message());
         assertEquals("fact_value", result.data().get("my_fact"));
     }
@@ -57,7 +57,7 @@ class ActionPluginTest {
     @Test
     void testSetFactActionPlugin() {
         Task task = new Task("Test Set Fact", "set_fact", Map.of("new_fact", "new_value"));
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
         assertTrue(result.success(), result.message());
 
         Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
@@ -68,14 +68,14 @@ class ActionPluginTest {
     @Test
     void testAssertActionPluginSuccess() {
         Task task = new Task("Test Assert Success", "assert", Map.of("that", List.of("1 == 1")));
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
         assertTrue(result.success(), result.message());
     }
 
     @Test
     void testAssertActionPluginFailure() {
         Task task = new Task("Test Assert Failure", "assert", Map.of("that", List.of("1 == 2")));
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
         assertFalse(result.success());
         // assert module usually returns evaluated results in 'assertion' or similar
     }

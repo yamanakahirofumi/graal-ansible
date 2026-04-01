@@ -62,7 +62,7 @@ class TemplateIntegrationTest {
                 "dest", destFile.toString()
         ));
 
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
 
         assertTrue(result.success(), result.message());
         assertTrue(result.changed());
@@ -82,7 +82,7 @@ class TemplateIntegrationTest {
                 "dest", destFile.toString()
         ));
 
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
 
         assertTrue(result.success(), result.message());
         assertEquals("012", Files.readString(destFile));
@@ -102,7 +102,7 @@ class TemplateIntegrationTest {
                 "owner", "admin"
         ));
 
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
 
         assertTrue(result.success());
         assertEquals("0755", result.data().get("mode"));

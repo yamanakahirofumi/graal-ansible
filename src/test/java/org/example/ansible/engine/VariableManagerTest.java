@@ -31,21 +31,21 @@ class VariableManagerTest {
         VariableManager manager = new VariableManager(inventory, extraVars);
 
         // Priority: Extra > Task > Play > Inventory(Host)
-        Map<String, Object> vars = manager.getAllVariables(play, host, task);
+        Map<String, Object> vars = manager.getAllVariables(play, host, task, null);
         assertEquals("extra_var", vars.get("my_var"));
 
         // Remove extra
         manager = new VariableManager(inventory, Map.of());
-        vars = manager.getAllVariables(play, host, task);
+        vars = manager.getAllVariables(play, host, task, null);
         assertEquals("task_var", vars.get("my_var"));
 
         // Remove task var
-        vars = manager.getAllVariables(play, host, null);
+        vars = manager.getAllVariables(play, host, null, null);
         assertEquals("play_var", vars.get("my_var"));
 
         // Remove play var
         play = new Play("play1", "all", List.of(), Map.of());
-        vars = manager.getAllVariables(play, host, null);
+        vars = manager.getAllVariables(play, host, null, null);
         assertEquals("host_var", vars.get("my_var"));
     }
 }

@@ -2,14 +2,18 @@ package org.example.ansible.engine;
 
 import org.example.ansible.inventory.Host;
 import org.example.ansible.inventory.Inventory;
+import org.example.ansible.inventory.Group;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -18,18 +22,25 @@ import java.util.Map;
 public class VariableManager {
     private final Inventory inventory;
     private final Map<String, Object> extraVars;
-    private final Map<String, Map<String, Object>> hostVars = new HashMap<>();
+    private final Map<String, Map<String, Object>> registeredVars = new HashMap<>();
+    private final Map<String, Map<String, Object>> hostFacts = new HashMap<>();
     private final Path baseDir;
+    private final Path inventoryDir;
     private final Yaml yaml = new Yaml();
 
     public VariableManager(Inventory inventory, Map<String, Object> extraVars) {
-        this(inventory, extraVars, null);
+        this(inventory, extraVars, null, null);
     }
 
     public VariableManager(Inventory inventory, Map<String, Object> extraVars, Path baseDir) {
+        this(inventory, extraVars, baseDir, null);
+    }
+
+    public VariableManager(Inventory inventory, Map<String, Object> extraVars, Path baseDir, Path inventoryDir) {
         this.inventory = inventory;
         this.extraVars = extraVars != null ? new HashMap<>(extraVars) : new HashMap<>();
         this.baseDir = baseDir;
+        this.inventoryDir = inventoryDir;
     }
 
     /**
@@ -48,7 +59,7 @@ public class VariableManager {
      * @param value    The variable value.
      */
     public void registerVariable(String hostName, String name, Object value) {
-        hostVars.computeIfAbsent(hostName, k -> new HashMap<>()).put(name, value);
+        registeredVars.computeIfAbsent(hostName, k -> new HashMap<>()).put(name, value);
     }
 
     /**
@@ -60,17 +71,17 @@ public class VariableManager {
      */
     public void addFacts(String hostName, Map<String, Object> facts) {
         if (facts == null || facts.isEmpty()) return;
-        Map<String, Object> hostVariables = hostVars.computeIfAbsent(hostName, k -> new HashMap<>());
+        Map<String, Object> factsMap = hostFacts.computeIfAbsent(hostName, k -> new HashMap<>());
 
         // Merge into top-level variables
-        hostVariables.putAll(facts);
+        factsMap.putAll(facts);
 
         // Merge into 'ansible_facts' dictionary
         @SuppressWarnings("unchecked")
-        Map<String, Object> ansibleFacts = (Map<String, Object>) hostVariables.get("ansible_facts");
+        Map<String, Object> ansibleFacts = (Map<String, Object>) factsMap.get("ansible_facts");
         if (ansibleFacts == null) {
             ansibleFacts = new HashMap<String, Object>();
-            hostVariables.put("ansible_facts", ansibleFacts);
+            factsMap.put("ansible_facts", ansibleFacts);
         }
         ansibleFacts.putAll(facts);
     }
@@ -82,7 +93,7 @@ public class VariableManager {
      * @return A merged map of variables for the host.
      */
     public Map<String, Object> getVariablesForHost(String hostName) {
-        Map<String, Object> vars = new HashMap<>(getAllVariables(null, new Host(hostName), null));
+        Map<String, Object> vars = new HashMap<>(getAllVariables(null, new Host(hostName), null, null));
         vars.put("inventory_hostname", hostName);
         return vars;
     }
@@ -91,76 +102,164 @@ public class VariableManager {
      * Resolves all variables for a given context (play, host, task).
      * Follows the priority defined in Variables-Templating.md.
      *
-     * @param play The current play.
-     * @param host The current host.
-     * @param task The current task.
+     * @param play      The current play.
+     * @param host      The current host.
+     * @param task      The current task.
+     * @param blockVars Accumulated block variables.
      * @return A merged map of all variables.
      */
-    public Map<String, Object> getAllVariables(Play play, Host host, Task task) {
+    public Map<String, Object> getAllVariables(Play play, Host host, Task task, Map<String, Object> blockVars) {
         Map<String, Object> variables = new HashMap<>();
+        String hostName = host != null ? host.name() : null;
 
         // Magic Variables
-        if (host != null) {
-            variables.put("inventory_hostname", host.name());
+        if (hostName != null) {
+            variables.put("inventory_hostname", hostName);
         }
 
-        // 1. Role Defaults (Not implemented yet)
+        // 3-10. Inventory and Directory Variables
+        if (hostName != null) {
+            if (inventory != null) {
+                // Level 3, 4, 6, 8: Basic Inventory Variables
+                variables.putAll(inventory.getVariablesForHost(hostName));
+            }
 
-        // 2-5. Inventory Variables (all, parent group, child group, host vars)
-        if (inventory != null && host != null) {
-            variables.putAll(inventory.getVariablesForHost(host.name()));
+            // Level 4-7: Directory-based Group Variables
+            List<String> groups = getHostGroups(hostName);
+            // 'all' group is always handled first (or it's already in the list from inventory)
+            variables.putAll(loadDirectoryVars(inventoryDir, "group_vars", "all"));
+            variables.putAll(loadDirectoryVars(baseDir, "group_vars", "all"));
+
+            for (String group : groups) {
+                if (!"all".equals(group)) {
+                    variables.putAll(loadDirectoryVars(inventoryDir, "group_vars", group));
+                    variables.putAll(loadDirectoryVars(baseDir, "group_vars", group));
+                }
+            }
+
+            // Level 9-10: Directory-based Host Variables
+            variables.putAll(loadDirectoryVars(inventoryDir, "host_vars", hostName));
+            variables.putAll(loadDirectoryVars(baseDir, "host_vars", hostName));
         }
 
-        // 6. Play Vars
+        // Level 11: Host Facts
+        if (hostName != null && hostFacts.containsKey(hostName)) {
+            variables.putAll(hostFacts.get(hostName));
+        }
+
+        // Level 12: Play Vars
         if (play != null) {
             variables.putAll(play.vars());
         }
 
-        // 7. Play Vars Files
+        // Level 14: Play Vars Files
         if (play != null && !play.varsFiles().isEmpty()) {
             for (String varsFile : play.varsFiles()) {
                 variables.putAll(loadVarsFile(varsFile));
             }
         }
 
-        // 8. Role Vars (Not implemented yet)
+        // Level 16: Block Vars
+        if (blockVars != null) {
+            variables.putAll(blockVars);
+        }
 
-        // 9. Task Vars
+        // Level 17: Task Vars
         if (task != null) {
             variables.putAll(task.vars());
         }
 
-        // 10. Registered Variables and Facts (Higher priority than Task Vars in Ansible)
-        if (host != null && hostVars.containsKey(host.name())) {
-            variables.putAll(hostVars.get(host.name()));
+        // Level 19: Registered Variables
+        if (hostName != null && registeredVars.containsKey(hostName)) {
+            variables.putAll(registeredVars.get(hostName));
         }
 
-        // 11. Extra Vars (Highest priority)
+        // Level 22: Extra Vars
         variables.putAll(extraVars);
 
         return Collections.unmodifiableMap(variables);
+    }
+
+    private List<String> getHostGroups(String hostName) {
+        if (inventory == null) return Collections.emptyList();
+        List<String> groups = new ArrayList<>();
+        findGroupsForHost(inventory.all(), hostName, groups);
+        return groups;
+    }
+
+    private void findGroupsForHost(Group group, String hostName, List<String> result) {
+        boolean hasHost = group.hosts().stream().anyMatch(h -> h.name().equals(hostName));
+        if (hasHost) {
+            if (!result.contains(group.name())) {
+                result.add(group.name());
+            }
+        }
+        for (Group child : group.children()) {
+            findGroupsForHost(child, hostName, result);
+        }
     }
 
     /**
      * Internal method to get registered and fact variables.
      */
     public Map<String, Object> getHostRuntimeVariables(String hostName) {
-        return hostVars.getOrDefault(hostName, Map.of());
+        Map<String, Object> runtimeVars = new HashMap<>();
+        if (hostFacts.containsKey(hostName)) {
+            runtimeVars.putAll(hostFacts.get(hostName));
+        }
+        if (registeredVars.containsKey(hostName)) {
+            runtimeVars.putAll(registeredVars.get(hostName));
+        }
+        return runtimeVars;
     }
 
     @SuppressWarnings("unchecked")
     private Map<String, Object> loadVarsFile(String varsFile) {
         Path filePath = baseDir != null ? baseDir.resolve(varsFile) : Path.of(varsFile);
-        try (InputStream is = new FileInputStream(filePath.toFile())) {
+        return loadVarsFileFromPath(filePath);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> loadVarsFileFromPath(Path path) {
+        if (!Files.exists(path)) return Map.of();
+        try (InputStream is = new FileInputStream(path.toFile())) {
             Object raw = yaml.load(is);
             if (raw instanceof Map<?, ?> map) {
                 return (Map<String, Object>) map;
             }
         } catch (IOException e) {
-            // In Ansible, if vars_file is not found, it's generally an error unless ignored.
-            // For now, we'll just throw a runtime exception or log it.
-            throw new RuntimeException("Failed to load vars_file: " + varsFile, e);
+            throw new RuntimeException("Failed to load vars file: " + path, e);
         }
         return Map.of();
+    }
+
+    private Map<String, Object> loadDirectoryVars(Path dir, String subDir, String name) {
+        if (dir == null) return Map.of();
+        Path varsDir = dir.resolve(subDir);
+        if (!Files.exists(varsDir)) return Map.of();
+
+        Map<String, Object> vars = new HashMap<>();
+
+        // 1. Load <name>.yml, <name>.yaml, or <name>.json
+        vars.putAll(loadVarsFileFromPath(varsDir.resolve(name + ".yml")));
+        vars.putAll(loadVarsFileFromPath(varsDir.resolve(name + ".yaml")));
+        vars.putAll(loadVarsFileFromPath(varsDir.resolve(name + ".json")));
+
+        // 2. Load all files in <name>/ directory
+        Path nameDir = varsDir.resolve(name);
+        if (Files.isDirectory(nameDir)) {
+            try (var stream = Files.list(nameDir)) {
+                stream.filter(p -> !Files.isDirectory(p))
+                        .filter(p -> {
+                            String s = p.toString();
+                            return s.endsWith(".yml") || s.endsWith(".yaml") || s.endsWith(".json");
+                        })
+                        .sorted()
+                        .forEach(p -> vars.putAll(loadVarsFileFromPath(p)));
+            } catch (IOException e) {
+                // Ignore directory listing errors
+            }
+        }
+        return vars;
     }
 }

@@ -20,8 +20,7 @@ class CheckModeTest {
     void testCheckModePrecedence() {
         List<Task> capturedTasks = new ArrayList<>();
         ITaskExecutor taskExecutor = new ITaskExecutor() {
-            @Override
-            public TaskResult execute(Play play, Host host, Task task, VariableManager variableManager, boolean inheritedCheckMode, Object inheritedEnvironment, Connection connection, ConnectionFactory connectionFactory) {
+            @Override public TaskResult execute(Play play, Host host, Task task, VariableManager variableManager, boolean inheritedCheckMode, Object inheritedEnvironment, Map<String, Object> blockVars, Connection connection, ConnectionFactory connectionFactory) {
                 // We use TaskExecutor's real logic to resolve check mode, but mock the final execution
                 TaskExecutor realExecutor = new TaskExecutor() {
                     @Override
@@ -36,7 +35,7 @@ class CheckModeTest {
                         return TaskResult.success(Map.of());
                     }
                 };
-                return realExecutor.execute(play, host, task, variableManager, inheritedCheckMode, inheritedEnvironment, connection, connectionFactory);
+                return realExecutor.execute(play, host, task, variableManager, inheritedCheckMode, inheritedEnvironment, blockVars, connection, connectionFactory);
             }
 
             @Override

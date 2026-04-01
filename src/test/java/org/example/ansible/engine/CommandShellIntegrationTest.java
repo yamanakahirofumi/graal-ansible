@@ -42,7 +42,7 @@ class CommandShellIntegrationTest {
     @Test
     void testCommandSuccess() {
         Task task = new Task("Run echo", "command", Map.of("_raw_params", "echo hello"));
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
 
         assertTrue(result.success(), "Execution failed: " + result.message() + " Data: " + result.data());
         assertTrue(result.changed());
@@ -55,7 +55,7 @@ class CommandShellIntegrationTest {
     @Test
     void testCommandFailure() {
         Task task = new Task("Run false", "command", Map.of("_raw_params", "false"));
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
 
         assertFalse(result.success());
         assertFalse(result.changed());
@@ -68,7 +68,7 @@ class CommandShellIntegrationTest {
         String command = isWindows ? "echo line2 | findstr line2" : "echo \"line1\nline2\" | grep line2";
 
         Task task = new Task("Run pipe", "shell", Map.of("_raw_params", command));
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
 
         assertTrue(result.success(), result.message());
         String stdout = (String) result.data().get("stdout");
@@ -86,7 +86,7 @@ class CommandShellIntegrationTest {
             null, 0, 0, null, false, false, false, List.of(), List.of(), List.of(),
             null, null, null, null, null, Map.of());
 
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
 
         assertFalse(result.success(), "Should be failed due to failed_when");
         String stdout = (String) result.data().get("stdout");
@@ -103,7 +103,7 @@ class CommandShellIntegrationTest {
             null, 0, 0, null, false, false, false, List.of(), List.of(), List.of(),
             null, null, null, null, null, Map.of());
 
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
 
         assertTrue(result.success(), "Task failed: " + result.message() + " (Data: " + result.data() + ")");
         assertFalse(result.changed(), "Should not be changed due to changed_when: false");
@@ -121,7 +121,7 @@ class CommandShellIntegrationTest {
             null, 0, 0, null, false, false, false, List.of(), List.of(), List.of(),
             null, null, null, null, null, env);
 
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
 
         assertTrue(result.success(), result.message());
         // Note: shell expansion of $MY_VAR might only work in 'shell' or if 'command' is executed via shell

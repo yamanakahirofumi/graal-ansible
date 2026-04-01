@@ -64,12 +64,12 @@ public class TaskQueueManager {
                     }
 
                     // Initial inherited check mode from Play level
-                    Map<String, Object> vars = variableManager.getAllVariables(play, host, task);
+                    Map<String, Object> vars = variableManager.getAllVariables(play, host, task, null);
                     boolean playCheckMode = variableResolver.resolveCheckMode(play.checkMode(), vars, globalCheckMode);
 
                     try {
                         Connection connection = getOrCreateConnection(host, vars);
-                        executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications, playCheckMode, null, connection);
+                        executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications, playCheckMode, null, null, connection);
                     } catch (UnreachableException e) {
                         if (task.ignoreUnreachable()) {
                             TaskResult unreachableResult = TaskResult.unreachable(e.getMessage());
@@ -87,7 +87,7 @@ public class TaskQueueManager {
                 if (failedHosts.contains(host.name())) {
                     continue;
                 }
-                Map<String, Object> vars = variableManager.getAllVariables(play, host, null);
+                Map<String, Object> vars = variableManager.getAllVariables(play, host, null, null);
                 boolean playCheckMode = variableResolver.resolveCheckMode(play.checkMode(), vars, globalCheckMode);
                 try {
                     Connection connection = getOrCreateConnection(host, vars);
@@ -132,7 +132,7 @@ public class TaskQueueManager {
                         for (Task handler : play.handlers()) {
                             if (handlerName.equals(handler.name())) {
                                 if (failedHosts.contains(host.name())) continue;
-                                executeTaskOnHost(play, host, handler, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, null, connection);
+                                executeTaskOnHost(play, host, handler, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, null, null, connection);
                                 anyNewNotified = true;
                                 break;
                             }
@@ -143,15 +143,15 @@ public class TaskQueueManager {
         } while (anyNewNotified);
     }
 
-    private void executeTaskOnHost(Play play, Host host, Task task, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode, Object inheritedEnvironment, Connection connection) {
+    private void executeTaskOnHost(Play play, Host host, Task task, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode, Object inheritedEnvironment, Map<String, Object> blockVars, Connection connection) {
         if (!task.block().isEmpty()) {
-            executeBlock(play, host, task, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, inheritedEnvironment, connection);
+            executeBlock(play, host, task, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, inheritedEnvironment, blockVars, connection);
             return;
         }
 
         TaskResult result;
         try {
-            result = taskExecutor.execute(play, host, task, variableManager, inheritedCheckMode, inheritedEnvironment, connection, connectionFactory);
+            result = taskExecutor.execute(play, host, task, variableManager, inheritedCheckMode, inheritedEnvironment, blockVars, connection, connectionFactory);
         } catch (UnreachableException e) {
             if (task.ignoreUnreachable()) {
                 result = TaskResult.unreachable(e.getMessage());
@@ -199,8 +199,8 @@ public class TaskQueueManager {
         }
     }
 
-    private void executeBlock(Play play, Host host, Task blockTask, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode, Object inheritedEnvironment, Connection connection) {
-        Map<String, Object> blockVars = variableManager.getAllVariables(play, host, blockTask);
+    private void executeBlock(Play play, Host host, Task blockTask, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode, Object inheritedEnvironment, Map<String, Object> inheritedBlockVars, Connection connection) {
+        Map<String, Object> blockVars = variableManager.getAllVariables(play, host, blockTask, inheritedBlockVars);
         boolean blockCheckMode = variableResolver.resolveCheckMode(blockTask.checkMode(), blockVars, inheritedCheckMode);
 
         if (!variableResolver.isWhenConditionMet(blockTask.when(), blockVars)) {
@@ -212,13 +212,16 @@ public class TaskQueueManager {
         boolean blockFailed = false;
         Set<String> blockFailedHosts = new HashSet<>();
         Object effectiveBlockEnv = blockTask.environment() != null ? blockTask.environment() : inheritedEnvironment;
+        Map<String, Object> combinedBlockVars = new HashMap<>();
+        if (inheritedBlockVars != null) combinedBlockVars.putAll(inheritedBlockVars);
+        combinedBlockVars.putAll(blockTask.vars());
 
         for (Task task : blockTask.block()) {
             if (blockFailedHosts.contains(host.name())) {
                 blockFailed = true;
                 break;
             }
-            executeTaskOnHost(play, host, task, variableManager, results, blockFailedHosts, hostNotifications, blockCheckMode, effectiveBlockEnv, connection);
+            executeTaskOnHost(play, host, task, variableManager, results, blockFailedHosts, hostNotifications, blockCheckMode, effectiveBlockEnv, combinedBlockVars, connection);
         }
 
         if (blockFailedHosts.contains(host.name())) {
@@ -227,12 +230,12 @@ public class TaskQueueManager {
 
         if (blockFailed) {
             for (Task task : blockTask.rescue()) {
-                executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications, blockCheckMode, effectiveBlockEnv, connection);
+                executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications, blockCheckMode, effectiveBlockEnv, combinedBlockVars, connection);
             }
         }
 
         for (Task task : blockTask.always()) {
-            executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications, blockCheckMode, effectiveBlockEnv, connection);
+            executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications, blockCheckMode, effectiveBlockEnv, combinedBlockVars, connection);
         }
 
         if (blockFailed && blockTask.rescue().isEmpty()) {

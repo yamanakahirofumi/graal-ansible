@@ -48,7 +48,7 @@ class NegativeIntegrationTest {
         Task task = new Task("Missing path", "file", Map.of(
                 "state", "touch"
         ));
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
 
         assertFalse(result.success(), "Task should have failed due to missing 'path'");
         String msg = result.data().getOrDefault("msg", "").toString();
@@ -63,7 +63,7 @@ class NegativeIntegrationTest {
                 "dest", List.of("/tmp/invalid"),
                 "content", "test"
         ));
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
 
         assertFalse(result.success(), "Task should have failed due to invalid type for 'dest'");
         assertTrue(result.data().getOrDefault("msg", "").toString().contains("list") ||
@@ -77,7 +77,7 @@ class NegativeIntegrationTest {
         Task task = new Task("Slurp non-existent", "slurp", Map.of(
                 "src", nonExistent.toString()
         ));
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
 
         assertFalse(result.success(), "Slurp should have failed for non-existent file");
         // Module usually returns failed=True and a message
@@ -89,7 +89,7 @@ class NegativeIntegrationTest {
         Task task = new Task("Run invalid command", "command", Map.of(
                 "_raw_params", "nonexistentcommand_xyz_123"
         ));
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
 
         assertFalse(result.success(), "Command should have failed");
         assertNotEquals(0, result.data().get("rc"), "Return code should not be zero");
@@ -101,7 +101,7 @@ class NegativeIntegrationTest {
         Task task = new Task("Invalid jinja", "debug", Map.of(
                 "msg", "hello {{ name"
         ));
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
 
         assertTrue(result.success());
         assertEquals("hello {{ name", result.data().get("msg"));

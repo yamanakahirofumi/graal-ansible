@@ -53,7 +53,7 @@ class UnicodeIntegrationTest {
                 "path", targetFile.toString(),
                 "state", "touch"
         ));
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
 
         assertTrue(result.success(), "Failed to create unicode file: " + result.message());
         assertTrue(Files.exists(targetFile), "File does not exist: " + targetFile);
@@ -68,7 +68,7 @@ class UnicodeIntegrationTest {
                 "dest", targetFile.toString(),
                 "content", content
         ));
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
 
         assertTrue(result.success(), "Failed to write unicode content: " + result.message());
         assertEquals(content, Files.readString(targetFile).trim());
@@ -87,7 +87,7 @@ class UnicodeIntegrationTest {
         Inventory inventory = new Inventory(new Group("all", List.of(host), List.of(), Map.of()));
         VariableManager vmWithVars = new VariableManager(inventory, vars);
 
-        TaskResult result = taskExecutor.execute(play, host, task, vmWithVars, false, null, new LocalConnection(), null);
+        TaskResult result = taskExecutor.execute(play, host, task, vmWithVars, false, null, null, new LocalConnection(), null);
 
         assertTrue(result.success());
         assertEquals("Value: プログラミング", result.data().get("msg"));
@@ -103,7 +103,7 @@ class UnicodeIntegrationTest {
                 "src", targetFile.toString()
         ));
 
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
 
         assertTrue(result.success());
         // Results are base64 encoded by slurp, but let's see if we can use it in a subsequent task via debug
@@ -112,12 +112,12 @@ class UnicodeIntegrationTest {
 
         // Simulate registering and using the variable
         variableManager.registerVariable(host.name(), "slurped_data", result.data());
-        Map<String, Object> allVars = variableManager.getAllVariables(play, host, task);
+        Map<String, Object> allVars = variableManager.getAllVariables(play, host, task, null);
 
         Task taskDebug = new Task("Debug slurped content", "debug", Map.of(
                 "msg", "{{ slurped_data.content }}"
         ));
-        TaskResult debugResult = taskExecutor.execute(play, host, taskDebug, variableManager, false, null, new LocalConnection(), null);
+        TaskResult debugResult = taskExecutor.execute(play, host, taskDebug, variableManager, false, null, null, new LocalConnection(), null);
 
         assertTrue(debugResult.success());
         assertEquals(encoded, debugResult.data().get("msg"));
