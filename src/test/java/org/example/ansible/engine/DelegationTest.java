@@ -2,6 +2,7 @@ package org.example.ansible.engine;
 
 import org.example.ansible.connection.BecomeContext;
 import org.example.ansible.connection.Connection;
+import org.example.ansible.connection.ConnectionFactory;
 import org.example.ansible.connection.LocalConnection;
 import org.example.ansible.inventory.Inventory;
 import org.example.ansible.inventory.Host;
@@ -48,5 +49,57 @@ class DelegationTest {
 
         assertEquals(1, capturedConnections.size());
         assertTrue(capturedConnections.get(0) instanceof LocalConnection);
+    }
+
+    @Test
+    void testDelegateToWithPlayVars() {
+        List<Map<String, Object>> capturedVars = new ArrayList<>();
+
+        TaskExecutor taskExecutor = new TaskExecutor() {
+            @Override
+            public TaskResult execute(Task task, BecomeContext becomeContext, Connection connection, Map<String, String> environment) {
+                // Connection's variables are not directly accessible here,
+                // but we can check what variables were used to create it if we mock the factory.
+                return TaskResult.success(Map.of());
+            }
+
+            @Override
+            public TaskResult execute(Play play, Host host, Task task, VariableManager variableManager, boolean inheritedCheckMode, Object inheritedEnvironment, Map<String, Object> blockVars, Connection connection, ConnectionFactory connectionFactory) {
+                // Capture all variables resolved for the task execution
+                capturedVars.add(variableManager.getAllVariables(play, host, task, blockVars));
+                return super.execute(play, host, task, variableManager, inheritedCheckMode, inheritedEnvironment, blockVars, connection, connectionFactory);
+            }
+        };
+        taskExecutor.registerModule("ping", (args, bc, ctx) -> TaskResult.success(Map.of()));
+
+        PlaybookExecutor executor = new PlaybookExecutor(taskExecutor, (host, vars) -> {
+            capturedVars.add(vars); // Capture variables passed to connection factory
+            return new LocalConnection();
+        });
+
+        Host remoteHost = new Host("remote-host");
+        Inventory inventory = new Inventory(new Group("all", List.of(remoteHost), List.of(), Map.of()));
+
+        // Play level variables
+        Map<String, Object> playVars = Map.of("play_var", "from_play");
+
+        Task task = new Task("delegate task", "ping", Map.of(), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, "localhost", false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, null, null);
+
+        Play play = new Play("test play", "all", List.of(task), playVars);
+        Playbook playbook = new Playbook(List.of(play));
+
+        executor.execute(playbook, inventory);
+
+        // Verification: The variables passed to the connection factory for 'localhost' should include 'play_var'
+        boolean foundPlayVar = false;
+        for (Map<String, Object> vars : capturedVars) {
+            if ("from_play".equals(vars.get("play_var"))) {
+                foundPlayVar = true;
+                break;
+            }
+        }
+        assertTrue(foundPlayVar, "Play-level variables should be preserved when delegating");
     }
 }

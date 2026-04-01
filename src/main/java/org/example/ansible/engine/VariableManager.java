@@ -93,7 +93,18 @@ public class VariableManager {
      * @return A merged map of variables for the host.
      */
     public Map<String, Object> getVariablesForHost(String hostName) {
-        Map<String, Object> vars = new HashMap<>(getAllVariables(null, new Host(hostName), null, null));
+        return getVariablesForHost(hostName, null);
+    }
+
+    /**
+     * Resolves all variables for a given host within a play context.
+     *
+     * @param hostName The host name.
+     * @param play     The current play.
+     * @return A merged map of variables for the host.
+     */
+    public Map<String, Object> getVariablesForHost(String hostName, Play play) {
+        Map<String, Object> vars = new HashMap<>(getAllVariables(play, new Host(hostName), null, null));
         vars.put("inventory_hostname", hostName);
         return vars;
     }
