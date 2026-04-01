@@ -22,6 +22,19 @@ public record Inventory(Group all) {
      */
     public Map<String, Object> getVariablesForHost(String hostName) {
         Map<String, Object> resolvedVars = new HashMap<>();
+        resolvedVars.putAll(getGroupVariablesForHost(hostName));
+        resolvedVars.putAll(getHostVariables(hostName));
+        return Map.copyOf(resolvedVars);
+    }
+
+    /**
+     * Gets all group variables for a given host, following hierarchy. (Level 3)
+     *
+     * @param hostName The name of the host.
+     * @return A map of resolved group variables.
+     */
+    public Map<String, Object> getGroupVariablesForHost(String hostName) {
+        Map<String, Object> resolvedVars = new HashMap<>();
 
         // 1. Start with 'all' group variables
         resolvedVars.putAll(all.variables());
@@ -30,7 +43,7 @@ public record Inventory(Group all) {
         List<List<Group>> paths = new ArrayList<>();
         findPathsToHost(all, hostName, new ArrayList<>(), paths);
 
-        // Merge group variables along the paths. 
+        // Merge group variables along the paths.
         // In case of multiple paths (host in multiple groups), we merge them all.
         // Child groups override parent groups within a path.
         for (List<Group> path : paths) {
@@ -38,11 +51,19 @@ public record Inventory(Group all) {
                 resolvedVars.putAll(group.variables());
             }
         }
+        return resolvedVars;
+    }
 
-        // 3. Finally, add host-specific variables
-        findHost(hostName).ifPresent(host -> resolvedVars.putAll(host.variables()));
-
-        return Map.copyOf(resolvedVars);
+    /**
+     * Gets host-specific variables from the inventory. (Level 8)
+     *
+     * @param hostName The name of the host.
+     * @return A map of host variables.
+     */
+    public Map<String, Object> getHostVariables(String hostName) {
+        return findHost(hostName)
+                .map(Host::variables)
+                .orElse(Map.of());
     }
 
     private void findPathsToHost(Group current, String hostName, List<Group> currentPath, List<List<Group>> paths) {
