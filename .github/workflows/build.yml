@@ -35,7 +35,7 @@ jobs:
         run: mvn -B verify
       - name: Upload test results to Codecov
         if: always() && runner.os == 'Linux'
-        uses: codecov-action@v5'
+        uses: codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           report-type: test_results
