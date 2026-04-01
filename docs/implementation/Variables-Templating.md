@@ -28,18 +28,18 @@ Ansible (ansible-core 2.17+) は 22 段階の非常に詳細な優先順位を�
 | 2 | ロールデフォルト (`roles/x/defaults/main.yml`) | △ | ロール機能と共に実装予定。 |
 | 3 | インベントリファイル / スクリプトのグループ変数 | ◎ | `Inventory.java` にて解決。 |
 | 4 | インベントリ `group_vars/all` | ◎ | `all` グループとして処理。 |
-| 5 | プレイブック `group_vars/all` | △ | プレイブック相対パスの検索を実装予定。 |
+| 5 | プレイブック `group_vars/all` | ◎ | プレイブック相対パスの検索をサポート。 |
 | 6 | インベントリ `group_vars/*` | ◎ | グループ階層パスに沿って解決。 |
-| 7 | プレイブック `group_vars/*` | △ | プレイブック相対パスの検索を実装予定。 |
+| 7 | プレイブック `group_vars/*` | ◎ | プレイブック相対パスの検索をサポート。 |
 | 8 | インベントリファイル / スクリプトのホスト変数 | ◎ | `host` 定義内の変数。 |
-| 9 | インベントリ `host_vars/*` | △ | 計画中。 |
-| 10 | プレイブック `host_vars/*` | △ | 計画中。 |
+| 9 | インベントリ `host_vars/*` | ◎ | インベントリ相対パスの検索をサポート。 |
+| 10 | プレイブック `host_vars/*` | ◎ | プレイブック相対パスの検索をサポート。 |
 | 11 | ホストファクト / キャッシュされた `set_facts` | ◎ | `VariableManager.addFacts` にて管理。 |
 | 12 | プレイ変数 (`vars`) | ◎ | `Play` レコードに保持。 |
 | 13 | プレイ `vars_prompt` | × | インタラクティブ入力のため優先度低。 |
 | 14 | プレイ変数ファイル (`vars_files`) | ◎ | `VariableManager.loadVarsFile` にて解決。 |
 | 15 | ロール変数 (`roles/x/vars/main.yml`) | △ | ロール機能と共に実装予定。 |
-| 16 | ブロック変数 (`block` 内の `vars`) | △ | 実行エンジンでのスコープ分離を強化中。 |
+| 16 | ブロック変数 (`block` 内の `vars`) | ◎ | 実行エンジンでのスコープ分離と伝播を実装済み。 |
 | 17 | タスク変数 (`task` 内の `vars`) | ◎ | `Task` レコードに保持。 |
 | 18 | `include_vars` | △ | Action Plugin として実装予定。 |
 | 19 | `set_facts` / `register` 変数 | ◎ | `VariableManager.registerVariable` で実行時に保存。 |

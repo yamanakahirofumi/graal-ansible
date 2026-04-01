@@ -91,7 +91,7 @@
 
 - **delegate_to**:
     - **ステータス**: `TaskExecutor.executeSingleTask` にて、変数解決（Jinja2 展開）およびコネクションの動的な切り替えを実装済み。
-    - **今後の課題**: 委譲先ホストの変数の完全な解決（現在は `VariableManager.getVariablesForHost` による基本解決のみ）。
+    - **実装詳細**: `VariableManager.getVariablesForHost(String, Play)` を使用して、委譲先ホストの変数を現在のプレイコンテキスト（プレイレベルの変数や `vars_files` を含む）で高精度に解決します。
 - **run_once**:
     - **ステータス**: `TaskQueueManager.executePlay` にて、1つのホストで実行されたら以降のホストをスキップする基本ロジックが実装済み。
 - **ignore_errors**:
