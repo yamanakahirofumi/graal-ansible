@@ -130,62 +130,79 @@ public class VariableManager {
 
         // 3-10. Inventory and Directory Variables
         if (hostName != null) {
+            // Level 3: Inventory group variables
             if (inventory != null) {
-                // Level 3, 4, 6, 8: Basic Inventory Variables
-                variables.putAll(inventory.getVariablesForHost(hostName));
+                variables.putAll(inventory.getGroupVariablesForHost(hostName));
             }
 
-            // Level 4-7: Directory-based Group Variables
-            List<String> groups = getHostGroups(hostName);
-            // 'all' group is always handled first (or it's already in the list from inventory)
+            // Level 4: Inventory group_vars/all
             variables.putAll(loadDirectoryVars(inventoryDir, "group_vars", "all"));
+
+            // Level 5: Playbook group_vars/all
             variables.putAll(loadDirectoryVars(baseDir, "group_vars", "all"));
 
+            // Get groups for Levels 6 and 7
+            List<String> groups = getHostGroups(hostName);
+
+            // Level 6: Inventory group_vars/*
             for (String group : groups) {
                 if (!"all".equals(group)) {
                     variables.putAll(loadDirectoryVars(inventoryDir, "group_vars", group));
+                }
+            }
+
+            // Level 7: Playbook group_vars/*
+            for (String group : groups) {
+                if (!"all".equals(group)) {
                     variables.putAll(loadDirectoryVars(baseDir, "group_vars", group));
                 }
             }
 
-            // Level 9-10: Directory-based Host Variables
+            // Level 8: Inventory host variables
+            if (inventory != null) {
+                variables.putAll(inventory.getHostVariables(hostName));
+            }
+
+            // Level 9: Inventory host_vars/*
             variables.putAll(loadDirectoryVars(inventoryDir, "host_vars", hostName));
+
+            // Level 10: Playbook host_vars/*
             variables.putAll(loadDirectoryVars(baseDir, "host_vars", hostName));
         }
 
-        // Level 11: Host Facts
+        // Level 11: Host facts
         if (hostName != null && hostFacts.containsKey(hostName)) {
             variables.putAll(hostFacts.get(hostName));
         }
 
-        // Level 12: Play Vars
+        // Level 12: Play variables
         if (play != null) {
             variables.putAll(play.vars());
         }
 
-        // Level 14: Play Vars Files
+        // Level 14: Play vars_files
         if (play != null && !play.varsFiles().isEmpty()) {
             for (String varsFile : play.varsFiles()) {
                 variables.putAll(loadVarsFile(varsFile));
             }
         }
 
-        // Level 16: Block Vars
+        // Level 16: Block variables
         if (blockVars != null) {
             variables.putAll(blockVars);
         }
 
-        // Level 17: Task Vars
+        // Level 17: Task variables
         if (task != null) {
             variables.putAll(task.vars());
         }
 
-        // Level 19: Registered Variables
+        // Level 19: Registered variables
         if (hostName != null && registeredVars.containsKey(hostName)) {
             variables.putAll(registeredVars.get(hostName));
         }
 
-        // Level 22: Extra Vars
+        // Level 22: Extra variables
         variables.putAll(extraVars);
 
         return Collections.unmodifiableMap(variables);

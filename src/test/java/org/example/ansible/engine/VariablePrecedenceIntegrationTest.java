@@ -129,7 +129,7 @@ class VariablePrecedenceIntegrationTest {
                       debug:
                         msg: "{{ my_var }}"
                     - name: register var
-                      shell: echo "reg_val"
+                      shell: echo reg_val
                       register: reg_result
                     - name: task after register
                       vars:
@@ -154,6 +154,6 @@ class VariablePrecedenceIntegrationTest {
         results = playbookExecutor.execute(playbook, inventory, vm, false);
         // The 4th task has a task-level var "reg_result" with "stdout: task_val"
         // But the registered var "reg_result" (reg_val) should win.
-        assertEquals("reg_val", results.get("host1").get(3).data().get("msg"));
+        assertEquals("reg_val", results.get("host1").get(3).data().get("msg").toString().trim());
     }
 }
