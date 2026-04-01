@@ -436,4 +436,60 @@ class ActualModuleIntegrationTest {
         assertTrue(Files.exists(downloadedFile), "Downloaded file should exist: " + downloadedFile);
         assertEquals(content, Files.readString(downloadedFile).trim());
     }
+
+    @Test
+    void testActualUnarchiveModule() throws IOException, InterruptedException {
+        // 1. Create a local file and tar it
+        Path localDir = tempDir.resolve("unarchive-src");
+        Files.createDirectories(localDir);
+        Files.writeString(localDir.resolve("content.txt"), "unarchive test content");
+
+        Path localTar = tempDir.resolve("test.tar.gz");
+        ProcessBuilder pb = new ProcessBuilder("tar", "-czf", localTar.toString(), "-C", localDir.toString(), "content.txt");
+        assertEquals(0, pb.start().waitFor(), "Failed to create tarball");
+
+        // 2. Transfer tarball to remote
+        String remoteTarPath = "/tmp/test.tar.gz";
+        connection.putFile(localTar, remoteTarPath);
+
+        // 3. Use unarchive module to extract it
+        String remoteDest = "/tmp/unarchive-dest";
+        connection.execCommand("mkdir -p " + remoteDest, BecomeContext.empty(), null);
+
+        Task task = new Task("test_unarchive", "unarchive", Map.of(
+                "src", remoteTarPath,
+                "dest", remoteDest,
+                "remote_src", true
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        assertTrue(result.changed());
+
+        // 4. Verify extraction
+        var execResult = connection.execCommand("cat " + remoteDest + "/content.txt", BecomeContext.empty(), null);
+        assertEquals(0, execResult.exitCode());
+        assertEquals("unarchive test content", execResult.stdout().trim());
+    }
+
+    @Test
+    void testActualUriModule() {
+        // Start a simple HTTP server in the container background
+        connection.execCommand("sh -c \"echo 'hello' > /tmp/index.html && cd /tmp && (python3 -m http.server 8080 &)\"", BecomeContext.empty(), null);
+
+        // Wait a bit for server to start
+        try { Thread.sleep(2000); } catch (InterruptedException e) {}
+
+        Task task = new Task("test_uri", "uri", Map.of(
+                "url", "http://localhost:8080/index.html",
+                "return_content", true
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        // Clean up the server
+        connection.execCommand("pkill -f 'python3 -m http.server'", BecomeContext.empty(), null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        assertTrue(((String) result.data().get("content")).contains("hello"));
+    }
 }

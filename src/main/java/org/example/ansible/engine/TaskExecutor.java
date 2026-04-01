@@ -197,8 +197,8 @@ public class TaskExecutor implements ITaskExecutor {
             Object resolved = variableResolver.resolveValue(variableResolver.wrapInJinja(task.delegateTo()), variables);
             resolvedDelegateTo = resolved != null ? resolved.toString() : null;
             if (resolvedDelegateTo != null) {
-                // We resolve variables for the delegated host if possible
-                Map<String, Object> delegatedVars = variableManager != null ? variableManager.getVariablesForHost(resolvedDelegateTo) : variables;
+                // We resolve variables for the delegated host if possible, including play context
+                Map<String, Object> delegatedVars = variableManager != null ? variableManager.getVariablesForHost(resolvedDelegateTo, play) : variables;
                 Host delegatedHost = new Host(resolvedDelegateTo);
                 ConnectionFactory factoryToUse = connectionFactory != null ? connectionFactory : this.connectionFactory;
                 effectiveConnection = factoryToUse.createConnection(delegatedHost, delegatedVars);
