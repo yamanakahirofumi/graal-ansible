@@ -256,9 +256,33 @@ class ActionBase:
     def _execute_remote_stat(self, path, all_vars, follow=False, *args, **kwargs):
         import hashlib
         p = _normalize_path(path)
+        conn = _current_task_context.get('connection_java')
+        if conn:
+            is_remote = False
+            try:
+                cn = conn.getClass().getName()
+                if 'Ssh' in cn: is_remote = True
+            except: pass
+            if is_remote:
+                try:
+                    res = conn.execCommand(f"test -d \"{p}\" && echo DIR || (test -f \"{p}\" && echo FILE || echo NO)",
+                                         _current_task_context.get('become_context_java'), None)
+                    stdout = ""
+                    try: stdout = str(res.stdout())
+                    except:
+                        try: stdout = str(res.stdout)
+                        except:
+                            s = str(res); m = re.search(r'stdout=(.*?), stderr=', s, re.DOTALL)
+                            if m: stdout = m.group(1)
+                    if 'DIR' in stdout: return {'exists': True, 'checksum': None, 'isdir': True, 'isreg': False, 'islnk': False}
+                    elif 'FILE' in stdout: return {'exists': True, 'checksum': None, 'isdir': False, 'isreg': True, 'islnk': False}
+                    elif 'NO' in stdout: return {'exists': False, 'checksum': None, 'isdir': False, 'isreg': False, 'islnk': False}
+                except: pass
         if os.path.exists(p):
-            with open(p, 'rb') as f:
-                csum = hashlib.sha1(f.read()).hexdigest()
+            csum = None
+            try:
+                with open(p, 'rb') as f: csum = hashlib.sha1(f.read()).hexdigest()
+            except: pass
             return {'exists': True, 'checksum': csum, 'isdir': os.path.isdir(p), 'isreg': os.path.isfile(p), 'islnk': os.path.islink(p)}
         return {'exists': False, 'checksum': None, 'isdir': False, 'isreg': False, 'islnk': False}
     def _transfer_file(self, local_path, remote_path):
