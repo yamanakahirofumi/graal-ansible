@@ -61,7 +61,7 @@ class CopyIntegrationTest {
                 "dest", destFile.toString()
         ));
 
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
 
         assertTrue(result.success());
         assertTrue(result.changed());
@@ -83,7 +83,7 @@ class CopyIntegrationTest {
                 "dest", destFile.toString()
         ));
 
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
 
         assertTrue(result.success(), result.message());
         assertTrue(result.changed());
@@ -103,7 +103,7 @@ class CopyIntegrationTest {
                 "owner", "testuser"
         ));
 
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
 
         assertTrue(result.success());
         assertTrue(result.changed());

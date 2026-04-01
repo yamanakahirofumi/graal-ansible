@@ -55,7 +55,7 @@ class FileModulesIntegrationTest {
                 "path", targetFile.toString(),
                 "state", "touch"
         ));
-        TaskResult resultTouch = taskExecutor.execute(play, host, taskTouch, variableManager, false, null, new LocalConnection(), null);
+        TaskResult resultTouch = taskExecutor.execute(play, host, taskTouch, variableManager, false, null, null, new LocalConnection(), null);
 
         if (!resultTouch.success()) {
             System.err.println("Touch failed: " + resultTouch.message());
@@ -70,7 +70,7 @@ class FileModulesIntegrationTest {
                 "path", targetDir.toString(),
                 "state", "directory"
         ));
-        TaskResult resultDir = taskExecutor.execute(play, host, taskDir, variableManager, false, null, new LocalConnection(), null);
+        TaskResult resultDir = taskExecutor.execute(play, host, taskDir, variableManager, false, null, null, new LocalConnection(), null);
 
         if (!resultDir.success()) {
             System.err.println("Directory creation failed: " + resultDir.message());
@@ -84,7 +84,7 @@ class FileModulesIntegrationTest {
                 "path", targetFile.toString(),
                 "state", "absent"
         ));
-        TaskResult resultAbsent = taskExecutor.execute(play, host, taskAbsent, variableManager, false, null, new LocalConnection(), null);
+        TaskResult resultAbsent = taskExecutor.execute(play, host, taskAbsent, variableManager, false, null, null, new LocalConnection(), null);
 
         assertTrue(resultAbsent.success());
         assertFalse(Files.exists(targetFile));
@@ -98,7 +98,7 @@ class FileModulesIntegrationTest {
         Task task = new Task("Stat file", "stat", Map.of(
                 "path", targetFile.toString()
         ));
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
 
         if (!result.success()) {
             System.err.println("Stat failed: " + result.message());
@@ -116,7 +116,7 @@ class FileModulesIntegrationTest {
                 "state", "file",
                 "suffix", "test"
         ));
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
 
         assertTrue(result.success(), result.message());
         String path = (String) result.data().get("path");
@@ -144,7 +144,7 @@ class FileModulesIntegrationTest {
                 "paths", List.of(tempDir.toAbsolutePath().toString()),
                 "patterns", List.of("find-*.txt")
         ));
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
 
         if (!result.success()) {
             System.err.println("Find failed: " + result.message());
@@ -166,7 +166,7 @@ class FileModulesIntegrationTest {
         Task task = new Task("Slurp file", "slurp", Map.of(
                 "src", targetFile.toString()
         ));
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
 
         if (!result.success()) {
             System.err.println("Slurp failed: " + result.message());
@@ -196,7 +196,7 @@ class FileModulesIntegrationTest {
                 "line", "line 2",
                 "insertafter", "line 1"
         ));
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
 
         assertTrue(result.success(), result.message());
         assertTrue(result.changed());
@@ -215,7 +215,7 @@ class FileModulesIntegrationTest {
                 "regexp", "world",
                 "replace", "ansible"
         ));
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
 
         assertTrue(result.success(), result.message());
         assertTrue(result.changed());
@@ -233,7 +233,7 @@ class FileModulesIntegrationTest {
                 "path", targetFile.toString(),
                 "block", "line 2\nline 3"
         ));
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
 
         assertTrue(result.success(), result.message());
         assertTrue(result.changed());
@@ -255,7 +255,7 @@ class FileModulesIntegrationTest {
                 "database", "passwd",
                 "key", "root"
         ));
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
 
         if (!result.success()) {
             System.err.println("Getent failed: " + result.message());
@@ -282,7 +282,7 @@ class FileModulesIntegrationTest {
                 "dest", localDest.toString(),
                 "flat", true
         ));
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, new LocalConnection(), null);
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
 
         if (!result.success()) {
             System.err.println("Fetch failed: " + result.message());

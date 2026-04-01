@@ -21,9 +21,10 @@ public interface ITaskExecutor extends AutoCloseable {
      * @param variableManager  The variable manager.
      * @param inheritedCheckMode Inherited check mode.
      * @param inheritedEnvironment Inherited environment.
+     * @param blockVars        Accumulated block variables.
      * @return The execution result.
      */
-    TaskResult execute(Play play, Host host, Task task, VariableManager variableManager, boolean inheritedCheckMode, Object inheritedEnvironment, Connection connection, ConnectionFactory connectionFactory);
+    TaskResult execute(Play play, Host host, Task task, VariableManager variableManager, boolean inheritedCheckMode, Object inheritedEnvironment, Map<String, Object> blockVars, Connection connection, ConnectionFactory connectionFactory);
 
     /**
      * Executes the given task.
