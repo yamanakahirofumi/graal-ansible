@@ -66,6 +66,24 @@ public record Inventory(Group all) {
                 .orElse(Map.of());
     }
 
+    /**
+     * Gets a map of all groups and their host names.
+     * @return A map of group name to list of host names.
+     */
+    public Map<String, List<String>> getGroupsMap() {
+        Map<String, List<String>> groupsMap = new HashMap<>();
+        collectGroups(all, groupsMap);
+        return Map.copyOf(groupsMap);
+    }
+
+    private void collectGroups(Group group, Map<String, List<String>> groupsMap) {
+        List<String> hostNames = group.hosts().stream().map(Host::name).toList();
+        groupsMap.put(group.name(), hostNames);
+        for (Group child : group.children()) {
+            collectGroups(child, groupsMap);
+        }
+    }
+
     private void findPathsToHost(Group current, String hostName, List<Group> currentPath, List<List<Group>> paths) {
         List<Group> newPath = new ArrayList<>(currentPath);
         if (!current.name().equals("all")) {
