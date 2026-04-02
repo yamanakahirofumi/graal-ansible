@@ -21,6 +21,7 @@ import java.util.Map;
  */
 public class VariableManager {
     private final Inventory inventory;
+    private final Map<String, Object> cliVars;
     private final Map<String, Object> extraVars;
     private final Map<String, Map<String, Object>> registeredVars = new HashMap<>();
     private final Map<String, Map<String, Object>> hostFacts = new HashMap<>();
@@ -29,15 +30,20 @@ public class VariableManager {
     private final Yaml yaml = new Yaml();
 
     public VariableManager(Inventory inventory, Map<String, Object> extraVars) {
-        this(inventory, extraVars, null, null);
+        this(inventory, Map.of(), extraVars, null, null);
     }
 
     public VariableManager(Inventory inventory, Map<String, Object> extraVars, Path baseDir) {
-        this(inventory, extraVars, baseDir, null);
+        this(inventory, Map.of(), extraVars, baseDir, null);
     }
 
     public VariableManager(Inventory inventory, Map<String, Object> extraVars, Path baseDir, Path inventoryDir) {
+        this(inventory, Map.of(), extraVars, baseDir, inventoryDir);
+    }
+
+    public VariableManager(Inventory inventory, Map<String, Object> cliVars, Map<String, Object> extraVars, Path baseDir, Path inventoryDir) {
         this.inventory = inventory;
+        this.cliVars = cliVars != null ? new HashMap<>(cliVars) : new HashMap<>();
         this.extraVars = extraVars != null ? new HashMap<>(extraVars) : new HashMap<>();
         this.baseDir = baseDir;
         this.inventoryDir = inventoryDir;
@@ -123,9 +129,36 @@ public class VariableManager {
         Map<String, Object> variables = new HashMap<>();
         String hostName = host != null ? host.name() : null;
 
+        // Level 1: CLI variables
+        variables.putAll(cliVars);
+
         // Magic Variables
         if (hostName != null) {
             variables.put("inventory_hostname", hostName);
+            if (baseDir != null) {
+                variables.put("playbook_dir", baseDir.toAbsolutePath().toString());
+            }
+            if (inventoryDir != null) {
+                variables.put("inventory_dir", inventoryDir.toAbsolutePath().toString());
+            }
+            // In a real Ansible, inventory_file would be the path to the inventory file.
+            // Here we use the inventoryDir if available.
+            if (inventoryDir != null) {
+                variables.put("inventory_file", inventoryDir.toAbsolutePath().toString());
+            }
+
+            if (inventory != null) {
+                variables.put("groups", inventory.getGroupsMap());
+                variables.put("group_names", getHostGroups(hostName));
+            }
+
+            // Propagate CLI settings as magic variables
+            if (cliVars.containsKey("ansible_check_mode")) {
+                variables.put("ansible_check_mode", cliVars.get("ansible_check_mode"));
+            }
+            if (cliVars.containsKey("ansible_verbosity")) {
+                variables.put("ansible_verbosity", cliVars.get("ansible_verbosity"));
+            }
         }
 
         // 3-10. Inventory and Directory Variables
