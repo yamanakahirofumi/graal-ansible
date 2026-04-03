@@ -60,6 +60,8 @@
 - [インベントリシステム実装](implementation/Inventory-System.md)：静的インベントリの解析と管理
 - [タスク実行エンジン](implementation/Task-Executor.md)：マルチスレッド実行と順序制御
 - [Action Plugin 実装仕様](implementation/Action-Plugins.md)：制御ノード側で動作するプラグインの実行メカニズム (Python-first)
+- [Action Plugin 実装調査報告](implementation/Action-Plugins-Investigation.md)：GraalPy 上での実行における技術的課題と解決策
+- [Action Plugin / Module Mock 実装リファレンス](implementation/Mock-Implementation-Reference.md)：Dependency Emulation Strategy のためのモック実装詳細
 - [Java Action Plugin 実装ガイド](implementation/Java-Action-Plugins.md)：Java による Action Plugin エミュレータの実装方法 (Legacy)
 - [タスク制御の実装詳細](implementation/Task-Control.md)：when, loop, register, block, retry等の制御ロジック
 - [Ansible モジュールの初期化と設定](implementation/Ansible-Module-Initialization.md)：AnsibleModule のインスタンス構成、引数の受け渡し、モンキーパッチの詳細

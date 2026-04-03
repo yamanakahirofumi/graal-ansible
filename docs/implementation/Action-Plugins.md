@@ -164,3 +164,115 @@ public interface ActionPlugin {
 - [タスク実行エンジン](Task-Executor.md)
 - [リモートノードでのモジュール実行仕様](Remote-Module-Execution.md)
 - [Ansible モジュールの初期化と設定](Ansible-Module-Initialization.md)
+
+---
+
+## 10. 例外的な Java 実装の詳細 (Internal Reference)
+
+> [!CAUTION]
+> 本節の内容は、歴史的経緯および極めて限定的な例外ケース（パフォーマンス上の致命的な問題など）のためにのみ参照してください。新規実装には原則として使用しません。
+
+### 10.1 インターフェース定義 (`ActionPlugin`)
+
+すべての Java Action Plugin は、以下の `org.example.ansible.plugin.ActionPlugin` インターフェースを実装します。
+
+```java
+public interface ActionPlugin {
+    /**
+     * 管理ノード上でアクションを実行します。
+     * @param task 実行対象のタスク（未解決の引数を含む）
+     * @param variables 現在の解決済み変数セット
+     * @param taskExecutor タスク実行エンジン (ITaskExecutor)
+     * @return 実行結果 (TaskResult)
+     */
+    TaskResult execute(Task task, Map<String, Object> variables, ITaskExecutor taskExecutor);
+}
+```
+
+### 10.2 実装パターン
+
+#### 引数の解決
+`ActionPlugin.execute` に渡される `task.args()` は、まだ Jinja2 テンプレートが展開されていない状態です。プラグイン内部で `taskExecutor.getVariableResolver()` を使用して解決する必要があります。
+
+```java
+// 単一の値の解決
+Object src = taskExecutor.getVariableResolver().resolveValue(task.args().get("src"), variables);
+
+// Map 全体の再帰的解決
+Map<String, Object> resolvedArgs = taskExecutor.getVariableResolver().resolve(task.args(), variables);
+```
+
+#### モジュール実行の委譲 (`_execute_module`)
+Action Plugin は、自身の処理の一部としてターゲットノード上で通常のモジュールを実行させることがよくあります。これは `ITaskExecutor.execute` を通じて行います。
+
+```java
+// 例: copy アクションの中でターゲットノードの 'stat' モジュールを呼び出す
+Task statTask = new Task("stat", "stat", Map.of("path", dest), ...);
+TaskResult statResult = taskExecutor.execute(statTask, becomeContext, connection, environment);
+```
+
+#### ファイル転送
+ファイル転送が必要な場合（`copy` 等）、`TaskExecutor` が保持する現在の `Connection` を使用します。
+
+```java
+Connection connection = TaskExecutor.getCurrentConnection();
+connection.putFile(localPath, remotePath);
+```
+
+### 10.3 主要プラグインの実装ロジック
+
+#### `copy` プラグイン
+1. **引数解決**: `src`, `dest`, `owner`, `group`, `mode` 等を解決。
+2. **ソースの特定**: `src` が相対パスの場合、プロジェクトのベースディレクトリからの絶対パスに変換。
+3. **ターゲット状態確認**: `stat` モジュールを呼び出し、リモート側のファイルの有無やチェックサムを確認。
+4. **転送要否判定**: ファイルが変更されている場合、または強制上書き設定の場合に転送。
+5. **転送**: `connection.putFile` を実行。
+6. **属性設定**: `file` モジュールを呼び出し、パーミッションや所有者を設定。
+
+#### `template` プラグイン
+1. **引数解決**: `src`, `dest` 等を解決。
+2. **レンダリング**: 管理ノード側で `VariableResolver` を使用して、テンプレートファイルをレンダリング。
+   ```java
+   String templateContent = Files.readString(localTemplatePath);
+   String rendered = taskExecutor.getVariableResolver().resolveValue(templateContent, variables).toString();
+   ```
+3. **一時ファイル作成**: レンダリング結果を管理ノード上の一時ファイルに書き出す。
+4. **以降の処理**: `copy` プラグインと同様のフロー（転送要否判定、転送、属性設定）を辿る。
+
+### 10.4 登録方法
+実装したプラグインは、`TaskExecutor` のコンストラクタ内で `builtInActionPlugins` マップに登録することで有効になります。
+
+```java
+public TaskExecutor(...) {
+    // ...
+    // 例: this.builtInActionPlugins.put("my_custom_action", new MyCustomAction());
+}
+```
+
+（注: 現在、標準のアクションプラグインはすべて Python で実行されているため、このマップは原則として空です。）
+
+### 10.5 エラーハンドリング
+Action Plugin 内で発生した例外は適切にキャッチし、`TaskResult.failure(message)` として返却してください。これにより、Ansible の標準的なエラーレポートに統合されます。
+
+---
+
+## 11. 新規アクションプラグインのサポート追加ガイド
+
+新しい Ansible コレクションのアクションプラグインを `graal-ansible` でサポートするための標準的なワークフローです。
+
+### 11.1 ステップ 1: ロード確認
+1. 対象のアクションを含む Playbook を作成し、実行します。
+2. GraalPy 上でのインポート時に `ApiInitException` や `ModuleNotFoundError` が発生するか確認します。
+
+### 11.2 ステップ 2: 依存関係の解決 (Dependency Emulation Strategy)
+ロードに失敗する場合、`ansible_bridge.py` を修正します。
+
+- **ネイティブ拡張の回避**: C 拡張を含むモジュール（例: `cryptography`）は、`sys.modules['mname'] = None` としてロードをスキップさせます。
+- **不足モジュールのスタブ化**: POSIX 固有のモジュールが Windows 環境で不足している場合、`types.ModuleType` を用いて最小限の属性を持つスタブを登録します。
+- **パス正規化**: パス操作で `OSError` が発生する場合、`_normalize_path` を適用するモンキーパッチを追加します。詳細は [Mock 実装リファレンス](Mock-Implementation-Reference.md) を参照してください。
+
+### 11.3 ステップ 3: ActionBase モックの拡張
+アクションプラグインが `ActionBase` の未実装メソッド（例: `_execute_remote_stat`, `_transfer_file`）に依存している場合、`ansible_bridge.py` 内の `ProxyActionBase` クラスに Java ブリッジを介した実装を追加します。
+
+### 11.4 ステップ 4: 統合テストの追加
+`ActualModuleIntegrationTest.java` に新しいテストケースを追加し、実際のコンテナ環境（Linux）でアクションが期待通りに動作することを確認します。
