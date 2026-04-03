@@ -39,7 +39,9 @@ def run_action_plugin():
         l = ansible_bridge.MockLoader()
         if 'task_executor_java' in globals():
             base_dir = task_executor_java.resolveLocalPath(".")
-            if base_dir: l.set_basedir(str(base_dir))
+            if base_dir:
+                l.set_basedir(str(base_dir))
+                mock_task._origin.path = str(base_dir)
 
         plugin = ansible_bridge._create_action_plugin(
             action_name,

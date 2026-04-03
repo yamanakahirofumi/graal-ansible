@@ -169,6 +169,13 @@ class MockLoader:
         pass
     def path_dwim(self, path):
         return _normalize_path(path)
+    def load_from_file(self, file_path, *args, **kwargs):
+        fp = _normalize_path(file_path)
+        if fp and os.path.exists(fp):
+            with open(fp, 'r', encoding='utf-8') as f:
+                import yaml
+                return yaml.safe_load(f)
+        return None
 
 class MockShell:
     def __init__(self):
@@ -298,6 +305,7 @@ class ActionBase:
 class Task:
     def __init__(self):
         self.action, self.args, self.async_val = None, {}, 0
+        self._origin = types.SimpleNamespace(path=None)
         self.collections = []
         self.tags = []
         self.implicit = False
@@ -645,7 +653,8 @@ def apply_mocks():
     create_mock('ansible.utils.fqcn', {'add_internal_fqcns': lambda *a, **kw: None})
     create_mock('ansible.utils.vars', {
         'isidentifier': lambda s, *a, **kw: True, 'validate_variable_name': lambda s, *a, **kw: True,
-        'merge_hash': lambda a, b: dict(a, **(b or {}))
+        'merge_hash': lambda a, b: dict(a, **(b or {})),
+        'combine_vars': lambda a, b, *args, **kwargs: {**a, **b}
     })
 
     # 4. Errors
@@ -708,8 +717,9 @@ def apply_mocks():
         'get_controller_serialize_map': lambda: {}
     })
     create_mock('ansible._internal._locking')
-    create_mock('ansible._internal._datatag', {'SourceWasEncrypted': type('SWE', (Exception,), {})})
-    create_mock('ansible._internal._datatag._tags', {'SourceWasEncrypted': type('SWE', (Exception,), {})})
+    swe = type('SWE', (Exception,), {'is_tagged_on': staticmethod(lambda x: False)})
+    create_mock('ansible._internal._datatag', {'SourceWasEncrypted': swe})
+    create_mock('ansible._internal._datatag._tags', {'SourceWasEncrypted': swe})
     create_mock('ansible._internal._templating', {
         '_template_vars': types.SimpleNamespace(generate_ansible_template_vars=lambda *a, **kw: {}),
         'get_text_file_contents': lambda x, *a, **kw: (open(_normalize_path(x), 'r').read() if x and os.path.exists(_normalize_path(x)) else "mock_content", True)

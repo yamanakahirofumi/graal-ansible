@@ -24,6 +24,7 @@ public class VariableManager {
     private final Map<String, Object> cliVars;
     private final Map<String, Object> extraVars;
     private final Map<String, Map<String, Object>> registeredVars = new HashMap<>();
+    private final Map<String, Map<String, Object>> includedVars = new HashMap<>();
     private final Map<String, Map<String, Object>> hostFacts = new HashMap<>();
     private final Path baseDir;
     private final Path inventoryDir;
@@ -66,6 +67,17 @@ public class VariableManager {
      */
     public void registerVariable(String hostName, String name, Object value) {
         registeredVars.computeIfAbsent(hostName, k -> new HashMap<>()).put(name, value);
+    }
+
+    /**
+     * Registers variables from include_vars for a specific host (Level 18).
+     *
+     * @param hostName The host name.
+     * @param vars     The variables to register.
+     */
+    public void addIncludedVars(String hostName, Map<String, Object> vars) {
+        if (vars == null || vars.isEmpty()) return;
+        includedVars.computeIfAbsent(hostName, k -> new HashMap<>()).putAll(vars);
     }
 
     /**
@@ -228,6 +240,11 @@ public class VariableManager {
         // Level 17: Task variables
         if (task != null) {
             variables.putAll(task.vars());
+        }
+
+        // Level 18: included_vars
+        if (hostName != null && includedVars.containsKey(hostName)) {
+            variables.putAll(includedVars.get(hostName));
         }
 
         // Level 19: Registered variables
