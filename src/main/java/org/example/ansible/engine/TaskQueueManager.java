@@ -172,7 +172,7 @@ public class TaskQueueManager {
                 variableManager.registerVariable(host.name(), task.register(), result.data());
             }
 
-            // Handle collected facts
+            // Handle collected facts or included vars
             if (result.data() != null && result.data().containsKey("ansible_facts")) {
                 @SuppressWarnings("unchecked")
                 Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
@@ -182,7 +182,19 @@ public class TaskQueueManager {
                 } else if (result.data().containsKey("_ansible_delegated_host")) {
                     factHost = result.data().get("_ansible_delegated_host").toString();
                 }
-                variableManager.addFacts(factHost, facts);
+
+                String action = task.action();
+                if (action.startsWith("ansible.builtin.")) {
+                    action = action.substring("ansible.builtin.".length());
+                } else if (action.startsWith("ansible.legacy.")) {
+                    action = action.substring("ansible.legacy.".length());
+                }
+
+                if ("include_vars".equals(action)) {
+                    variableManager.addIncludedVars(factHost, facts);
+                } else {
+                    variableManager.addFacts(factHost, facts);
+                }
             }
 
             if (result.changed() && !task.notifications().isEmpty()) {
