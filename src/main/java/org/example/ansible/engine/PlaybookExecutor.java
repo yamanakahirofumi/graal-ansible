@@ -90,7 +90,10 @@ public class PlaybookExecutor {
      * @return A map of host names to their execution results for each task.
      */
     public Map<String, List<TaskResult>> execute(Playbook playbook, Inventory inventory, Map<String, Object> extraVars, Path baseDir, Path inventoryDir, boolean globalCheckMode) {
-        return execute(playbook, inventory, new VariableManager(inventory, extraVars, baseDir, inventoryDir), globalCheckMode);
+        Map<String, Object> cliVars = new HashMap<>();
+        cliVars.put("ansible_check_mode", globalCheckMode);
+        // Additional CLI-relevant variables could be added here in the future
+        return execute(playbook, inventory, new VariableManager(inventory, cliVars, extraVars, baseDir, inventoryDir), globalCheckMode);
     }
 
     /**
