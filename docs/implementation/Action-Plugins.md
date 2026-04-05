@@ -143,22 +143,12 @@ Windows 管理ノード対応などのため、Linux 固有のモジュール（
 | `include_vars` | Python (Actual) | 動的な変数ファイルの読み込み。 |
 | その他 | Python (Actual) | `ansible_bridge.py` 経由での実行。 |
 
-## 8. 例外的な Java による実装 (Legacy)
+## 8. Java によるエミュレータの廃止
 
-> [!WARNING]
-> 本節で述べる Java による実装は、現在**非推奨**です。歴史的経緯および極めて限定的な例外ケース（パフォーマンス上の致命的な問題など）のためにのみ参照してください。
-
-### 8.1 Java インターフェース (`ActionPlugin`)
-組み込みの軽量エミュレータは、以下の Java インターフェースを実装します。詳細は [Java Action Plugin 実装ガイド](Java-Action-Plugins.md) を参照してください。
-
-```java
-public interface ActionPlugin {
-    TaskResult execute(Task task, Map<String, Object> variables, ITaskExecutor taskExecutor);
-}
-```
-
-### 8.2 優先順位と登録
-`TaskExecutor` の `builtInActionPlugins` マップに登録されている場合、Python 実装よりも優先して実行される仕組みになっていますが、現在は原則としてこのマップは空です。
+> [!IMPORTANT]
+> **本プロジェクトでは、以前存在した Java ベースの Action Plugin エミュレータは完全に廃止されました。**
+>
+> 以前は `debug`, `set_fact`, `copy` などの主要なアクションを Java で再実装していましたが、本家 Ansible との完全な互換性を確保し、保守コストを削減するために、現在はすべての標準アクションプラグインを Python (Actual) 方式で実行しています。
 
 ## 9. 関連ドキュメント
 - [GraalPy 互換性テクニカルリファレンス](Action-Plugins-Investigation.md)
@@ -169,96 +159,7 @@ public interface ActionPlugin {
 
 ---
 
-## 10. 例外的な Java 実装の詳細 (Internal Reference)
-
-> [!CAUTION]
-> 本節の内容は、歴史的経緯および極めて限定的な例外ケース（パフォーマンス上の致命的な問題など）のためにのみ参照してください。新規実装には原則として使用しません。
-
-### 10.1 インターフェース定義 (`ActionPlugin`)
-
-すべての Java Action Plugin は、以下の `org.example.ansible.plugin.ActionPlugin` インターフェースを実装します。
-
-```java
-public interface ActionPlugin {
-    /**
-     * 管理ノード上でアクションを実行します。
-     * @param task 実行対象のタスク（未解決の引数を含む）
-     * @param variables 現在の解決済み変数セット
-     * @param taskExecutor タスク実行エンジン (ITaskExecutor)
-     * @return 実行結果 (TaskResult)
-     */
-    TaskResult execute(Task task, Map<String, Object> variables, ITaskExecutor taskExecutor);
-}
-```
-
-### 10.2 実装パターン
-
-#### 引数の解決
-`ActionPlugin.execute` に渡される `task.args()` は、まだ Jinja2 テンプレートが展開されていない状態です。プラグイン内部で `taskExecutor.getVariableResolver()` を使用して解決する必要があります。
-
-```java
-// 単一の値の解決
-Object src = taskExecutor.getVariableResolver().resolveValue(task.args().get("src"), variables);
-
-// Map 全体の再帰的解決
-Map<String, Object> resolvedArgs = taskExecutor.getVariableResolver().resolve(task.args(), variables);
-```
-
-#### モジュール実行の委譲 (`_execute_module`)
-Action Plugin は、自身の処理の一部としてターゲットノード上で通常のモジュールを実行させることがよくあります。これは `ITaskExecutor.execute` を通じて行います。
-
-```java
-// 例: copy アクションの中でターゲットノードの 'stat' モジュールを呼び出す
-Task statTask = new Task("stat", "stat", Map.of("path", dest), ...);
-TaskResult statResult = taskExecutor.execute(statTask, becomeContext, connection, environment);
-```
-
-#### ファイル転送
-ファイル転送が必要な場合（`copy` 等）、`TaskExecutor` が保持する現在の `Connection` を使用します。
-
-```java
-Connection connection = TaskExecutor.getCurrentConnection();
-connection.putFile(localPath, remotePath);
-```
-
-### 10.3 主要プラグインの実装ロジック
-
-#### `copy` プラグイン
-1. **引数解決**: `src`, `dest`, `owner`, `group`, `mode` 等を解決。
-2. **ソースの特定**: `src` が相対パスの場合、プロジェクトのベースディレクトリからの絶対パスに変換。
-3. **ターゲット状態確認**: `stat` モジュールを呼び出し、リモート側のファイルの有無やチェックサムを確認。
-4. **転送要否判定**: ファイルが変更されている場合、または強制上書き設定の場合に転送。
-5. **転送**: `connection.putFile` を実行。
-6. **属性設定**: `file` モジュールを呼び出し、パーミッションや所有者を設定。
-
-#### `template` プラグイン
-1. **引数解決**: `src`, `dest` 等を解決。
-2. **レンダリング**: 管理ノード側で `VariableResolver` を使用して、テンプレートファイルをレンダリング。
-   ```java
-   String templateContent = Files.readString(localTemplatePath);
-   String rendered = taskExecutor.getVariableResolver().resolveValue(templateContent, variables).toString();
-   ```
-3. **一時ファイル作成**: レンダリング結果を管理ノード上の一時ファイルに書き出す。
-4. **以降の処理**: `copy` プラグインと同様のフロー（転送要否判定、転送、属性設定）を辿る。
-
-### 10.4 登録方法
-実装したプラグインは、`TaskExecutor` のコンストラクタ内で `builtInActionPlugins` マップに登録することで有効になります。
-
-```java
-public TaskExecutor(...) {
-    // ...
-    // 例: this.builtInActionPlugins.put("my_custom_action", new MyCustomAction());
-}
-```
-
-（注: 現在、標準のアクションプラグインはすべて Python で実行されているため、このマップは原則として空です。）
-
-### 10.5 エラーハンドリング
-Action Plugin 内で発生した例外は適切にキャッチし、`TaskResult.failure(message)` として返却してください。これにより、Ansible の標準的なエラーレポートに統合されます。
-
----
-
-## 11. 新規アクションプラグインのサポート追加ガイド
+## 10. 新規アクションプラグインのサポート追加ガイド
 
 新しい Ansible コレクションのアクションプラグインを `graal-ansible` でサポートするための標準的なワークフローです。
 
