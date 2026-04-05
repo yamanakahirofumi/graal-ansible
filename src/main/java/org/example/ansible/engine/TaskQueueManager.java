@@ -192,6 +192,10 @@ public class TaskQueueManager {
 
                 if ("include_vars".equals(action)) {
                     variableManager.addIncludedVars(factHost, facts);
+                } else if ("set_fact".equals(action)) {
+                    variableManager.addSetFactVars(factHost, facts);
+                    // Also add as facts (Level 11) for ansible_facts dictionary compatibility
+                    variableManager.addFacts(factHost, facts);
                 } else {
                     variableManager.addFacts(factHost, facts);
                 }
