@@ -144,9 +144,16 @@ class VariablePrecedenceIntegrationTest {
 
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
 
-        // Scenario 1: Task Var (17) > Fact (11)
+        // Scenario 1: Fact (11)
+        // Note: Task Var (17) should override Fact (11).
+        // If 'my_var' was set via set_fact (19), it would override Task Var (17).
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory, vm, false);
-        assertEquals("task_val", results.get("host1").get(1).data().get("msg"));
+        // Task 1: set_fact (executed during play)
+        // Task 2: check var with task-level vars: my_var=task_val
+        // In this test, vm.addFacts was called BEFORE execution.
+        // During execution, Task 1 "set fact" runs and sets my_var: fact_val at Level 19.
+        // Level 19 (set_fact) > Level 17 (task vars)
+        assertEquals("fact_val", results.get("host1").get(1).data().get("msg"));
 
         // Scenario 2: Registered Var (19) > Task Var (17)
         // We'll simulate this by adding a registered variable manually to the VM

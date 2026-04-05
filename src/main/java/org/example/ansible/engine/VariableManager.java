@@ -25,6 +25,7 @@ public class VariableManager {
     private final Map<String, Object> extraVars;
     private final Map<String, Map<String, Object>> registeredVars = new HashMap<>();
     private final Map<String, Map<String, Object>> includedVars = new HashMap<>();
+    private final Map<String, Map<String, Object>> setFactVars = new HashMap<>();
     private final Map<String, Map<String, Object>> hostFacts = new HashMap<>();
     private final Path baseDir;
     private final Path inventoryDir;
@@ -78,6 +79,17 @@ public class VariableManager {
     public void addIncludedVars(String hostName, Map<String, Object> vars) {
         if (vars == null || vars.isEmpty()) return;
         includedVars.computeIfAbsent(hostName, k -> new HashMap<>()).putAll(vars);
+    }
+
+    /**
+     * Registers variables from set_fact for a specific host (Level 19).
+     *
+     * @param hostName The host name.
+     * @param vars     The variables to register.
+     */
+    public void addSetFactVars(String hostName, Map<String, Object> vars) {
+        if (vars == null || vars.isEmpty()) return;
+        setFactVars.computeIfAbsent(hostName, k -> new HashMap<>()).putAll(vars);
     }
 
     /**
@@ -247,9 +259,14 @@ public class VariableManager {
             variables.putAll(includedVars.get(hostName));
         }
 
-        // Level 19: Registered variables
-        if (hostName != null && registeredVars.containsKey(hostName)) {
-            variables.putAll(registeredVars.get(hostName));
+        // Level 19: Registered variables / set_fact
+        if (hostName != null) {
+            if (setFactVars.containsKey(hostName)) {
+                variables.putAll(setFactVars.get(hostName));
+            }
+            if (registeredVars.containsKey(hostName)) {
+                variables.putAll(registeredVars.get(hostName));
+            }
         }
 
         // Level 22: Extra variables
@@ -278,12 +295,18 @@ public class VariableManager {
     }
 
     /**
-     * Internal method to get registered and fact variables.
+     * Internal method to get registered, included, and fact variables.
      */
     public Map<String, Object> getHostRuntimeVariables(String hostName) {
         Map<String, Object> runtimeVars = new HashMap<>();
         if (hostFacts.containsKey(hostName)) {
             runtimeVars.putAll(hostFacts.get(hostName));
+        }
+        if (includedVars.containsKey(hostName)) {
+            runtimeVars.putAll(includedVars.get(hostName));
+        }
+        if (setFactVars.containsKey(hostName)) {
+            runtimeVars.putAll(setFactVars.get(hostName));
         }
         if (registeredVars.containsKey(hostName)) {
             runtimeVars.putAll(registeredVars.get(hostName));
