@@ -492,4 +492,21 @@ class ActualModuleIntegrationTest {
         assertTrue(result.success(), "Execution failed: " + result.message());
         assertTrue(((String) result.data().get("content")).contains("hello"));
     }
+
+    @Test
+    void testActualIncludeVarsModule() throws IOException {
+        Path varsFile = tempDir.resolve("actual_vars.yml");
+        Files.writeString(varsFile, "fact_from_file: hello_actual\noverridden_fact: from_file");
+
+        Task task = new Task("test_include_vars", "include_vars", Map.of(
+                "file", varsFile.toAbsolutePath().toString()
+        ));
+
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
+        assertNotNull(facts, "ansible_facts should be present. Full data: " + result.data());
+        assertEquals("hello_actual", facts.get("fact_from_file"));
+    }
 }

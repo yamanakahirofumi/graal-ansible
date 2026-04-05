@@ -149,4 +149,5 @@ class IncludeVarsIntegrationTest {
         // Assert
         assertEquals("value_a and value_b", results.get("host1").get(1).data().get("msg"));
     }
+
 }
