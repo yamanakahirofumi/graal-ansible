@@ -83,8 +83,8 @@
 | - `systemd` | △ | ？ | - | ロード確認済。 |
 | - `systemd_service` | △ | ？ | - | ロード確認済。 |
 | - `sysvinit` | △ | ？ | - | ロード確認済。 |
- | - `unarchive` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
- | - `uri` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
+| - `unarchive` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
+| - `uri` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
 | - `validate_argument_spec` | △ | ？ | ？ | ロード確認済。 |
 | - `wait_for` | △ | ？ | - | ロード確認済。 |
 | - `wait_for_connection` | △ | ？ | ？ | ロード確認済。 |

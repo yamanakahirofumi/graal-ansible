@@ -20,9 +20,9 @@ Ansible モジュールは通常、標準入力経由で引数（JSON または 
 
 ## 3. 初期化フローと `ansible_bridge.py`
 
-`PythonModule.java` はモジュール本体を実行する前に、`ansible_bridge.py` をロードして評価します。このブリッジスクリプトは、GraalPy 環境における共通の初期化ロジック、モジュールモック、および Ansible へのパッチ提供を担います。
+`graal-ansible` では、効率化のために `TaskExecutor` のコンストラクタ内で `ansible_bridge.py` をあらかじめロード（事前ロード）しています。このブリッジスクリプトは、GraalPy 環境における共通の初期化ロジック、モジュールモック、および Ansible へのパッチ提供を一手に担います。
 
-各ランチャー（`ansible_launcher.py` または `ansible_mock_launcher.py`）は、このブリッジ内の関数を呼び出すことで実行環境を整えます。
+各ランチャー（`ansible_launcher.py`, `ansible_action_launcher.py`, `ansible_mock_launcher.py`）は、実行の冒頭でこのブリッジ内の `initialize()` 関数を呼び出すことで、タスク固有の変数（`complex_args` 等）のバインドと実行環境の最終的なセットアップを行います。
 
 ### 3.1 ブリッジが提供する主要機能
 - **`setup_sys_path(site_packages)`**: `site_packages_java` を `sys.path` に追加し、Ansible ライブラリをロード可能にします。
@@ -69,16 +69,7 @@ ansible.module_utils.basic.AnsibleModule._load_params = lambda self: (complex_ar
 
 ### 5.2 コマンド実行 (`run_command`)
 モジュール内でのコマンド実行を、Java 側の `Connection` オブジェクトを経由するように変更します。これにより、SSH 経由の実行などが透過的に行われます。
-```python
-def mocked_run_command(self, args, **kwargs):
-    if isinstance(args, list):
-        command = " ".join(args)
-    else:
-        command = args
-    # Java の Connection.execCommand を呼び出す
-    res = connection_java.execCommand(command, become_context_java)
-    return (res.exitCode(), res.stdout(), res.stderr())
-```
+また、`ansible_bridge.py` 内の `mock_run_command` は、`getent` コマンドの出力をエミュレートする機能を備えており、Linux 以外の環境でもユーザー/グループ情報の取得を可能にしています。
 
 ### 5.3 バイナリパスの検索 (`get_bin_path`)
 システム探索を避け、パフォーマンスと安全性のために `/usr/bin/` 以下のパスを優先的に返すように固定します。
