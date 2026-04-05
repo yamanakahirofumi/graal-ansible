@@ -25,22 +25,18 @@ sequenceDiagram
         Worker->>Worker: 変数の解決 (Jinja2テンプレート展開)
 
         alt Action Plugin の場合 (例: template, copy, debug, set_fact)
-            alt 組み込み (Java) の場合 (例: debug, set_fact)
-                Worker->>Worker: 組み込み Action Plugin 実行
-            else 外部プラグイン (Python) の場合
-                Worker->>AP: Action Plugin 実行 (Python)
-                opt モジュール実行が必要な場合
-                    AP->>Worker: _execute_module 呼び出し
-                    Worker->>CP: モジュール転送・実行依頼
-                    Note over CP, TN: Ansiballz形式によるパッケージング
-                    CP->>TN: モジュール + 依存ライブラリ転送 (SFTP/SCP)
-                    CP->>TN: リモートコマンド実行 (python)
-                    TN-->>CP: 実行結果 (JSON)
-                    CP-->>Worker: 結果返却
-                    Worker-->>AP: 結果返却
-                end
-                AP-->>Worker: Action Plugin 完了
+            Worker->>AP: Action Plugin 実行 (Python)
+            opt モジュール実行が必要な場合
+                AP->>Worker: _execute_module 呼び出し
+                Worker->>CP: モジュール転送・実行依頼
+                Note over CP, TN: Ansiballz形式によるパッケージング
+                CP->>TN: モジュール + 依存ライブラリ転送 (SFTP/SCP)
+                CP->>TN: リモートコマンド実行 (python)
+                TN-->>CP: 実行結果 (JSON)
+                CP-->>Worker: 結果返却
+                Worker-->>AP: 結果返却
             end
+            AP-->>Worker: Action Plugin 完了
         else 通常モジュールの実行 (例: command, apt, ping)
             Worker->>CP: モジュール転送・実行依頼
             Note over CP, TN: モジュール転送型モデル (Ansiballz)
@@ -65,7 +61,7 @@ sequenceDiagram
 *   **PlaybookExecutor**: Playbook 全体の実行を管理します。Play、Block、Task の階層構造を辿り、実行をスケジュールします。
 *   **TaskQueueManager (TQM)**: 各ホストへのタスク配信や結果の集計を制御します。
 *   **Worker Process**: 個別のタスク実行を担当するプロセスです。Jinja2 を用いた変数の解決や、プラグインの呼び出しを行います。
-*   **Action Plugin**: 管理ノード上で動作するプラグインです。ターゲットノードへのファイル転送の準備や、管理ノード側での複雑な処理（`template` のレンダリング等）を担当し、必要に応じてターゲットノード上でモジュールを実行させます。`graal-ansible` では、**Java による軽量エミュレータ（組み込み）**と **GraalPy 上で動作する Python プラグイン（外部）**の両方をサポートしています。
+*   **Action Plugin**: 管理ノード上で動作するプラグインです。ターゲットノードへのファイル転送の準備や、管理ノード側での複雑な処理（`template` のレンダリング等）を担当し、必要に応じてターゲットノード上でモジュールを実行させます。`graal-ansible` では、**本家 Ansible の Python 実装を GraalPy 上でそのまま動作させる「Python-first」方式**を採用しています。
 *   **Connection Plugin (ssh, local, winrm等)**: ターゲットノードとの通信を担当します。ファイルの転送やリモートコマンドの実行を抽象化します。
 
 ### ターゲットノード (Target Node) で実行されるもの
