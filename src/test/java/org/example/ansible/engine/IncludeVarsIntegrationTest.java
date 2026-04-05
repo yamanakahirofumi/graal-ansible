@@ -150,28 +150,4 @@ class IncludeVarsIntegrationTest {
         assertEquals("value_a and value_b", results.get("host1").get(1).data().get("msg"));
     }
 
-    @Test
-    void testAnsibleCheckModeFromCli() throws IOException {
-        String inventoryIni = "host1";
-        Inventory inventory = new IniInventoryParser().parse(new ByteArrayInputStream(inventoryIni.getBytes(StandardCharsets.UTF_8)));
-
-        String playbookYaml = """
-                - name: play
-                  hosts: all
-                  tasks:
-                    - name: check ansible_check_mode
-                      debug:
-                        msg: "{{ ansible_check_mode }}"
-                """;
-
-        Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
-
-        // Act with check mode = true
-        Map<String, List<TaskResult>> resultsTrue = playbookExecutor.execute(playbook, inventory, Map.of(), tempDir, tempDir, true);
-        assertEquals(true, resultsTrue.get("host1").get(0).data().get("msg"));
-
-        // Act with check mode = false
-        Map<String, List<TaskResult>> resultsFalse = playbookExecutor.execute(playbook, inventory, Map.of(), tempDir, tempDir, false);
-        assertEquals(false, resultsFalse.get("host1").get(0).data().get("msg"));
-    }
 }

@@ -63,7 +63,7 @@
 | - `import_tasks` | ？ | ？ | ？ | 検証予定。 |
 | - `include_role` | ？ | ？ | ？ | 検証予定。 |
 | - `include_tasks` | ？ | ？ | ？ | 検証予定。 |
-| - `include_vars` | ◎ | ？ | ？ | オリジナル Python ソースコードにより検証済。 |
+| - `include_vars` | ？ | ？ | ？ | 検証予定。 |
 | - `iptables` | △ | ？ | - | ロード確認済。 |
 | - `known_hosts` | △ | ？ | - | ロード確認済。 |
 | - `meta` | ？ | ？ | ？ | 検証予定。 |
