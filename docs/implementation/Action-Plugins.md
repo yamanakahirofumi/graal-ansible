@@ -39,7 +39,7 @@ Worker Process (`TaskExecutor`) は、タスクの `action` 名に基づき、�
 2.  **コンテキスト準備**:
     - 現在のタスク変数（`task_vars`）を Python コンテキストにバインドします。
     - Java の `ITaskExecutor` および `Connection` オブジェクトへのブリッジ（`connection_java`, `task_executor_java`）を用意します。
-3.  **ランチャー起動**: `ansible_action_launcher.py` を使用して、対象の Action Plugin クラスをインスタンス化し、`run()` メソッドを呼び出します。
+3.  **ランチャー起動**: `ansible_action_launcher.py` を使用して、対象の Action Plugin クラスをインスタンス化し、`run()` メソッドを呼び出します。ランチャーの内部では、`ansible_bridge.py` を通じて `initialize()` が行われ、必要な全てのモックとパッチが適用されます。
 
 ### 3.2 Python 側 (ansible_action_launcher.py)
 1.  **Ansible コアクラスのモック**: Action Plugin が依存する `Task`, `Connection`, `PlayContext`, `DataLoader`, `Templar` 等のコアクラスを、Java ブリッジを利用するようにモック化します。
