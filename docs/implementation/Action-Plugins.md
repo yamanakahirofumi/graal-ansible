@@ -163,19 +163,19 @@ Windows 管理ノード対応などのため、Linux 固有のモジュール（
 
 新しい Ansible コレクションのアクションプラグインを `graal-ansible` でサポートするための標準的なワークフローです。
 
-### 11.1 ステップ 1: ロード確認
+### 10.1 ステップ 1: ロード確認
 1. 対象のアクションを含む Playbook を作成し、実行します。
 2. GraalPy 上でのインポート時に `ApiInitException` や `ModuleNotFoundError` が発生するか確認します。
 
-### 11.2 ステップ 2: 依存関係の解決 (Dependency Emulation Strategy)
+### 10.2 ステップ 2: 依存関係の解決 (Dependency Emulation Strategy)
 ロードに失敗する場合、`ansible_bridge.py` を修正します。
 
 - **ネイティブ拡張の回避**: C 拡張を含むモジュール（例: `cryptography`）は、`sys.modules['mname'] = None` としてロードをスキップさせます。
 - **不足モジュールのスタブ化**: POSIX 固有のモジュールが Windows 環境で不足している場合、`types.ModuleType` を用いて最小限の属性を持つスタブを登録します。
 - **パス正規化**: パス操作で `OSError` が発生する場合、`_normalize_path` を適用するモンキーパッチを追加します。詳細は [Mock 実装リファレンス](Mock-Implementation-Reference.md) を参照してください。
 
-### 11.3 ステップ 3: ActionBase モックの拡張
+### 10.3 ステップ 3: ActionBase モックの拡張
 アクションプラグインが `ActionBase` の未実装メソッド（例: `_execute_remote_stat`, `_transfer_file`）に依存している場合、`ansible_bridge.py` 内の `ProxyActionBase` クラスに Java ブリッジを介した実装を追加します。
 
-### 11.4 ステップ 4: 統合テストの追加
+### 10.4 ステップ 4: 統合テストの追加
 `ActualModuleIntegrationTest.java` に新しいテストケースを追加し、実際のコンテナ環境（Linux）でアクションが期待通りに動作することを確認します。
