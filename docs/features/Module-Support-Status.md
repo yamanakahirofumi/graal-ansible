@@ -16,7 +16,7 @@
 
 | コレクション / モジュール | Target: Linux | Target: macOS | Target: Windows | 備考 |
 | :--- | :---: | :---: | :---: | :--- |
-| **ansible.builtin** | △ | ？ | ？ | Linux で全 72 モジュールを一覧化。うち 26 モジュールを実行確認済。 |
+| **ansible.builtin** | △ | ？ | ？ | Linux で全 72 モジュールを一覧化。うち 27 モジュールを実行確認済。 |
 | - `debug` | ◎ | ○ | ○ | オリジナル Python ソースコードにより検証済。 |
 | - `ping` | ◎ | ○ | - | オリジナル Python ソースコードにより検証済。 |
 | - `copy` | ◎ | ○ | - | オリジナル Python ソースコードにより検証済。 |
@@ -63,7 +63,7 @@
 | - `import_tasks` | ？ | ？ | ？ | 検証予定。 |
 | - `include_role` | ？ | ？ | ？ | 検証予定。 |
 | - `include_tasks` | ？ | ？ | ？ | 検証予定。 |
-| - `include_vars` | ？ | ？ | ？ | 検証予定。 |
+| - `include_vars` | ◎ | ○ | ○ | オリジナル Python ソースコードにより検証済。 |
 | - `iptables` | △ | ？ | - | ロード確認済。 |
 | - `known_hosts` | △ | ？ | - | ロード確認済。 |
 | - `meta` | ？ | ？ | ？ | 検証予定。 |

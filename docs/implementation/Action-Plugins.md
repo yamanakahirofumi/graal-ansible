@@ -139,6 +139,8 @@ Windows 管理ノード対応などのため、Linux 固有のモジュール（
 | `copy` | Python (Actual) | `ansible_bridge.py` による `ActionBase` の高度なモックにより動作。 |
 | `template` | Python (Actual) | 管理ノード側での Jinja2 レンダリングを含む。 |
 | `setup` | Python (Actual) | ファクト収集。 |
+| `fetch` | Python (Actual) | ターゲットノードからのファイル取得。 |
+| `include_vars` | Python (Actual) | 動的な変数ファイルの読み込み。 |
 | その他 | Python (Actual) | `ansible_bridge.py` 経由での実行。 |
 
 ## 8. 例外的な Java による実装 (Legacy)
