@@ -52,6 +52,28 @@ public class YamlParser {
         return new Playbook(plays);
     }
 
+    /**
+     * Parses a list of tasks from an InputStream.
+     *
+     * @param inputStream The input stream of the YAML file.
+     * @return The list of parsed tasks.
+     */
+    public List<Task> parseTasks(InputStream inputStream) {
+        return parseTasks(inputStream, List.of());
+    }
+
+    /**
+     * Parses a list of tasks from an InputStream with inherited tags.
+     *
+     * @param inputStream   The input stream of the YAML file.
+     * @param inheritedTags The tags to inherit.
+     * @return The list of parsed tasks.
+     */
+    public List<Task> parseTasks(InputStream inputStream, List<String> inheritedTags) {
+        Object raw = yaml.load(inputStream);
+        return parseTaskList(raw, inheritedTags);
+    }
+
     @SuppressWarnings("unchecked")
     private Play parsePlay(Map<String, Object> map) {
         String name = (String) map.getOrDefault("name", "Unnamed Play");
