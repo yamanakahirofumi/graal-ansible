@@ -106,16 +106,28 @@ public class PlaybookExecutor {
      * @return A map of host names to their execution results for each task.
      */
     public Map<String, List<TaskResult>> execute(Playbook playbook, Inventory inventory, VariableManager variableManager, boolean globalCheckMode) {
-        Map<String, List<TaskResult>> results = new HashMap<>();
+        return execute(playbook, inventory, variableManager, globalCheckMode, List.of(), List.of(), null);
+    }
 
-        // Re-instantiate TaskExecutor with the connectionFactory if it's the default one
-        // or if it doesn't have it. Actually, it's better to ensure taskExecutor has the factory.
-        // But taskExecutor is final and passed in constructor.
+    /**
+     * Executes the entire playbook with tags and limit filtering.
+     *
+     * @param playbook        The playbook to execute.
+     * @param inventory       The inventory.
+     * @param variableManager The variable manager to use.
+     * @param globalCheckMode Whether the execution is in global check mode.
+     * @param runTags          The tags to run.
+     * @param skipTags         The tags to skip.
+     * @param limit            The host limit pattern.
+     * @return A map of host names to their execution results for each task.
+     */
+    public Map<String, List<TaskResult>> execute(Playbook playbook, Inventory inventory, VariableManager variableManager, boolean globalCheckMode, List<String> runTags, List<String> skipTags, String limit) {
+        Map<String, List<TaskResult>> results = new HashMap<>();
 
         TaskQueueManager tqm = new TaskQueueManager(taskExecutor, connectionFactory);
 
         for (Play play : playbook.plays()) {
-            tqm.executePlay(play, inventory, variableManager, results, globalCheckMode);
+            tqm.executePlay(play, inventory, variableManager, results, globalCheckMode, runTags, skipTags, limit);
         }
 
         return results;

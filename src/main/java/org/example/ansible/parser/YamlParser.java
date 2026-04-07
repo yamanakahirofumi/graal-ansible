@@ -56,13 +56,15 @@ public class YamlParser {
     private Play parsePlay(Map<String, Object> map) {
         String name = (String) map.getOrDefault("name", "Unnamed Play");
         String hosts = (String) map.get("hosts");
+        List<String> tags = parseTags(map.get("tags"));
+
         List<Task> tasks = new ArrayList<>();
         Object tasksObj = map.get("tasks");
 
         if (tasksObj instanceof List<?> tasksList) {
             for (Object taskItem : tasksList) {
                 if (taskItem instanceof Map<?, ?> taskMap) {
-                    tasks.add(parseTask((Map<String, Object>) taskMap));
+                    tasks.add(parseTask((Map<String, Object>) taskMap, tags));
                 }
             }
         }
@@ -72,7 +74,7 @@ public class YamlParser {
         if (handlersObj instanceof List<?> handlersList) {
             for (Object handlerItem : handlersList) {
                 if (handlerItem instanceof Map<?, ?> handlerMap) {
-                    handlers.add(parseTask((Map<String, Object>) handlerMap));
+                    handlers.add(parseTask((Map<String, Object>) handlerMap, tags));
                 }
             }
         }
@@ -98,18 +100,26 @@ public class YamlParser {
         Object checkMode = map.get("check_mode");
         Object environment = map.get("environment");
 
-        return new Play(name, hosts, tasks, vars, varsFiles, handlers, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment);
+        return new Play(name, hosts, tasks, vars, varsFiles, handlers, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags);
     }
 
     @SuppressWarnings("unchecked")
     private Task parseTask(Map<String, Object> map) {
+        return parseTask(map, List.of());
+    }
+
+    @SuppressWarnings("unchecked")
+    private Task parseTask(Map<String, Object> map, List<String> inheritedTags) {
         String name = (String) map.getOrDefault("name", "Unnamed Task");
         String action = null;
         Map<String, Object> args = Map.of();
 
-        List<Task> block = parseTaskList(map.get("block"));
-        List<Task> rescue = parseTaskList(map.get("rescue"));
-        List<Task> always = parseTaskList(map.get("always"));
+        List<String> taskTags = new ArrayList<>(inheritedTags);
+        taskTags.addAll(parseTags(map.get("tags")));
+
+        List<Task> block = parseTaskList(map.get("block"), taskTags);
+        List<Task> rescue = parseTaskList(map.get("rescue"), taskTags);
+        List<Task> always = parseTaskList(map.get("always"), taskTags);
 
         for (Map.Entry<String, Object> entry : map.entrySet()) {
             String key = entry.getKey();
@@ -171,19 +181,29 @@ public class YamlParser {
 
         return new Task(name, action, args, vars, when, register, loop, notify, failedWhen, changedWhen, ignoreErrors,
                 until, retries, delay, delegateTo, delegateFacts, runOnce, ignoreUnreachable, block, rescue, always,
-                become, becomeMethod, becomeUser, becomeFlags, checkMode, environment);
+                become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, taskTags);
     }
 
     @SuppressWarnings("unchecked")
-    private List<Task> parseTaskList(Object obj) {
+    private List<Task> parseTaskList(Object obj, List<String> inheritedTags) {
         List<Task> tasks = new ArrayList<>();
         if (obj instanceof List<?> list) {
             for (Object item : list) {
                 if (item instanceof Map<?, ?> map) {
-                    tasks.add(parseTask((Map<String, Object>) map));
+                    tasks.add(parseTask((Map<String, Object>) map, inheritedTags));
                 }
             }
         }
         return tasks;
+    }
+
+    private List<String> parseTags(Object obj) {
+        if (obj == null) return List.of();
+        if (obj instanceof List<?> list) {
+            return list.stream().map(Object::toString).toList();
+        } else if (obj instanceof String s) {
+            return List.of(s);
+        }
+        return List.of(obj.toString());
     }
 }
