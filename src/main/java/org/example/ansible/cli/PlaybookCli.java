@@ -15,6 +15,7 @@ import org.example.ansible.module.python.PythonModule;
 import org.example.ansible.engine.PlaybookExecutor;
 import org.example.ansible.engine.TaskExecutor;
 import org.example.ansible.engine.TaskResult;
+import org.example.ansible.engine.VariableManager;
 import org.example.ansible.inventory.IniInventoryParser;
 import org.example.ansible.inventory.Inventory;
 import org.example.ansible.inventory.InventoryParser;
@@ -55,6 +56,9 @@ public class PlaybookCli implements Callable<Integer> {
 
     @Option(names = {"-t", "--tags"}, description = "Only run plays and tasks tagged with these values.")
     private List<String> tags = new ArrayList<>();
+
+    @Option(names = {"--skip-tags"}, description = "Only run plays and tasks whose tags do not match these values.")
+    private List<String> skipTags = new ArrayList<>();
 
     @Option(names = {"-C", "--check"}, description = "Don't make any changes; instead, try to predict some of the changes that may occur.")
     private boolean check;
@@ -110,7 +114,10 @@ public class PlaybookCli implements Callable<Integer> {
                 // Execute Playbook
                 PlaybookExecutor executor = new PlaybookExecutor(taskExecutor);
                 java.nio.file.Path baseDir = playbookFile.getAbsoluteFile().getParentFile().toPath();
-                Map<String, List<TaskResult>> results = executor.execute(playbook, inventory, parsedExtraVars, baseDir, check);
+                Map<String, Object> cliVars = new HashMap<>();
+                cliVars.put("ansible_check_mode", check);
+                VariableManager variableManager = new VariableManager(inventory, cliVars, parsedExtraVars, baseDir, null);
+                Map<String, List<TaskResult>> results = executor.execute(playbook, inventory, variableManager, check, tags, skipTags, limit);
 
                 // Print Results
                 printSummary(results);

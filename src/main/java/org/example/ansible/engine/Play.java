@@ -18,6 +18,7 @@ import java.util.Map;
  * @param becomeFlags  Additional flags for privilege escalation.
  * @param checkMode    Whether to run this play in check mode.
  * @param environment  Environment variables for this play.
+ * @param tags         The tags defined for this play.
  */
 public record Play(
         String name,
@@ -31,13 +32,31 @@ public record Play(
         String becomeUser,
         String becomeFlags,
         Object checkMode,
-        Object environment
+        Object environment,
+        List<String> tags
 ) {
     public Play(String name, String hosts, List<Task> tasks) {
-        this(name, hosts, tasks, Map.of(), List.of(), List.of(), null, null, null, null, null, null);
+        this(name, hosts, tasks, Map.of(), List.of(), List.of(), null, null, null, null, null, null, List.of());
     }
 
     public Play(String name, String hosts, List<Task> tasks, Map<String, Object> vars) {
-        this(name, hosts, tasks, vars, List.of(), List.of(), null, null, null, null, null, null);
+        this(name, hosts, tasks, vars, List.of(), List.of(), null, null, null, null, null, null, List.of());
+    }
+
+    public Play(
+            String name,
+            String hosts,
+            List<Task> tasks,
+            Map<String, Object> vars,
+            List<String> varsFiles,
+            List<Task> handlers,
+            Object become,
+            String becomeMethod,
+            String becomeUser,
+            String becomeFlags,
+            Object checkMode,
+            Object environment
+    ) {
+        this(name, hosts, tasks, vars, varsFiles, handlers, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, List.of());
     }
 }

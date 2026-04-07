@@ -33,6 +33,7 @@ import java.util.List;
  * @param becomeFlags       Additional flags for privilege escalation.
  * @param checkMode         Whether to run this task in check mode.
  * @param environment       Environment variables for this task.
+ * @param tags              The tags defined for this task.
  */
 public record Task(
         String name,
@@ -61,17 +62,52 @@ public record Task(
         String becomeUser,
         String becomeFlags,
         Object checkMode,
-        Object environment
+        Object environment,
+        List<String> tags
 ) {
     public Task(String name, String action, Map<String, Object> args) {
         this(name, action, args, Map.of(), null, null, null, List.of(), null, null, false,
                 null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
-                null, null, null, null, null, null);
+                null, null, null, null, null, null, List.of());
     }
 
     public Task(String name, String action, Map<String, Object> args, Map<String, Object> vars) {
         this(name, action, args, vars, null, null, null, List.of(), null, null, false,
                 null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
-                null, null, null, null, null, null);
+                null, null, null, null, null, null, List.of());
+    }
+
+    public Task(
+            String name,
+            String action,
+            Map<String, Object> args,
+            Map<String, Object> vars,
+            Object when,
+            String register,
+            Object loop,
+            List<String> notifications,
+            Object failedWhen,
+            Object changedWhen,
+            boolean ignoreErrors,
+            Object until,
+            Integer retries,
+            Integer delay,
+            String delegateTo,
+            boolean delegateFacts,
+            boolean runOnce,
+            boolean ignoreUnreachable,
+            List<Task> block,
+            List<Task> rescue,
+            List<Task> always,
+            Object become,
+            String becomeMethod,
+            String becomeUser,
+            String becomeFlags,
+            Object checkMode,
+            Object environment
+    ) {
+        this(name, action, args, vars, when, register, loop, notifications, failedWhen, changedWhen, ignoreErrors,
+                until, retries, delay, delegateTo, delegateFacts, runOnce, ignoreUnreachable, block, rescue, always,
+                become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, List.of());
     }
 }
