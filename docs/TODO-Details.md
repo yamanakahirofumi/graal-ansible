@@ -13,13 +13,6 @@
 
 ## 2. 実装時の詳細事項
 
-### [ ] Ansible 本体の完全ロードと基本動作の実現 (フェーズ1)
-- **概要**: `ansible-core` を完全にロードし、Linux/macOS での主要モジュールの動作確認。
-- **詳細は [Module-Support-Status.md](features/Module-Support-Status.md) を参照。**
-- **テスト拡充戦略については [Test-Expansion-Strategy.md](tech/Test-Expansion-Strategy.md) を参照。**
-- **注意**: `python.IsolateNativeModules` と `python.PosixModuleBackend` はフェーズ 1 では変更しない。
-- **備考**: 検証には必要に応じて **Testcontainers** を**ターゲットノード**として活用する。
-
 ### [ ] ハイブリッド実装による Windows サポート (フェーズ2)
 - **概要**: ハイブリッド実装（モンキーパッチ等）による Windows サポート。
 - **詳細は [Module-Support-Status.md](features/Module-Support-Status.md) を参照。**
@@ -29,6 +22,14 @@
 - **詳細は [Module-Support-Status.md](features/Module-Support-Status.md) を参照。**
 
 ## 3. 完了済みの項目 (Completed)
+
+### [✓] Ansible 本体の完全ロードと基本動作の実現 (フェーズ1)
+- **完了日**: 2026-03-25
+- **概要**: `ansible-core` を完全にロードし、Linux/macOS での主要モジュールの動作確認。
+- **詳細は [Module-Support-Status.md](features/Module-Support-Status.md) を参照。**
+- **テスト拡充戦略については [Test-Expansion-Strategy.md](tech/Test-Expansion-Strategy.md) を参照。**
+- **注意**: `python.IsolateNativeModules` と `python.PosixModuleBackend` はフェーズ 1 においては原則として固定（Linuxでは安定のため True/Native）とした。
+- **備考**: 検証には必要に応じて **Testcontainers** を**ターゲットノード**として活用した。
 
 ### [✓] 実際の Ansible コレクションを使ったテストの実施
 - **完了日**: 2026-03-25

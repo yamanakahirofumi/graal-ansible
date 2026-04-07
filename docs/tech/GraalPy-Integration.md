@@ -12,8 +12,8 @@ Ansible モジュールの多くは複雑な Python スクリプトであり、�
 
 | オプション | 設定値 | 目的 |
 | :--- | :--- | :--- |
-| `python.IsolateNativeModules` | `false` (`true`) | ネイティブモジュールの分離。Linux環境では安定のため `true` を使用（詳細は [5. 実行環境コンテキストの固定](../tech/Test-Expansion-Strategy.md#25-実行環境コンテキストの固定) を参照）。 |
-| `python.PosixModuleBackend` | `java` (`native`) | POSIX モジュールのバックエンド。Linux環境では `native` を使用。 |
+| `python.IsolateNativeModules` | `true` (Linux) | ネイティブモジュールの分離。Linux環境では安定のため `true` を使用（詳細は [5. 実行環境コンテキストの固定](../tech/Test-Expansion-Strategy.md#25-実行環境コンテキストの固定) を参照）。 |
+| `python.PosixModuleBackend` | `native` (Linux) | POSIX モジュールのバックエンド。Linux環境では `native` を使用。 |
 | `python.Executable` | (自動検出) | GraalPy 実行バイナリのパスを指定します。 |
 
 ## 3. Python 環境の構築
