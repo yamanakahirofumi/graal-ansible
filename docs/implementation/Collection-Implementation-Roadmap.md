@@ -6,12 +6,12 @@
 
 [モジュールの開発方針](../features/Module-Development-Policy.md)に基づき、本プロジェクトでは本物の Ansible コレクションを使用することを原則としています。しかし、コレクションは Ansible 本体の内部ライブラリ（`ansible.module_utils` 等）に強く依存しており、GraalPy 上での完全な動作には多くの技術的ハードルがあることが判明しました。これらを解決し、最終的に安定かつ高速な実行環境を実現するために、以下の 3 段階のフェーズで実装を進めます。
 
-## 2. フェーズ 1：Ansible 本体の完全ロードと基本動作の実現 (Completed)
+## 2. フェーズ 1：Ansible 本体の完全ロードと基本動作の実現 (In Progress)
 
 このフェーズでは、まず「動くこと」を最優先とし、技術的な実現可能性を検証します。
 
 - **アプローチ**: `ansible-core` の全コードを GraalPy の実行パスに含め、本物のコレクションが依存するライブラリをすべて参照可能な状態にします。
-- **目標**: 複数の主要モジュール（[Module-Compatibility.md](../features/Module-Compatibility.md) の対象コレクションすべて）が GraalPy 上で実際に動作することを確認します。
+- **目標**: **全 72 モジュール**（[Module-Support-Status.md](../features/Module-Support-Status.md) 参照）が GraalPy 上で実際に動作することを確認します。
 - **進捗状況**:
     - 主要な 27 モジュールの Linux 上での実行検証を完了。
     - `ansible_bridge.py` による高度なモック化により、オリジナルの Python ソースコードによる Action Plugin およびモジュールの実行に成功。
