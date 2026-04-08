@@ -16,7 +16,7 @@
 
 | コレクション / モジュール | Target: Linux | Target: macOS | Target: Windows | 備考 |
 | :--- | :---: | :---: | :---: | :--- |
-| **ansible.builtin** | △ | ？ | ？ | Linux で全 72 モジュールを一覧化。うち 27 モジュールを実行確認済。 |
+| **ansible.builtin** | △ | ？ | ？ | Linux で全 72 モジュールを一覧化。うち 32 モジュールを実行確認済。 |
 | - `debug` | ◎ | ○ | ○ | オリジナル Python ソースコードにより検証済。 |
 | - `ping` | ◎ | ○ | - | オリジナル Python ソースコードにより検証済。 |
 | - `copy` | ◎ | ○ | - | オリジナル Python ソースコードにより検証済。 |
@@ -34,10 +34,10 @@
 | - `tempfile` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
 | - `hostname` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
 | - `slurp` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `set_fact` | ○ | ○ | ○ | オリジナル Python ソースコードにより検証済。 |
+| - `set_fact` | ◎ | ○ | ○ | オリジナル Python ソースコードにより検証済。 |
 | - `assert` | ◎ | ○ | ○ | オリジナル Python ソースコードにより検証済。 |
-| - `fail` | ○ | ○ | ○ | オリジナル Python ソースコードにより検証済。 |
-| - `gather_facts` | ○ | ○ | - | オリジナル Python ソースコードにより検証済。 |
+| - `fail` | ◎ | ○ | ○ | オリジナル Python ソースコードにより検証済。 |
+| - `gather_facts` | ◎ | ○ | - | オリジナル Python ソースコードにより検証済。 |
 | - `add_host` | △ | ？ | ？ | ロード確認済。 |
 | - `apt` | △ | ？ | - | ロード確認済。 |
 | - `apt_key` | △ | ？ | - | ロード確認済。 |
@@ -60,9 +60,9 @@
 | - `group_by` | △ | ？ | ？ | ロード確認済。 |
 | - `import_playbook` | ？ | ？ | ？ | 検証予定。 |
 | - `import_role` | ？ | ？ | ？ | 検証予定。 |
-| - `import_tasks` | ？ | ？ | ？ | 検証予定。 |
+| - `import_tasks` | ◎ | ？ | ？ | オリジナル Python ソースコードにより検証済。 |
 | - `include_role` | ？ | ？ | ？ | 検証予定。 |
-| - `include_tasks` | ？ | ？ | ？ | 検証予定。 |
+| - `include_tasks` | ◎ | ？ | ？ | オリジナル Python ソースコードにより検証済。 |
 | - `include_vars` | ◎ | ○ | ○ | オリジナル Python ソースコードにより検証済。 |
 | - `iptables` | △ | ？ | - | ロード確認済。 |
 | - `known_hosts` | △ | ？ | - | ロード確認済。 |
@@ -108,7 +108,7 @@
 100% の互換性と最適化を目指し、以下の 3 つのフェーズで開発を進めています。詳細は [コレクション実装ロードマップ](../implementation/Collection-Implementation-Roadmap.md) を参照してください。
 
 - **フェーズ 1: Ansible 本体の完全ロードと基本動作の実現 (In Progress)**
-  - Linux/macOS 上での主要モジュール（[Module-Compatibility.md](Module-Compatibility.md) の対象コレクションすべて）の動作確認。
+  - Linux/macOS 上での主要モジュール（[Module-Compatibility.md](Module-Compatibility.md) の対象コレクションすべて）の動作確認。現在は 32 モジュールの動作を確認済み。
   - **完了条件**:
     - ビルド時の `pip` による `ansible-core` 取得の自動化。
     - GraalPy へのライブラリパス統合。

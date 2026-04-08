@@ -44,7 +44,7 @@ Ansible (ansible-core 2.17+) は 22 段階の非常に詳細な優先順位を�
 | 18 | `include_vars` | ◎ | Action Plugin として実装済み。 |
 | 19 | `set_facts` / `register` 変数 | ◎ | `VariableManager.registerVariable` で実行時に保存。 |
 | 20 | ロールパラメータ | △ | ロール呼び出し時の引数。 |
-| 21 | インクルードパラメータ | △ | `include_tasks` 等の引数。 |
+| 21 | インクルードパラメータ | ◎ | `include_tasks` 等の引数。`TaskQueueManager` での再帰実行時に `blockVars` として伝播。 |
 | 22 | エクストラ変数 (`-e` / `--extra-vars`) | ◎ | **最高優先。** `VariableManager.extraVars` に保持。 |
 
 ### 2.1 マージ戦略
