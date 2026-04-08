@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -508,5 +509,40 @@ class ActualModuleIntegrationTest {
         Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
         assertNotNull(facts, "ansible_facts should be present. Full data: " + result.data());
         assertEquals("hello_actual", facts.get("fact_from_file"));
+    }
+
+    @Test
+    void testActualSetFactModule() {
+        Task task = new Task("test_set_fact", "set_fact", Map.of(
+                "my_custom_fact", "my_custom_value"
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
+        assertNotNull(facts);
+        assertEquals("my_custom_value", facts.get("my_custom_fact"));
+    }
+
+    @Test
+    void testActualFailModule() {
+        Task task = new Task("test_fail", "fail", Map.of(
+                "msg", "fail module test"
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertFalse(result.success());
+        assertEquals("fail module test", result.data().get("msg"));
+    }
+
+    @Test
+    void testActualGatherFactsModule() {
+        Task task = new Task("test_gather_facts", "gather_facts", Map.of());
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
+        assertNotNull(facts);
+        assertTrue(facts.containsKey("ansible_os_family"));
     }
 }
