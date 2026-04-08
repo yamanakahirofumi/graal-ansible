@@ -3,6 +3,7 @@ import sys
 import os
 import types
 import re
+import tempfile
 from io import StringIO
 
 # Global context to hold current task state
@@ -187,7 +188,6 @@ class MockLoader:
 
 class MockShell:
     def __init__(self):
-        import tempfile
         self.tmpdir = tempfile.gettempdir()
     def path_has_trailing_slash(self, path): return path.endswith('/') or path.endswith('\\')
     def join_path(self, *args): return os.path.join(*args)
@@ -240,6 +240,7 @@ class ActionBase:
                 if not isinstance(r_dict, dict): r_dict = {'failed': True, 'msg': 'Module result not a dict'}
                 if r_dict.get('failed') and 'exception' not in r_dict:
                     r_dict['exception'] = r_dict.get('msg', 'Module execution failed')
+                # Do not force changed=True if it is already present
                 if 'changed' not in r_dict: r_dict['changed'] = True
                 return r_dict
         return {'failed': True, 'msg': 'task_executor_java not available'}
@@ -344,10 +345,9 @@ class AnsibleModule:
         if 'path' in self.params and self.params['path'] is None:
             self.params['path'] = self.params.get('dest') or self.params.get('name')
         self.check_mode = self._debug = self._diff = False
-        self.boolean = lambda x, *a, **kw: str(x).lower() in ('yes', 'true', 't', '1', 'on', 'y')
+        self.boolean = lambda x, **kw: str(x).lower() in ('yes', 'true', 't', '1', 'on', 'y')
     @property
     def tmpdir(self):
-        import tempfile
         return tempfile.gettempdir()
     def exit_json(self, **kwargs):
         global _last_module_result
@@ -384,16 +384,22 @@ class AnsibleModule:
         import hashlib
         try: return hashlib.sha1(open(_normalize_path(path), 'rb').read()).hexdigest()
         except: return None
+    def digest_from_file(self, filename, algorithm):
+        import hashlib
+        h = hashlib.new(algorithm)
+        with open(_normalize_path(filename), 'rb') as f:
+            for chunk in iter(lambda: f.read(4096), b""): h.update(chunk)
+        return h.hexdigest()
     def atomic_move(self, src, dest, **kwargs):
         import shutil
         shutil.move(_normalize_path(src), _normalize_path(dest))
     def load_file_common_arguments(self, params, path=None):
         actual_path = path or params.get('path') or params.get('dest') or params.get('name')
         return {'path': _normalize_path(actual_path)}
-    def set_fs_attributes_if_different(self, file_args, changed, **kwargs):
+    def set_fs_attributes_if_different(self, file_args, changed, diff=None, expand=True):
         if file_args: self._stored_file_args.update(file_args)
         return changed
-    def set_file_attributes_if_different(self, file_args, changed, **kwargs):
+    def set_file_attributes_if_different(self, file_args, changed, diff=None, expand=True):
         if file_args: self._stored_file_args.update(file_args)
         return changed
 
@@ -461,7 +467,6 @@ def apply_mocks():
             }
     dt_mod.DateTimeFactCollector = MockDateTimeFactCollector
 
-    import tempfile
     create_mock('ansible.constants', {
         'DEFAULT_REMOTE_TMP': '/tmp', 'DEFAULT_LOCAL_TMP': tempfile.gettempdir(), 'DEFAULT_KEEP_REMOTE_FILES': False,
         'config': type('Config', (), {'get_config_value': lambda *a, **kw: ['setup']}),
@@ -483,7 +488,8 @@ def apply_mocks():
 
     create_mock('ansible.errors', {
         'AnsibleError': Exception, 'AnsibleActionFail': type('AAF', (Exception,), {}), 'AnsibleTemplateError': type('ATE', (Exception,), {}),
-        'AnsibleAssertionError': type('AAE', (Exception,), {}), 'AnsibleFileNotFound': type('AFNF', (Exception,), {}), 'AnsibleParserError': type('APE', (Exception,), {})
+        'AnsibleAssertionError': type('AAE', (Exception,), {}), 'AnsibleFileNotFound': type('AFNF', (Exception,), {}), 'AnsibleParserError': type('APE', (Exception,), {}),
+        'AnsibleValueOmittedError': type('AVOE', (Exception,), {}), 'AnsibleConnectionFailure': type('ACF', (Exception,), {}), 'AnsibleActionSkip': type('AAS', (Exception,), {})
     })
 
     create_mock('ansible.plugins', {'AnsiblePlugin': type('AnsiblePlugin', (), {})})
@@ -502,7 +508,15 @@ def apply_mocks():
     create_mock('ansible.playbook.play_context', {'PlayContext': PlayContext})
     create_mock('ansible.template', {'Templar': Templar, 'trust_as_template': lambda x: x})
     create_mock('ansible._internal._locking')
-    create_mock('ansible._internal._ansiballz', {'_builder': type('B', (), {})})
+
+    # ansiballz code reading fix
+    ansiballz_dir = tempfile.mkdtemp()
+    wrapper_path = os.path.join(ansiballz_dir, '_wrapper.py')
+    with open(wrapper_path, 'w') as f: f.write("# mock wrapper")
+    init_path = os.path.join(ansiballz_dir, '__init__.py')
+    with open(init_path, 'w') as f: f.write("# mock init")
+    create_mock('ansible._internal._ansiballz', {'_builder': type('B', (), {}), '_wrapper': type('W', (), {}), '__file__': init_path})
+
     create_mock('ansible._internal._errors', {'_error_utils': type('EU', (), {'result_dict_from_captured_errors': lambda **kw: {}})})
     create_mock('ansible._internal._datatag', {'SourceWasEncrypted': Exception, '_utils': type('U', (), {})})
     create_mock('ansible._internal._datatag._tags', {'SourceWasEncrypted': Exception, 'Origin': type('Origin', (), {}), 'VaultedValue': type('VaultedValue', (), {}), 'TrustedAsTemplate': type('TrustedAsTemplate', (), {})})
@@ -519,9 +533,15 @@ def apply_mocks():
         create_mock(mname, is_package=True)
 
     if mocks_applied: return
+    create_mock('ansible.module_utils._internal', {'get_controller_serialize_map': lambda: {}})
     create_mock('ansible.module_utils.common.sys_info', {'get_distribution': lambda: 'Linux', 'get_distribution_version': lambda: 'Any', 'get_distribution_codename': lambda: 'Any', 'get_platform_subclass': lambda cls: cls})
     create_mock('ansible.module_utils.compat.version', {'LooseVersion': str, 'StrictVersion': str})
-    create_mock('ansible.module_utils.parsing.convert_bool', {'convert_bool': lambda x: str(x).lower() in ('yes', 'true', 't', '1'), 'boolean': lambda x: str(x).lower() in ('yes', 'true', 't', '1'), 'BOOLEANS_TRUE': frozenset(['y', 'yes', 'on', '1', 'true', 't', 1, True]), 'BOOLEANS_FALSE': frozenset(['n', 'no', 'off', '0', 'false', 'f', 0, False])})
+    create_mock('ansible.module_utils.parsing.convert_bool', {
+        'convert_bool': lambda x, **kw: str(x).lower() in ('yes', 'true', 't', '1'),
+        'boolean': lambda x, **kw: str(x).lower() in ('yes', 'true', 't', '1'),
+        'BOOLEANS_TRUE': frozenset(['y', 'yes', 'on', '1', 'true', 't', 1, True]),
+        'BOOLEANS_FALSE': frozenset(['n', 'no', 'off', '0', 'false', 'f', 0, False])
+    })
     create_mock('ansible.module_utils.basic', {'AnsibleModule': AnsibleModule, '_load_params': lambda: (_current_task_context['complex_args'] or {}, 'main'), 'FILE_COMMON_ARGUMENTS': {}, 'missing_required_lib': lambda *a, **kw: None, 'get_bin_path': lambda arg, *a, **kw: arg, 'is_executable': lambda x: True, 'debug': lambda *a: None, 'sys_info': types.SimpleNamespace(get_distribution=lambda: 'Linux', get_distribution_version=lambda: 'Any', get_distribution_codename=lambda: 'Any')})
     create_mock('grp', {'getgrnam': lambda n: type('G', (), {'gr_gid': 0, 'gr_name': str(n), 'gr_mem': []})(), 'getgrgid': lambda *a: type('G', (), {'gr_name': 'root', 'gr_gid': 0, 'gr_mem': []})(), 'getgrall': lambda: []}, False)
     create_mock('pwd', {'getpwnam': lambda n: type('P', (), {'pw_uid': 0, 'pw_gid': 0, 'pw_dir': '/root', 'pw_shell': '/bin/bash', 'pw_name': str(n), 'pw_gecos': ''})(), 'getpwuid': lambda *a: type('P', (), {'pw_name': 'root', 'pw_uid': 0, 'pw_gid': 0, 'pw_dir': '/root', 'pw_shell': '/bin/bash', 'pw_gecos': ''})(), 'getpwall': lambda: []}, False)
