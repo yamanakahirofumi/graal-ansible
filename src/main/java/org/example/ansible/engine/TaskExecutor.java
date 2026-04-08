@@ -364,7 +364,7 @@ public class TaskExecutor implements ITaskExecutor {
     }
 
     private TaskResult executeLoopTask(Play play, Host host, Task task, VariableManager variableManager, Map<String, Object> allVars, boolean inheritedCheckMode, Object inheritedEnvironment, Map<String, Object> blockVars, Connection connection, ConnectionFactory connectionFactory) {
-        List<?> items = resolveLoopItems(task.loop(), allVars);
+        List<?> items = variableResolver.resolveLoopItems(task.loop(), allVars);
         if (items == null) {
             return TaskResult.failure("loop must be a list or a template that resolves to a list");
         }
@@ -386,18 +386,6 @@ public class TaskExecutor implements ITaskExecutor {
         }
 
         return buildFinalLoopResult(loopResults, anyFailed, anyChanged, allSkipped);
-    }
-
-    private List<?> resolveLoopItems(Object loop, Map<String, Object> variables) {
-        Object resolved = loop;
-        if (loop instanceof String str) {
-            resolved = variableResolver.resolveValue(variableResolver.wrapInJinja(str), variables);
-        }
-
-        if (resolved instanceof List<?> items) {
-            return items;
-        }
-        return null;
     }
 
     private TaskResult executeLoopIteration(Play play, Host host, Task task, Object item, Map<String, Object> allVars, VariableManager variableManager, boolean inheritedCheckMode, Object inheritedEnvironment, Map<String, Object> blockVars, Connection connection, ConnectionFactory connectionFactory) {

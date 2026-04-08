@@ -221,6 +221,25 @@ public class VariableResolver {
     }
 
     /**
+     * Resolves loop items from a loop object (List or template string).
+     *
+     * @param loop      The loop object to resolve.
+     * @param variables The variable map.
+     * @return A list of resolved loop items, or null if resolution fails.
+     */
+    public List<?> resolveLoopItems(Object loop, Map<String, Object> variables) {
+        Object resolved = loop;
+        if (loop instanceof String str) {
+            resolved = resolveValue(wrapInJinja(str), variables);
+        }
+
+        if (resolved instanceof List<?> items) {
+            return items;
+        }
+        return null;
+    }
+
+    /**
      * Wraps an expression in Jinja2 delimiters if not already wrapped.
      *
      * @param expression The expression to wrap.
