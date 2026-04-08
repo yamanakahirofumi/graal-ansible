@@ -164,12 +164,17 @@ public class TaskExecutor implements ITaskExecutor {
 
     @Override
     public TaskResult execute(Play play, Host host, Task task, VariableManager variableManager, boolean inheritedCheckMode, Object inheritedEnvironment, Map<String, Object> blockVars, Connection connection, ConnectionFactory connectionFactory) {
-        Map<String, Object> allVars = variableManager.getAllVariables(play, host, task, blockVars);
+        return execute(play, host, task, variableManager, inheritedCheckMode, inheritedEnvironment, blockVars, null, null, connection, connectionFactory);
+    }
+
+    @Override
+    public TaskResult execute(Play play, Host host, Task task, VariableManager variableManager, boolean inheritedCheckMode, Object inheritedEnvironment, Map<String, Object> blockVars, Map<String, Object> roleParams, Map<String, Object> includeParams, Connection connection, ConnectionFactory connectionFactory) {
+        Map<String, Object> allVars = variableManager.getAllVariables(play, host, task, blockVars, roleParams, includeParams);
 
         if (task.loop() != null) {
-            return executeLoopTask(play, host, task, variableManager, allVars, inheritedCheckMode, inheritedEnvironment, blockVars, connection, connectionFactory);
+            return executeLoopTask(play, host, task, variableManager, allVars, inheritedCheckMode, inheritedEnvironment, blockVars, roleParams, includeParams, connection, connectionFactory);
         } else {
-            TaskResult result = executeSingleTask(play, host, task, allVars, variableManager, inheritedCheckMode, inheritedEnvironment, blockVars, connection, connectionFactory);
+            TaskResult result = executeSingleTask(play, host, task, allVars, variableManager, inheritedCheckMode, inheritedEnvironment, blockVars, roleParams, includeParams, connection, connectionFactory);
             if (result != null && task.until() == null && !result.isSkipped()) {
                 result = evaluateResultCustomization(task, result, allVars);
             }
@@ -177,7 +182,7 @@ public class TaskExecutor implements ITaskExecutor {
         }
     }
 
-    private TaskResult executeSingleTask(Play play, Host host, Task task, Map<String, Object> variables, VariableManager variableManager, boolean inheritedCheckMode, Object inheritedEnvironment, Map<String, Object> blockVars, Connection connection, ConnectionFactory connectionFactory) {
+    private TaskResult executeSingleTask(Play play, Host host, Task task, Map<String, Object> variables, VariableManager variableManager, boolean inheritedCheckMode, Object inheritedEnvironment, Map<String, Object> blockVars, Map<String, Object> roleParams, Map<String, Object> includeParams, Connection connection, ConnectionFactory connectionFactory) {
         if (!variableResolver.isWhenConditionMet(task.when(), variables)) {
             return TaskResult.skipped("Skipped due to when condition");
         }
@@ -282,7 +287,7 @@ public class TaskExecutor implements ITaskExecutor {
 
                 if (task.register() != null && variableManager != null) {
                     variableManager.registerVariable(host.name(), task.register(), resultData);
-                    variables = variableManager.getAllVariables(play, host, task, blockVars);
+                    variables = variableManager.getAllVariables(play, host, task, blockVars, roleParams, includeParams);
                 }
 
                 Map<String, Object> evalVars = new HashMap<>(variables);
@@ -363,7 +368,7 @@ public class TaskExecutor implements ITaskExecutor {
         });
     }
 
-    private TaskResult executeLoopTask(Play play, Host host, Task task, VariableManager variableManager, Map<String, Object> allVars, boolean inheritedCheckMode, Object inheritedEnvironment, Map<String, Object> blockVars, Connection connection, ConnectionFactory connectionFactory) {
+    private TaskResult executeLoopTask(Play play, Host host, Task task, VariableManager variableManager, Map<String, Object> allVars, boolean inheritedCheckMode, Object inheritedEnvironment, Map<String, Object> blockVars, Map<String, Object> roleParams, Map<String, Object> includeParams, Connection connection, ConnectionFactory connectionFactory) {
         List<?> items = variableResolver.resolveLoopItems(task.loop(), allVars);
         if (items == null) {
             return TaskResult.failure("loop must be a list or a template that resolves to a list");
@@ -375,7 +380,7 @@ public class TaskExecutor implements ITaskExecutor {
         boolean allSkipped = true;
 
         for (Object item : items) {
-            TaskResult result = executeLoopIteration(play, host, task, item, allVars, variableManager, inheritedCheckMode, inheritedEnvironment, blockVars, connection, connectionFactory);
+            TaskResult result = executeLoopIteration(play, host, task, item, allVars, variableManager, inheritedCheckMode, inheritedEnvironment, blockVars, roleParams, includeParams, connection, connectionFactory);
 
             Map<String, Object> resultData = buildIterationResultData(result, item);
             loopResults.add(resultData);
@@ -388,11 +393,11 @@ public class TaskExecutor implements ITaskExecutor {
         return buildFinalLoopResult(loopResults, anyFailed, anyChanged, allSkipped);
     }
 
-    private TaskResult executeLoopIteration(Play play, Host host, Task task, Object item, Map<String, Object> allVars, VariableManager variableManager, boolean inheritedCheckMode, Object inheritedEnvironment, Map<String, Object> blockVars, Connection connection, ConnectionFactory connectionFactory) {
+    private TaskResult executeLoopIteration(Play play, Host host, Task task, Object item, Map<String, Object> allVars, VariableManager variableManager, boolean inheritedCheckMode, Object inheritedEnvironment, Map<String, Object> blockVars, Map<String, Object> roleParams, Map<String, Object> includeParams, Connection connection, ConnectionFactory connectionFactory) {
         Map<String, Object> iterationVars = new HashMap<>(allVars);
         iterationVars.put("item", item);
 
-        TaskResult result = executeSingleTask(play, host, task, iterationVars, variableManager, inheritedCheckMode, inheritedEnvironment, blockVars, connection, connectionFactory);
+        TaskResult result = executeSingleTask(play, host, task, iterationVars, variableManager, inheritedCheckMode, inheritedEnvironment, blockVars, roleParams, includeParams, connection, connectionFactory);
         if (result != null && task.until() == null && !result.isSkipped()) {
             result = evaluateResultCustomization(task, result, iterationVars);
         }

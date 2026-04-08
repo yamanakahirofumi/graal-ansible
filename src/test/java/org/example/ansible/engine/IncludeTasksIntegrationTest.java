@@ -175,4 +175,40 @@ class IncludeTasksIntegrationTest {
         assertEquals(1, hostResults.size());
         assertEquals("imported", hostResults.get(0).data().get("msg"));
     }
+
+    @Test
+    void testIncludeTasksPrecedence() throws IOException {
+        // Arrange
+        Path includedFile = tempDir.resolve("tasks.yml");
+        // Level 17: Task variables
+        String tasksYaml = """
+                - name: inner task
+                  debug:
+                    msg: "{{ my_var }}"
+                  vars:
+                    my_var: inner
+                """;
+        Files.writeString(includedFile, tasksYaml);
+
+        String playbookYaml = """
+                - name: test include_tasks precedence
+                  hosts: all
+                  tasks:
+                    - name: include with higher precedence var
+                      include_tasks: tasks.yml
+                      vars:
+                        my_var: outer
+                """;
+        Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
+
+        // Act
+        Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory, Map.of(), tempDir, false);
+
+        // Assert
+        List<TaskResult> hostResults = results.get("localhost");
+        assertEquals(1, hostResults.size());
+        // Level 21 (outer) should win over Level 17 (inner)
+        assertEquals("outer", hostResults.get(0).data().get("msg"),
+                "Include parameter (Level 21) should override task variable (Level 17)");
+    }
 }

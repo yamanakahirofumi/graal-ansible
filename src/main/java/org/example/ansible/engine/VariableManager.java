@@ -134,7 +134,7 @@ public class VariableManager {
      * @return A merged map of variables for the host.
      */
     public Map<String, Object> getVariablesForHost(String hostName, Play play) {
-        Map<String, Object> vars = new HashMap<>(getAllVariables(play, new Host(hostName), null, null));
+        Map<String, Object> vars = new HashMap<>(getAllVariables(play, new Host(hostName), null, null, null, null));
         vars.put("inventory_hostname", hostName);
         return vars;
     }
@@ -143,13 +143,19 @@ public class VariableManager {
      * Resolves all variables for a given context (play, host, task).
      * Follows the priority defined in Variables-Templating.md.
      *
-     * @param play      The current play.
-     * @param host      The current host.
-     * @param task      The current task.
-     * @param blockVars Accumulated block variables.
+     * @param play          The current play.
+     * @param host          The current host.
+     * @param task          The current task.
+     * @param blockVars     Accumulated block variables.
+     * @param roleParams    Role parameters (Level 20).
+     * @param includeParams Include parameters (Level 21).
      * @return A merged map of all variables.
      */
     public Map<String, Object> getAllVariables(Play play, Host host, Task task, Map<String, Object> blockVars) {
+        return getAllVariables(play, host, task, blockVars, null, null);
+    }
+
+    public Map<String, Object> getAllVariables(Play play, Host host, Task task, Map<String, Object> blockVars, Map<String, Object> roleParams, Map<String, Object> includeParams) {
         Map<String, Object> variables = new HashMap<>();
         String hostName = host != null ? host.name() : null;
 
@@ -267,6 +273,16 @@ public class VariableManager {
             if (registeredVars.containsKey(hostName)) {
                 variables.putAll(registeredVars.get(hostName));
             }
+        }
+
+        // Level 20: Role parameters
+        if (roleParams != null) {
+            variables.putAll(roleParams);
+        }
+
+        // Level 21: Include parameters
+        if (includeParams != null) {
+            variables.putAll(includeParams);
         }
 
         // Level 22: Extra variables
