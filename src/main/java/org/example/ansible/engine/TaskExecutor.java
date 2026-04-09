@@ -16,6 +16,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.ansible.plugin.ActionPlugin;
 import org.example.ansible.module.python.PythonModule;
 import org.example.ansible.util.PythonEnv;
+import org.example.ansible.util.PythonOSMock;
 
 import java.io.File;
 import java.io.InputStream;
@@ -100,6 +101,7 @@ public class TaskExecutor implements ITaskExecutor {
     private final Context context;
     private final VariableResolver variableResolver = new VariableResolver();
     private final ConnectionFactory connectionFactory;
+    private final PythonOSMock pythonOSMock;
 
     public TaskExecutor() {
         this(OSHandlerFactory.getHandler());
@@ -112,6 +114,7 @@ public class TaskExecutor implements ITaskExecutor {
     public TaskExecutor(OSHandler osHandler, ConnectionFactory connectionFactory) {
         this.osHandler = osHandler;
         this.connectionFactory = connectionFactory;
+        this.pythonOSMock = new PythonOSMock(osHandler);
 
         Context.Builder builder = Context.newBuilder("python")
                 .allowAllAccess(true);
@@ -123,6 +126,7 @@ public class TaskExecutor implements ITaskExecutor {
 
         // Pre-load the bridge
         try {
+            this.context.getBindings("python").putMember("os_java", this.pythonOSMock);
             this.context.eval(loadResource("ansible_bridge.py"));
         } catch (Exception e) {
             throw new RuntimeException("Failed to pre-load ansible_bridge.py", e);
