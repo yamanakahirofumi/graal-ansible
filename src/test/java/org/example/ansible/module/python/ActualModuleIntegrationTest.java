@@ -2,9 +2,15 @@ package org.example.ansible.module.python;
 
 import org.example.ansible.connection.BecomeContext;
 import org.example.ansible.connection.SshConnection;
+import org.example.ansible.inventory.Group;
+import org.example.ansible.inventory.Host;
+import org.example.ansible.inventory.Inventory;
+import org.example.ansible.engine.Play;
 import org.example.ansible.engine.Task;
 import org.example.ansible.engine.TaskExecutor;
+import org.example.ansible.engine.TaskQueueManager;
 import org.example.ansible.engine.TaskResult;
+import org.example.ansible.engine.VariableManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,7 +26,9 @@ import org.testcontainers.utility.DockerImageName;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -508,5 +516,96 @@ class ActualModuleIntegrationTest {
         Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
         assertNotNull(facts, "ansible_facts should be present. Full data: " + result.data());
         assertEquals("hello_actual", facts.get("fact_from_file"));
+    }
+
+    @Test
+    void testActualIncludeTasks() throws IOException {
+        // Prepare tasks file in temp directory (local to management node)
+        Path tasksFile = tempDir.resolve("tasks_to_include.yml");
+        Files.writeString(tasksFile, """
+                - name: included task
+                  ping:
+                - name: task with var
+                  debug:
+                    msg: "val is {{ my_var }}"
+                """);
+
+        // The inclusion is handled by TaskQueueManager, not TaskExecutor directly for modules.
+        // But for ActualModuleIntegrationTest, we are testing via TaskExecutor.
+        // However, include_tasks/import_tasks are handled in TaskQueueManager.
+        // To test them "actually", we should use PlaybookExecutor or TaskQueueManager.
+
+        Play play = new Play("inclusion play", "all", List.of(
+                new Task("include it", "include_tasks", Map.of("_raw_params", tasksFile.toString()), Map.of("my_var", "default_val"))
+        ));
+
+        Inventory inventory = new Inventory(new Group("all", List.of(new Host(targetNode.getHost())), List.of(), Map.of()));
+        VariableManager vm = new VariableManager(inventory, Map.of(), tempDir);
+
+        // We need a TaskQueueManager that uses our SshConnection
+        TaskQueueManager tqm = new TaskQueueManager(taskExecutor, (host, vars) -> connection);
+        Map<String, List<TaskResult>> results = new HashMap<>();
+
+        // Act
+        tqm.executePlay(play, inventory, vm, results, false);
+
+        // Assert
+        List<TaskResult> hostResults = results.get(targetNode.getHost());
+        assertNotNull(hostResults, "Results should exist for " + targetNode.getHost());
+        // Results: 1. ping (from include), 2. debug (from include)
+        assertEquals(2, hostResults.size(), "Should have 2 results from included tasks");
+        assertTrue(hostResults.get(0).success());
+        assertEquals("pong", hostResults.get(0).data().get("ping"));
+        assertEquals("val is default_val", hostResults.get(1).data().get("msg"));
+    }
+
+    @Test
+    void testActualIncludeTasksPrecedence() throws IOException {
+        Path tasksFile = tempDir.resolve("precedence_tasks.yml");
+        Files.writeString(tasksFile, """
+                - name: inner task
+                  debug:
+                    msg: "{{ my_var }}"
+                  vars:
+                    my_var: inner
+                """);
+
+        Play play = new Play("precedence play", "all", List.of(
+                new Task("include with higher precedence", "include_tasks",
+                        Map.of("_raw_params", tasksFile.toString(), "my_var", "outer"))
+        ));
+
+        Inventory inventory = new Inventory(new Group("all", List.of(new Host(targetNode.getHost())), List.of(), Map.of()));
+        VariableManager vm = new VariableManager(inventory, Map.of(), tempDir);
+        TaskQueueManager tqm = new TaskQueueManager(taskExecutor, (host, vars) -> connection);
+        Map<String, List<TaskResult>> results = new HashMap<>();
+
+        tqm.executePlay(play, inventory, vm, results, false);
+
+        List<TaskResult> hostResults = results.get(targetNode.getHost());
+        assertEquals(1, hostResults.size());
+        assertEquals("outer", hostResults.get(0).data().get("msg"),
+                "Include parameter (Level 21) should override task variable (Level 17) even in actual SSH execution");
+    }
+
+    @Test
+    void testActualImportTasks() throws IOException {
+        Path tasksFile = tempDir.resolve("tasks_to_import.yml");
+        Files.writeString(tasksFile, "- debug: { msg: 'imported' }");
+
+        Play play = new Play("import play", "all", List.of(
+                new Task("import it", "import_tasks", Map.of("_raw_params", tasksFile.toString()))
+        ));
+
+        Inventory inventory = new Inventory(new Group("all", List.of(new Host(targetNode.getHost())), List.of(), Map.of()));
+        VariableManager vm = new VariableManager(inventory, Map.of(), tempDir);
+        TaskQueueManager tqm = new TaskQueueManager(taskExecutor, (host, vars) -> connection);
+        Map<String, List<TaskResult>> results = new HashMap<>();
+
+        tqm.executePlay(play, inventory, vm, results, false);
+
+        List<TaskResult> hostResults = results.get(targetNode.getHost());
+        assertEquals(1, hostResults.size());
+        assertEquals("imported", hostResults.get(0).data().get("msg"));
     }
 }

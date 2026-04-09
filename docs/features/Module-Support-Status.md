@@ -60,9 +60,9 @@
 | - `group_by` | △ | ？ | ？ | ロード確認済。 |
 | - `import_playbook` | ？ | ？ | ？ | 検証予定。 |
 | - `import_role` | ？ | ？ | ？ | 検証予定。 |
-| - `import_tasks` | ？ | ？ | ？ | 検証予定。 |
+| - `import_tasks` | ◎ | ？ | ？ | オリジナル Python ソースコードにより検証済。 |
 | - `include_role` | ？ | ？ | ？ | 検証予定。 |
-| - `include_tasks` | ？ | ？ | ？ | 検証予定。 |
+| - `include_tasks` | ◎ | ？ | ？ | オリジナル Python ソースコードにより検証済。 |
 | - `include_vars` | ◎ | ○ | ○ | オリジナル Python ソースコードにより検証済。 |
 | - `iptables` | △ | ？ | - | ロード確認済。 |
 | - `known_hosts` | △ | ？ | - | ロード確認済。 |

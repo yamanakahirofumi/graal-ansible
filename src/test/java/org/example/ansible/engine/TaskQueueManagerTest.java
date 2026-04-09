@@ -42,7 +42,7 @@ class TaskQueueManagerTest {
         VariableManager variableManager = new VariableManager(inventory, Collections.emptyMap());
         Map<String, List<TaskResult>> results = new HashMap<>();
 
-        when(taskExecutor.execute(any(), any(), any(), any(), anyBoolean(), any(), any(), any(), any()))
+        when(taskExecutor.execute(any(), any(), any(), any(), anyBoolean(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(TaskResult.success(Map.of("ping", "pong")));
 
         // Act
@@ -51,7 +51,7 @@ class TaskQueueManagerTest {
         // Assert
         assertTrue(results.containsKey("host1"));
         assertEquals(1, results.get("host1").size());
-        verify(taskExecutor).execute(eq(play), argThat(h -> h.name().equals("host1")), eq(task), any(), eq(false), any(), any(), any(), any());
+        verify(taskExecutor).execute(eq(play), argThat(h -> h.name().equals("host1")), eq(task), any(), eq(false), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -66,7 +66,7 @@ class TaskQueueManagerTest {
         VariableManager variableManager = new VariableManager(inventory, Collections.emptyMap());
         Map<String, List<TaskResult>> results = new HashMap<>();
 
-        when(taskExecutor.execute(any(), any(), any(), any(), anyBoolean(), any(), any(), any(), any()))
+        when(taskExecutor.execute(any(), any(), any(), any(), anyBoolean(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(TaskResult.success(Map.of("ping", "pong")));
 
         // Act
@@ -75,7 +75,7 @@ class TaskQueueManagerTest {
         // Assert
         assertTrue(results.containsKey("host1"));
         assertEquals(1, results.get("host1").size());
-        verify(taskExecutor).execute(eq(play), any(), eq(innerTask), any(), anyBoolean(), any(), any(), any(), any());
+        verify(taskExecutor).execute(eq(play), any(), eq(innerTask), any(), anyBoolean(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -97,7 +97,7 @@ class TaskQueueManagerTest {
         assertTrue(results.containsKey("host1"));
         assertEquals(1, results.get("host1").size());
         assertTrue((Boolean) results.get("host1").get(0).data().get("skipped"));
-        verify(taskExecutor, never()).execute(any(), any(), eq(innerTask), any(), anyBoolean(), any(), any(), any(), any());
+        verify(taskExecutor, never()).execute(any(), any(), eq(innerTask), any(), anyBoolean(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -113,17 +113,17 @@ class TaskQueueManagerTest {
         VariableManager variableManager = new VariableManager(inventory, Collections.emptyMap());
         Map<String, List<TaskResult>> results = new HashMap<>();
 
-        when(taskExecutor.execute(eq(play), any(), eq(failingTask), any(), anyBoolean(), any(), any(), any(), any()))
+        when(taskExecutor.execute(eq(play), any(), eq(failingTask), any(), anyBoolean(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(TaskResult.failure("failed"));
-        when(taskExecutor.execute(eq(play), any(), eq(rescueTask), any(), anyBoolean(), any(), any(), any(), any()))
+        when(taskExecutor.execute(eq(play), any(), eq(rescueTask), any(), anyBoolean(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(TaskResult.success(Map.of()));
 
         // Act
         tqm.executePlay(play, inventory, variableManager, results, false);
 
         // Assert
-        verify(taskExecutor).execute(eq(play), any(), eq(failingTask), any(), anyBoolean(), any(), any(), any(), any());
-        verify(taskExecutor).execute(eq(play), any(), eq(rescueTask), any(), anyBoolean(), any(), any(), any(), any());
+        verify(taskExecutor).execute(eq(play), any(), eq(failingTask), any(), anyBoolean(), any(), any(), any(), any(), any(), any());
+        verify(taskExecutor).execute(eq(play), any(), eq(rescueTask), any(), anyBoolean(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -139,17 +139,17 @@ class TaskQueueManagerTest {
         Map<String, List<TaskResult>> results = new HashMap<>();
 
         // First call (ping) returns changed=true
-        when(taskExecutor.execute(eq(play), any(), eq(task), any(), anyBoolean(), any(), any(), any(), any()))
+        when(taskExecutor.execute(eq(play), any(), eq(task), any(), anyBoolean(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(TaskResult.success(true, Map.of("changed", true)));
         // Second call (handler)
-        when(taskExecutor.execute(eq(play), any(), eq(handlerTask), any(), anyBoolean(), any(), any(), any(), any()))
+        when(taskExecutor.execute(eq(play), any(), eq(handlerTask), any(), anyBoolean(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(TaskResult.success(Map.of()));
 
         // Act
         tqm.executePlay(play, inventory, variableManager, results, false);
 
         // Assert
-        verify(taskExecutor).execute(eq(play), any(), eq(task), any(), anyBoolean(), any(), any(), any(), any());
-        verify(taskExecutor).execute(eq(play), any(), eq(handlerTask), any(), anyBoolean(), any(), any(), any(), any());
+        verify(taskExecutor).execute(eq(play), any(), eq(task), any(), anyBoolean(), any(), any(), any(), any(), any(), any());
+        verify(taskExecutor).execute(eq(play), any(), eq(handlerTask), any(), anyBoolean(), any(), any(), any(), any(), any(), any());
     }
 }

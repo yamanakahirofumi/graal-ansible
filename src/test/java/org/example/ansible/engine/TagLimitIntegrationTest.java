@@ -45,7 +45,7 @@ public class TagLimitIntegrationTest {
 
         Inventory inventory = new Inventory(new Group("all", List.of(new Host("localhost")), List.of(), Map.of()));
         ITaskExecutor executor = mock(ITaskExecutor.class);
-        when(executor.execute(any(), any(), any(), any(), anyBoolean(), any(), any(), any(), any())).thenReturn(TaskResult.success(false, Map.of()));
+        when(executor.execute(any(), any(), any(), any(), anyBoolean(), any(), any(), any(), any(), any(), any())).thenReturn(TaskResult.success(false, Map.of()));
 
         TaskQueueManager tqm = new TaskQueueManager(executor, (h, v) -> mock(Connection.class));
         VariableManager vm = new VariableManager(inventory, Map.of());
@@ -109,7 +109,7 @@ public class TagLimitIntegrationTest {
         Playbook playbook = parser.parse(new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8)));
 
         ITaskExecutor executor = mock(ITaskExecutor.class);
-        when(executor.execute(any(), any(), any(), any(), anyBoolean(), any(), any(), any(), any())).thenReturn(TaskResult.success(false, Map.of()));
+        when(executor.execute(any(), any(), any(), any(), anyBoolean(), any(), any(), any(), any(), any(), any())).thenReturn(TaskResult.success(false, Map.of()));
 
         TaskQueueManager tqm = new TaskQueueManager(executor, (h, v) -> mock(Connection.class));
         VariableManager vm = new VariableManager(inventory, Map.of());
