@@ -15,6 +15,13 @@ _current_task_context = {
 
 def _normalize_path(p):
     if p is None: return None
+    if 'os_java' in globals():
+        try:
+            # Handle potential bytes from Ansible
+            s_val = p.decode('utf-8', errors='replace') if isinstance(p, bytes) else str(p)
+            return os_java.normalizePath(s_val)
+        except: pass
+
     if isinstance(p, bytes):
         try: s = p.decode('utf-8')
         except: s = p.decode('latin-1', errors='replace')
@@ -24,47 +31,64 @@ def _normalize_path(p):
         try: s = str(p)
         except: return p
 
-    # Remove leading slashes from Windows absolute paths (e.g. /C:\... -> C:\...)
-    # We use a loop to handle multiple leading slashes and ensure we don't accidentally
-    # strip valid UNC paths (which start with \\ but not with a drive letter)
     temp_s = s
     while True:
         if len(temp_s) > 3 and temp_s[0] in ('/', '\\') and temp_s[2] == ':' and temp_s[1].isalpha():
             temp_s = temp_s[1:]
         elif len(temp_s) > 2 and temp_s[0] in ('/', '\\') and temp_s[1] in ('/', '\\') and temp_s[2] != '\\':
-            # This handles //server or similar by NOT stripping if it looks like a UNC root,
-            # but usually in this bridge we get /C: which is what we want to fix.
-            if len(temp_s) > 3 and temp_s[3] == ':': # Case like //C:
+            if len(temp_s) > 3 and temp_s[3] == ':':
                 temp_s = temp_s[1:]
             else:
                 break
         else:
             break
 
-    # Fix backslashes for Windows if we are on Windows
     if os.name == 'nt' and ':' in temp_s:
         temp_s = temp_s.replace('/', '\\')
 
     return temp_s
 
-# Override os functions to automatically normalize paths
+# Override os functions to use Java-based mocks
 _orig_os_makedirs = os.makedirs
 def _mock_os_makedirs(name, mode=0o777, exist_ok=False):
+    if 'os_java' in globals():
+        try:
+            return os_java.makedirs(_normalize_path(name), mode, exist_ok)
+        except: pass
     return _orig_os_makedirs(_normalize_path(name), mode, exist_ok)
 os.makedirs = _mock_os_makedirs
 
 _orig_os_mkdir = os.mkdir
 def _mock_os_mkdir(path, mode=0o777):
+    if 'os_java' in globals():
+        try:
+            return os_java.mkdir(_normalize_path(path), mode)
+        except: pass
     return _orig_os_mkdir(_normalize_path(path), mode)
 os.mkdir = _mock_os_mkdir
 
 _orig_os_path_exists = os.path.exists
 def _mock_os_path_exists(path):
+    if 'os_java' in globals():
+        try:
+            return os_java.exists(_normalize_path(path))
+        except: pass
     return _orig_os_path_exists(_normalize_path(path))
 os.path.exists = _mock_os_path_exists
 
 _orig_os_stat = os.stat
 def _mock_os_stat(path, *args, **kwargs):
+    if 'os_java' in globals():
+        try:
+            res = os_java.stat(_normalize_path(path))
+            if res:
+                return os.stat_result((
+                    int(res.get('st_mode', 0)), 0, 0, 0,
+                    int(res.get('st_uid', 0)), int(res.get('st_gid', 0)),
+                    int(res.get('st_size', 0)), float(res.get('st_atime', 0)),
+                    float(res.get('st_mtime', 0)), float(res.get('st_ctime', 0))
+                ))
+        except: pass
     return _orig_os_stat(_normalize_path(path), *args, **kwargs)
 os.stat = _mock_os_stat
 
@@ -583,11 +607,16 @@ def apply_mocks():
         return m
 
     # 1. Native & System Mocks
-    if not hasattr(os, 'geteuid'): os.geteuid = lambda: 0
-    if not hasattr(os, 'getuid'): os.getuid = lambda: 0
-    # Mock other POSIX-only functions to be no-ops on non-POSIX
-    for func in ['chown', 'lchown', 'lchmod', 'setegid', 'seteuid', 'setgid', 'setuid']:
-        if not hasattr(os, func): setattr(os, func, lambda *a, **kw: None)
+    if 'os_java' in globals():
+        os.geteuid = os_java.geteuid
+        os.getuid = os_java.getuid
+        for func in ['chown', 'lchown', 'lchmod', 'setegid', 'seteuid', 'setgid', 'setuid']:
+            setattr(os, func, getattr(os_java, func))
+    else:
+        if not hasattr(os, 'geteuid'): os.geteuid = lambda: 0
+        if not hasattr(os, 'getuid'): os.getuid = lambda: 0
+        for func in ['chown', 'lchown', 'lchmod', 'setegid', 'seteuid', 'setgid', 'setuid']:
+            if not hasattr(os, func): setattr(os, func, lambda *a, **kw: None)
 
     create_mock('_posixsubprocess', {'fork_exec': lambda *a, **kw: 0, 'cloexec_pipe': lambda: (0, 0)}, False)
     create_mock('fcntl', {'fcntl': lambda *a, **kw: 0, 'ioctl': lambda *a, **kw: 0, 'flock': lambda *a, **kw: 0, 'lockf': lambda *a, **kw: 0}, False)
