@@ -35,7 +35,7 @@
 - **概要**: [実際のコレクションを使ったテスト方法の設計](tech/Actual-Collection-Testing.md) に基づき、主要なモジュールのテストを統合。
 - **解決策**:
     - `ping`, `copy`, `file`, `stat`, `template`, `debug`, `command`, `shell`, `setup`, `lineinfile`, `replace`, `user`, `group`, `find`, `tempfile`, `hostname`, `slurp`, `assert`, `blockinfile`, `getent`, `fetch`, `uri`, `unarchive`, `include_vars` の統合テストを CI 環境へ統合済み。
-    - また、`set_fact`, `fail`, `gather_facts` を含む計 27 モジュールの動作を確認済み。
+    - また、`set_fact`, `fail`, `gather_facts`, `add_host`, `assemble`, `group_by`, `get_url`, `script`, `package_facts` を含む計 38 モジュールの動作を確認済み。
     - GraalPy および `ansible-core` のセットアップを GitHub Actions 上で自動化済み。
 
 ### [✓] Action Plugin の互換性向上 (Python-first)
