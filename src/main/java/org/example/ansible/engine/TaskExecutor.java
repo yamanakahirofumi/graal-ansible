@@ -234,7 +234,7 @@ public class TaskExecutor implements ITaskExecutor {
             setCurrentVariableManager(variableManager);
             try {
                 // Action Plugin detection
-                if (isActionPlugin(resolvedTask.action())) {
+                if (isActionPlugin(resolvedTask.action()) && !modules.containsKey(resolvedTask.action())) {
                     TaskResult actionResult = executeActionPlugin(resolvedTask, becomeContext, effectiveConnection, resolvedEnvironment, variables);
                     if (resolvedDelegateTo != null) {
                         Map<String, Object> dataWithDelegate = new HashMap<>(actionResult.data());

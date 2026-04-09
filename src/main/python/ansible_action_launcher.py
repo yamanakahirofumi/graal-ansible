@@ -27,14 +27,7 @@ def run_action_plugin():
         mock_task = Task()
         mock_task.action, mock_task.args = action_name, module_args
         # Initialize internal fields required by some Action Plugins (like copy)
-        mock_task._original_basename = os.path.basename(module_args.get('src', ''))
-
-        class MockShell:
-            def __init__(self): self.tmpdir = None
-        class ConnectionProxy:
-            def __init__(self, java_conn):
-                self._java_conn, self._shell = java_conn, MockShell()
-            def __getattr__(self, name): return getattr(self._java_conn, name)
+        mock_task._original_basename = os.path.basename(str(module_args.get('src', '')))
 
         l = ansible_bridge.MockLoader()
         if 'task_executor_java' in globals():
@@ -43,14 +36,19 @@ def run_action_plugin():
                 l.set_basedir(str(base_dir))
                 mock_task._origin.path = str(base_dir)
 
+        # Ensure action_loader mock has action_loader itself if needed (for shell -> command chain)
+        loader_mod = sys.modules['ansible.plugins.loader']
+        if not hasattr(loader_mod.action_loader, 'action_loader'):
+            loader_mod.action_loader.action_loader = loader_mod.action_loader
+
         plugin = ansible_bridge._create_action_plugin(
             action_name,
             task=mock_task,
-            connection=ConnectionProxy(connection_java),
+            connection=connection_java,
             play_context=PlayContext(),
             loader=l,
             templar=Templar(variables=task_vars),
-            shared_loader_obj=sys.modules['ansible.plugins.loader'].action_loader
+            shared_loader_obj=loader_mod.action_loader
         )
         return plugin.run(tmp=None, task_vars=task_vars)
 

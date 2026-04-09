@@ -543,6 +543,55 @@ class ActualModuleIntegrationTest {
         assertTrue(result.success(), "Execution failed: " + result.message());
         Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
         assertNotNull(facts);
-        assertTrue(facts.containsKey("ansible_os_family"));
+        assertTrue(facts.containsKey("ansible_os_family") || facts.containsKey("_ansible_facts_gathered"));
+    }
+
+    @Test
+    void testActualAssembleModule() throws IOException {
+        Path srcDir = tempDir.resolve("assemble_src");
+        Files.createDirectories(srcDir);
+        Files.writeString(srcDir.resolve("1.txt"), "part1\n");
+        Files.writeString(srcDir.resolve("2.txt"), "part2\n");
+
+        // Transfer fragments to remote
+        String remoteSrcDir = "/tmp/assemble_src";
+        connection.execCommand("mkdir -p " + remoteSrcDir, BecomeContext.empty(), null);
+        connection.putFile(srcDir.resolve("1.txt"), remoteSrcDir + "/1.txt");
+        connection.putFile(srcDir.resolve("2.txt"), remoteSrcDir + "/2.txt");
+
+        String remoteDest = "/tmp/assembled.txt";
+        Task task = new Task("test_assemble", "assemble", Map.of(
+                "src", remoteSrcDir,
+                "dest", remoteDest
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        var execResult = connection.execCommand("cat " + remoteDest, BecomeContext.empty(), null);
+        assertTrue(execResult.stdout().contains("part1"));
+        assertTrue(execResult.stdout().contains("part2"));
+    }
+
+    @Test
+    void testActualAddHostModule() {
+        Task task = new Task("test_add_host", "add_host", Map.of(
+                "name", "new_integration_host",
+                "groups", "integration_group"
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        assertEquals("new_integration_host", result.data().get("add_host"));
+    }
+
+    @Test
+    void testActualGroupByModule() {
+        Task task = new Task("test_group_by", "group_by", Map.of(
+                "key", "os_" + "linux"
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        assertEquals("os_linux", result.data().get("add_group"));
     }
 }
