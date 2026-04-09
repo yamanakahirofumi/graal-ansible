@@ -119,6 +119,10 @@ public class TaskExecutor implements ITaskExecutor {
         // Using IsolateNativeModules=false for stability with ansible-core
         builder.option("python.IsolateNativeModules", "false");
 
+        if (System.getProperty("os.name").toLowerCase().contains("win")) {
+            builder.option("python.PosixModuleBackend", "java");
+        }
+
         this.context = builder.build();
 
         // Pre-load the bridge

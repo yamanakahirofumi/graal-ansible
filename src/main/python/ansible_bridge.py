@@ -26,19 +26,21 @@ def _normalize_path(p):
         try: s = str(p)
         except: return p
 
-    # Handle absolute paths on Windows
-    if os.name == 'nt':
-        # Remove leading slash if it precedes a drive letter (e.g., /C:/path -> C:/path)
-        # But ONLY if it's followed by a drive letter and colon.
-        # Don't strip if it's just a root-relative path.
-        if len(s) > 2 and s[0] == '/' and s[2] == ':':
-            s = s[1:]
-        # If we have a path like /C:\Users\... it's likely mixed from different sources.
-        # Check for C:\ after a leading slash.
-        elif len(s) > 3 and s[0] == '/' and s[1].isalpha() and s[2] == ':' and s[3] == '\\':
-            s = s[1:]
+    # Skip URLs
+    if '://' in s: return s
 
+    # Aggressively handle absolute Windows paths that might have a leading slash
+    # e.g., /C:/Users or /C:\Users
+    # We do this regardless of os.name because the pattern is uniquely Windows.
+    if len(s) > 2 and s[0] == '/' and s[1].isalpha() and s[2] == ':':
+        s = s[1:]
+
+    # If it starts with a drive letter, it's definitely a Windows path
+    is_windows = len(s) >= 2 and s[1] == ':' and s[0].isalpha()
+
+    if is_windows or os.name == 'nt':
         s = s.replace('/', '\\')
+
     return s
 
 class JavaDictWrapper:
@@ -83,25 +85,23 @@ def _deep_convert(obj):
     if obj is None: return None
     if isinstance(obj, bool): return obj
     if isinstance(obj, (int, float)): return obj
-    if isinstance(obj, (str, bytes)):
-        return obj.decode('utf-8', errors='replace') if isinstance(obj, bytes) else obj
 
-    # Check for Java objects
+    # Check for Java objects first
     if hasattr(obj, 'getClass'):
         cls_name = obj.getClass().getName()
+        if 'String' in cls_name:
+            return _normalize_path(str(obj))
         if 'Map' in cls_name:
             return JavaDictWrapper(obj)
         if 'List' in cls_name or 'Set' in cls_name:
             res = []
             try:
-                # Use java iterator for reliability
                 it = obj.iterator()
                 while it.hasNext():
                     res.append(_deep_convert(it.next()))
             except:
                 try:
-                    for i in obj:
-                        res.append(_deep_convert(i))
+                    for i in obj: res.append(_deep_convert(i))
                 except: pass
             return res
         if 'TaskResult' in cls_name:
@@ -112,8 +112,15 @@ def _deep_convert(obj):
                 data['changed'] = obj.changed()
                 return data
             except: pass
-        try: return str(obj)
+        try:
+            s = str(obj)
+            if isinstance(s, str): return _normalize_path(s)
+            return s
         except: return obj
+
+    if isinstance(obj, (str, bytes)):
+        s = obj.decode('utf-8', errors='replace') if isinstance(obj, bytes) else obj
+        return _normalize_path(s)
 
     if isinstance(obj, JavaDictWrapper):
         return obj
@@ -170,7 +177,7 @@ class MockLoader:
     def get_real_file(self, file_path, decrypt=True): return file_path
     def get_text_file_contents(self, file_path, loader=None):
         fp = _normalize_path(file_path)
-        if not os.path.isabs(fp):
+        if not self.is_abs(fp):
             fp = os.path.join(self._basedir, fp)
         if fp and os.path.exists(fp):
             with open(fp, 'r', encoding='utf-8', errors='surrogateescape') as f:
@@ -178,8 +185,14 @@ class MockLoader:
         return "", False
     def cleanup_tmp_file(self, *args, **kwargs): pass
     def path_dwim(self, path): return _normalize_path(path)
+    def is_abs(self, path):
+        p = _normalize_path(path)
+        if len(p) >= 2 and p[1] == ':' and p[0].isalpha(): return True
+        return os.path.isabs(p)
     def load_from_file(self, file_path, *args, **kwargs):
         fp = _normalize_path(file_path)
+        if not self.is_abs(fp):
+            fp = os.path.join(self._basedir, fp)
         if fp and os.path.exists(fp):
             with open(fp, 'r', encoding='utf-8') as f:
                 import yaml
