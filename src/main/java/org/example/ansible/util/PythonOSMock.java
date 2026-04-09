@@ -67,9 +67,14 @@ public class PythonOSMock {
 
     private String convertToString(Object o) {
         if (o == null) return null;
-        if (o instanceof String) return (String) o;
-        if (o instanceof byte[]) return new String((byte[]) o, java.nio.charset.StandardCharsets.UTF_8);
-        String s = o.toString();
+        String s;
+        if (o instanceof String) {
+            s = (String) o;
+        } else if (o instanceof byte[]) {
+            s = new String((byte[]) o, java.nio.charset.StandardCharsets.UTF_8);
+        } else {
+            s = o.toString();
+        }
         if (s.startsWith("b'") && s.endsWith("'") && s.length() >= 3) {
             s = s.substring(2, s.length() - 1);
             return unescape(s);
