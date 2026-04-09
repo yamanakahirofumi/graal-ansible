@@ -1,15 +1,19 @@
 package org.example.ansible.util;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.PosixFileAttributes;
+import java.nio.file.attribute.PosixFilePermission;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Java implementation of os module functions for Python bridge.
+ * Absorb OS differences by utilizing OSHandler.
  */
 public class PythonOSMock {
     private final OSHandler osHandler;
@@ -30,6 +34,7 @@ public class PythonOSMock {
         String s = path;
 
         // Remove leading slashes from Windows absolute paths (e.g. /C:\... -> C:\...)
+        // This is a common issue when GraalPy interacts with Windows paths
         while (true) {
             if (s.length() > 3 && (s.charAt(0) == '/' || s.charAt(0) == '\\') && s.charAt(2) == ':' && Character.isLetter(s.charAt(1))) {
                 s = s.substring(1);
@@ -44,9 +49,12 @@ public class PythonOSMock {
             }
         }
 
-        // Fix backslashes for Windows if we are on Windows
-        if (System.getProperty("os.name").toLowerCase().contains("win") && s.contains(":")) {
+        // Use OSHandler's separator to normalize slashes
+        String targetSeparator = osHandler.getSeparator();
+        if ("\\".equals(targetSeparator)) {
             s = s.replace('/', '\\');
+        } else {
+            s = s.replace('\\', '/');
         }
 
         return s;
@@ -54,7 +62,7 @@ public class PythonOSMock {
 
     public boolean exists(String path) {
         if (path == null) return false;
-        return new File(normalizePath(path)).exists();
+        return Files.exists(Paths.get(normalizePath(path)));
     }
 
     public void makedirs(String path, int mode, boolean existOk) throws IOException {
@@ -70,30 +78,70 @@ public class PythonOSMock {
     }
 
     public Map<String, Object> stat(String path) {
-        File file = new File(normalizePath(path));
-        if (!file.exists()) {
+        Path p = Paths.get(normalizePath(path));
+        if (!Files.exists(p)) {
             return null;
         }
         Map<String, Object> result = new HashMap<>();
-        // Basic stat info
-        result.put("st_mode", file.isDirectory() ? 040755 : 0100644);
-        result.put("st_size", file.length());
-        result.put("st_mtime", file.lastModified() / 1000.0);
-        result.put("st_atime", file.lastModified() / 1000.0);
-        result.put("st_ctime", file.lastModified() / 1000.0);
-        result.put("st_uid", 0);
-        result.put("st_gid", 0);
+        try {
+            BasicFileAttributes attrs = Files.readAttributes(p, BasicFileAttributes.class);
+            result.put("st_size", attrs.size());
+            result.put("st_mtime", attrs.lastModifiedTime().toMillis() / 1000.0);
+            result.put("st_atime", attrs.lastAccessTime().toMillis() / 1000.0);
+            result.put("st_ctime", attrs.creationTime().toMillis() / 1000.0);
+
+            int mode = attrs.isDirectory() ? 040000 : 0100000;
+
+            if (attrs instanceof PosixFileAttributes) {
+                PosixFileAttributes posix = (PosixFileAttributes) attrs;
+                result.put("st_uid", 1000); // Default for mock
+                result.put("st_gid", 1000);
+                mode |= decodePermissions(posix.permissions());
+            } else {
+                result.put("st_uid", 0);
+                result.put("st_gid", 0);
+                // Default permissions if not POSIX
+                mode |= attrs.isDirectory() ? 0755 : 0644;
+            }
+            result.put("st_mode", mode);
+
+        } catch (IOException e) {
+            return null;
+        }
         return result;
     }
 
-    // POSIX-only functions mocks
-    public int geteuid() { return 0; }
-    public int getuid() { return 0; }
-    public void chown(String path, int uid, int gid) { /* no-op */ }
-    public void lchown(String path, int uid, int gid) { /* no-op */ }
-    public void lchmod(String path, int mode) { /* no-op */ }
-    public void setegid(int gid) { /* no-op */ }
-    public void seteuid(int uid) { /* no-op */ }
-    public void setgid(int gid) { /* no-op */ }
-    public void setuid(int uid) { /* no-op */ }
+    private int decodePermissions(Set<PosixFilePermission> permissions) {
+        int mode = 0;
+        if (permissions.contains(PosixFilePermission.OWNER_READ)) mode |= 0400;
+        if (permissions.contains(PosixFilePermission.OWNER_WRITE)) mode |= 0200;
+        if (permissions.contains(PosixFilePermission.OWNER_EXECUTE)) mode |= 0100;
+        if (permissions.contains(PosixFilePermission.GROUP_READ)) mode |= 0040;
+        if (permissions.contains(PosixFilePermission.GROUP_WRITE)) mode |= 0020;
+        if (permissions.contains(PosixFilePermission.GROUP_EXECUTE)) mode |= 0010;
+        if (permissions.contains(PosixFilePermission.OTHERS_READ)) mode |= 0004;
+        if (permissions.contains(PosixFilePermission.OTHERS_WRITE)) mode |= 0002;
+        if (permissions.contains(PosixFilePermission.OTHERS_EXECUTE)) mode |= 0001;
+        return mode;
+    }
+
+    // POSIX-only functions mocks - can be further refined using OSHandler
+    public int geteuid() {
+        return "Linux".equals(osHandler.getOSFamily()) || "Darwin".equals(osHandler.getOSFamily()) ? 0 : 0;
+    }
+
+    public int getuid() {
+        return "Linux".equals(osHandler.getOSFamily()) || "Darwin".equals(osHandler.getOSFamily()) ? 0 : 0;
+    }
+
+    public void chown(String path, int uid, int gid) {
+        // Logic could be added here to use java.nio.file.attribute.UserPrincipalLookupService if supported
+    }
+
+    public void lchown(String path, int uid, int gid) { }
+    public void lchmod(String path, int mode) { }
+    public void setegid(int gid) { }
+    public void seteuid(int uid) { }
+    public void setgid(int gid) { }
+    public void setuid(int uid) { }
 }
