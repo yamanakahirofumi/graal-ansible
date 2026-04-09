@@ -29,8 +29,15 @@ def _normalize_path(p):
     # Handle absolute paths on Windows
     if os.name == 'nt':
         # Remove leading slash if it precedes a drive letter (e.g., /C:/path -> C:/path)
+        # But ONLY if it's followed by a drive letter and colon.
+        # Don't strip if it's just a root-relative path.
         if len(s) > 2 and s[0] == '/' and s[2] == ':':
             s = s[1:]
+        # If we have a path like /C:\Users\... it's likely mixed from different sources.
+        # Check for C:\ after a leading slash.
+        elif len(s) > 3 and s[0] == '/' and s[1].isalpha() and s[2] == ':' and s[3] == '\\':
+            s = s[1:]
+
         s = s.replace('/', '\\')
     return s
 
