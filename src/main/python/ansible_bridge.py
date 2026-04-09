@@ -29,10 +29,10 @@ def _normalize_path(p):
     # Skip URLs
     if '://' in s: return s
 
-    # Aggressively handle absolute Windows paths that might have a leading slash
-    # e.g., /C:/Users or /C:\Users
+    # Aggressively handle absolute Windows paths that might have a leading slash or backslash
+    # e.g., /C:/Users, /C:\Users, \C:\Users
     # We do this regardless of os.name because the pattern is uniquely Windows.
-    if len(s) > 2 and s[0] == '/' and s[1].isalpha() and s[2] == ':':
+    if len(s) > 2 and s[0] in ('/', '\\') and s[1].isalpha() and s[2] == ':':
         s = s[1:]
 
     # If it starts with a drive letter, it's definitely a Windows path
@@ -358,6 +358,11 @@ class AnsibleModule:
         # Ensure complex_args is a dict for items()
         if hasattr(ia, 'items'):
             for k, v in ia.items(): self.params[self.aliases.get(k, k)] = v
+
+        # Aggressive path normalization for all parameters on Windows-like paths
+        for k, v in self.params.items():
+            if isinstance(v, str) and (('\\' in v) or (len(v) > 2 and v[1] == ':') or (len(v) > 2 and v[0] in ('/', '\\') and v[2] == ':')):
+                self.params[k] = _normalize_path(v)
 
         # Simple type conversion for 'path'
         for k, v in spec.items():
