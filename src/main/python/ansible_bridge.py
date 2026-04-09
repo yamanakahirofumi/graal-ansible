@@ -5,6 +5,35 @@ import types
 import re
 from io import StringIO
 
+# Fail early if os_java mock is not available
+if 'os_java' not in globals():
+    raise ImportError("os_java mock not found in GraalPy context. Ensure TaskExecutor correctly injects PythonOSMock.")
+
+# Wrap Java os.stat to return a proper os.stat_result
+def _os_stat(path, *args, **kwargs):
+    res = os_java.stat(path)
+    if res is None:
+        raise FileNotFoundError(f"[Errno 2] No such file or directory: '{path}'")
+    # os.stat_result takes a tuple of 10 elements
+    return os.stat_result(tuple(res))
+
+# Override os functions to use Java-based mocks
+os.makedirs = os_java.makedirs
+os.mkdir = os_java.mkdir
+os.path.exists = os_java.exists
+os.stat = _os_stat
+os.geteuid = os_java.geteuid
+os.getuid = os_java.getuid
+os.getegid = os_java.getegid
+os.getgid = os_java.getgid
+os.chown = os_java.chown
+os.lchown = os_java.lchown
+os.lchmod = os_java.lchmod
+os.setegid = os_java.setegid
+os.seteuid = os_java.seteuid
+os.setgid = os_java.setgid
+os.setuid = os_java.setuid
+
 # Global context to hold current task state
 _current_task_context = {
     'complex_args': {},
@@ -14,83 +43,7 @@ _current_task_context = {
 }
 
 def _normalize_path(p):
-    if p is None: return None
-    if 'os_java' in globals():
-        try:
-            # Handle potential bytes from Ansible
-            s_val = p.decode('utf-8', errors='replace') if isinstance(p, bytes) else str(p)
-            return os_java.normalizePath(s_val)
-        except: pass
-
-    if isinstance(p, bytes):
-        try: s = p.decode('utf-8')
-        except: s = p.decode('latin-1', errors='replace')
-    elif isinstance(p, str):
-        s = p
-    else:
-        try: s = str(p)
-        except: return p
-
-    temp_s = s
-    while True:
-        if len(temp_s) > 3 and temp_s[0] in ('/', '\\') and temp_s[2] == ':' and temp_s[1].isalpha():
-            temp_s = temp_s[1:]
-        elif len(temp_s) > 2 and temp_s[0] in ('/', '\\') and temp_s[1] in ('/', '\\') and temp_s[2] != '\\':
-            if len(temp_s) > 3 and temp_s[3] == ':':
-                temp_s = temp_s[1:]
-            else:
-                break
-        else:
-            break
-
-    if os.name == 'nt' and ':' in temp_s:
-        temp_s = temp_s.replace('/', '\\')
-
-    return temp_s
-
-# Override os functions to use Java-based mocks
-_orig_os_makedirs = os.makedirs
-def _mock_os_makedirs(name, mode=0o777, exist_ok=False):
-    if 'os_java' in globals():
-        try:
-            return os_java.makedirs(_normalize_path(name), mode, exist_ok)
-        except: pass
-    return _orig_os_makedirs(_normalize_path(name), mode, exist_ok)
-os.makedirs = _mock_os_makedirs
-
-_orig_os_mkdir = os.mkdir
-def _mock_os_mkdir(path, mode=0o777):
-    if 'os_java' in globals():
-        try:
-            return os_java.mkdir(_normalize_path(path), mode)
-        except: pass
-    return _orig_os_mkdir(_normalize_path(path), mode)
-os.mkdir = _mock_os_mkdir
-
-_orig_os_path_exists = os.path.exists
-def _mock_os_path_exists(path):
-    if 'os_java' in globals():
-        try:
-            return os_java.exists(_normalize_path(path))
-        except: pass
-    return _orig_os_path_exists(_normalize_path(path))
-os.path.exists = _mock_os_path_exists
-
-_orig_os_stat = os.stat
-def _mock_os_stat(path, *args, **kwargs):
-    if 'os_java' in globals():
-        try:
-            res = os_java.stat(_normalize_path(path))
-            if res:
-                return os.stat_result((
-                    int(res.get('st_mode', 0)), 0, 0, 0,
-                    int(res.get('st_uid', 0)), int(res.get('st_gid', 0)),
-                    int(res.get('st_size', 0)), float(res.get('st_atime', 0)),
-                    float(res.get('st_mtime', 0)), float(res.get('st_ctime', 0))
-                ))
-        except: pass
-    return _orig_os_stat(_normalize_path(path), *args, **kwargs)
-os.stat = _mock_os_stat
+    return os_java.normalizePath(p)
 
 def _deep_convert(obj):
     if obj is None: return None
@@ -99,7 +52,6 @@ def _deep_convert(obj):
     if isinstance(obj, (int, float, bool)): return obj
 
     if hasattr(obj, 'getClass'):
-        # It's likely a Java object
         from java.util import Map, List, Set
         if isinstance(obj, Map):
             return {str(k): _deep_convert(v) for k, v in obj.items()}
@@ -128,13 +80,11 @@ def _deep_convert(obj):
     return obj
 
 def bind_task(complex_args, connection_java, become_context_java, environment_java):
-    # Ensure complex_args is a dict before deep convert if it's a Map proxy
     args = complex_args
     if hasattr(complex_args, 'getClass') and 'Map' in complex_args.getClass().getName():
         from java.util import HashMap
         args = HashMap(complex_args)
 
-    # Pre-process complex_args to handle Windows paths passed from Java
     converted_args = _deep_convert(args)
 
     _current_task_context.update({
@@ -149,7 +99,6 @@ def setup_sys_path(site_packages):
         for p in site_packages:
             p_str = _normalize_path(p)
             if p_str not in sys.path: sys.path.append(p_str)
-            # Link mocked packages to disk paths to allow loading non-mocked submodules
             for mname in ['ansible', 'ansible.module_utils', 'ansible.module_utils.common', 'ansible.module_utils.compat', 'ansible.module_utils._internal', 'ansible.module_utils.parsing', 'ansible.plugins', 'ansible.plugins.action']:
                 if mname in sys.modules:
                     m = sys.modules[mname]
@@ -159,7 +108,6 @@ def setup_sys_path(site_packages):
                         if os.path.exists(cand):
                             if cand not in m.__path__:
                                 m.__path__.insert(0, cand)
-                            # Update __file__ if it's missing or points to wrong place
                             target_file = os.path.join(cand, '__init__.py')
                             if not hasattr(m, '__file__') or not m.__file__ or not os.path.exists(str(m.__file__)):
                                 try:
@@ -256,17 +204,14 @@ class ActionBase:
         if 'task_executor_java' in globals():
             res = task_executor_java.execute_from_python(m_name, m_args, task_vars or {})
             if res is not None:
-                # Bridge Java Map proxy to Python dict robustly
                 try:
                     r_dict = {str(k): v for k, v in res.items()}
                 except:
                     try:
-                        # Maybe it's a TaskResult record or object
                         r_dict = {str(k): v for k, v in res.data().items()}
                         r_dict['failed'] = not res.success()
                         r_dict['changed'] = res.changed()
                     except:
-                        # Fallback to string parsing if necessary
                         s = str(res)
                         if 'data=' in s:
                             r_dict = {'changed': 'changed=true' in s.lower()}
@@ -376,7 +321,6 @@ class Templar:
                 return str(self.available_variables.get(var_name, match.group(0)))
             return re.sub(r'\{\{\s*(.*?)\s*\}\}', repl, msg)
     def evaluate_conditional(self, conditional, *args, **kwargs):
-        # Basic implementation for mock
         try:
             return eval(str(conditional), {}, self.available_variables)
         except:
@@ -432,11 +376,6 @@ class AnsibleModule:
             if 'dest' in self.params and self.params['dest'] is not None: self.params['path'] = self.params['dest']
             elif 'name' in self.params and self.params['name'] is not None: self.params['path'] = self.params['name']
 
-        # Crucial for 'file' module touch action
-        # The file module expects 'path' in the result of load_file_common_arguments
-        # which it uses as 'file_args'.
-        # We need to make sure that 'path' is correctly handled in params.
-
         if '_raw_params' in input_args: self.params['_raw_params'] = input_args['_raw_params']
         self.params['_uses_shell'] = input_args.get('_uses_shell', False)
         self.check_mode = self._debug = self._diff = False
@@ -450,7 +389,6 @@ class AnsibleModule:
         return tempfile.gettempdir()
     def exit_json(self, **kwargs):
         if 'changed' not in kwargs: kwargs['changed'] = False
-        # Inject stored file attributes if they were requested but missing from result
         for k, v in self._stored_file_args.items():
             if k not in kwargs and v is not None:
                 kwargs[k] = v
@@ -463,7 +401,6 @@ class AnsibleModule:
         print(json.dumps(kwargs))
         sys.exit(1)
     def run_command(self, args, **kwargs):
-        # 1. Emulator for 'getent' command
         if isinstance(args, list) and len(args) >= 2 and str(args[0]) == 'getent':
             db = str(args[1])
             key = str(args[2]) if len(args) > 2 else None
@@ -478,7 +415,6 @@ class AnsibleModule:
                 elif key is None:
                     return 0, "root:x:0:\ntestgroup:x:1001:\n", ""
 
-        # 2. Actual command execution via Java connection
         conn = _current_task_context['connection_java']
         if conn:
             cmd_str = " ".join(args) if isinstance(args, list) else args
@@ -490,9 +426,6 @@ class AnsibleModule:
 
             res = conn.execCommand(cmd_str, _current_task_context['become_context_java'], env_dict)
 
-            # Bridge ConnectionResult record/object to Python tuple
-            # Record field access in GraalPy can be tricky, especially with Record types.
-            # Using str(res) and regex with DOTALL is a very robust fallback for Java objects.
             s = str(res)
             if 'exitCode=' in s:
                 try:
@@ -506,11 +439,9 @@ class AnsibleModule:
                 except: pass
 
             try:
-                # Direct method calls
                 return (int(res.exitCode()), str(res.stdout()), str(res.stderr()))
             except:
                 try:
-                    # Attribute access
                     return (int(res.exitCode), str(res.stdout), str(res.stderr))
                 except:
                     return (-1, "", "Failed to access ConnectionResult: " + s)
@@ -565,7 +496,6 @@ class AnsibleModule:
         res = {}
         for k in ['mode', 'owner', 'group', 'seuser', 'serole', 'setype', 'selevel', 'attributes', 'unsafe_writes']:
             if k in params: res[k] = params[k]
-        # Very important for modules like 'file' that use these results to identify the target
         actual_path = path or params.get('path') or params.get('dest') or params.get('name')
         if actual_path:
             item = actual_path[0] if isinstance(actual_path, (list, tuple)) and len(actual_path) > 0 else actual_path
@@ -607,17 +537,6 @@ def apply_mocks():
         return m
 
     # 1. Native & System Mocks
-    if 'os_java' in globals():
-        os.geteuid = os_java.geteuid
-        os.getuid = os_java.getuid
-        for func in ['chown', 'lchown', 'lchmod', 'setegid', 'seteuid', 'setgid', 'setuid']:
-            setattr(os, func, getattr(os_java, func))
-    else:
-        if not hasattr(os, 'geteuid'): os.geteuid = lambda: 0
-        if not hasattr(os, 'getuid'): os.getuid = lambda: 0
-        for func in ['chown', 'lchown', 'lchmod', 'setegid', 'seteuid', 'setgid', 'setuid']:
-            if not hasattr(os, func): setattr(os, func, lambda *a, **kw: None)
-
     create_mock('_posixsubprocess', {'fork_exec': lambda *a, **kw: 0, 'cloexec_pipe': lambda: (0, 0)}, False)
     create_mock('fcntl', {'fcntl': lambda *a, **kw: 0, 'ioctl': lambda *a, **kw: 0, 'flock': lambda *a, **kw: 0, 'lockf': lambda *a, **kw: 0}, False)
     create_mock('resource', {'getrlimit': lambda *a, **kw: (1024, 1024), 'RLIMIT_NOFILE': 7}, False)
@@ -767,7 +686,6 @@ def apply_mocks():
             m.RoutingMarkerBehavior = type('RoMB', (), {'__init__': lambda *a, **kw: None})
 
     # 8. Module Utils
-    # Mock core packages as base for hybrid loading
     for mname in ['ansible', 'ansible.module_utils', 'ansible.module_utils.common', 'ansible.module_utils.compat', 'ansible.module_utils._internal', 'ansible.module_utils.parsing', 'ansible.plugins', 'ansible.plugins.action']:
         attrs = {}
         if mname == 'ansible.module_utils._internal':
@@ -895,7 +813,6 @@ def _create_action_plugin(action_name, task, connection, play_context, loader, t
             if os.path.exists(cand): path = cand; break
 
     if not path:
-        # Fallback to module execution if no action plugin found
         class ModuleAction(ActionBase):
             def run(self, tmp=None, task_vars=None):
                 return self._execute_module(module_name=action_name, module_args=self._task.args, task_vars=task_vars)
