@@ -594,4 +594,55 @@ class ActualModuleIntegrationTest {
         assertTrue(result.success(), "Execution failed: " + result.message());
         assertEquals("os_linux", result.data().get("add_group"));
     }
+
+    @Test
+    void testActualGetUrlModule() {
+        // Start a simple HTTP server in the container background
+        connection.execCommand("sh -c \"echo 'hello get_url' > /tmp/index_get_url.html && cd /tmp && (python3 -m http.server 8081 &)\"", BecomeContext.empty(), null);
+
+        // Wait a bit for server to start
+        try { Thread.sleep(2000); } catch (InterruptedException e) {}
+
+        String destPath = "/tmp/downloaded.html";
+        Task task = new Task("test_get_url", "get_url", Map.of(
+                "url", "http://localhost:8081/index_get_url.html",
+                "dest", destPath
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        // Clean up the server
+        connection.execCommand("pkill -f 'python3 -m http.server 8081'", BecomeContext.empty(), null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+
+        var execResult = connection.execCommand("cat " + destPath, BecomeContext.empty(), null);
+        assertEquals("hello get_url", execResult.stdout().trim());
+    }
+
+    @Test
+    void testActualScriptModule() throws IOException {
+        Path localScript = tempDir.resolve("test_script.sh");
+        Files.writeString(localScript, "#!/bin/sh\necho \"script ran successfully\"\n");
+
+        Task task = new Task("test_script", "script", Map.of(
+                "_raw_params", localScript.toString()
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        assertTrue(result.data().get("stdout").toString().contains("script ran successfully"));
+    }
+
+    @Test
+    void testActualPackageFactsModule() {
+        Task task = new Task("test_package_facts", "package_facts", Map.of(
+                "manager", "auto"
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
+        assertNotNull(facts);
+        assertTrue(facts.containsKey("packages"));
+    }
 }

@@ -112,6 +112,8 @@ class CommandShellIntegrationTest {
     @Test
     void testCommandWithEnv() {
         boolean isWindows = System.getProperty("os.name").toLowerCase().contains("win");
+        // Windows cmd.exe uses %VAR%, but if we use a shell like git-bash it might use $VAR.
+        // However, LocalConnection uses osHandler.getShellExecutable() which is typically cmd.exe on Windows.
         String echoVar = isWindows ? "echo %MY_VAR%" : "echo $MY_VAR";
 
         Map<String, String> env = Map.of("MY_VAR", "my_value");
@@ -123,7 +125,7 @@ class CommandShellIntegrationTest {
 
         TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
 
-        assertTrue(result.success(), result.message());
+        assertTrue(result.success(), "Execution failed: " + result.message() + " Data: " + result.data());
         // Note: shell expansion of $MY_VAR might only work in 'shell' or if 'command' is executed via shell
         // Our 'command' implementation currently uses osHandler.getShellExecutable() which IS a shell.
         String stdout = (String) result.data().get("stdout");

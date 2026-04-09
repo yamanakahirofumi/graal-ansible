@@ -26,11 +26,51 @@ def _normalize_path(p):
         try: s = str(p)
         except: return p
 
-    if os.name == 'nt' and len(s) > 2 and s[0] == '/' and s[2] == ':':
-        s = s[1:]
+    # Handle absolute paths on Windows
     if os.name == 'nt':
+        # Remove leading slash if it precedes a drive letter (e.g., /C:/path -> C:/path)
+        if len(s) > 2 and s[0] == '/' and s[2] == ':':
+            s = s[1:]
         s = s.replace('/', '\\')
     return s
+
+class JavaDictWrapper:
+    def __init__(self, obj):
+        self._obj = obj
+    def __getitem__(self, key):
+        return _deep_convert(self._obj.get(key))
+    def __setitem__(self, key, value):
+        self._obj.put(key, value)
+    def __delitem__(self, key):
+        self._obj.remove(key)
+    def __contains__(self, key):
+        return self._obj.containsKey(key)
+    def __iter__(self):
+        # Convert keys to list to avoid ConcurrentModificationException if needed,
+        # but Java Set iterator should be fine in GraalPy if not modified during iteration.
+        # Still, list() is safer.
+        return iter(list(self._obj.keySet()))
+    def __len__(self):
+        return self._obj.size()
+    def get(self, key, default=None):
+        if key in self: return self[key]
+        return default
+    def pop(self, key, *args):
+        if key in self:
+            val = self[key]
+            self._obj.remove(key)
+            return val
+        if args: return args[0]
+        raise KeyError(key)
+    def copy(self):
+        return dict(self.items())
+    def items(self):
+        res = {}
+        for k in self._obj.keySet():
+            res[str(k)] = _deep_convert(self._obj.get(k))
+        return res.items()
+    def update(self, other):
+        for k, v in other.items(): self[k] = v
 
 def _deep_convert(obj):
     if obj is None: return None
@@ -43,26 +83,24 @@ def _deep_convert(obj):
     if hasattr(obj, 'getClass'):
         cls_name = obj.getClass().getName()
         if 'Map' in cls_name:
-            res = {}
-            try:
-                it = obj.entrySet().iterator()
-                while it.hasNext():
-                    entry = it.next()
-                    res[str(entry.getKey())] = _deep_convert(entry.getValue())
-            except: pass
-            return res
+            return JavaDictWrapper(obj)
         if 'List' in cls_name or 'Set' in cls_name:
             res = []
             try:
+                # Use java iterator for reliability
                 it = obj.iterator()
                 while it.hasNext():
                     res.append(_deep_convert(it.next()))
-            except: pass
+            except:
+                try:
+                    for i in obj:
+                        res.append(_deep_convert(i))
+                except: pass
             return res
         if 'TaskResult' in cls_name:
             try:
                 data = _deep_convert(obj.data())
-                if not isinstance(data, dict): data = {}
+                if isinstance(data, JavaDictWrapper): data = data.copy()
                 data['failed'] = not obj.success()
                 data['changed'] = obj.changed()
                 return data
@@ -70,11 +108,19 @@ def _deep_convert(obj):
         try: return str(obj)
         except: return obj
 
+    if isinstance(obj, JavaDictWrapper):
+        return obj
     if isinstance(obj, dict):
         return {str(k): _deep_convert(v) for k, v in obj.items()}
     if isinstance(obj, (list, tuple, set, frozenset)):
         return [_deep_convert(i) for i in obj]
     return obj
+
+class CustomEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, JavaDictWrapper):
+            return obj.copy()
+        return super().default(obj)
 
 def bind_task(complex_args, connection_java, become_context_java, environment_java):
     args = complex_args
@@ -117,6 +163,8 @@ class MockLoader:
     def get_real_file(self, file_path, decrypt=True): return file_path
     def get_text_file_contents(self, file_path, loader=None):
         fp = _normalize_path(file_path)
+        if not os.path.isabs(fp):
+            fp = os.path.join(self._basedir, fp)
         if fp and os.path.exists(fp):
             with open(fp, 'r', encoding='utf-8', errors='surrogateescape') as f:
                 return f.read(), True
@@ -158,6 +206,7 @@ class PlayContext:
         self.verbosity = 10
         self.check_mode = False
         self.diff = False
+        self.become = False
 
 class ActionBase:
     def __init__(self, task, connection, play_context, loader, templar, shared_loader_obj):
@@ -183,6 +232,7 @@ class ActionBase:
             res = task_executor_java.execute_from_python(m_name, m_args, task_vars or {})
             if res is not None:
                 r_dict = _deep_convert(res)
+                if isinstance(r_dict, JavaDictWrapper): r_dict = r_dict.copy()
                 if not isinstance(r_dict, dict):
                     try: r_dict = dict(r_dict)
                     except: r_dict = {'failed': True, 'msg': 'Module result not a dict'}
@@ -247,9 +297,16 @@ class Templar:
         self._engine = MockEngine(self)
     def template(self, msg, *args, **kwargs):
         if msg is None or not isinstance(msg, str): return msg
+        if '{{' not in msg and '{%' not in msg: return msg
         try:
-            from jinja2 import Template
-            return Template(msg).render(**self.available_variables)
+            import jinja2
+            vars_dict = self.available_variables
+            if hasattr(vars_dict, 'copy'): vars_dict = vars_dict.copy()
+            elif hasattr(vars_dict, 'items'): vars_dict = dict(vars_dict.items())
+
+            env = jinja2.Environment()
+            t = env.from_string(msg)
+            return t.render(vars_dict)
         except: return msg
     def resolve_to_container(self, x): return x
     def evaluate_conditional(self, conditional=None, *args, **kwargs):
@@ -278,7 +335,9 @@ class AnsibleModule:
                     for al in v['aliases']: self.aliases[al] = k
             else: self.params[k] = None
         ia = _current_task_context['complex_args'] or {}
-        for k, v in ia.items(): self.params[self.aliases.get(k, k)] = v
+        # Ensure complex_args is a dict for items()
+        if hasattr(ia, 'items'):
+            for k, v in ia.items(): self.params[self.aliases.get(k, k)] = v
 
         # Simple type conversion for 'path'
         for k, v in spec.items():
@@ -298,6 +357,7 @@ class AnsibleModule:
             if kwargs.get(k) is None: kwargs[k] = v
 
         res = _deep_convert(kwargs)
+        if isinstance(res, JavaDictWrapper): res = res.copy()
         _last_module_result = res
         print(json.dumps(res))
         sys.exit(0)
@@ -305,6 +365,7 @@ class AnsibleModule:
         global _last_module_result
         kwargs['failed'] = True
         res = _deep_convert(kwargs)
+        if isinstance(res, JavaDictWrapper): res = res.copy()
         _last_module_result = res
         print(json.dumps(res))
         sys.exit(1)
@@ -316,7 +377,8 @@ class AnsibleModule:
         conn = _current_task_context['connection_java']
         if conn:
             cmd_str = " ".join(args) if isinstance(args, list) else args
-            res = conn.execCommand(cmd_str, _current_task_context['become_context_java'], None)
+            env = _current_task_context.get('environment_java')
+            res = conn.execCommand(cmd_str, _current_task_context['become_context_java'], env)
             return (int(res.exitCode()), str(res.stdout()), str(res.stderr()))
         return (1, '', 'No connection')
     def get_bin_path(self, arg, *a, **kw): return arg
@@ -327,6 +389,10 @@ class AnsibleModule:
     def md5(self, path):
         p = _normalize_path(path)
         if os.path.exists(p) and not os.path.isdir(p): return hashlib.md5(open(p, 'rb').read()).hexdigest()
+        return None
+    def digest_from_file(self, path, algorithm):
+        if algorithm == 'sha1': return self.sha1(path)
+        if algorithm == 'md5': return self.md5(path)
         return None
     def atomic_move(self, src, dest, **kwargs):
         shutil.move(_normalize_path(src), _normalize_path(dest))
@@ -408,11 +474,16 @@ def apply_mocks():
         'is_executable': lambda p: os.access(p, os.X_OK)
     })
 
+    def combine_vars(a, b, **kw):
+        res = a.copy() if hasattr(a, 'copy') else dict(a.items() if hasattr(a, 'items') else a)
+        res.update(b.items() if hasattr(b, 'items') else b)
+        return res
+
     create_mock('ansible.utils.vars', {
         'isidentifier': lambda s: True,
         'validate_variable_name': lambda s: True,
-        'merge_hash': lambda a, b, **kw: {**a, **b},
-        'combine_vars': lambda a, b, **kw: {**a, **b}
+        'merge_hash': combine_vars,
+        'combine_vars': combine_vars
     })
 
     loader_mod = create_mock('ansible.plugins.loader')
@@ -431,10 +502,13 @@ def apply_mocks():
     loader_mod.module_loader.find_plugin = lambda *a, **kw: None
     loader_mod.module_loader.find_plugin_with_context = lambda name, **kw: types.SimpleNamespace(resolved_fqcn=name)
 
-    create_mock('ansible.plugins.action', {'ActionBase': ActionBase})
+    create_mock('ansible.plugins.action', {'ActionBase': ActionBase, 'ActionModule': ActionBase})
     create_mock('ansible.playbook.task', {'Task': Task})
     create_mock('ansible.playbook.play_context', {'PlayContext': PlayContext})
-    create_mock('ansible.template', {'Templar': Templar, 'trust_as_template': lambda x: x})
+    def trust_as_template(x):
+        if isinstance(x, tuple) and len(x) > 0: return x[0]
+        return x
+    create_mock('ansible.template', {'Templar': Templar, 'trust_as_template': trust_as_template})
 
     dt_mod = create_mock('ansible.module_utils.facts.system.date_time')
     class MockDTColl:
@@ -507,7 +581,12 @@ def apply_mocks():
     eu.result_dict_from_captured_errors = lambda msg, errors: {'msg': msg, 'failed': True, 'exception': str(errors[0]) if errors else ''}
     create_mock('ansible._internal._errors._handler', {'ErrorHandler': type('ErrorHandler', (), {})})
 
-    create_mock('ansible._internal._templating', {'_jinja_bits': types.ModuleType('jinja_bits')})
+    _template_vars = types.ModuleType('_template_vars')
+    _template_vars.generate_ansible_template_vars = lambda *a, **kw: {}
+    create_mock('ansible._internal._templating', {
+        '_jinja_bits': types.ModuleType('jinja_bits'),
+        '_template_vars': _template_vars
+    })
     create_mock('ansible._internal._templating._engine', {'TemplateEngine': type('TemplateEngine', (), {})})
     create_mock('ansible._internal._templating._jinja_common', {
         'UndefinedMarker': type('UndefinedMarker', (), {}),
@@ -560,6 +639,14 @@ def _create_action_plugin(action_name, task, connection, play_context, loader, t
                 except: cn = ""
                 self.transport = 'local' if 'LocalConnection' in cn else 'ssh'
                 self.ansible_name = 'ansible.builtin.local'
+                self.become = False
+                self.check_password_prompt = lambda *a, **kw: False
+            def fetch_file(self, in_path, out_path):
+                from java.nio.file import Paths
+                return self._obj.fetchFile(str(in_path), Paths.get(str(out_path)))
+            def put_file(self, in_path, out_path):
+                from java.nio.file import Paths
+                return self._obj.putFile(Paths.get(str(in_path)), str(out_path))
             def __getattr__(self, name): return getattr(self._obj, name)
         c = Proxy(connection)
 
@@ -575,7 +662,7 @@ def execute_module(module_name, complex_args, module_code=None):
     if module_name in ['setup', 'ansible.builtin.setup', 'ansible.legacy.setup']:
         res = {'ansible_facts': {'ansible_os_family': 'Mocked'}, 'changed': False}
         _last_module_result = res
-        return json.dumps(res)
+        return json.dumps(res, cls=CustomEncoder)
 
     import __main__
     __main__._module_fqn = f"ansible.builtin.{module_name}"
@@ -594,12 +681,12 @@ def execute_module(module_name, complex_args, module_code=None):
             with open(path, 'rb') as f:
                 exec(compile(f.read(), path, 'exec'), {'__name__': '__main__', '__file__': path, '__package__': 'ansible.modules'})
 
-        return json.dumps(_last_module_result) if _last_module_result else sys.stdout.getvalue()
+        return json.dumps(_last_module_result, cls=CustomEncoder) if _last_module_result else sys.stdout.getvalue()
     except SystemExit:
-        return json.dumps(_last_module_result) if _last_module_result else sys.stdout.getvalue()
+        return json.dumps(_last_module_result, cls=CustomEncoder) if _last_module_result else sys.stdout.getvalue()
     except Exception as e:
         import traceback
-        return json.dumps({'failed': True, 'msg': str(e), 'traceback': traceback.format_exc()})
+        return json.dumps({'failed': True, 'msg': str(e), 'traceback': traceback.format_exc()}, cls=CustomEncoder)
     finally:
         sys.stdout = old_stdout
 

@@ -58,4 +58,4 @@ def run_action_plugin():
 
 import json
 res = run_action_plugin()
-result = json.dumps(res)
+result = json.dumps(res, cls=ansible_bridge.CustomEncoder)

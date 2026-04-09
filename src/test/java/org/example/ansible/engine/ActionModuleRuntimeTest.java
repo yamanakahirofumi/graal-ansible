@@ -138,6 +138,11 @@ class ActionModuleRuntimeTest {
         TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
 
         assertTrue(result.success(), "add_host failed: " + result.message());
-        assertEquals("new_guy", result.data().get("add_host"));
+        Object addHost = result.data().get("add_host");
+        if (addHost instanceof Map) {
+            assertEquals("new_guy", ((Map<?, ?>) addHost).get("host_name"));
+        } else {
+            assertEquals("new_guy", addHost);
+        }
     }
 }
