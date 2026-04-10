@@ -79,4 +79,15 @@ class ActionPluginTest {
         assertFalse(result.success());
         // assert module usually returns evaluated results in 'assertion' or similar
     }
+
+    @Test
+    void testSetFactIntegration() {
+        Task task = new Task("Test Set Fact Integration", "set_fact", Map.of("integration_fact", "integration_value"));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), result.message());
+
+        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
+        assertNotNull(facts);
+        assertEquals("integration_value", facts.get("integration_fact"));
+    }
 }

@@ -608,4 +608,17 @@ class ActualModuleIntegrationTest {
         assertEquals(1, hostResults.size());
         assertEquals("imported", hostResults.get(0).data().get("msg"));
     }
+
+    @Test
+    void testActualSetFactModule() {
+        Task task = new Task("test_set_fact", "set_fact", Map.of(
+                "my_actual_fact", "actual_value"
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
+        assertNotNull(facts, "ansible_facts should be present. Full data: " + result.data());
+        assertEquals("actual_value", facts.get("my_actual_fact"));
+    }
 }
