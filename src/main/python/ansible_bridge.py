@@ -339,66 +339,65 @@ class AnsibleModule:
             spec_conv, input_args, kwargs_conv,
             _current_task_context.get('connection_java'),
             _current_task_context.get('become_context_java'),
-            _current_task_context.get('environment_java')
+            _current_task_context.get('environment_java'),
+            print, sys.exit
         )
-        self.params = self._java_mock.getParams()
-        self.check_mode = self._java_mock.isCheckMode()
-        self._debug = self._java_mock.isDebug()
-        self._diff = self._java_mock.isDiff()
+        self.params = _deep_convert(self._java_mock.getParams())
+        self.check_mode = self._java_mock.getCheck_mode()
+        self._debug = self._java_mock.get_debug()
+        self._diff = self._java_mock.get_diff()
         self.boolean = self.boolean_value
 
     def boolean_value(self, x):
-        return self._java_mock.booleanValue(x)
+        return self._java_mock.boolean_value(x)
 
     @property
     def tmpdir(self):
-        return _normalize_path(self._java_mock.getTmpDir())
+        return _normalize_path(self._java_mock.getTmpdir())
 
     def exit_json(self, **kwargs):
-        res = _deep_convert(self._java_mock.getExitArgs(kwargs))
-        print(json.dumps(res)); sys.exit(0)
+        self._java_mock.exit_json(_deep_convert(kwargs))
 
     def fail_json(self, **kwargs):
-        res = _deep_convert(self._java_mock.getFailArgs(kwargs))
-        print(json.dumps(res)); sys.exit(1)
+        self._java_mock.fail_json(_deep_convert(kwargs))
 
     def run_command(self, args, **kwargs):
-        res = self._java_mock.runCommand(args)
+        res = self._java_mock.run_command(args)
         return (int(res[0]), str(res[1]), str(res[2]))
 
     def get_bin_path(self, arg, required=False, opt_dirs=None):
-        return self._java_mock.getBinPath(arg, required, opt_dirs or [])
+        return self._java_mock.get_bin_path(arg, required, opt_dirs or [])
 
     def sha1(self, path): return self._java_mock.sha1(path)
     def md5(self, path): return self._java_mock.md5(path)
     def sha256(self, path): return self._java_mock.sha256(path)
 
     def atomic_move(self, src, dest, unsafe_writes=False, **kwargs):
-        self._java_mock.atomicMove(src, dest)
+        self._java_mock.atomic_move(src, dest)
 
-    def debug(self, msg): self._java_mock.log(msg)
-    def warn(self, msg): self._java_mock.log(msg)
+    def debug(self, msg): self._java_mock.debug(msg)
+    def warn(self, msg): self._java_mock.warn(msg)
     def deprecate(self, msg, version=None, date=None, collection_name=None):
-        self._java_mock.log(msg)
+        self._java_mock.deprecate(msg, version, date, collection_name)
 
     def digest_from_file(self, filename, algorithm):
-        return self._java_mock.digestFromFile(filename, algorithm)
+        return self._java_mock.digest_from_file(filename, algorithm)
 
     def get_file_attributes(self, path):
-        return _deep_convert(self._java_mock.getFileAttributes(path))
+        return _deep_convert(self._java_mock.get_file_attributes(path))
 
     def load_file_common_arguments(self, params, path=None):
-        return _deep_convert(self._java_mock.loadFileCommonArguments(params, path))
+        return _deep_convert(self._java_mock.load_file_common_arguments(params, path))
 
     def set_fs_attributes_if_different(self, file_args, changed, diff=None, expand=True):
-        self._java_mock.setFileAttributes(file_args)
+        self._java_mock.set_fs_attributes_if_different(file_args, changed)
         return changed
     def set_file_attributes_if_different(self, file_args, changed, diff=None, expand=True):
-        self._java_mock.setFileAttributes(file_args)
+        self._java_mock.set_file_attributes_if_different(file_args, changed)
         return changed
 
     def makedirs_safe(self, path, mode=None):
-        self._java_mock.makedirsSafe(path, mode)
+        self._java_mock.makedirs_safe(path, mode)
 
 # --- Mock Application ---
 

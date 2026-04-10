@@ -3,6 +3,8 @@ package org.example.ansible.util;
 import org.example.ansible.connection.BecomeContext;
 import org.example.ansible.connection.Connection;
 import org.example.ansible.connection.ConnectionResult;
+import org.graalvm.polyglot.Value;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -19,12 +21,16 @@ import java.util.*;
  * Java implementation of AnsibleModule logic for GraalPy bridge.
  */
 public class PythonAnsibleModuleMock implements Serializable {
+    private static final ObjectMapper objectMapper = new ObjectMapper();
+
     private final Map<String, Object> params = new HashMap<>();
     private final Map<String, String> aliases = new HashMap<>();
     private final PythonOSMock osMock;
     private final Connection connection;
     private final BecomeContext becomeContext;
     private final Map<String, String> environment;
+    private final Value pythonPrint;
+    private final Value pythonExit;
 
     private final boolean checkMode;
     private final boolean debug;
@@ -34,11 +40,13 @@ public class PythonAnsibleModuleMock implements Serializable {
     public PythonAnsibleModuleMock(Map<String, Object> argumentSpec, Map<String, Object> inputArgs,
                                  Map<String, Object> kwargs, PythonOSMock osMock,
                                  Connection connection, BecomeContext becomeContext,
-                                 Map<String, String> environment) {
+                                 Map<String, String> environment, Value pythonPrint, Value pythonExit) {
         this.osMock = osMock;
         this.connection = connection;
         this.becomeContext = becomeContext;
         this.environment = environment;
+        this.pythonPrint = pythonPrint;
+        this.pythonExit = pythonExit;
 
         // Initialize flags from inputArgs
         this.checkMode = inputArgs != null && Truthiness.isTrue(inputArgs.get("_ansible_check_mode"));
@@ -51,7 +59,7 @@ public class PythonAnsibleModuleMock implements Serializable {
         }
 
         // Logic similar to Python's add_file_common_args
-        if (kwargs != null && Boolean.TRUE.equals(kwargs.get("add_file_common_args"))) {
+        if (kwargs != null && Truthiness.isTrue(kwargs.get("add_file_common_args"))) {
             effectiveSpec.put("path", Map.of("type", "str", "aliases", List.of("dest", "name")));
             effectiveSpec.put("mode", Map.of("type", "raw"));
             effectiveSpec.put("owner", Map.of("type", "str"));
@@ -142,27 +150,54 @@ public class PythonAnsibleModuleMock implements Serializable {
         return params;
     }
 
-    public boolean isCheckMode() {
-        return checkMode;
-    }
+    public boolean getCheck_mode() { return checkMode; }
+    public boolean get_debug() { return debug; }
+    public boolean get_diff() { return diff; }
 
-    public boolean isDebug() {
-        return debug;
-    }
-
-    public boolean isDiff() {
-        return diff;
-    }
-
-    public boolean booleanValue(Object v) {
+    public boolean boolean_value(Object v) {
         return Truthiness.isTrue(v);
     }
 
-    public String getTmpDir() {
+    public String getTmpdir() {
         return System.getProperty("java.io.tmpdir");
     }
 
-    public Object[] runCommand(Object argsObj) {
+    public void exit_json(Map<String, Object> kwargs) {
+        Map<String, Object> res = new HashMap<>();
+        if (kwargs != null) res.putAll(kwargs);
+        if (!res.containsKey("changed")) res.put("changed", false);
+        for (Map.Entry<String, Object> entry : storedFileArgs.entrySet()) {
+            if (!res.containsKey(entry.getKey()) && entry.getValue() != null) {
+                res.put(entry.getKey(), entry.getValue());
+            }
+        }
+        outputAndExit(res, 0);
+    }
+
+    public void fail_json(Map<String, Object> kwargs) {
+        Map<String, Object> res = new HashMap<>();
+        if (kwargs != null) res.putAll(kwargs);
+        res.put("failed", true);
+        if (!res.containsKey("msg")) res.put("msg", "Module failed");
+        outputAndExit(res, 1);
+    }
+
+    private void outputAndExit(Map<String, Object> result, int code) {
+        try {
+            String json = objectMapper.writeValueAsString(result);
+            if (pythonPrint != null) {
+                pythonPrint.execute(json);
+            }
+            if (pythonExit != null) {
+                pythonExit.execute(code);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            if (pythonExit != null) pythonExit.execute(1);
+        }
+    }
+
+    public Object[] run_command(Object argsObj) {
         if (connection == null) {
             return new Object[]{1, "", "No connection"};
         }
@@ -220,7 +255,7 @@ public class PythonAnsibleModuleMock implements Serializable {
         }
     }
 
-    public String digestFromFile(Object filename, Object algorithm) {
+    public String digest_from_file(Object filename, Object algorithm) {
         if (algorithm == null) return null;
         // Ansible algorithm names might differ from Java's
         String javaAlg = algorithm.toString().toUpperCase();
@@ -237,7 +272,7 @@ public class PythonAnsibleModuleMock implements Serializable {
         return sb.toString();
     }
 
-    public void atomicMove(Object src, Object dest) throws IOException {
+    public void atomic_move(Object src, Object dest) throws IOException {
         String sPath = osMock.normalizePath(src);
         String dPath = osMock.normalizePath(dest);
         if (sPath == null || dPath == null) return;
@@ -246,7 +281,7 @@ public class PythonAnsibleModuleMock implements Serializable {
         Files.move(s, d, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
     }
 
-    public Map<String, Object> getFileAttributes(Object path) {
+    public Map<String, Object> get_file_attributes(Object path) {
         String p = osMock.normalizePath(path);
         if (!osMock.exists(p)) return Collections.emptyMap();
 
@@ -263,7 +298,7 @@ public class PythonAnsibleModuleMock implements Serializable {
         return attrs;
     }
 
-    public Map<String, Object> loadFileCommonArguments(Map<String, Object> params, Object path) {
+    public Map<String, Object> load_file_common_arguments(Map<String, Object> params, Object path) {
         Map<String, Object> res = new HashMap<>();
         String[] keys = {"mode", "owner", "group", "seuser", "serole", "setype", "selevel", "attributes", "unsafe_writes"};
         for (String k : keys) {
@@ -287,41 +322,25 @@ public class PythonAnsibleModuleMock implements Serializable {
         return res;
     }
 
-    public void setFileAttributes(Map<String, Object> fileArgs) {
+    public void set_file_attributes_if_different(Map<String, Object> fileArgs, boolean changed) {
         if (fileArgs != null) {
             storedFileArgs.putAll(fileArgs);
         }
     }
 
-    public Map<String, Object> getExitArgs(Map<String, Object> kwargs) {
-        Map<String, Object> res = new HashMap<>();
-        if (kwargs != null) res.putAll(kwargs);
-        if (!res.containsKey("changed")) res.put("changed", false);
-        for (Map.Entry<String, Object> entry : storedFileArgs.entrySet()) {
-            if (!res.containsKey(entry.getKey()) && entry.getValue() != null) {
-                res.put(entry.getKey(), entry.getValue());
-            }
-        }
-        return res;
+    public void set_fs_attributes_if_different(Map<String, Object> fileArgs, boolean changed) {
+        set_file_attributes_if_different(fileArgs, changed);
     }
 
-    public Map<String, Object> getFailArgs(Map<String, Object> kwargs) {
-        Map<String, Object> res = new HashMap<>();
-        if (kwargs != null) res.putAll(kwargs);
-        res.put("failed", true);
-        if (!res.containsKey("msg")) res.put("msg", "Module failed");
-        return res;
-    }
-
-    public String getBinPath(Object arg, boolean required, List<Object> optDirs) {
+    public String get_bin_path(Object arg, boolean required, List<Object> optDirs) {
         return Objects.toString(arg);
     }
 
-    public void log(Object msg) {
-        // Logging can be added here if needed
-    }
+    public void debug(Object msg) { }
+    public void warn(Object msg) { }
+    public void deprecate(Object msg, Object version, Object date, Object collectionName) { }
 
-    public void makedirsSafe(Object path, Object mode) {
+    public void makedirs_safe(Object path, Object mode) {
         try {
             int m = mode instanceof Number ? ((Number) mode).intValue() : 0777;
             osMock.makedirs(path, m, true);
@@ -337,8 +356,9 @@ public class PythonAnsibleModuleMock implements Serializable {
 
         public PythonAnsibleModuleMock create(Map<String, Object> argumentSpec, Map<String, Object> inputArgs,
                                             Map<String, Object> kwargs, Connection connection,
-                                            BecomeContext becomeContext, Map<String, String> environment) {
-            return new PythonAnsibleModuleMock(argumentSpec, inputArgs, kwargs, osMock, connection, becomeContext, environment);
+                                            BecomeContext becomeContext, Map<String, String> environment,
+                                            Value pythonPrint, Value pythonExit) {
+            return new PythonAnsibleModuleMock(argumentSpec, inputArgs, kwargs, osMock, connection, becomeContext, environment, pythonPrint, pythonExit);
         }
     }
 }
