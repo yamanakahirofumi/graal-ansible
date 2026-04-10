@@ -329,55 +329,25 @@ class Templar:
 
 class AnsibleModule:
     def __init__(self, argument_spec, *args, **kwargs):
-        self.params = {}
-        self.aliases = {}
         self._stored_file_args = {}
         input_args = _current_task_context['complex_args'] or {}
-        effective_spec = argument_spec.copy() if argument_spec else {}
-        if kwargs.get('add_file_common_args'):
-            import sys
-            basic = sys.modules.get('ansible.module_utils.basic')
-            if basic and hasattr(basic, 'FILE_COMMON_ARGUMENTS'):
-                effective_spec.update(basic.FILE_COMMON_ARGUMENTS)
 
-        for k, v in effective_spec.items():
-            if isinstance(v, dict) and 'aliases' in v:
-                for alias in v['aliases']: self.aliases[alias] = k
+        # Use Java factory if available
+        if 'AnsibleModuleJava' in globals():
+            spec_conv = _deep_convert(argument_spec)
+            kwargs_conv = _deep_convert(kwargs)
+            self._java_mock = AnsibleModuleJava.create(
+                spec_conv, input_args, kwargs_conv,
+                _current_task_context.get('connection_java'),
+                _current_task_context.get('become_context_java'),
+                _current_task_context.get('environment_java')
+            )
+            self.params = self._java_mock.getParams()
+        else:
+            self.params = {}
+            # Fallback (legacy)
+            self.params.update(input_args)
 
-        for k, v in effective_spec.items():
-            if isinstance(v, dict) and 'default' in v:
-                self.params[k] = v['default']
-            else:
-                self.params[k] = None
-
-        for k, v in dict(input_args).items():
-            target_key = k
-            if k in self.aliases: target_key = self.aliases[k]
-
-            val = v
-            spec_entry = effective_spec.get(target_key)
-            if isinstance(spec_entry, dict):
-                t = spec_entry.get('type')
-                if t == 'list':
-                    if not isinstance(v, (list, tuple)): val = [v]
-                elif t == 'str' or t == 'path':
-                    item = v[0] if isinstance(v, (list, tuple)) and len(v) > 0 else v
-                    val = _normalize_path(item)
-                elif t == 'bool':
-                    val = str(v).lower() in ('yes', 'true', 't', '1', 'on')
-                elif t == 'int':
-                    try: val = int(v)
-                    except: pass
-
-            self.params[target_key] = val
-            if target_key != k: self.params[k] = val
-
-        if 'path' in self.params and self.params['path'] is None:
-            if 'dest' in self.params and self.params['dest'] is not None: self.params['path'] = self.params['dest']
-            elif 'name' in self.params and self.params['name'] is not None: self.params['path'] = self.params['name']
-
-        if '_raw_params' in input_args: self.params['_raw_params'] = input_args['_raw_params']
-        self.params['_uses_shell'] = input_args.get('_uses_shell', False)
         self.check_mode = self._debug = self._diff = False
         def mock_boolean(x, *a, **kw):
             return str(x).lower() in ('yes', 'true', 't', '1', 'on', 'y')
@@ -401,106 +371,40 @@ class AnsibleModule:
         print(json.dumps(kwargs))
         sys.exit(1)
     def run_command(self, args, **kwargs):
-        if isinstance(args, list) and len(args) >= 2 and str(args[0]) == 'getent':
-            db = str(args[1])
-            key = str(args[2]) if len(args) > 2 else None
-            if db == 'passwd':
-                if key == 'root':
-                    return 0, "root:x:0:0:root:/root:/bin/bash\n", ""
-                elif key is None:
-                    return 0, "root:x:0:0:root:/root:/bin/bash\ntestuser:x:1001:1001:testuser:/home/testuser:/bin/bash\n", ""
-            elif db == 'group':
-                if key == 'root':
-                    return 0, "root:x:0:\n", ""
-                elif key is None:
-                    return 0, "root:x:0:\ntestgroup:x:1001:\n", ""
-
-        conn = _current_task_context['connection_java']
-        if conn:
-            cmd_str = " ".join(args) if isinstance(args, list) else args
-            env_java = _current_task_context['environment_java']
-            env_dict = None
-            if env_java:
-                try: env_dict = dict(env_java)
-                except: pass
-
-            res = conn.execCommand(cmd_str, _current_task_context['become_context_java'], env_dict)
-
-            s = str(res)
-            if 'exitCode=' in s:
-                try:
-                    ec_m = re.search(r'exitCode=(-?\d+)', s)
-                    exit_code = int(ec_m.group(1)) if ec_m else -1
-                    stdout_m = re.search(r'stdout=(.*?), stderr=', s, re.DOTALL)
-                    stdout = stdout_m.group(1) if stdout_m else ""
-                    stderr_m = re.search(r'stderr=(.*?), exitCode=', s, re.DOTALL)
-                    stderr = stderr_m.group(1) if stderr_m else ""
-                    return (exit_code, stdout, stderr)
-                except: pass
-
-            try:
-                return (int(res.exitCode()), str(res.stdout()), str(res.stderr()))
-            except:
-                try:
-                    return (int(res.exitCode), str(res.stdout), str(res.stderr))
-                except:
-                    return (-1, "", "Failed to access ConnectionResult: " + s)
-        return (1, '', 'No connection')
+        if hasattr(self, '_java_mock'):
+            res = self._java_mock.runCommand(args)
+            return (int(res[0]), str(res[1]), str(res[2]))
+        return (1, '', 'Java mock not available')
     def get_bin_path(self, arg, required=False, opt_dirs=None): return arg
     def sha1(self, path):
-        import hashlib
-        p = _normalize_path(path)
-        try:
-            with open(p, 'rb') as f: return hashlib.sha1(f.read()).hexdigest()
-        except: return None
+        if hasattr(self, '_java_mock'): return self._java_mock.sha1(path)
+        return None
     def md5(self, path):
-        import hashlib
-        p = _normalize_path(path)
-        try:
-            with open(p, 'rb') as f: return hashlib.md5(f.read()).hexdigest()
-        except: return None
+        if hasattr(self, '_java_mock'): return self._java_mock.md5(path)
+        return None
     def sha256(self, path):
-        import hashlib
-        p = _normalize_path(path)
-        try:
-            with open(p, 'rb') as f: return hashlib.sha256(f.read()).hexdigest()
-        except: return None
+        if hasattr(self, '_java_mock'): return self._java_mock.sha256(path)
+        return None
     def atomic_move(self, src, dest, unsafe_writes=False, **kwargs):
-        import os, shutil
-        shutil.move(_normalize_path(src), _normalize_path(dest))
+        if hasattr(self, '_java_mock'):
+            self._java_mock.atomicMove(src, dest)
+        else:
+            import shutil
+            shutil.move(_normalize_path(src), _normalize_path(dest))
     def debug(self, msg): pass
     def warn(self, msg): pass
     def deprecate(self, msg, version=None, date=None, collection_name=None): pass
     def digest_from_file(self, filename, algorithm):
-        import hashlib
-        p = _normalize_path(filename)
-        h = hashlib.new(algorithm)
-        with open(p, 'rb') as f:
-            for chunk in iter(lambda: f.read(4096), b""):
-                h.update(chunk)
-        return h.hexdigest()
+        if hasattr(self, '_java_mock'): return self._java_mock.digestFromFile(filename, algorithm)
+        return None
     def get_file_attributes(self, path):
-        import os, stat
-        p = _normalize_path(path)
-        if not os.path.exists(p): return {}
-        st = os.stat(p)
-        return {
-            'mode': oct(stat.S_IMODE(st.st_mode))[2:],
-            'owner': str(st.st_uid),
-            'group': str(st.st_gid),
-            'size': st.st_size,
-            'uid': st.st_uid,
-            'gid': st.st_gid
-        }
+        if hasattr(self, '_java_mock'):
+            return _deep_convert(self._java_mock.getFileAttributes(path))
+        return {}
     def load_file_common_arguments(self, params, path=None):
-        res = {}
-        for k in ['mode', 'owner', 'group', 'seuser', 'serole', 'setype', 'selevel', 'attributes', 'unsafe_writes']:
-            if k in params: res[k] = params[k]
-        actual_path = path or params.get('path') or params.get('dest') or params.get('name')
-        if actual_path:
-            item = actual_path[0] if isinstance(actual_path, (list, tuple)) and len(actual_path) > 0 else actual_path
-            res['path'] = _normalize_path(item)
-        return res
+        if hasattr(self, '_java_mock'):
+            return _deep_convert(self._java_mock.loadFileCommonArguments(params, path))
+        return {}
     def set_fs_attributes_if_different(self, file_args, changed, diff=None, expand=True):
         if file_args: self._stored_file_args.update(file_args)
         return changed
@@ -508,11 +412,14 @@ class AnsibleModule:
         if file_args: self._stored_file_args.update(file_args)
         return changed
     def makedirs_safe(self, path, mode=None):
-        import os
-        p = _normalize_path(path)
-        if not os.path.exists(p):
-            try: os.makedirs(p, mode=mode if mode is not None else 0o777)
-            except: pass
+        if hasattr(self, '_java_mock'):
+            self._java_mock.makedirsSafe(path, mode)
+        else:
+            import os
+            p = _normalize_path(path)
+            if not os.path.exists(p):
+                try: os.makedirs(p, mode=mode if mode is not None else 0o777)
+                except: pass
 
 # --- Mock Application ---
 
