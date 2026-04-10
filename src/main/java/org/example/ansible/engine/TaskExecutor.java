@@ -15,6 +15,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.example.ansible.plugin.ActionPlugin;
 import org.example.ansible.module.python.PythonModule;
+import org.example.ansible.util.PythonAnsibleModuleMock;
 import org.example.ansible.util.PythonEnv;
 import org.example.ansible.util.PythonOSMock;
 
@@ -127,6 +128,7 @@ public class TaskExecutor implements ITaskExecutor {
         // Pre-load the bridge
         try {
             this.context.getBindings("python").putMember("os_java", this.pythonOSMock);
+            this.context.getBindings("python").putMember("AnsibleModuleJava", new PythonAnsibleModuleMock.Factory(this.pythonOSMock));
             this.context.eval(loadResource("ansible_bridge.py"));
         } catch (Exception e) {
             throw new RuntimeException("Failed to pre-load ansible_bridge.py", e);
