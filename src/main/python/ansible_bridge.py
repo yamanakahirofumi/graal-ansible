@@ -358,6 +358,8 @@ class AnsibleModule:
 
     @property
     def tmpdir(self):
+        if hasattr(self, '_java_mock'):
+            return _normalize_path(self._java_mock.getTmpDir())
         import tempfile
         return tempfile.gettempdir()
 

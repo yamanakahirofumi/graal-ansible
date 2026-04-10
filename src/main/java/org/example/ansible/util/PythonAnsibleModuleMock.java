@@ -158,6 +158,10 @@ public class PythonAnsibleModuleMock implements Serializable {
         return Truthiness.isTrue(v);
     }
 
+    public String getTmpDir() {
+        return System.getProperty("java.io.tmpdir");
+    }
+
     public Object[] runCommand(Object argsObj) {
         if (connection == null) {
             return new Object[]{1, "", "No connection"};
