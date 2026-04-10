@@ -26,6 +26,11 @@ public class PythonAnsibleModuleMock implements Serializable {
     private final BecomeContext becomeContext;
     private final Map<String, String> environment;
 
+    private final boolean checkMode;
+    private final boolean debug;
+    private final boolean diff;
+    private final Map<String, Object> storedFileArgs = new HashMap<>();
+
     public PythonAnsibleModuleMock(Map<String, Object> argumentSpec, Map<String, Object> inputArgs,
                                  Map<String, Object> kwargs, PythonOSMock osMock,
                                  Connection connection, BecomeContext becomeContext,
@@ -34,6 +39,11 @@ public class PythonAnsibleModuleMock implements Serializable {
         this.connection = connection;
         this.becomeContext = becomeContext;
         this.environment = environment;
+
+        // Initialize flags from inputArgs
+        this.checkMode = inputArgs != null && Truthiness.isTrue(inputArgs.get("_ansible_check_mode"));
+        this.debug = inputArgs != null && Truthiness.isTrue(inputArgs.get("_ansible_debug"));
+        this.diff = inputArgs != null && Truthiness.isTrue(inputArgs.get("_ansible_diff"));
 
         Map<String, Object> effectiveSpec = new HashMap<>();
         if (argumentSpec != null) {
@@ -99,7 +109,7 @@ public class PythonAnsibleModuleMock implements Serializable {
                         }
                         val = osMock.normalizePath(s);
                     } else if ("bool".equals(type)) {
-                        val = isTruthy(v);
+                        val = Truthiness.isTrue(v);
                     } else if ("int".equals(type)) {
                         try {
                             val = Integer.parseInt(v.toString());
@@ -128,15 +138,24 @@ public class PythonAnsibleModuleMock implements Serializable {
         }
     }
 
-    private boolean isTruthy(Object v) {
-        if (v == null) return false;
-        if (v instanceof Boolean) return (Boolean) v;
-        String s = v.toString().toLowerCase();
-        return Arrays.asList("yes", "true", "t", "1", "on", "y").contains(s);
-    }
-
     public Map<String, Object> getParams() {
         return params;
+    }
+
+    public boolean isCheckMode() {
+        return checkMode;
+    }
+
+    public boolean isDebug() {
+        return debug;
+    }
+
+    public boolean isDiff() {
+        return diff;
+    }
+
+    public boolean booleanValue(Object v) {
+        return Truthiness.isTrue(v);
     }
 
     public Object[] runCommand(Object argsObj) {
@@ -262,6 +281,40 @@ public class PythonAnsibleModuleMock implements Serializable {
             res.put("path", osMock.normalizePath(s));
         }
         return res;
+    }
+
+    public void setFileAttributes(Map<String, Object> fileArgs) {
+        if (fileArgs != null) {
+            storedFileArgs.putAll(fileArgs);
+        }
+    }
+
+    public Map<String, Object> getExitArgs(Map<String, Object> kwargs) {
+        Map<String, Object> res = new HashMap<>();
+        if (kwargs != null) res.putAll(kwargs);
+        if (!res.containsKey("changed")) res.put("changed", false);
+        for (Map.Entry<String, Object> entry : storedFileArgs.entrySet()) {
+            if (!res.containsKey(entry.getKey()) && entry.getValue() != null) {
+                res.put(entry.getKey(), entry.getValue());
+            }
+        }
+        return res;
+    }
+
+    public Map<String, Object> getFailArgs(Map<String, Object> kwargs) {
+        Map<String, Object> res = new HashMap<>();
+        if (kwargs != null) res.putAll(kwargs);
+        res.put("failed", true);
+        if (!res.containsKey("msg")) res.put("msg", "Module failed");
+        return res;
+    }
+
+    public String getBinPath(Object arg, boolean required, List<Object> optDirs) {
+        return Objects.toString(arg);
+    }
+
+    public void log(Object msg) {
+        // Logging can be added here if needed
     }
 
     public void makedirsSafe(Object path, Object mode) {

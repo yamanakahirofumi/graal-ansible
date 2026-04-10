@@ -329,10 +329,8 @@ class Templar:
 
 class AnsibleModule:
     def __init__(self, argument_spec, *args, **kwargs):
-        self._stored_file_args = {}
         input_args = _current_task_context['complex_args'] or {}
 
-        # Use Java factory if available
         if 'AnsibleModuleJava' in globals():
             spec_conv = _deep_convert(argument_spec)
             kwargs_conv = _deep_convert(kwargs)
@@ -343,39 +341,52 @@ class AnsibleModule:
                 _current_task_context.get('environment_java')
             )
             self.params = self._java_mock.getParams()
+            self.check_mode = self._java_mock.isCheckMode()
+            self._debug = self._java_mock.isDebug()
+            self._diff = self._java_mock.isDiff()
         else:
             self.params = {}
-            # Fallback (legacy)
             self.params.update(input_args)
+            self.check_mode = self._debug = self._diff = False
 
-        self.check_mode = self._debug = self._diff = False
-        def mock_boolean(x, *a, **kw):
-            return str(x).lower() in ('yes', 'true', 't', '1', 'on', 'y')
-        self.boolean = mock_boolean
+        self.boolean = self.boolean_value
+
+    def boolean_value(self, x):
+        if hasattr(self, '_java_mock'):
+            return self._java_mock.booleanValue(x)
+        return str(x).lower() in ('yes', 'true', 't', '1', 'on', 'y')
 
     @property
     def tmpdir(self):
         import tempfile
         return tempfile.gettempdir()
+
     def exit_json(self, **kwargs):
+        if hasattr(self, '_java_mock'):
+            res = _deep_convert(self._java_mock.getExitArgs(kwargs))
+            print(json.dumps(res)); sys.exit(0)
         if 'changed' not in kwargs: kwargs['changed'] = False
-        for k, v in self._stored_file_args.items():
-            if k not in kwargs and v is not None:
-                kwargs[k] = v
         print(json.dumps(kwargs)); sys.exit(0)
+
     def fail_json(self, **kwargs):
+        if hasattr(self, '_java_mock'):
+            res = _deep_convert(self._java_mock.getFailArgs(kwargs))
+            print(json.dumps(res)); sys.exit(1)
         kwargs['failed'] = True
         if 'msg' not in kwargs: kwargs['msg'] = 'Module failed'
-        kwargs['diagnostic_os_name'] = os.name
-        kwargs['diagnostic_sys_platform'] = sys.platform
-        print(json.dumps(kwargs))
-        sys.exit(1)
+        print(json.dumps(kwargs)); sys.exit(1)
+
     def run_command(self, args, **kwargs):
         if hasattr(self, '_java_mock'):
             res = self._java_mock.runCommand(args)
             return (int(res[0]), str(res[1]), str(res[2]))
         return (1, '', 'Java mock not available')
-    def get_bin_path(self, arg, required=False, opt_dirs=None): return arg
+
+    def get_bin_path(self, arg, required=False, opt_dirs=None):
+        if hasattr(self, '_java_mock'):
+            return self._java_mock.getBinPath(arg, required, opt_dirs or [])
+        return arg
+
     def sha1(self, path):
         if hasattr(self, '_java_mock'): return self._java_mock.sha1(path)
         return None
@@ -385,37 +396,46 @@ class AnsibleModule:
     def sha256(self, path):
         if hasattr(self, '_java_mock'): return self._java_mock.sha256(path)
         return None
+
     def atomic_move(self, src, dest, unsafe_writes=False, **kwargs):
         if hasattr(self, '_java_mock'):
             self._java_mock.atomicMove(src, dest)
         else:
             import shutil
             shutil.move(_normalize_path(src), _normalize_path(dest))
-    def debug(self, msg): pass
-    def warn(self, msg): pass
-    def deprecate(self, msg, version=None, date=None, collection_name=None): pass
+
+    def debug(self, msg):
+        if hasattr(self, '_java_mock'): self._java_mock.log(msg)
+    def warn(self, msg):
+        if hasattr(self, '_java_mock'): self._java_mock.log(msg)
+    def deprecate(self, msg, version=None, date=None, collection_name=None):
+        if hasattr(self, '_java_mock'): self._java_mock.log(msg)
+
     def digest_from_file(self, filename, algorithm):
         if hasattr(self, '_java_mock'): return self._java_mock.digestFromFile(filename, algorithm)
         return None
+
     def get_file_attributes(self, path):
         if hasattr(self, '_java_mock'):
             return _deep_convert(self._java_mock.getFileAttributes(path))
         return {}
+
     def load_file_common_arguments(self, params, path=None):
         if hasattr(self, '_java_mock'):
             return _deep_convert(self._java_mock.loadFileCommonArguments(params, path))
         return {}
+
     def set_fs_attributes_if_different(self, file_args, changed, diff=None, expand=True):
-        if file_args: self._stored_file_args.update(file_args)
+        if hasattr(self, '_java_mock'): self._java_mock.setFileAttributes(file_args)
         return changed
     def set_file_attributes_if_different(self, file_args, changed, diff=None, expand=True):
-        if file_args: self._stored_file_args.update(file_args)
+        if hasattr(self, '_java_mock'): self._java_mock.setFileAttributes(file_args)
         return changed
+
     def makedirs_safe(self, path, mode=None):
         if hasattr(self, '_java_mock'):
             self._java_mock.makedirsSafe(path, mode)
         else:
-            import os
             p = _normalize_path(path)
             if not os.path.exists(p):
                 try: os.makedirs(p, mode=mode if mode is not None else 0o777)
