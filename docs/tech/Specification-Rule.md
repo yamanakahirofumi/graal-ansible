@@ -19,11 +19,15 @@
 | ファイル名 | 推奨される記述内容（必須項目） |
 | :----------------------- | :--------------------------------------------------------------------------------------------------- |
 | `CLI-Specification.md`   | `ansible-playbook` 互換のコマンドライン引数、オプション、終了コードの仕様。                          |
+| `Process-Flow.md`        | 管理ノードからターゲットノードまでの全体フロー（本プロジェクトの基本設計方針）。                      |
 | `Playbook-Execution.md`  | Playbook の解析フロー、タスク実行順序、変数解決の優先順位、ループや条件分岐のサポート範囲。          |
 | `Inventory-System.md`    | 静的・動的インベントリのサポート形式（INI, YAML等）、グループ変数、ホスト変数の管理方法。            |
+| `Collection-Management.md`| コレクションの取得方法、プロジェクト構成、探索パスの優先順位。                                       |
 | `Module-Development-Policy.md`| Ansible モジュール自体の利用と、再実装禁止に関する基本方針。                                  |
 | `Module-Compatibility.md`| サポート対象のモジュール一覧、GraalPy 実装における互換性の維持方針。                            |
+| `Module-Support-Status.md`| OS ごとのコレクション・モジュールサポート状況、テスト完了状態。                                      |
 | `System-Requirements.md` | 動作環境（Java/GraalVMバージョン、OS互換性）、必要な外部ライブラリ等の技術的制約。                   |
+| `Ansible-Terminology.md` | コレクション、モジュール、ロール、管理ノード等の用語定義。                                           |
 
 ### 記述時の注意
 - 新しい機能を追加する場合は、既存の構成との整合性を確認した上で、新しいファイルを作成してください。
@@ -38,11 +42,18 @@
 | ファイル名 | 推奨される記述内容（必須項目） |
 | :--------------------------- | :-------------------------------------------------------------------------------------------------------------- |
 | `YAML-Parser.md`             | SnakeYAML 2.x を用いた Playbook 解析の実装詳細、独自タグの処理方法。                                            |
+| `Inventory-System.md`        | 静的インベントリの解析と管理の実装詳細。                                                                        |
 | `Task-Executor.md`           | マルチスレッドによるタスク実行エンジン、実行戦略（linear等）の実装方法。                                        |
+| `Task-Control.md`            | when, loop, register, block, retry等の制御ロジックの実装詳細。                                                  |
+| `Action-Plugins.md`          | 制御ノード側で動作するプラグインの実行メカニズム (Python-first)。                                               |
+| `Ansible-Module-Initialization.md` | AnsibleModule のインスタンス構成、引数の受け渡し、モンキーパッチの詳細。                                   |
 | `Connection-Plugins.md`      | Local, SSH (Apache MINA SSHD) 等の接続プラグインの実装詳細。                                                    |
+| `Remote-Module-Execution.md` | ターゲットノードへモジュールを転送して実行する仕組み（Ansiballz）。                                             |
+| `Privilege-Escalation.md`    | sudo, su等による実行ユーザーの切り替え（become）の実装。                                                       |
 | `Variables-Templating.md`    | Jinja2 互換テンプレートエンジン（Jinjava等）の統合、独自フィルターの実装。                                      |
 | `OS-Abstraction.md`          | ファイル操作やプロセス実行など、OSごとの差異を吸収するための抽象化レイヤーの設計。                              |
 | `Native-Image-Optimization.md`| GraalVM Native Image での動作を最適化するためのリフレクション設定、リソース定義。                               |
+| `Collection-Implementation-Roadmap.md` | 本物のコレクション実行に向けた段階的実装計画。                                                       |
 
 ### 記述時の注意
 - 複雑なアルゴリズムやデータ構造を導入する場合は、個別に詳細なファイルを作成し、関連するドキュメントからリンクを貼ってください。

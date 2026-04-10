@@ -12,7 +12,7 @@ Ansible の Jinja2 テンプレートとの高い互換性を Java で実現す�
     - 独自フィルターやテストの追加が容易。
     - GraalVM Native Image での動作実績がある。
 
-## 2. 変数の優先順位 (Variable Precedence)
+## 2. 変数優先順位 (Variable Precedence)
 
 Ansible (ansible-core 2.17+) は 22 段階の非常に詳細な優先順位を定義しています。`graal-ansible` では、これらの互換性を維持しつつ、主要なレベルから順次実装を進めています。
 
