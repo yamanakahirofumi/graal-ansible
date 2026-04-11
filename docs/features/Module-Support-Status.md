@@ -16,7 +16,7 @@
 
 | コレクション / モジュール | Target: Linux | Target: macOS | Target: Windows | 備考 |
 | :--- | :---: | :---: | :---: | :--- |
-| **ansible.builtin** | △ | ？ | ？ | Linux で全 72 モジュールを一覧化。うち 38 モジュールを実行確認済。 |
+| **ansible.builtin** | △ | ？ | ？ | Linux で全 72 モジュールを一覧化。うち 46 モジュールを実行確認済。 |
 | - `debug` | ◎ | ○ | ○ | オリジナル Python ソースコードにより検証済。 |
 | - `ping` | ◎ | ○ | - | オリジナル Python ソースコードにより検証済。 |
 | - `copy` | ◎ | ○ | - | オリジナル Python ソースコードにより検証済。 |
@@ -109,6 +109,7 @@
 
 - **フェーズ 1: Ansible 本体の完全ロードと基本動作の実現 (In Progress)**
   - Linux/macOS 上での主要モジュール（[Module-Compatibility.md](Module-Compatibility.md) の対象コレクションすべて）の動作確認。
+  - **進捗**: 46 / 72 モジュール検証済み。
   - **完了条件**:
     - ビルド時の `pip` による `ansible-core` 取得の自動化。
     - GraalPy へのライブラリパス統合。
