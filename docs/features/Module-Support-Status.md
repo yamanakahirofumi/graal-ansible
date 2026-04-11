@@ -107,7 +107,7 @@
 ## 3. 実装フェーズと進捗状況 (Implementation Phases)
 100% の互換性と最適化を目指し、以下の 3 つのフェーズで開発を進めています。詳細は [コレクション実装ロードマップ](../implementation/Collection-Implementation-Roadmap.md) を参照してください。
 
-- **フェーズ 1: Ansible 本体の完全ロードと基本動作の実現 (Completed)**
+- **フェーズ 1: Ansible 本体の完全ロードと基本動作の実現 (In Progress)**
   - Linux/macOS 上での主要モジュール（[Module-Compatibility.md](Module-Compatibility.md) の対象コレクションすべて）の動作確認。
   - **完了条件**:
     - ビルド時の `pip` による `ansible-core` 取得の自動化。

@@ -13,13 +13,12 @@
 
 ## 2. 実装時の詳細事項
 
-### [✓] Ansible 本体の完全ロードと基本動作の実現 (フェーズ1)
-- **完了日**: 2026-03-25
-- **概要**: `ansible-core` を完全にロードし、Linux/macOS での主要 38 モジュールの動作確認（全 72 モジュールの検証を目指す）。
+### [ ] Ansible 本体の完全ロードと基本動作の実現 (フェーズ1)
+- **概要**: `ansible-core` を完全にロードし、Linux/macOS での全 72 モジュールの動作確認。
 - **詳細は [Module-Support-Status.md](features/Module-Support-Status.md) を参照。**
 - **テスト拡充戦略については [Test-Expansion-Strategy.md](tech/Test-Expansion-Strategy.md) を参照。**
 - **注意**: `python.IsolateNativeModules` と `python.PosixModuleBackend` はフェーズ 1 においては原則として固定（Linuxでは安定のため True/Native）とする。
-- **備考**: 検証には必要に応じて **Testcontainers** を**ターゲットノード**として活用する。主要 38 モジュールの検証完了をもってフェーズ 1 完了とする。
+- **備考**: 検証には必要に応じて **Testcontainers** を**ターゲットノード**として活用する。全モジュールの検証完了をもってフェーズ 1 完了とする。
 
 ### [ ] ハイブリッド実装による Windows サポート (フェーズ2)
 - **概要**: ハイブリッド実装（モンキーパッチ等）による Windows サポート。
