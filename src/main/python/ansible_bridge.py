@@ -306,6 +306,8 @@ class ActionBase:
     def _remote_expand_user(self, path, *args, **kwargs): return path
     def _execute_remote_stat(self, path, all_vars, follow=False, *args, **kwargs):
         p = _normalize_path(path)
+        # Always return a full dictionary to avoid KeyError in Action Plugins
+        res = {'exists': False, 'isdir': False, 'isreg': False, 'islnk': False, 'checksum': None}
         if self._connection.transport == 'local':
             import hashlib
             if os.path.exists(p):
@@ -313,17 +315,18 @@ class ActionBase:
                 try:
                     with open(p, 'rb') as f: csum = hashlib.sha1(f.read()).hexdigest()
                 except: pass
-                return {'exists': True, 'checksum': csum, 'isdir': os.path.isdir(p), 'isreg': os.path.isfile(p), 'islnk': os.path.islink(p)}
-            return {'exists': False, 'checksum': None, 'isdir': False, 'isreg': False, 'islnk': False}
+                res.update({'exists': True, 'checksum': csum, 'isdir': os.path.isdir(p), 'isreg': os.path.isfile(p), 'islnk': os.path.islink(p)})
+            return res
         else:
             # Simple remote stat via command
             # We use a unique marker to find the result in case of SSH noise
             marker = "---STAT-RESULT---"
             cmd = f"test -e \"{p}\" && echo {marker} && (test -d \"{p}\" && echo dir || (test -L \"{p}\" && echo link || echo file))"
             rc, out, err = self._connection.exec_command(cmd)
+
             # Be very lenient with markers due to potential SSH noise
             if rc != 0 or marker not in out:
-                return {'exists': False}
+                return res
 
             # Find the line immediately following the marker
             lines = out.splitlines()
@@ -333,22 +336,29 @@ class ActionBase:
                     if i + 1 < len(lines):
                         ftype = lines[i+1].strip()
                     else:
-                        # Marker might be on the same line as ftype if using echo -n or similar
-                        ftype = line.split(marker)[1].strip()
+                        parts = line.split(marker)
+                        if len(parts) > 1: ftype = parts[1].strip()
                     break
 
-            res = {
+            res.update({
                 'exists': True,
                 'isdir': 'dir' in ftype,
                 'isreg': 'file' in ftype,
-                'islnk': 'link' in ftype,
-                'checksum': None
-            }
+                'islnk': 'link' in ftype
+            })
             if res['isreg']:
                 cmd_sum = f"sha1sum \"{p}\" && echo {marker}"
                 rc_sum, out_sum, _ = self._connection.exec_command(cmd_sum)
                 if rc_sum == 0 and marker in out_sum:
-                    res['checksum'] = out_sum.strip().split()[0]
+                    # Handle noise before/after marker
+                    sum_lines = out_sum.splitlines()
+                    for j, sline in enumerate(sum_lines):
+                        if marker in sline:
+                            if j > 0:
+                                res['checksum'] = sum_lines[j-1].strip().split()[0]
+                            elif sline.split(marker)[0].strip():
+                                res['checksum'] = sline.split(marker)[0].strip().split()[0]
+                            break
             return res
     def _transfer_file(self, local_path, remote_path):
         conn = _current_task_context['connection_java']
