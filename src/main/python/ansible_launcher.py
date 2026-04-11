@@ -12,7 +12,8 @@ try:
         env_vars=env,
         complex_args=complex_args,
         connection_java=connection_java,
-        become_context_java=become_context_java
+        become_context_java=become_context_java,
+        connection_transport=connection_transport if 'connection_transport' in globals() else 'local'
     )
 
     result = ansible_bridge.execute_module(module_name, complex_args)

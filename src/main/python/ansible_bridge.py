@@ -23,6 +23,25 @@ def _os_stat(path, *args, **kwargs):
 os.makedirs = os_java.makedirs
 os.mkdir = os_java.mkdir
 os.path.exists = os_java.exists
+def _os_path_isdir(p):
+    try:
+        st = os_java.stat(p)
+        return bool(st and (st[0] & 0o170000 == 0o040000))
+    except: return False
+def _os_path_isfile(p):
+    try:
+        st = os_java.stat(p)
+        return bool(st and (st[0] & 0o170000 == 0o100000))
+    except: return False
+def _os_path_islink(p):
+    try:
+        st = os_java.stat(p)
+        return bool(st and (st[0] & 0o170000 == 0o120000))
+    except: return False
+os.path.isdir = _os_path_isdir
+os.path.isfile = _os_path_isfile
+os.path.islink = _os_path_islink
+os.path.realpath = lambda p: p # Simple mock
 os.stat = _os_stat
 os.geteuid = os_java.geteuid
 os.getuid = os_java.getuid
@@ -49,31 +68,42 @@ def _normalize_path(p):
 
 def _deep_convert(obj):
     if obj is None: return None
-    if isinstance(obj, str): return _normalize_path(obj)
-    if isinstance(obj, bytes): return _normalize_path(obj)
-    if isinstance(obj, (int, float, bool)): return obj
+    # Check for GraalPy foreign object null
+    try:
+        if hasattr(obj, 'isNull') and obj.isNull(): return None
+    except: pass
 
+    if isinstance(obj, (bool, int, float, str)):
+        return obj
+    if isinstance(obj, (bytes, bytearray)):
+        try: return obj.decode('utf-8', errors='surrogateescape')
+        except: return obj.decode('latin-1')
+
+    # Handle Java types
     if hasattr(obj, 'getClass'):
         from java.util import Map, List, Set
         if isinstance(obj, Map):
-            return {str(k): _deep_convert(v) for k, v in obj.items()}
+            # Use keys to avoid issues with items() on foreign maps
+            res = {}
+            for k in obj.keySet():
+                res[str(k)] = _deep_convert(obj.get(k))
+            return res
         if isinstance(obj, (List, Set)):
             return [_deep_convert(i) for i in obj]
 
         class_name = obj.getClass().getName()
-        if class_name == 'java.lang.String': return _normalize_path(str(obj))
+        if class_name == 'java.lang.String': return str(obj)
         if class_name == 'java.lang.Boolean': return bool(obj)
         if class_name in ('java.lang.Integer', 'java.lang.Long', 'java.lang.Short', 'java.lang.Byte'): return int(obj)
         if class_name in ('java.lang.Float', 'java.lang.Double'): return float(obj)
-        if 'java.nio.file.Path' in class_name: return _normalize_path(str(obj.toString()))
-        if 'java.io.File' in class_name: return _normalize_path(str(obj.getAbsolutePath()))
+        if 'java.nio.file.Path' in class_name: return str(obj.toString())
+        if 'java.io.File' in class_name: return str(obj.getAbsolutePath())
 
-        if 'Proxy' in class_name or 'com.sun.proxy' in class_name:
-            if hasattr(obj, 'substring'): return _normalize_path(str(obj))
-            if hasattr(obj, 'toString'): return _normalize_path(str(obj.toString()))
+        # If it's a proxy or something else, try to check if it represents a string
+        if hasattr(obj, 'substring') and hasattr(obj, 'length'): return str(obj)
 
-        try: return str(obj)
-        except: return obj
+        # Don't call str() blindly on unknown objects
+        return obj
 
     if isinstance(obj, dict):
         return {str(k): _deep_convert(v) for k, v in obj.items()}
@@ -81,7 +111,7 @@ def _deep_convert(obj):
         return [_deep_convert(i) for i in obj]
     return obj
 
-def bind_task(complex_args, connection_java, become_context_java, environment_java):
+def bind_task(complex_args, connection_java, become_context_java, environment_java, connection_transport='local'):
     args = complex_args
     if hasattr(complex_args, 'getClass') and 'Map' in complex_args.getClass().getName():
         from java.util import HashMap
@@ -93,7 +123,8 @@ def bind_task(complex_args, connection_java, become_context_java, environment_ja
         'complex_args': converted_args,
         'connection_java': connection_java,
         'become_context_java': become_context_java,
-        'environment_java': environment_java
+        'environment_java': environment_java,
+        'connection_transport': connection_transport
     })
 
 def setup_sys_path(site_packages):
@@ -200,7 +231,11 @@ class ActionBase:
     def run(self, tmp=None, task_vars=None):
         return {'changed': False, 'failed': False}
     def _compute_environment_string(self, env_dict): return ""
-    def _remote_file_exists(self, path): return os.path.exists(_normalize_path(path))
+    def _remote_file_exists(self, path):
+        if self._connection.transport == 'local':
+            return os.path.exists(_normalize_path(path))
+        res = self._execute_remote_stat(path, all_vars={})
+        return res.get('exists', False)
     def _remove_tmp_path(self, *args, **kwargs): pass
     def validate_argument_spec(self, argument_spec, *args, **kwargs):
         res = {}
@@ -270,15 +305,51 @@ class ActionBase:
         return _normalize_path(needle)
     def _remote_expand_user(self, path, *args, **kwargs): return path
     def _execute_remote_stat(self, path, all_vars, follow=False, *args, **kwargs):
-        import hashlib
         p = _normalize_path(path)
-        if os.path.exists(p):
-            csum = None
-            try:
-                with open(p, 'rb') as f: csum = hashlib.sha1(f.read()).hexdigest()
-            except: pass
-            return {'exists': True, 'checksum': csum, 'isdir': os.path.isdir(p), 'isreg': os.path.isfile(p), 'islnk': os.path.islink(p)}
-        return {'exists': False, 'checksum': None, 'isdir': False, 'isreg': False, 'islnk': False}
+        if self._connection.transport == 'local':
+            import hashlib
+            if os.path.exists(p):
+                csum = None
+                try:
+                    with open(p, 'rb') as f: csum = hashlib.sha1(f.read()).hexdigest()
+                except: pass
+                return {'exists': True, 'checksum': csum, 'isdir': os.path.isdir(p), 'isreg': os.path.isfile(p), 'islnk': os.path.islink(p)}
+            return {'exists': False, 'checksum': None, 'isdir': False, 'isreg': False, 'islnk': False}
+        else:
+            # Simple remote stat via command
+            # We use a unique marker to find the result in case of SSH noise
+            marker = "---STAT-RESULT---"
+            cmd = f"test -e \"{p}\" && echo {marker} && (test -d \"{p}\" && echo dir || (test -L \"{p}\" && echo link || echo file))"
+            rc, out, err = self._connection.exec_command(cmd)
+            # Be very lenient with markers due to potential SSH noise
+            if rc != 0 or marker not in out:
+                return {'exists': False}
+
+            # Find the line immediately following the marker
+            lines = out.splitlines()
+            ftype = ""
+            for i, line in enumerate(lines):
+                if marker in line:
+                    if i + 1 < len(lines):
+                        ftype = lines[i+1].strip()
+                    else:
+                        # Marker might be on the same line as ftype if using echo -n or similar
+                        ftype = line.split(marker)[1].strip()
+                    break
+
+            res = {
+                'exists': True,
+                'isdir': 'dir' in ftype,
+                'isreg': 'file' in ftype,
+                'islnk': 'link' in ftype,
+                'checksum': None
+            }
+            if res['isreg']:
+                cmd_sum = f"sha1sum \"{p}\" && echo {marker}"
+                rc_sum, out_sum, _ = self._connection.exec_command(cmd_sum)
+                if rc_sum == 0 and marker in out_sum:
+                    res['checksum'] = out_sum.strip().split()[0]
+            return res
     def _transfer_file(self, local_path, remote_path):
         conn = _current_task_context['connection_java']
         lp, rp = _normalize_path(local_path), _normalize_path(remote_path)
@@ -376,10 +447,23 @@ class AnsibleModule:
         return _normalize_path(self._java_mock.getTmpdir())
 
     def exit_json(self, **kwargs):
-        self._java_mock.exit_json(_deep_convert(kwargs))
+        res_dict = _deep_convert(dict(kwargs))
+        if 'changed' not in res_dict:
+            res_dict['changed'] = False
+        else:
+            val = res_dict['changed']
+            if isinstance(val, str):
+                res_dict['changed'] = val.lower() in ('yes', 'true', 't', '1', 'on')
+            else:
+                res_dict['changed'] = bool(val)
+
+        if 'failed' not in res_dict:
+            res_dict['failed'] = False
+
+        self._java_mock.exit_json(res_dict)
 
     def fail_json(self, **kwargs):
-        self._java_mock.fail_json(_deep_convert(kwargs))
+        self._java_mock.fail_json(_deep_convert(dict(kwargs)))
 
     def run_command(self, args, **kwargs):
         res = self._java_mock.run_command(args)
@@ -393,7 +477,10 @@ class AnsibleModule:
     def sha256(self, path): return self._java_mock.sha256(path)
 
     def atomic_move(self, src, dest, unsafe_writes=False, **kwargs):
+        if os.path.isdir(_normalize_path(dest)):
+            dest = os.path.join(dest, os.path.basename(src))
         self._java_mock.atomic_move(src, dest)
+    def selinux_enabled(self): return False
 
     def debug(self, msg): self._java_mock.debug(msg)
     def warn(self, msg): self._java_mock.warn(msg)
@@ -410,11 +497,11 @@ class AnsibleModule:
         return _deep_convert(self._java_mock.load_file_common_arguments(params, path))
 
     def set_fs_attributes_if_different(self, file_args, changed, diff=None, expand=True):
-        self._java_mock.set_fs_attributes_if_different(file_args, changed)
-        return changed
+        res = self._java_mock.set_fs_attributes_if_different(file_args, changed)
+        return res
     def set_file_attributes_if_different(self, file_args, changed, diff=None, expand=True):
-        self._java_mock.set_file_attributes_if_different(file_args, changed)
-        return changed
+        res = self._java_mock.set_file_attributes_if_different(file_args, changed)
+        return res
 
     def makedirs_safe(self, path, mode=None):
         self._java_mock.makedirs_safe(path, mode)
@@ -682,10 +769,19 @@ def apply_mocks():
         'BOOLEANS_TRUE': frozenset(['y', 'yes', 'on', '1', 'true', 't', 1, True]),
         'BOOLEANS_FALSE': frozenset(['n', 'no', 'off', '0', 'false', 'f', 0, False])
     })
+    def _to_bytes(x, *args, **kwargs):
+        if x is None: return None
+        if isinstance(x, bytes): return x
+        return str(x).encode('utf-8')
+    def _to_text(x, *args, **kwargs):
+        if x is None or (kwargs.get('nonstring') == 'passthru' and not isinstance(x, (str, bytes))):
+            return x
+        if isinstance(x, bytes): return x.decode('utf-8', errors='surrogateescape')
+        return str(x)
     create_mock('ansible.module_utils.common.text.converters', {
-        'to_bytes': lambda x, *a, **kw: str(x).encode('utf-8') if isinstance(x, str) else x,
-        'to_text': lambda x, *a, **kw: x.decode('utf-8') if isinstance(x, bytes) else str(x),
-        'to_native': lambda x, *a, **kw: str(x)
+        'to_bytes': _to_bytes,
+        'to_text': _to_text,
+        'to_native': _to_text
     })
     FILE_COMMON_ARGUMENTS = {
         'path': dict(type='str', aliases=['dest', 'name']),
@@ -743,14 +839,14 @@ def apply_mocks():
     if not hasattr(json, '_graal_ansible_patched'):
         class AnsibleEncoder(json.JSONEncoder):
             def default(self, o):
-                if isinstance(o, bytes):
+                if isinstance(o, (bytes, bytearray)):
                     try: return o.decode('utf-8')
                     except: return o.decode('latin-1')
                 if isinstance(o, (set, frozenset, range)): return list(o)
                 if isinstance(o, Exception):
                     return {'failed': True, 'msg': str(o), 'exception': str(o)}
                 try:
-                    if hasattr(o, '__iter__') and not isinstance(o, (str, bytes)):
+                    if hasattr(o, '__iter__') and not isinstance(o, (str, bytes, bytearray)):
                         if hasattr(o, 'keys'): return dict(o)
                         if hasattr(o, 'size') and hasattr(o, 'get'):
                             try: return [o.get(i) for i in range(o.size())]
@@ -807,8 +903,8 @@ def _create_action_plugin(action_name, task, connection, play_context, loader, t
             def __init__(self, obj):
                 self._obj, self._shell = obj, MockShell()
                 self.become = False
-                self.transport = 'local'
-                self.ansible_name = 'ansible.builtin.local'
+                self.transport = _current_task_context.get('connection_transport', 'local')
+                self.ansible_name = f'ansible.builtin.{self.transport}'
             def exec_command(self, cmd, in_data=None, sudoable=True):
                 become = _current_task_context.get('become_context_java')
                 env = _current_task_context.get('environment_java')
@@ -901,7 +997,7 @@ def execute_module(module_name, complex_args, module_code=None):
     finally:
         sys.stdout = old_stdout
 
-def initialize(site_packages=None, env_vars=None, complex_args=None, connection_java=None, become_context_java=None):
+def initialize(site_packages=None, env_vars=None, complex_args=None, connection_java=None, become_context_java=None, connection_transport='local'):
     apply_mocks()
     setup_sys_path(site_packages)
 
@@ -920,7 +1016,7 @@ def initialize(site_packages=None, env_vars=None, complex_args=None, connection_
             sys.modules['ansible.plugins'].AnsiblePlugin = AnsiblePlugin
 
     setup_env(env_vars)
-    bind_task(complex_args or {}, connection_java, become_context_java, env_vars)
+    bind_task(complex_args or {}, connection_java, become_context_java, env_vars, connection_transport)
 
 # Early initialization
 apply_mocks()

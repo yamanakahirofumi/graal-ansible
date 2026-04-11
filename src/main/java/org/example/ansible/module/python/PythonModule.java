@@ -83,6 +83,7 @@ public class PythonModule implements Module {
             context.getBindings("python").putMember("connection_java", connection);
             context.getBindings("python").putMember("become_context_java", becomeContext);
             context.getBindings("python").putMember("environment_java", TaskExecutor.getCurrentEnvironment());
+            context.getBindings("python").putMember("connection_transport", connection != null ? connection.getClass().getSimpleName().toLowerCase().replace("connection", "") : "local");
 
             // Bridge is pre-loaded in TaskExecutor constructor
 

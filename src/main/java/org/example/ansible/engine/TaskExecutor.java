@@ -569,6 +569,7 @@ public class TaskExecutor implements ITaskExecutor {
             context.getBindings("python").putMember("action_name", actionName);
             context.getBindings("python").putMember("module_args_java", task.args());
             context.getBindings("python").putMember("site_packages_java", sitePackages);
+            context.getBindings("python").putMember("connection_transport", connection != null ? connection.getClass().getSimpleName().toLowerCase().replace("connection", "") : "local");
 
             context.eval(loadResource("ansible_action_launcher.py"));
 

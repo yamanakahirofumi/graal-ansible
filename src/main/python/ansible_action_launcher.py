@@ -17,7 +17,8 @@ def run_action_plugin():
             env_vars=env,
             complex_args=module_args,
             connection_java=connection_java,
-            become_context_java=become_context_java
+            become_context_java=become_context_java,
+            connection_transport=connection_transport if 'connection_transport' in globals() else 'local'
         )
 
         from ansible.playbook.task import Task
@@ -35,8 +36,8 @@ def run_action_plugin():
             def __init__(self, java_conn):
                 self._java_conn, self._shell = java_conn, MockShell()
                 self.become = False
-                self.transport = 'local'
-                self.ansible_name = 'ansible.builtin.local'
+                self.transport = connection_transport if 'connection_transport' in globals() else 'local'
+                self.ansible_name = f'ansible.builtin.{self.transport}'
             def exec_command(self, cmd, in_data=None, sudoable=True):
                 become = ansible_bridge._current_task_context.get('become_context_java')
                 env = ansible_bridge._current_task_context.get('environment_java')

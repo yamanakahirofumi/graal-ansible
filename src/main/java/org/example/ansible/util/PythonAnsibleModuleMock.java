@@ -106,16 +106,11 @@ public class PythonAnsibleModuleMock implements Serializable {
                         if (!(v instanceof List) && !(v instanceof Object[])) {
                             val = Collections.singletonList(v);
                         }
-                    } else if ("str".equals(type) || "path".equals(type)) {
-                        String s;
-                        if (v instanceof List && !((List<?>) v).isEmpty()) {
-                            s = Objects.toString(((List<?>) v).get(0));
-                        } else if (v instanceof Object[] && ((Object[]) v).length > 0) {
-                            s = Objects.toString(((Object[]) v)[0]);
-                        } else {
-                            s = Objects.toString(v);
-                        }
+                    } else if ("path".equals(type)) {
+                        String s = extractString(v);
                         val = osMock.normalizePath(s);
+                    } else if ("str".equals(type)) {
+                        val = extractString(v);
                     } else if ("bool".equals(type)) {
                         val = Truthiness.isTrue(v);
                     } else if ("int".equals(type)) {
@@ -278,7 +273,12 @@ public class PythonAnsibleModuleMock implements Serializable {
         if (sPath == null || dPath == null) return;
         Path s = Paths.get(sPath);
         Path d = Paths.get(dPath);
-        Files.move(s, d, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        try {
+            Files.move(s, d, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        } catch (IOException e) {
+            // Fallback to non-atomic move if atomic move is not supported or fails
+            Files.move(s, d, StandardCopyOption.REPLACE_EXISTING);
+        }
     }
 
     public Map<String, Object> get_file_attributes(Object path) {
@@ -298,6 +298,17 @@ public class PythonAnsibleModuleMock implements Serializable {
         return attrs;
     }
 
+    private String extractString(Object v) {
+        if (v == null) return null;
+        if (v instanceof List && !((List<?>) v).isEmpty()) {
+            return Objects.toString(((List<?>) v).get(0));
+        } else if (v instanceof Object[] && ((Object[]) v).length > 0) {
+            return Objects.toString(((Object[]) v)[0]);
+        } else {
+            return Objects.toString(v);
+        }
+    }
+
     public Map<String, Object> load_file_common_arguments(Map<String, Object> params, Object path) {
         Map<String, Object> res = new HashMap<>();
         String[] keys = {"mode", "owner", "group", "seuser", "serole", "setype", "selevel", "attributes", "unsafe_writes"};
@@ -311,25 +322,20 @@ public class PythonAnsibleModuleMock implements Serializable {
             if (actualPath == null) actualPath = params.get("name");
         }
         if (actualPath != null) {
-            String s;
-            if (actualPath instanceof List && !((List<?>) actualPath).isEmpty()) {
-                s = Objects.toString(((List<?>) actualPath).get(0));
-            } else {
-                s = Objects.toString(actualPath);
-            }
-            res.put("path", osMock.normalizePath(s));
+            res.put("path", osMock.normalizePath(extractString(actualPath)));
         }
         return res;
     }
 
-    public void set_file_attributes_if_different(Map<String, Object> fileArgs, boolean changed) {
+    public boolean set_file_attributes_if_different(Map<String, Object> fileArgs, boolean changed) {
         if (fileArgs != null) {
             storedFileArgs.putAll(fileArgs);
         }
+        return changed;
     }
 
-    public void set_fs_attributes_if_different(Map<String, Object> fileArgs, boolean changed) {
-        set_file_attributes_if_different(fileArgs, changed);
+    public boolean set_fs_attributes_if_different(Map<String, Object> fileArgs, boolean changed) {
+        return set_file_attributes_if_different(fileArgs, changed);
     }
 
     public String get_bin_path(Object arg, boolean required, List<Object> optDirs) {
