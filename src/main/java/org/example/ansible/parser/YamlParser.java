@@ -2,11 +2,13 @@ package org.example.ansible.parser;
 
 import org.example.ansible.engine.Play;
 import org.example.ansible.engine.Playbook;
+import org.example.ansible.engine.Role;
 import org.example.ansible.engine.Task;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -91,6 +93,33 @@ public class YamlParser {
             }
         }
 
+        List<Role> roles = new ArrayList<>();
+        Object rolesObj = map.get("roles");
+        if (rolesObj instanceof List<?> rolesList) {
+            for (Object roleItem : rolesList) {
+                if (roleItem instanceof String roleName) {
+                    roles.add(new Role(roleName));
+                } else if (roleItem instanceof Map<?, ?> roleMap) {
+                    Map<String, Object> rMap = (Map<String, Object>) roleMap;
+                    String roleName = (String) rMap.get("role");
+                    if (roleName == null) {
+                        // If 'role' key is missing, look for the first key that is not a reserved role parameter
+                        // (This is a simplification, Ansible has more complex role parsing)
+                        for (Map.Entry<String, Object> entry : rMap.entrySet()) {
+                            if (!"vars".equals(entry.getKey()) && !"tags".equals(entry.getKey()) && !"when".equals(entry.getKey())) {
+                                roleName = entry.getKey();
+                                break;
+                            }
+                        }
+                    }
+                    Map<String, Object> roleVars = new HashMap<>(rMap);
+                    roleVars.remove("role");
+                    // We treat all other keys as Level 20 variables for now
+                    roles.add(new Role(roleName, roleVars));
+                }
+            }
+        }
+
         List<Task> handlers = new ArrayList<>();
         Object handlersObj = map.get("handlers");
         if (handlersObj instanceof List<?> handlersList) {
@@ -122,7 +151,7 @@ public class YamlParser {
         Object checkMode = map.get("check_mode");
         Object environment = map.get("environment");
 
-        return new Play(name, hosts, tasks, vars, varsFiles, handlers, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags);
+        return new Play(name, hosts, tasks, vars, varsFiles, roles, handlers, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags);
     }
 
     @SuppressWarnings("unchecked")

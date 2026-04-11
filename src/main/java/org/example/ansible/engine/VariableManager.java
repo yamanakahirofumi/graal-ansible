@@ -27,6 +27,8 @@ public class VariableManager {
     private final Map<String, Map<String, Object>> includedVars = new HashMap<>();
     private final Map<String, Map<String, Object>> setFactVars = new HashMap<>();
     private final Map<String, Map<String, Object>> hostFacts = new HashMap<>();
+    private final Map<String, Map<String, Object>> roleDefaults = new HashMap<>();
+    private final Map<String, Map<String, Object>> roleVars = new HashMap<>();
     private final Path baseDir;
     private final Path inventoryDir;
     private final Yaml yaml = new Yaml();
@@ -90,6 +92,28 @@ public class VariableManager {
     public void addSetFactVars(String hostName, Map<String, Object> vars) {
         if (vars == null || vars.isEmpty()) return;
         setFactVars.computeIfAbsent(hostName, k -> new HashMap<>()).putAll(vars);
+    }
+
+    /**
+     * Registers role defaults (Level 2).
+     *
+     * @param roleName The role name.
+     * @param vars     The variables to register.
+     */
+    public void addRoleDefaults(String roleName, Map<String, Object> vars) {
+        if (vars == null || vars.isEmpty()) return;
+        roleDefaults.computeIfAbsent(roleName, k -> new HashMap<>()).putAll(vars);
+    }
+
+    /**
+     * Registers role variables (Level 15).
+     *
+     * @param roleName The role name.
+     * @param vars     The variables to register.
+     */
+    public void addRoleVars(String roleName, Map<String, Object> vars) {
+        if (vars == null || vars.isEmpty()) return;
+        roleVars.computeIfAbsent(roleName, k -> new HashMap<>()).putAll(vars);
     }
 
     /**
@@ -161,6 +185,16 @@ public class VariableManager {
 
         // Level 1: CLI variables
         variables.putAll(cliVars);
+
+        // Level 2: Role defaults
+        if (play != null) {
+            for (Role role : play.roles()) {
+                Map<String, Object> defaults = roleDefaults.get(role.name());
+                if (defaults != null) {
+                    variables.putAll(defaults);
+                }
+            }
+        }
 
         // Magic Variables
         if (hostName != null) {
@@ -247,6 +281,16 @@ public class VariableManager {
         if (play != null && !play.varsFiles().isEmpty()) {
             for (String varsFile : play.varsFiles()) {
                 variables.putAll(loadVarsFile(varsFile));
+            }
+        }
+
+        // Level 15: Role variables
+        if (play != null) {
+            for (Role role : play.roles()) {
+                Map<String, Object> vars = roleVars.get(role.name());
+                if (vars != null) {
+                    variables.putAll(vars);
+                }
             }
         }
 
