@@ -34,7 +34,18 @@ def run_action_plugin():
         class ConnectionProxy:
             def __init__(self, java_conn):
                 self._java_conn, self._shell = java_conn, MockShell()
-            def __getattr__(self, name): return getattr(self._java_conn, name)
+                self.become = False
+                self.transport = 'local'
+                self.ansible_name = 'ansible.builtin.local'
+            def exec_command(self, cmd, in_data=None, sudoable=True):
+                become = ansible_bridge._current_task_context.get('become_context_java')
+                env = ansible_bridge._current_task_context.get('environment_java')
+                res = self._java_conn.execCommand(cmd, become, env)
+                return res.exitCode(), res.stdout(), res.stderr()
+            def __getattr__(self, name):
+                if name == 'ansible_name': return 'ansible.builtin.local'
+                try: return getattr(self._java_conn, name)
+                except AttributeError: raise AttributeError(f"foreign object has no attribute '{name}'")
 
         l = ansible_bridge.MockLoader()
         if 'task_executor_java' in globals():
@@ -50,7 +61,7 @@ def run_action_plugin():
             play_context=PlayContext(),
             loader=l,
             templar=Templar(variables=task_vars),
-            shared_loader_obj=sys.modules['ansible.plugins.loader'].action_loader
+            shared_loader_obj=sys.modules['ansible.plugins.loader']
         )
         return plugin.run(tmp=None, task_vars=task_vars)
 

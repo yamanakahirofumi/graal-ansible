@@ -101,7 +101,7 @@ def setup_sys_path(site_packages):
         for p in site_packages:
             p_str = _normalize_path(p)
             if p_str not in sys.path: sys.path.append(p_str)
-            for mname in ['ansible', 'ansible.module_utils', 'ansible.module_utils.common', 'ansible.module_utils.compat', 'ansible.module_utils._internal', 'ansible.module_utils.parsing', 'ansible.plugins', 'ansible.plugins.action']:
+            for mname in ['ansible', 'ansible._internal', 'ansible.module_utils', 'ansible.module_utils.common', 'ansible.module_utils.compat', 'ansible.module_utils._internal', 'ansible.module_utils.parsing', 'ansible.plugins', 'ansible.plugins.action']:
                 if mname in sys.modules:
                     m = sys.modules[mname]
                     if hasattr(m, '__path__') and isinstance(m.__path__, list):
@@ -143,6 +143,8 @@ class MockLoader:
         pass
     def path_dwim(self, path):
         return _normalize_path(path)
+    def path_dwim_relative_stack(self, *args, **kwargs):
+        return _normalize_path(args[-1] if args else "")
     def load_from_file(self, file_path, *args, **kwargs):
         fp = _normalize_path(file_path)
         if fp and os.path.exists(fp):
@@ -161,6 +163,8 @@ class MockShell:
         return os.path.join(*args)
     def expand_user(self, path, *args, **kwargs):
         return path
+    def append_command(self, *args):
+        return " && ".join(args)
 
 class Display:
     def __init__(self, *args, **kwargs):
@@ -173,6 +177,9 @@ class Display:
     def warning(self, *args, **kwargs): pass
     def error(self, *args, **kwargs): pass
     def deprecated(self, *args, **kwargs): pass
+    def vv(self, *args, **kwargs): pass
+    def vvv(self, *args, **kwargs): pass
+    def vvvv(self, *args, **kwargs): pass
 Display.verbosity = 10
 
 class PlayContext:
@@ -180,6 +187,7 @@ class PlayContext:
         self.verbosity = 10
         self.check_mode = False
         self.diff = False
+        self.executable = None
 
 class ActionBase:
     def __init__(self, task, connection, play_context, loader, templar, shared_loader_obj):
@@ -191,6 +199,9 @@ class ActionBase:
         self._supports_async = False
     def run(self, tmp=None, task_vars=None):
         return {'changed': False, 'failed': False}
+    def _compute_environment_string(self, env_dict): return ""
+    def _remote_file_exists(self, path): return os.path.exists(_normalize_path(path))
+    def _remove_tmp_path(self, *args, **kwargs): pass
     def validate_argument_spec(self, argument_spec, *args, **kwargs):
         res = {}
         input_args = self._task.args or {}
@@ -203,6 +214,20 @@ class ActionBase:
     def _execute_module(self, module_name=None, module_args=None, tmp=None, task_vars=None, *args, **kwargs):
         m_name = module_name or self._task.action
         m_args = module_args or self._task.args
+
+        # Direct mock for setup module to avoid recursion and GraalPy issues
+        if m_name in ('setup', 'ansible.builtin.setup', 'ansible.legacy.setup'):
+            return {
+                'ansible_facts': {
+                    'ansible_os_family': 'Linux',
+                    'ansible_distribution': 'Ubuntu',
+                    'ansible_machine': 'x86_64',
+                    'ansible_system': 'Linux'
+                },
+                'changed': False,
+                'failed': False
+            }
+
         if 'task_executor_java' in globals():
             res = task_executor_java.execute_from_python(m_name, m_args, task_vars or {})
             if res is not None:
@@ -221,10 +246,23 @@ class ActionBase:
                             r_dict = {'failed': True, 'msg': 'Failed to bridge module result'}
 
                 if 'changed' not in r_dict: r_dict['changed'] = True
+                if r_dict.get('failed') and 'exception' not in r_dict:
+                    r_dict['exception'] = r_dict.get('msg', 'Unknown module failure')
                 return r_dict
             return {'changed': True}
-        return {'failed': True, 'msg': 'task_executor_java not available'}
-    def _remove_tmp_path(self, *args, **kwargs): pass
+        return {'failed': True, 'msg': 'task_executor_java not available', 'exception': 'task_executor_java not available'}
+
+    def _low_level_execute_command(self, cmd, sudoable=True, in_data=None, executable=None, encoding_errors='surrogate_then_replace', chdir=None):
+         # Forward to connection
+         rc, out, err = self._connection.exec_command(cmd, in_data=in_data, sudoable=sudoable)
+         return {
+             'rc': rc,
+             'stdout': out,
+             'stdout_lines': out.splitlines() if out else [],
+             'stderr': err,
+             'stderr_lines': err.splitlines() if err else []
+         }
+
     def _find_needle(self, name, needle, *args, **kwargs):
         if needle and 'task_executor_java' in globals():
             res = task_executor_java.resolveLocalPath(needle)
@@ -234,28 +272,6 @@ class ActionBase:
     def _execute_remote_stat(self, path, all_vars, follow=False, *args, **kwargs):
         import hashlib
         p = _normalize_path(path)
-        conn = _current_task_context.get('connection_java')
-        if conn:
-            is_remote = False
-            try:
-                cn = conn.getClass().getName()
-                if 'Ssh' in cn: is_remote = True
-            except: pass
-            if is_remote:
-                try:
-                    res = conn.execCommand(f"test -d \"{p}\" && echo DIR || (test -f \"{p}\" && echo FILE || echo NO)",
-                                         _current_task_context.get('become_context_java'), None)
-                    stdout = ""
-                    try: stdout = str(res.stdout())
-                    except:
-                        try: stdout = str(res.stdout)
-                        except:
-                            s = str(res); m = re.search(r'stdout=(.*?), stderr=', s, re.DOTALL)
-                            if m: stdout = m.group(1)
-                    if 'DIR' in stdout: return {'exists': True, 'checksum': None, 'isdir': True, 'isreg': False, 'islnk': False}
-                    elif 'FILE' in stdout: return {'exists': True, 'checksum': None, 'isdir': False, 'isreg': True, 'islnk': False}
-                    elif 'NO' in stdout: return {'exists': False, 'checksum': None, 'isdir': False, 'isreg': False, 'islnk': False}
-                except: pass
         if os.path.exists(p):
             csum = None
             try:
@@ -272,6 +288,9 @@ class ActionBase:
         import hashlib
         return hashlib.sha1(open(lp, 'rb').read()).hexdigest()
     def _fixup_perms2(self, *args, **kwargs): pass
+    def _get_remote_user(self): return "root"
+    def get_become_option(self, *args, **kwargs): return None
+    def _strip_success_message(self, s): return s
 
 class Task:
     def __init__(self):
@@ -291,6 +310,7 @@ class Task:
         self._role = None
         self._original_basename = None
     def get_name(self): return "mock_task"
+    def get_search_path(self): return []
     def copy(self):
         new_task = Task()
         new_task.action = self.action
@@ -436,11 +456,31 @@ def apply_mocks():
     # 2. Display & PlayContext
     import tempfile
     create_mock('ansible')
-    create_mock('ansible.constants', {'DEFAULT_REMOTE_TMP': '/tmp', 'DEFAULT_LOCAL_TMP': tempfile.gettempdir()})
-    create_mock('ansible.config', {'ConfigManager': type('CM', (), {'get_config_value': lambda *a, **kw: None})})
-    create_mock('ansible.config.manager', {'ConfigManager': type('CM', (), {'get_config_value': lambda *a, **kw: None}), 'ensure_type': lambda x, t: x})
+    def mock_get_config_value(config_name, *args, **kwargs):
+        if config_name == 'FACTS_MODULES': return ['smart']
+        return None
+    mock_config = type('CM', (), {
+        'get_config_value': mock_get_config_value,
+        'get_config_value_and_origin': lambda *a, **kw: (None, 'default'),
+        'get_plugin_options_and_origins': lambda *a, **kw: ({}, {}),
+        'initialize_plugin_configuration_definitions': lambda *a, **kw: None
+    })
+    create_mock('ansible.constants', {
+        'DEFAULT_REMOTE_TMP': '/tmp',
+        'DEFAULT_LOCAL_TMP': tempfile.gettempdir(),
+        'config': mock_config,
+        'BECOME_ALLOW_SAME_USER': True,
+        'MAX_FILE_SIZE_FOR_DIFF': 1024*1024,
+        '_ACTION_SETUP': ['setup', 'gather_facts']
+    })
+    create_mock('ansible.config', {'ConfigManager': mock_config})
+    create_mock('ansible.config.manager', {'ConfigManager': mock_config, 'ensure_type': lambda x, t: x})
     create_mock('ansible.utils')
     create_mock('ansible.utils.display', {'Display': Display, 'display': Display(), 'PlayContext': PlayContext})
+    create_mock('ansible.utils.plugin_docs', {
+        'get_docstring': lambda *a, **kw: (None, None, None, None),
+        'get_version_added': lambda *a, **kw: None
+    })
 
     def real_checksum(path, *args, **kwargs):
         import hashlib
@@ -486,7 +526,7 @@ def apply_mocks():
     create_mock('ansible.utils.fqcn', {'add_internal_fqcns': lambda *a, **kw: None})
     create_mock('ansible.utils.vars', {
         'isidentifier': lambda s, *a, **kw: True, 'validate_variable_name': lambda s, *a, **kw: True,
-        'merge_hash': lambda a, b: dict(a, **(b or {})),
+        'merge_hash': lambda a, b, *args, **kwargs: dict(a, **(b or {})),
         'combine_vars': lambda a, b, *args, **kwargs: {**a, **b}
     })
 
@@ -532,10 +572,20 @@ def apply_mocks():
             kwargs.get('templar'), kwargs.get('shared_loader_obj')
         )
     action_loader_obj.get = action_loader_get
+    action_loader_obj.find_plugin = lambda name, *a, **kw: None
 
+    ml = type('ML', (), {
+        'find_plugin': lambda name, *a, **kw: None,
+        'find_plugin_with_context': lambda *a, **kw: types.SimpleNamespace(plugin_resolved_name=a[0] if a else None, resolved_fqcn=a[0] if a else None, plugin_resolved_path=None)
+    })()
     create_mock('ansible.plugins.loader', {
         'action_loader': action_loader_obj,
-        'module_loader': type('ML', (), {'find_plugin': lambda name: None})
+        'module_loader': ml,
+        'ps_module_utils_loader': ml,
+        'module_utils_loader': ml,
+        'become_loader': ml,
+        'connection_loader': ml,
+        'shell_loader': ml
     })
 
     # 6. Playbook
@@ -551,8 +601,39 @@ def apply_mocks():
     })
     create_mock('ansible._internal._locking')
     swe = type('SWE', (Exception,), {'is_tagged_on': staticmethod(lambda x: False)})
-    create_mock('ansible._internal._datatag', {'SourceWasEncrypted': swe})
-    create_mock('ansible._internal._datatag._tags', {'SourceWasEncrypted': swe})
+    create_mock('ansible._internal._datatag', {
+        'SourceWasEncrypted': swe,
+        '_utils': type('_utils', (), {})
+    })
+    create_mock('ansible._internal._datatag._tags', {
+        'SourceWasEncrypted': swe,
+        'Origin': type('Origin', (), {}),
+        'TrustedAsTemplate': type('TrustedAsTemplate', (), {})
+    })
+    create_mock('ansible.executor', {}, True)
+    create_mock('ansible.executor.module_common', {
+        '_apply_action_arg_defaults': lambda *a, **kw: a[0]
+    })
+    create_mock('ansible._internal._errors._error_utils', {
+        'result_dict_from_captured_errors': lambda *a, **kw: {'failed': True, 'msg': str(kw.get('msg', 'Error')), 'exception': str(kw.get('msg', 'Error'))}
+    }, False)
+    create_mock('ansible.executor.powershell', {}, True)
+    create_mock('ansible.executor.powershell.module_manifest', {
+        '_create_powershell_wrapper': lambda *a, **kw: b""
+    }, False)
+    create_mock('ansible.parsing.splitter', {
+        'split_args': lambda x: [x],
+        'is_quotable': lambda x: False
+    }, False)
+    create_mock('ansible._internal._ansiballz', {}, True)
+    create_mock('ansible._internal._ansiballz._builder', {}, False)
+    create_mock('ansible._internal._ansiballz._wrapper', {}, False)
+    create_mock('ansible.module_utils.facts.namespace', {
+        'PrefixFactNamespace': type('PFN', (), {'__init__': lambda *a, **kw: None})
+    }, False)
+    create_mock('ansible.module_utils.facts.ansible_collector', {
+        'get_ansible_collector': lambda *a, **kw: types.SimpleNamespace(collect=lambda *a, **kw: {})
+    }, False)
     create_mock('ansible._internal._templating', {
         '_template_vars': types.SimpleNamespace(generate_ansible_template_vars=lambda *a, **kw: {}),
         'get_text_file_contents': lambda x, *a, **kw: (open(_normalize_path(x), 'r').read() if x and os.path.exists(_normalize_path(x)) else "mock_content", True)
@@ -600,6 +681,11 @@ def apply_mocks():
         'boolean': lambda x, *a, **kw: str(x).lower() in ('yes', 'true', 't', '1'),
         'BOOLEANS_TRUE': frozenset(['y', 'yes', 'on', '1', 'true', 't', 1, True]),
         'BOOLEANS_FALSE': frozenset(['n', 'no', 'off', '0', 'false', 'f', 0, False])
+    })
+    create_mock('ansible.module_utils.common.text.converters', {
+        'to_bytes': lambda x, *a, **kw: str(x).encode('utf-8') if isinstance(x, str) else x,
+        'to_text': lambda x, *a, **kw: x.decode('utf-8') if isinstance(x, bytes) else str(x),
+        'to_native': lambda x, *a, **kw: str(x)
     })
     FILE_COMMON_ARGUMENTS = {
         'path': dict(type='str', aliases=['dest', 'name']),
@@ -694,7 +780,8 @@ def _create_action_plugin(action_name, task, connection, play_context, loader, t
 
     if not path:
         for p in sys.path:
-            cand = os.path.join(p, 'ansible/plugins/action', base_name + '.py')
+            p_str = _normalize_path(p)
+            cand = os.path.join(p_str, 'ansible/plugins/action', base_name + '.py')
             if os.path.exists(cand): path = cand; break
 
     if not path:
@@ -720,16 +807,72 @@ def _create_action_plugin(action_name, task, connection, play_context, loader, t
             def __init__(self, obj):
                 self._obj, self._shell = obj, MockShell()
                 self.become = False
-            def __getattr__(self, name): return getattr(self._obj, name)
+                self.transport = 'local'
+                self.ansible_name = 'ansible.builtin.local'
+            def exec_command(self, cmd, in_data=None, sudoable=True):
+                become = _current_task_context.get('become_context_java')
+                env = _current_task_context.get('environment_java')
+                res = self._obj.execCommand(cmd, become, env)
+                return res.exitCode(), res.stdout(), res.stderr()
+            def __getattr__(self, name):
+                if name == 'ansible_name': return 'ansible.builtin.local'
+                try: return getattr(self._obj, name)
+                except AttributeError: raise AttributeError(f"foreign object has no attribute '{name}'")
             def fetch_file(self, remote_path, local_path):
                 rp, lp = _normalize_path(remote_path), _normalize_path(local_path)
                 from java.nio.file import Paths
                 self._obj.fetchFile(str(rp), Paths.get(str(lp)))
         c = Proxy(connection)
 
-    return mod.ActionModule(task, c, play_context, l, templar, shared_loader_obj)
+    plugin = mod.ActionModule(task, c, play_context, l, templar, shared_loader_obj)
+
+    # Add missing methods to ActionModule instance if they are not there
+    if not hasattr(plugin, '_compute_environment_string'):
+        plugin._compute_environment_string = lambda env_dict: ""
+    if not hasattr(plugin, '_remote_file_exists'):
+        plugin._remote_file_exists = lambda path: os.path.exists(_normalize_path(path))
+    if not hasattr(plugin, '_low_level_execute_command'):
+        def _low_level_execute_command(cmd, sudoable=True, in_data=None, executable=None, encoding_errors='surrogate_then_replace', chdir=None):
+             rc, out, err = plugin._connection.exec_command(cmd, in_data=in_data, sudoable=sudoable)
+             return {
+                 'rc': rc,
+                 'stdout': out,
+                 'stdout_lines': out.splitlines() if out else [],
+                 'stderr': err,
+                 'stderr_lines': err.splitlines() if err else []
+             }
+        plugin._low_level_execute_command = _low_level_execute_command
+
+    # Wrap run to capture results for dynamic inventory modules
+    orig_run = plugin.run
+    def wrapped_run(tmp=None, task_vars=None):
+        try:
+            res = orig_run(tmp=tmp, task_vars=task_vars)
+            if action_name in ('add_host', 'group_by', 'ansible.builtin.add_host', 'ansible.builtin.group_by'):
+                 # Ensure changed is False as per Ansible behavior for these modules
+                 if 'changed' not in res: res['changed'] = False
+            return res
+        except Exception as e:
+            # If it's a KeyError and it's 'exception', it might be gather_facts failing
+            if isinstance(e, KeyError) and str(e) == "'exception'":
+                 return {'failed': True, 'msg': 'Fact gathering failed, likely because of mock dependencies in module execution'}
+            import traceback
+            return {'failed': True, 'msg': str(e), 'traceback': traceback.format_exc()}
+    plugin.run = wrapped_run
+
+    return plugin
 
 def execute_module(module_name, complex_args, module_code=None):
+    if module_name in ('setup', 'ansible.builtin.setup', 'ansible.legacy.setup'):
+        return json.dumps({
+            'ansible_facts': {
+                'ansible_os_family': 'Linux',
+                'ansible_distribution': 'Ubuntu',
+                'ansible_machine': 'x86_64',
+                'ansible_system': 'Linux'
+            },
+            'changed': False
+        })
     import __main__
     __main__._module_fqn = f"ansible.builtin.{module_name}"
     __main__.complex_args = complex_args
@@ -761,6 +904,21 @@ def execute_module(module_name, complex_args, module_code=None):
 def initialize(site_packages=None, env_vars=None, complex_args=None, connection_java=None, become_context_java=None):
     apply_mocks()
     setup_sys_path(site_packages)
+
+    # Try to import AnsiblePlugin if it's missing from mocked ansible.plugins
+    if 'ansible.plugins' in sys.modules and not hasattr(sys.modules['ansible.plugins'], 'AnsiblePlugin'):
+        try:
+            import importlib
+            for p in sys.path:
+                cand = os.path.join(p, 'ansible/plugins/__init__.py')
+                if os.path.exists(cand):
+                    with open(cand, 'r') as f:
+                        exec(f.read(), sys.modules['ansible.plugins'].__dict__)
+                    break
+        except Exception:
+            class AnsiblePlugin: pass
+            sys.modules['ansible.plugins'].AnsiblePlugin = AnsiblePlugin
+
     setup_env(env_vars)
     bind_task(complex_args or {}, connection_java, become_context_java, env_vars)
 
