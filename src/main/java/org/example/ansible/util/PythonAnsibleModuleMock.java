@@ -198,12 +198,15 @@ public class PythonAnsibleModuleMock implements Serializable {
         }
 
         String command;
-        if (argsObj instanceof List) {
-            List<?> list = (List<?>) argsObj;
+        if (argsObj instanceof List || argsObj instanceof Object[]) {
+            Iterable<?> list = (argsObj instanceof List) ? (List<?>) argsObj : Arrays.asList((Object[]) argsObj);
             // Handle getent mock if needed (logic from Python)
-            if (list.size() >= 2 && "getent".equals(list.get(0).toString())) {
-                String db = list.get(1).toString();
-                String key = list.size() > 2 ? list.get(2).toString() : null;
+            List<Object> listCopy = new ArrayList<>();
+            list.forEach(listCopy::add);
+
+            if (listCopy.size() >= 2 && "getent".equals(extractString(listCopy.get(0)))) {
+                String db = extractString(listCopy.get(1));
+                String key = listCopy.size() > 2 ? extractString(listCopy.get(2)) : null;
                 if ("passwd".equals(db)) {
                     if ("root".equals(key)) return new Object[]{0, "root:x:0:0:root:/root:/bin/bash\n", ""};
                     if (key == null) return new Object[]{0, "root:x:0:0:root:/root:/bin/bash\ntestuser:x:1001:1001:testuser:/home/testuser:/bin/bash\n", ""};
@@ -213,13 +216,18 @@ public class PythonAnsibleModuleMock implements Serializable {
                 }
             }
             StringBuilder sb = new StringBuilder();
-            for (Object o : list) {
+            for (Object o : listCopy) {
                 if (sb.length() > 0) sb.append(" ");
-                sb.append(o.toString());
+                String s = extractString(o);
+                if (s != null && s.contains(" ")) {
+                    sb.append("\"").append(s.replace("\"", "\\\"")).append("\"");
+                } else {
+                    sb.append(s);
+                }
             }
             command = sb.toString();
         } else {
-            command = argsObj.toString();
+            command = extractString(argsObj);
         }
 
         try {
@@ -300,10 +308,20 @@ public class PythonAnsibleModuleMock implements Serializable {
 
     private String extractString(Object v) {
         if (v == null) return null;
+        if (v instanceof Value val) {
+            if (val.isNull()) return null;
+            if (val.isString()) return val.asString();
+            if (val.hasArrayElements() && val.getArraySize() > 0) {
+                return extractString(val.getArrayElement(0));
+            }
+            return val.toString();
+        }
         if (v instanceof List && !((List<?>) v).isEmpty()) {
-            return Objects.toString(((List<?>) v).get(0));
+            return extractString(((List<?>) v).get(0));
         } else if (v instanceof Object[] && ((Object[]) v).length > 0) {
-            return Objects.toString(((Object[]) v)[0]);
+            return extractString(((Object[]) v)[0]);
+        } else if (v instanceof byte[]) {
+            return new String((byte[]) v, java.nio.charset.StandardCharsets.UTF_8);
         } else {
             return Objects.toString(v);
         }

@@ -1,5 +1,6 @@
 package org.example.ansible.util;
 
+import org.graalvm.polyglot.Value;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -68,7 +69,11 @@ public class PythonOSMock {
     private String convertToString(Object o) {
         if (o == null) return null;
         String s;
-        if (o instanceof String) {
+        if (o instanceof Value v) {
+            if (v.isNull()) return null;
+            if (v.isString()) s = v.asString();
+            else s = v.toString();
+        } else if (o instanceof String) {
             s = (String) o;
         } else if (o instanceof byte[]) {
             s = new String((byte[]) o, java.nio.charset.StandardCharsets.UTF_8);

@@ -316,6 +316,10 @@ class ActionBase:
                     with open(p, 'rb') as f: csum = hashlib.sha1(f.read()).hexdigest()
                 except: pass
                 res.update({'exists': True, 'checksum': csum, 'isdir': os.path.isdir(p), 'isreg': os.path.isfile(p), 'islnk': os.path.islink(p)})
+
+            # Action Plugins like copy.py might expect 'checksum' to be present if force=True
+            if kwargs.get('checksum') and not res.get('checksum'):
+                 res['checksum'] = None
             return res
         else:
             # Simple remote stat via command
@@ -476,8 +480,9 @@ class AnsibleModule:
         self._java_mock.fail_json(_deep_convert(dict(kwargs)))
 
     def run_command(self, args, **kwargs):
-        res = self._java_mock.run_command(args)
-        return (int(res[0]), str(res[1]), str(res[2]))
+        # Action Plugins expect native Python types
+        res = self._java_mock.run_command(_deep_convert(args))
+        return (int(res[0]), _deep_convert(res[1]), _deep_convert(res[2]))
 
     def get_bin_path(self, arg, required=False, opt_dirs=None):
         return self._java_mock.get_bin_path(arg, required, opt_dirs or [])
