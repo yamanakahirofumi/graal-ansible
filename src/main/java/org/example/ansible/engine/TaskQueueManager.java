@@ -304,48 +304,79 @@ public class TaskQueueManager {
         List<Host> hosts = getTargetHosts(pattern, inventory);
 
         if (limit != null && !limit.isBlank()) {
-            Set<String> limitSet = new HashSet<>();
-            for (String part : limit.split(",")) {
-                String trimmed = part.trim();
-                if (trimmed.isEmpty()) continue;
-
-                // Use a flattened list of all hosts in the inventory to check against the limit
-                List<Host> allInventoryHosts = getAllHosts(inventory.all());
-                if (allInventoryHosts.stream().anyMatch(h -> h.name().equals(trimmed))) {
-                    limitSet.add(trimmed);
-                } else {
-                    Group group = findGroup(inventory.all(), trimmed);
-                    if (group != null) {
-                        for (Host h : getAllHosts(group)) {
-                            limitSet.add(h.name());
-                        }
-                    }
-                }
-            }
-            hosts = hosts.stream().filter(h -> limitSet.contains(h.name())).toList();
+            List<Host> limitHosts = getTargetHosts(limit, inventory);
+            Set<String> limitNames = limitHosts.stream().map(Host::name).collect(Collectors.toSet());
+            hosts = hosts.stream().filter(h -> limitNames.contains(h.name())).toList();
         }
 
         return hosts;
     }
 
     private List<Host> getTargetHosts(String pattern, Inventory inventory) {
-        if (inventory == null) return List.of();
-        if ("all".equals(pattern)) {
-            return getAllHosts(inventory.all());
+        if (pattern == null || pattern.isBlank() || inventory == null) {
+            return List.of();
         }
 
+        Set<String> matchedHostNames = new HashSet<>();
         List<Host> allHosts = getAllHosts(inventory.all());
-        List<Host> matchingHosts = allHosts.stream()
-                .filter(h -> h.name().equals(pattern))
-                .toList();
-        if (!matchingHosts.isEmpty()) return matchingHosts;
 
-        Group group = findGroup(inventory.all(), pattern);
-        if (group != null) {
-            return getAllHosts(group);
+        for (String subPattern : pattern.split("[,:]")) {
+            String trimmed = subPattern.trim();
+            if (trimmed.isEmpty()) continue;
+
+            if ("all".equals(trimmed)) {
+                for (Host h : allHosts) matchedHostNames.add(h.name());
+                continue;
+            }
+
+            if (trimmed.contains("*")) {
+                String regex = trimmed.replace(".", "\\.").replace("*", ".*");
+                // Match hosts
+                for (Host h : allHosts) {
+                    if (h.name().matches(regex)) {
+                        matchedHostNames.add(h.name());
+                    }
+                }
+                // Match groups
+                matchGroupsByWildcard(inventory.all(), regex, matchedHostNames);
+            } else {
+                // Exact match
+                boolean foundAsHost = false;
+                for (Host h : allHosts) {
+                    if (h.name().equals(trimmed)) {
+                        matchedHostNames.add(h.name());
+                        foundAsHost = true;
+                    }
+                }
+                if (!foundAsHost) {
+                    Group group = findGroup(inventory.all(), trimmed);
+                    if (group != null) {
+                        for (Host h : getAllHosts(group)) {
+                            matchedHostNames.add(h.name());
+                        }
+                    }
+                }
+            }
         }
 
-        return List.of();
+        List<Host> result = new ArrayList<>();
+        for (Host h : allHosts) {
+            if (matchedHostNames.contains(h.name())) {
+                result.add(h);
+            }
+        }
+        return result;
+    }
+
+    private void matchGroupsByWildcard(Group group, String regex, Set<String> matchedHostNames) {
+        if (group.name().matches(regex)) {
+            for (Host h : getAllHosts(group)) {
+                matchedHostNames.add(h.name());
+            }
+        }
+        for (Group child : group.children()) {
+            matchGroupsByWildcard(child, regex, matchedHostNames);
+        }
     }
 
     private boolean isTaskToBeExecuted(Task task, List<String> runTags, List<String> skipTags) {
