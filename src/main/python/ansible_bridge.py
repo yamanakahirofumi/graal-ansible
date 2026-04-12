@@ -11,19 +11,20 @@ if 'os_java' not in globals():
 if 'AnsibleModuleJava' not in globals():
     raise ImportError("AnsibleModuleJava factory not found. Ensure TaskExecutor correctly injects PythonAnsibleModuleMock.Factory.")
 
-# Wrap Java os.stat to return a proper os.stat_result
-def _os_stat(path, *args, **kwargs):
-    res = os_java.stat(path)
-    if res is None:
-        raise FileNotFoundError(f"[Errno 2] No such file or directory: '{path}'")
-    # os.stat_result takes a tuple of 10 elements
-    return os.stat_result(tuple(res))
+def _raise_file_not_found(msg):
+    # This helper is necessary because Java cannot directly 'raise' a Python exception.
+    # By calling this function, Java triggers a Python-level raise statement,
+    # ensuring the exception is correctly caught as a FileNotFoundError in Python.
+    raise FileNotFoundError(msg)
+
+# Initialize Java-based os mock with Python classes
+os_java.setPythonClasses(os.stat_result, _raise_file_not_found)
 
 # Override os functions to use Java-based mocks
 os.makedirs = os_java.makedirs
 os.mkdir = os_java.mkdir
 os.path.exists = os_java.exists
-os.stat = _os_stat
+os.stat = os_java.statPython
 os.geteuid = os_java.geteuid
 os.getuid = os_java.getuid
 os.getegid = os_java.getegid
