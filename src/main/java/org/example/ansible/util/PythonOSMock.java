@@ -8,7 +8,9 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.PosixFileAttributes;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
+import org.graalvm.polyglot.Value;
 
 /**
  * Java implementation of os module functions for Python bridge.
@@ -16,6 +18,8 @@ import java.util.Set;
  */
 public class PythonOSMock {
     private final OSHandler osHandler;
+    private Value statResultFactory;
+    private Value exceptionHandler;
 
     public PythonOSMock() {
         this(OSHandlerFactory.getHandler());
@@ -23,6 +27,11 @@ public class PythonOSMock {
 
     public PythonOSMock(OSHandler osHandler) {
         this.osHandler = osHandler;
+    }
+
+    public void setPythonClasses(Value statResultFactory, Value exceptionHandler) {
+        this.statResultFactory = statResultFactory;
+        this.exceptionHandler = exceptionHandler;
     }
 
     /**
@@ -139,24 +148,59 @@ public class PythonOSMock {
     }
     public void mkdir(Object path) throws IOException { mkdir(path, 0777); }
 
-    public StatResult stat(Object path, Object... args) {
+    /**
+     * Native Java implementation of stat. Returns StatResult.
+     */
+    public StatResult stat(Object path) {
         Path p = toPath(path);
         if (p == null || !Files.exists(p)) return null;
         try {
             BasicFileAttributes attrs = Files.readAttributes(p, BasicFileAttributes.class);
-            int mode = attrs.isDirectory() ? 040000 : 0100000;
+            long mode = attrs.isDirectory() ? 040000 : 0100000;
             if (attrs instanceof PosixFileAttributes) {
                 mode |= decodePermissions(((PosixFileAttributes) attrs).permissions());
             } else {
                 mode |= attrs.isDirectory() ? 0755 : 0644;
             }
+
             return new StatResult(
                 mode, attrs.size(),
                 attrs.lastAccessTime().toMillis() / 1000.0,
                 attrs.lastModifiedTime().toMillis() / 1000.0,
                 attrs.creationTime().toMillis() / 1000.0
             );
-        } catch (IOException e) { return null; }
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Python-compatible stat implementation. Uses factories to return os.stat_result.
+     */
+    public Object statPython(Object path, Object... args) {
+        StatResult res = stat(path);
+        if (res == null) {
+            if (exceptionHandler != null) {
+                exceptionHandler.execute("[Errno 2] No such file or directory: '" + path + "'");
+            }
+            return null;
+        }
+
+        if (statResultFactory != null) {
+            List<Object> tuple = new ArrayList<>();
+            tuple.add(res.st_mode);
+            tuple.add(res.st_ino);
+            tuple.add(res.st_dev);
+            tuple.add(res.st_nlink);
+            tuple.add(res.st_uid);
+            tuple.add(res.st_gid);
+            tuple.add(res.st_size);
+            tuple.add(res.st_atime);
+            tuple.add(res.st_mtime);
+            tuple.add(res.st_ctime);
+            return statResultFactory.execute(tuple);
+        }
+        return res;
     }
 
     private int decodePermissions(Set<PosixFilePermission> permissions) {
