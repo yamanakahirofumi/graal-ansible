@@ -12,6 +12,9 @@ if 'AnsibleModuleJava' not in globals():
     raise ImportError("AnsibleModuleJava factory not found. Ensure TaskExecutor correctly injects PythonAnsibleModuleMock.Factory.")
 
 def _raise_file_not_found(msg):
+    # This helper is necessary because Java cannot directly 'raise' a Python exception.
+    # By calling this function, Java triggers a Python-level raise statement,
+    # ensuring the exception is correctly caught as a FileNotFoundError in Python.
     raise FileNotFoundError(msg)
 
 # Initialize Java-based os mock with Python classes
