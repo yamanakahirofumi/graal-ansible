@@ -11,6 +11,7 @@ Java から渡されるパスや Windows 環境特有の挙動を吸収するた
   - Windows 環境（`os.name == 'nt'`）では、スラッシュをバックスラッシュに統一する処理も含まれます。
 - **`os` モジュールのパッチ**:
   - `os.makedirs`, `os.mkdir`, `os.path.exists`, `os.stat` をオーバーライドし、引数に自動的に `_normalize_path` を適用します。
+  - **`os.stat` の詳細**: `PythonOSMock.java` (Java) の `statPython` メソッドを呼び出します。Java 側ではファイルが見つからない場合に直接 Python 例外を投げることができないため、ブリッジ側で用意した `_raise_file_not_found` ヘルパー関数を Java から呼び出すことで、Python レベルの `FileNotFoundError` を正しく発生させます。
 - **POSIX 関数のモック**:
   - Windows 環境で欠落している `os.geteuid`, `os.getuid`, `os.chown`, `os.lchown`, `os.lchmod`, `os.setegid`, `os.seteuid`, `os.setgid`, `os.setuid` などを、No-op (何もしない) または固定値（root 相当の 0 など）を返すスタブとして実装し、Unix 前提のモジュールコードのクラッシュを防ぎます。
 
@@ -29,6 +30,8 @@ Java と Python の間のデータ受け渡しを円滑にし、型変換の不�
 - **`_deep_convert`**:
   - Java の `Map`, `List`, `Set`, `String`, `Boolean`, `Integer`, `Long`, `Float`, `Double`, `Path`, `File` などのオブジェクトを、再帰的に Python のネイティブ型（`dict`, `list`, `str`, `bool`, `int`, `float`）に変換します。
   - GraalPy の Proxy オブジェクトに対しても、`toString()` 等を用いた頑健な文字列化処理を行います。
+- **データ変換ユーティリティ**:
+  - **`to_text`, `to_bytes`**: `ansible.module_utils._text` 内のこれらの関数を、`None` を受け取った場合に `str(None)` ではなく `None` を返すようにパッチしています。これにより、オプション引数を扱うモジュールの互換性を高めています。
 - **JSON カスタムエンコーダ (`AnsibleEncoder`)**:
   - `json.dumps` をパッチし、標準ではシリアライズできない以下の型を自動変換します。
     - `bytes`: UTF-8（失敗時は latin-1）でデコード。
@@ -42,12 +45,14 @@ Action Plugin の実行コンテキストを擬似的に構築するための実
 
 - **`ActionBase`**:
   - `_execute_module` をパッチし、内部からのモジュール実行要求を Java 側の `TaskExecutor.execute_from_python` へルーティングします。
+  - `setup` モジュールに対する `_execute_module` 呼び出しは、内部的な GraalVM エラーを回避するためにブリッジ内で用意された軽量なモック実装へバイパスされます。
   - `_transfer_file` や `_execute_remote_stat` を実装し、Java の `Connection` オブジェクトを介した実際のファイル操作と連携します。
 - **`Templar`**:
   - `template` メソッドにより Jinja2 テンプレートの評価をサポートします。
   - `evaluate_conditional` は Python の `eval()` を用いて実装されており、`assert` モジュール等の条件評価に対応しています。
 - **`MockLoader`, `MockShell`**:
   - `path_dwim`（パスの絶対パス化）や `path_has_trailing_slash` など、Action Plugin（特に `fetch` や `copy`）が内部で利用するパス操作ユーティリティを提供します。
+  - `ansible.plugins.loader.module_loader` をモック化し、`gather_facts` 等の複雑な Action Plugin が内部で依存するモジュール検索ロジックをサポートします。
 
 ## 5. モジュール実行と `AnsibleModule` (Module Execution Mocks)
 

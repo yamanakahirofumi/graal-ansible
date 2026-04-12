@@ -25,7 +25,7 @@ Ansible (ansible-core 2.17+) は 22 段階の非常に詳細な優先順位を�
 | 優先度 | 変数のソース | サポート状況 | 備考 |
 | :--- | :--- | :---: | :--- |
 | 1 | コマンドライン値 (例: `-u user` ※ `-e` 以外) | ◎ | `ansible_check_mode` 等の CLI オプションが `PlaybookExecutor` によって注入され、変数として統合済み。 |
-| 2 | ロールデフォルト (`roles/x/defaults/main.yml`) | △ | ロール機能と共に実装予定。 |
+| 2 | ロールデフォルト (`roles/x/defaults/main.yml`) | ◎ | `VariableManager` にて解決。 |
 | 3 | インベントリファイル / スクリプトのグループ変数 | ◎ | `Inventory.java` にて解決。 |
 | 4 | インベントリ `group_vars/all` | ◎ | `all` グループとして処理。 |
 | 5 | プレイブック `group_vars/all` | ◎ | プレイブック相対パスの検索をサポート。 |
@@ -38,7 +38,7 @@ Ansible (ansible-core 2.17+) は 22 段階の非常に詳細な優先順位を�
 | 12 | プレイ変数 (`vars`) | ◎ | `Play` レコードに保持。 |
 | 13 | プレイ `vars_prompt` | × | インタラクティブ入力のため優先度低。 |
 | 14 | プレイ変数ファイル (`vars_files`) | ◎ | `VariableManager.loadVarsFile` にて解決。 |
-| 15 | ロール変数 (`roles/x/vars/main.yml`) | △ | ロール機能と共に実装予定。 |
+| 15 | ロール変数 (`roles/x/vars/main.yml`) | ◎ | `VariableManager` にて解決。 |
 | 16 | ブロック変数 (`block` 内の `vars`) | ◎ | 実行エンジンでのスコープ分離と伝播を実装済み。 |
 | 17 | タスク変数 (`task` 内の `vars`) | ◎ | `Task` レコードに保持。 |
 | 18 | `include_vars` | ◎ | Action Plugin として実装済み。 |
