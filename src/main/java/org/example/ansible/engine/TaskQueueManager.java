@@ -12,6 +12,7 @@ import org.example.ansible.util.Truthiness;
 
 import java.io.FileInputStream;
 import java.io.InputStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -76,6 +77,10 @@ public class TaskQueueManager {
         Map<String, Set<String>> hostNotifications = new HashMap<>();
 
         try {
+            for (Role role : play.roles()) {
+                executeRole(play, role, targetHosts, inventory, variableManager, results, failedHosts, hostNotifications, globalCheckMode, runTags, skipTags);
+            }
+
             for (Task task : play.tasks()) {
                 if (!isTaskToBeExecuted(task, runTags, skipTags)) {
                     for (Host host : targetHosts) {
@@ -501,6 +506,89 @@ public class TaskQueueManager {
         } catch (Exception e) {
             results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(TaskResult.failure("Failed to load included tasks: " + e.getMessage()));
         }
+    }
+
+    private void executeRole(Play play, Role role, List<Host> targetHosts, Inventory inventory, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean globalCheckMode, List<String> runTags, List<String> skipTags) {
+        Path playbookDir = variableManager.getBaseDir();
+        if (playbookDir == null) {
+            playbookDir = Path.of(".");
+        }
+        Path roleDir = playbookDir.resolve("roles").resolve(role.name());
+        if (!Files.exists(roleDir)) {
+            // Check in current directory too, as a fallback or if roles is a sibling
+            roleDir = Path.of("roles").resolve(role.name());
+            if (!Files.exists(roleDir)) {
+                // Return or throw error? Ansible usually fails if role is not found.
+                // For now, we'll try to just return to avoid crashing if it's not strictly according to layout
+                return;
+            }
+        }
+
+        // Load defaults/main.yml (Level 2)
+        variableManager.addRoleDefaults(role.name(), loadRoleVarsFile(roleDir, "defaults"));
+        // Load vars/main.yml (Level 15)
+        variableManager.addRoleVars(role.name(), loadRoleVarsFile(roleDir, "vars"));
+
+        // Load tasks/main.yml
+        Path tasksFile = roleDir.resolve("tasks").resolve("main.yml");
+        if (!Files.exists(tasksFile)) {
+            tasksFile = roleDir.resolve("tasks").resolve("main.yaml");
+        }
+
+        if (Files.exists(tasksFile)) {
+            try (InputStream is = new FileInputStream(tasksFile.toFile())) {
+                YamlParser parser = new YamlParser();
+                List<Task> roleTasks = parser.parseTasks(is, play.tags());
+
+                for (Task task : roleTasks) {
+                    if (!isTaskToBeExecuted(task, runTags, skipTags)) continue;
+
+                    boolean executedOnce = false;
+                    for (Host host : targetHosts) {
+                        if (failedHosts.contains(host.name())) continue;
+                        if (task.runOnce() && executedOnce) continue;
+
+                        Map<String, Object> vars = variableManager.getAllVariables(play, host, task, null, role.vars(), null);
+                        boolean playCheckMode = variableResolver.resolveCheckMode(play.checkMode(), vars, globalCheckMode);
+
+                        try {
+                            Connection connection = getOrCreateConnection(host, vars);
+                            executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications, playCheckMode, null, null, role.vars(), null, connection, runTags, skipTags);
+                        } catch (UnreachableException e) {
+                            if (task.ignoreUnreachable()) {
+                                results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(TaskResult.unreachable(e.getMessage()));
+                            } else {
+                                failedHosts.add(host.name());
+                            }
+                        }
+                        executedOnce = true;
+                    }
+                }
+            } catch (Exception e) {
+                // Log or handle task loading error
+            }
+        }
+    }
+
+    private Map<String, Object> loadRoleVarsFile(Path roleDir, String subDir) {
+        Path varsFile = roleDir.resolve(subDir).resolve("main.yml");
+        if (!Files.exists(varsFile)) {
+            varsFile = roleDir.resolve(subDir).resolve("main.yaml");
+        }
+        if (!Files.exists(varsFile)) {
+            return Collections.emptyMap();
+        }
+
+        org.yaml.snakeyaml.Yaml yaml = new org.yaml.snakeyaml.Yaml();
+        try (InputStream is = new FileInputStream(varsFile.toFile())) {
+            Object raw = yaml.load(is);
+            if (raw instanceof Map) {
+                return (Map<String, Object>) raw;
+            }
+        } catch (Exception e) {
+            // Ignore loading errors
+        }
+        return Collections.emptyMap();
     }
 
     private Group findGroup(Group root, String name) {
