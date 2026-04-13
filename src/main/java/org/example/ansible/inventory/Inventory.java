@@ -8,10 +8,17 @@ import java.util.Optional;
 
 /**
  * Represents the entire inventory.
- *
- * @param all The root group containing all hosts and groups.
  */
-public record Inventory(Group all) {
+public class Inventory {
+    private final Group all;
+
+    public Inventory(Group all) {
+        this.all = all;
+    }
+
+    public Group all() {
+        return all;
+    }
 
     /**
      * Resolves all variables for a given host by name.

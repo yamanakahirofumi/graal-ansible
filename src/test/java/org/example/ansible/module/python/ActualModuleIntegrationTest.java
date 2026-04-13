@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -620,5 +621,157 @@ class ActualModuleIntegrationTest {
         Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
         assertNotNull(facts, "ansible_facts should be present. Full data: " + result.data());
         assertEquals("actual_value", facts.get("my_actual_fact"));
+    }
+
+    @Test
+    void testActualFailModule() {
+        Task task = new Task("test_fail", "fail", Map.of(
+                "msg", "Expected Failure"
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertFalse(result.success(), "Execution should have failed");
+        assertEquals("Expected Failure", result.data().get("msg"));
+    }
+
+    @Test
+    void testActualGatherFactsModule() {
+        Task task = new Task("test_gather_facts", "gather_facts", Map.of());
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
+        assertNotNull(facts, "ansible_facts should be present");
+        assertTrue(facts.containsKey("ansible_os_family"), "Should contain ansible_os_family");
+    }
+
+    @Test
+    void testActualPackageFactsModule() {
+        Task task = new Task("test_package_facts", "package_facts", Map.of());
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
+        assertNotNull(facts, "ansible_facts should be present");
+        assertTrue(facts.containsKey("packages"), "Should contain 'packages' fact");
+    }
+
+    @Test
+    void testActualGetUrlModule() {
+        // Start a simple HTTP server in the container background
+        connection.execCommand("sh -c \"echo 'download content' > /tmp/to_download.txt && cd /tmp && (python3 -m http.server 8081 &)\"", BecomeContext.empty(), null);
+
+        // Wait a bit for server to start
+        try { Thread.sleep(2000); } catch (InterruptedException e) {}
+
+        String destPath = "/tmp/downloaded.txt";
+        Task task = new Task("test_get_url", "get_url", Map.of(
+                "url", "http://localhost:8081/to_download.txt",
+                "dest", destPath
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        // Clean up the server
+        connection.execCommand("pkill -f 'python3 -m http.server 8081'", BecomeContext.empty(), null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        assertTrue(result.changed());
+
+        var execResult = connection.execCommand("cat " + destPath, BecomeContext.empty(), null);
+        assertEquals("download content", execResult.stdout().trim());
+    }
+
+    @Test
+    void testActualAssembleModule() {
+        String srcDir = "/tmp/assemble_src";
+        connection.execCommand("mkdir -p " + srcDir, BecomeContext.empty(), null);
+        connection.execCommand("echo 'part1' > " + srcDir + "/01.txt", BecomeContext.empty(), null);
+        connection.execCommand("echo 'part2' > " + srcDir + "/02.txt", BecomeContext.empty(), null);
+
+        String destFile = "/tmp/assembled.txt";
+        Task task = new Task("test_assemble", "assemble", Map.of(
+                "src", srcDir,
+                "dest", destFile
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        assertTrue(result.changed());
+
+        var execResult = connection.execCommand("cat " + destFile, BecomeContext.empty(), null);
+        String output = execResult.stdout().trim();
+        assertTrue(output.contains("part1"));
+        assertTrue(output.contains("part2"));
+    }
+
+    @Test
+    void testActualScriptModule() throws IOException {
+        Path localScript = tempDir.resolve("test_script.sh");
+        Files.writeString(localScript, "#!/bin/sh\necho 'hello from script'");
+        // No need to set executable bit locally, script module handles it on remote
+
+        Task task = new Task("test_script", "script", Map.of(
+                "_raw_params", localScript.toString()
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        String stdout = (String) result.data().get("stdout");
+        assertNotNull(stdout);
+        assertTrue(stdout.contains("hello from script"));
+    }
+
+    @Test
+    void testActualAddHostModule() {
+        // Use TaskQueueManager to verify inventory update
+        Inventory inventory = new Inventory(new Group("all", List.of(new Host("localhost")), List.of(), Map.of()));
+        VariableManager vm = new VariableManager(inventory, Map.of());
+        TaskQueueManager tqm = new TaskQueueManager(taskExecutor, (host, vars) -> connection);
+
+        Play play = new Play("add host play", "localhost", List.of(
+                new Task("add new host", "add_host", Map.of(
+                        "name", "new_dynamic_host",
+                        "groups", "dynamic_group",
+                        "custom_var", "custom_val"
+                ))
+        ));
+
+        Map<String, List<TaskResult>> results = new HashMap<>();
+        tqm.executePlay(play, inventory, vm, results, false);
+
+        // Verify inventory update
+        Group dynamicGroup = inventory.all().children().stream()
+                .filter(g -> g.name().equals("dynamic_group")).findFirst().orElse(null);
+        assertNotNull(dynamicGroup, "dynamic_group should be created");
+        Host dynamicHost = dynamicGroup.hosts().stream()
+                .filter(h -> h.name().equals("new_dynamic_host")).findFirst().orElse(null);
+        assertNotNull(dynamicHost, "new_dynamic_host should be in dynamic_group");
+        assertEquals("custom_val", dynamicHost.variables().get("custom_var"));
+    }
+
+    @Test
+    void testActualGroupByModule() {
+        Inventory inventory = new Inventory(new Group("all", List.of(new Host("localhost")), List.of(), Map.of()));
+        VariableManager vm = new VariableManager(inventory, Map.of());
+        TaskQueueManager tqm = new TaskQueueManager(taskExecutor, (host, vars) -> connection);
+
+        // Setup a fact for group_by
+        vm.addFacts("localhost", Map.of("os_type", "linux_distro"));
+
+        Play play = new Play("group by play", "localhost", List.of(
+                new Task("group hosts", "group_by", Map.of(
+                        "key", "{{ os_type }}"
+                ))
+        ));
+
+        Map<String, List<TaskResult>> results = new HashMap<>();
+        tqm.executePlay(play, inventory, vm, results, false);
+
+        // Verify inventory update
+        Group distroGroup = inventory.all().children().stream()
+                .filter(g -> g.name().equals("linux_distro")).findFirst().orElse(null);
+        assertNotNull(distroGroup, "linux_distro group should be created");
+        assertTrue(distroGroup.hosts().stream().anyMatch(h -> h.name().equals("localhost")),
+                "localhost should be in linux_distro group");
     }
 }
