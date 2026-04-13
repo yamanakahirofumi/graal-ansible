@@ -572,10 +572,12 @@ def apply_mocks():
             m.RoutingMarkerBehavior = type('RoMB', (), {'__init__': lambda *a, **kw: None})
 
     # 8. Module Utils
-    for mname in ['ansible', 'ansible.module_utils', 'ansible.module_utils.common', 'ansible.module_utils.compat', 'ansible.module_utils._internal', 'ansible.module_utils.parsing', 'ansible.plugins', 'ansible.plugins.action']:
+    for mname in ['ansible', 'ansible.module_utils', 'ansible.module_utils.common', 'ansible.module_utils.compat', 'ansible.module_utils._internal', 'ansible.module_utils.parsing', 'ansible.plugins', 'ansible.plugins.action', 'ansible._internal._ansiballz']:
         attrs = {}
         if mname == 'ansible.module_utils._internal':
             attrs['get_controller_serialize_map'] = lambda: {}
+        if mname == 'ansible.plugins':
+            attrs['AnsiblePlugin'] = type('AnsiblePlugin', (), {})
         create_mock(mname, attributes=attrs, is_package=True)
 
     if mocks_applied: return

@@ -723,12 +723,13 @@ class ActualModuleIntegrationTest {
 
     @Test
     void testActualAddHostModule() {
+        String hostname = targetNode.getHost();
         // Use TaskQueueManager to verify inventory update
-        Inventory inventory = new Inventory(new Group("all", List.of(new Host("localhost")), List.of(), Map.of()));
+        Inventory inventory = new Inventory(new Group("all", List.of(new Host(hostname)), List.of(), Map.of()));
         VariableManager vm = new VariableManager(inventory, Map.of());
         TaskQueueManager tqm = new TaskQueueManager(taskExecutor, (host, vars) -> connection);
 
-        Play play = new Play("add host play", "localhost", List.of(
+        Play play = new Play("add host play", hostname, List.of(
                 new Task("add new host", "add_host", Map.of(
                         "name", "new_dynamic_host",
                         "groups", "dynamic_group",
@@ -751,14 +752,15 @@ class ActualModuleIntegrationTest {
 
     @Test
     void testActualGroupByModule() {
-        Inventory inventory = new Inventory(new Group("all", List.of(new Host("localhost")), List.of(), Map.of()));
+        String hostname = targetNode.getHost();
+        Inventory inventory = new Inventory(new Group("all", List.of(new Host(hostname)), List.of(), Map.of()));
         VariableManager vm = new VariableManager(inventory, Map.of());
         TaskQueueManager tqm = new TaskQueueManager(taskExecutor, (host, vars) -> connection);
 
         // Setup a fact for group_by
-        vm.addFacts("localhost", Map.of("os_type", "linux_distro"));
+        vm.addFacts(hostname, Map.of("os_type", "linux_distro"));
 
-        Play play = new Play("group by play", "localhost", List.of(
+        Play play = new Play("group by play", hostname, List.of(
                 new Task("group hosts", "group_by", Map.of(
                         "key", "{{ os_type }}"
                 ))
@@ -771,7 +773,7 @@ class ActualModuleIntegrationTest {
         Group distroGroup = inventory.all().children().stream()
                 .filter(g -> g.name().equals("linux_distro")).findFirst().orElse(null);
         assertNotNull(distroGroup, "linux_distro group should be created");
-        assertTrue(distroGroup.hosts().stream().anyMatch(h -> h.name().equals("localhost")),
-                "localhost should be in linux_distro group");
+        assertTrue(distroGroup.hosts().stream().anyMatch(h -> h.name().equals(hostname)),
+                hostname + " should be in linux_distro group");
     }
 }
