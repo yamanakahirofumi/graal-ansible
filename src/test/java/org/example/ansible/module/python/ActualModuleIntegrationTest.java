@@ -647,9 +647,20 @@ class ActualModuleIntegrationTest {
 
     @Test
     void testActualPackageFactsModule() {
-        Task task = new Task("test_package_facts", "package_facts", Map.of());
-        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+        String hostname = targetNode.getHost();
+        // package_facts might need ansible_facts to detect package manager
+        Inventory inventory = new Inventory(new Group("all", List.of(new Host(hostname)), List.of(), Map.of()));
+        VariableManager vm = new VariableManager(inventory, Map.of());
+        vm.addFacts(hostname, Map.of("ansible_os_family", "Debian", "ansible_distribution", "Ubuntu"));
 
+        Task task = new Task("test_package_facts", "package_facts", Map.of());
+        // We use the signature that takes VariableManager
+        TaskResult result = taskExecutor.execute(null, new Host(hostname), task, vm, false, null, null, connection, null);
+
+        if (!result.success()) {
+            System.err.println("Package facts failed: " + result.message());
+            System.err.println("Data: " + result.data());
+        }
         assertTrue(result.success(), "Execution failed: " + result.message());
         Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
         assertNotNull(facts, "ansible_facts should be present");

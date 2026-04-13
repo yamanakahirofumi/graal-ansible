@@ -418,6 +418,12 @@ def apply_mocks():
                 placeholder_file = os.path.join(os.getcwd(), mname.replace('.', '/'), '__init__.py')
                 setattr(m, '__file__', placeholder_file)
                 m.__dict__['__file__'] = placeholder_file
+
+        if '.' in mname:
+            pname, leaf = mname.rsplit('.', 1)
+            if pname in sys.modules:
+                setattr(sys.modules[pname], leaf, m)
+
         if attributes:
             for k, v in attributes.items(): setattr(m, k, v)
         return m
@@ -553,7 +559,7 @@ def apply_mocks():
     create_mock('ansible._internal._locking')
     swe = type('SWE', (Exception,), {'is_tagged_on': staticmethod(lambda x: False)})
     create_mock('ansible._internal._datatag', {'SourceWasEncrypted': swe})
-    create_mock('ansible._internal._datatag._tags', {'SourceWasEncrypted': swe})
+    create_mock('ansible._internal._datatag._tags', {'SourceWasEncrypted': swe, 'Origin': type('Origin', (), {})})
     create_mock('ansible._internal._templating', {
         '_template_vars': types.SimpleNamespace(generate_ansible_template_vars=lambda *a, **kw: {}),
         'get_text_file_contents': lambda x, *a, **kw: (open(_normalize_path(x), 'r').read() if x and os.path.exists(_normalize_path(x)) else "mock_content", True)
@@ -572,7 +578,7 @@ def apply_mocks():
             m.RoutingMarkerBehavior = type('RoMB', (), {'__init__': lambda *a, **kw: None})
 
     # 8. Module Utils
-    for mname in ['ansible', 'ansible.module_utils', 'ansible.module_utils.common', 'ansible.module_utils.compat', 'ansible.module_utils._internal', 'ansible.module_utils.parsing', 'ansible.plugins', 'ansible.plugins.action', 'ansible._internal._ansiballz']:
+    for mname in ['ansible', 'ansible.module_utils', 'ansible.module_utils.common', 'ansible.module_utils.compat', 'ansible.module_utils._internal', 'ansible.module_utils.parsing', 'ansible.plugins', 'ansible.plugins.action', 'ansible._internal._ansiballz', 'ansible._internal._ansiballz._builder', 'ansible._internal._ansiballz._wrapper']:
         attrs = {}
         if mname == 'ansible.module_utils._internal':
             attrs['get_controller_serialize_map'] = lambda: {}
@@ -623,6 +629,12 @@ def apply_mocks():
         args = _current_task_context['complex_args']
         if not args: return {}, 'main'
         return args, 'main'
+
+    # Add missing submodules to _ansiballz
+    abz = sys.modules.get('ansible._internal._ansiballz')
+    if abz:
+        abz._builder = sys.modules.get('ansible._internal._ansiballz._builder')
+        abz._wrapper = sys.modules.get('ansible._internal._ansiballz._wrapper')
 
     create_mock('ansible.module_utils.basic', {
         'AnsibleModule': AnsibleModule,
@@ -687,6 +699,18 @@ def _create_action_plugin(action_name, task, connection, play_context, loader, t
     base_name = action_name
     if base_name.startswith('ansible.builtin.'): base_name = base_name[16:]
     elif base_name.startswith('ansible.legacy.'): base_name = base_name[15:]
+
+    if base_name == 'add_host':
+        class AddHostAction(ActionBase):
+            def run(self, tmp=None, task_vars=None): return {'changed': True, 'failed': False}
+        return AddHostAction(task, connection, play_context, loader, templar, shared_loader_obj)
+    if base_name == 'group_by':
+        class GroupByAction(ActionBase):
+            def run(self, tmp=None, task_vars=None):
+                key = self._task.args.get('key')
+                if key and '{{' in str(key): key = self._templar.template(key)
+                return {'changed': True, 'failed': False, 'add_group': key}
+        return GroupByAction(task, connection, play_context, loader, templar, shared_loader_obj)
 
     path = None
     site_pkgs = globals().get('site_packages_java')
