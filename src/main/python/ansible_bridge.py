@@ -157,9 +157,18 @@ class MockShell:
         import tempfile
         self.tmpdir = tempfile.gettempdir()
     def path_has_trailing_slash(self, path):
-        return path.endswith('/') or path.endswith('\\')
+        if isinstance(path, list):
+            if len(path) > 0: path = path[0]
+            else: return False
+        return str(path).endswith('/') or str(path).endswith('\\')
     def join_path(self, *args):
-        return os.path.join(*args)
+        cleaned_args = []
+        for a in args:
+            if isinstance(a, list):
+                if len(a) > 0: a = a[0]
+                else: a = ""
+            cleaned_args.append(str(a))
+        return os.path.join(*cleaned_args)
     def expand_user(self, path, *args, **kwargs):
         return path
 

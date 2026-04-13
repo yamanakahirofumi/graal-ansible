@@ -31,6 +31,20 @@ def run_action_plugin():
 
         class MockShell:
             def __init__(self): self.tmpdir = None
+            def path_has_trailing_slash(self, path):
+                if isinstance(path, list):
+                    if len(path) > 0: path = path[0]
+                    else: return False
+                return str(path).endswith('/') or str(path).endswith('\\')
+            def join_path(self, *args):
+                cleaned_args = []
+                for a in args:
+                    if isinstance(a, list):
+                        if len(a) > 0: a = a[0]
+                        else: a = ""
+                    cleaned_args.append(str(a))
+                return os.path.join(*cleaned_args)
+
         class ConnectionProxy:
             def __init__(self, java_conn):
                 self._java_conn, self._shell = java_conn, MockShell()
