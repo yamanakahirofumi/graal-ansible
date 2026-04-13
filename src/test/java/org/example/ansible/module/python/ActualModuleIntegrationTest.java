@@ -653,9 +653,10 @@ class ActualModuleIntegrationTest {
         VariableManager vm = new VariableManager(inventory, Map.of());
         vm.addFacts(hostname, Map.of("ansible_os_family", "Debian", "ansible_distribution", "Ubuntu"));
 
+        Play dummyPlay = new Play("dummy", "all", List.of());
         Task task = new Task("test_package_facts", "package_facts", Map.of());
         // We use the signature that takes VariableManager
-        TaskResult result = taskExecutor.execute(null, new Host(hostname), task, vm, false, null, null, connection, null);
+        TaskResult result = taskExecutor.execute(dummyPlay, new Host(hostname), task, vm, false, null, null, connection, null);
 
         if (!result.success()) {
             System.err.println("Package facts failed: " + result.message());
