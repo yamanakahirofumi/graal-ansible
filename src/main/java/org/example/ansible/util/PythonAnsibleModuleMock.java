@@ -3,6 +3,7 @@ package org.example.ansible.util;
 import org.example.ansible.connection.BecomeContext;
 import org.example.ansible.connection.Connection;
 import org.example.ansible.connection.ConnectionResult;
+import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Value;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -191,9 +192,23 @@ public class PythonAnsibleModuleMock implements Serializable {
             if (pythonExit != null) {
                 pythonExit.execute(code);
             }
+        } catch (PolyglotException e) {
+            if (e.isExit()) {
+                throw e;
+            }
+            e.printStackTrace();
+            if (pythonExit != null) {
+                try {
+                    pythonExit.execute(1);
+                } catch (Exception ignored) {}
+            }
         } catch (Exception e) {
             e.printStackTrace();
-            if (pythonExit != null) pythonExit.execute(1);
+            if (pythonExit != null) {
+                try {
+                    pythonExit.execute(1);
+                } catch (Exception ignored) {}
+            }
         }
     }
 

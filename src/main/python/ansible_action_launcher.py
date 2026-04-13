@@ -24,17 +24,17 @@ def run_action_plugin():
         from ansible.playbook.play_context import PlayContext
         from ansible.template import Templar
 
+        # Flatten common arguments if they are single-element lists
+        for key in ['dest', 'src', 'path', 'name']:
+            if key in module_args and isinstance(module_args[key], list) and len(module_args[key]) == 1:
+                module_args[key] = module_args[key][0]
+
         mock_task = Task()
         mock_task.action, mock_task.args = action_name, module_args
         # Initialize internal fields required by some Action Plugins (like copy)
-        mock_task._original_basename = os.path.basename(module_args.get('src', ''))
-
-        class MockShell:
-            def __init__(self): self.tmpdir = None
-        class ConnectionProxy:
-            def __init__(self, java_conn):
-                self._java_conn, self._shell = java_conn, MockShell()
-            def __getattr__(self, name): return getattr(self._java_conn, name)
+        src_val = module_args.get('src', '')
+        if isinstance(src_val, list) and len(src_val) > 0: src_val = src_val[0]
+        mock_task._original_basename = os.path.basename(str(src_val))
 
         l = ansible_bridge.MockLoader()
         if 'task_executor_java' in globals():
@@ -46,7 +46,7 @@ def run_action_plugin():
         plugin = ansible_bridge._create_action_plugin(
             action_name,
             task=mock_task,
-            connection=ConnectionProxy(connection_java),
+            connection=connection_java,
             play_context=PlayContext(),
             loader=l,
             templar=Templar(variables=task_vars),
