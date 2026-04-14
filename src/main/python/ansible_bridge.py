@@ -363,7 +363,7 @@ class AnsibleModule:
 
     @property
     def tmpdir(self):
-        return _normalize_path(self._java_mock.getTmpdir())
+        return self._java_mock.getTmpdir()
 
     def exit_json(self, **kwargs):
         self._java_mock.exit_json(_deep_convert(kwargs))

@@ -160,7 +160,7 @@ public class PythonAnsibleModuleMock implements Serializable {
     }
 
     public String getTmpdir() {
-        return System.getProperty("java.io.tmpdir");
+        return osMock.normalizePath(System.getProperty("java.io.tmpdir"));
     }
 
     public void exit_json(Map<String, Object> kwargs) {
