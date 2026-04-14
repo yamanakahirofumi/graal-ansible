@@ -25,6 +25,16 @@ os.makedirs = os_java.makedirs
 os.mkdir = os_java.mkdir
 os.path.exists = os_java.exists
 os.stat = os_java.statPython
+
+# Determine if we are on Windows
+_is_windows = os.name == 'nt' or (sys.platform == 'win32')
+
+# Ensure os.path is appropriate for the platform to avoid basename/join issues
+if _is_windows:
+    import ntpath
+    os.path = ntpath
+    sys.modules['os.path'] = ntpath
+
 os.geteuid = os_java.geteuid
 os.getuid = os_java.getuid
 os.getegid = os_java.getegid
@@ -157,6 +167,10 @@ class MockShell:
     def __init__(self):
         import tempfile
         self.tmpdir = tempfile.gettempdir()
+        self._is_win = _is_windows
+    def mkdtemp(self, *args, **kwargs):
+        import tempfile
+        return tempfile.mkdtemp(dir=self.tmpdir)
     def path_has_trailing_slash(self, path):
         if isinstance(path, list):
             if len(path) > 0: path = path[0]
@@ -169,6 +183,9 @@ class MockShell:
                 if len(a) > 0: a = a[0]
                 else: a = ""
             cleaned_args.append(str(a))
+        if self._is_win:
+            import ntpath
+            return ntpath.join(*cleaned_args)
         return os.path.join(*cleaned_args)
     def expand_user(self, path, *args, **kwargs):
         return path
@@ -470,7 +487,7 @@ def apply_mocks():
     import tempfile
     create_mock('ansible')
     create_mock('ansible.constants', {
-        'DEFAULT_REMOTE_TMP': '/tmp',
+        'DEFAULT_REMOTE_TMP': tempfile.gettempdir(),
         'DEFAULT_LOCAL_TMP': tempfile.gettempdir(),
         'DEFAULT_KEEP_REMOTE_FILES': False,
         'config': type('Config', (), {'get_config_value': lambda *a, **kw: ['setup']}),
@@ -728,8 +745,20 @@ def apply_mocks():
         'LibMgr': type('LibMgr', (), {}),
         'RespawningLibMgr': type('RespawningLibMgr', (), {}),
         'get_all_pkg_managers': lambda: PkgDict({
+            'apk': lambda: PkgMgrMock(False),
             'apt': lambda: PkgMgrMock(True),
-            'rpm': lambda: PkgMgrMock(False)
+            'dnf': lambda: PkgMgrMock(False),
+            'dnf5': lambda: PkgMgrMock(False),
+            'openbsd_pkg': lambda: PkgMgrMock(False),
+            'pacman': lambda: PkgMgrMock(False),
+            'pkg': lambda: PkgMgrMock(False),
+            'pkg5': lambda: PkgMgrMock(False),
+            'pkg_info': lambda: PkgMgrMock(False),
+            'pkgng': lambda: PkgMgrMock(False),
+            'portage': lambda: PkgMgrMock(False),
+            'rpm': lambda: PkgMgrMock(False),
+            'yum': lambda: PkgMgrMock(False),
+            'zypper': lambda: PkgMgrMock(False),
         })
     })
     create_mock('ansible.module_utils.facts.packages.apt', {'Apt': type('Apt', (), {'is_available': lambda self: True, 'list_installed': lambda self: {}})})
@@ -875,14 +904,21 @@ _orig_strftime = time.strftime
 def _patched_strftime(format, t=None):
     if format == '%s':
         if t is None: t = time.localtime()
-        return str(int(time.mktime(t)))
+        # Ensure we return a string, but the input to str() must be valid
+        try:
+            return str(int(time.mktime(t)))
+        except:
+            return "0"
     return _orig_strftime(format, t)
 time.strftime = _patched_strftime
 
 _orig_dt_strftime = datetime.datetime.strftime
 def _patched_dt_strftime(self, format):
     if format == '%s':
-        return str(int(self.timestamp()))
+        try:
+            return str(int(self.timestamp()))
+        except:
+            return "0"
     return _orig_dt_strftime(self, format)
 datetime.datetime.strftime = _patched_dt_strftime
 

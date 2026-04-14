@@ -105,8 +105,11 @@ public class LocalConnection implements Connection {
     public void putFile(Path localPath, String remotePath) {
         try {
             Path target = Path.of(remotePath);
-            if (Files.isDirectory(target)) {
+            if (Files.exists(target) && Files.isDirectory(target)) {
                 target = target.resolve(localPath.getFileName());
+            }
+            if (target.getParent() != null && !Files.exists(target.getParent())) {
+                Files.createDirectories(target.getParent());
             }
             Files.copy(localPath, target, StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException e) {

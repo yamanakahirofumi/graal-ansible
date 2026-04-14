@@ -94,8 +94,10 @@ class LocalModuleIntegrationTest {
         Files.writeString(srcFile, "get_url content");
         Path destFile = tempDir.resolve("get_url_dest.txt");
 
+        String url = srcFile.toUri().toString();
+
         Task task = new Task("test_get_url", "get_url", Map.of(
-                "url", "file://" + srcFile.toAbsolutePath(),
+                "url", url,
                 "dest", destFile.toAbsolutePath().toString()
         ));
 

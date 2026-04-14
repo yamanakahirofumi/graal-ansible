@@ -34,7 +34,10 @@ def run_action_plugin():
         # Initialize internal fields required by some Action Plugins (like copy)
         src_val = module_args.get('src') or module_args.get('_raw_params', '')
         if isinstance(src_val, list) and len(src_val) > 0: src_val = src_val[0]
-        mock_task._original_basename = os.path.basename(str(src_val))
+        # Robust basename calculation for cross-platform paths
+        import re
+        parts = re.split(r'[\\/]', str(src_val))
+        mock_task._original_basename = parts[-1] if parts else ''
 
         l = ansible_bridge.MockLoader()
         if 'task_executor_java' in globals():

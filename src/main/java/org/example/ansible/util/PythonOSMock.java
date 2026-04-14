@@ -110,13 +110,20 @@ public class PythonOSMock {
     public String normalizePath(Object path) {
         String s = convertToString(path);
         if (s == null) return null;
+        boolean isWin = System.getProperty("os.name").toLowerCase().contains("win");
+
+        // Handle /C:/style paths from some Python/Java interop
         if (s.length() > 2 && (s.charAt(0) == '/' || s.charAt(0) == '\\') && s.charAt(2) == ':' && Character.isLetter(s.charAt(1))) {
             s = s.substring(1);
         }
-        if (System.getProperty("os.name").toLowerCase().contains("win")) {
-            if (s.contains(":")) s = s.replace('/', '\\');
+
+        if (isWin) {
+            s = s.replace('/', '\\');
         } else {
-            if (s.startsWith("/") || s.contains("/")) s = s.replace('\\', '/');
+            // On Unix, only convert backslash if it looks like a mistaken Windows path
+            if (s.contains("\\") && !s.contains("/")) {
+                s = s.replace('\\', '/');
+            }
         }
         return s;
     }
