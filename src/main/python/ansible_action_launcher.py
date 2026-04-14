@@ -36,7 +36,7 @@ def run_action_plugin():
         if isinstance(src_val, list) and len(src_val) > 0: src_val = src_val[0]
         # Robust basename calculation for cross-platform paths
         import re
-        parts = re.split(r'[\\/]', str(src_val))
+        parts = [p for p in re.split(r'[\\/]', str(src_val)) if p]
         mock_task._original_basename = parts[-1] if parts else ''
 
         l = ansible_bridge.MockLoader()

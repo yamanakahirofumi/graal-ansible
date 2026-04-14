@@ -36,11 +36,20 @@ class PythonOSMockTest {
         // b'test\x2fpath' -> test/path (\x2f is '/')
         assertEquals("test/path", osMock.normalizePath("b'test\\x2fpath'").replace('\\', '/'));
 
+        // Test more escapes in Python byte string
+        assertEquals("a\nb\rc\td\\e'f\"g", osMock.normalizePath("b'a\\nb\\rc\\td\\\\e\\'f\\\"g'"));
+
+        // Test octal escapes
+        assertEquals("\123", osMock.normalizePath("b'\\123'"));
+
         // Test Windows drive letter prefix (on non-Windows it should just strip leading /)
         String winPath = "/C:/test";
         String normalizedWinPath = osMock.normalizePath(winPath);
         assertTrue(normalizedWinPath.equals("C:/test") || normalizedWinPath.equals("C:\\test"),
             "Expected C:/test or C:\\test, but got " + normalizedWinPath);
+
+        // Test multiple separators
+        assertEquals("a/b/c", osMock.normalizePath("a///b//c").replace('\\', '/'));
 
         // Test null
         assertNull(osMock.normalizePath(null));

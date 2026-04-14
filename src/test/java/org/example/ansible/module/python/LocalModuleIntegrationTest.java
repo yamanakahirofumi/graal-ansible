@@ -65,28 +65,29 @@ class LocalModuleIntegrationTest {
         assertEquals("Intentional Failure", result.data().get("msg"));
     }
 
-    // @Test
-    // void testGatherFactsModule() {
-    //     Task task = new Task("test_gather_facts", "gather_facts", Map.of());
-    //
-    //     // gather_facts is an Action Plugin.
-    //     // We use TaskQueueManager to properly handle the results (adding facts to VariableManager)
-    //     TaskQueueManager tqm = new TaskQueueManager(taskExecutor, (h, v) -> connection);
-    //     Map<String, List<TaskResult>> results = new HashMap<>();
-    //
-    //     Play playWithGatherFacts = new Play("gather facts play", "all", List.of(task));
-    //     tqm.executePlay(playWithGatherFacts, inventory, variableManager, results, false);
-    //
-    //     List<TaskResult> hostResults = results.get("localhost");
-    //     assertNotNull(hostResults);
-    //     TaskResult result = hostResults.get(0);
-    //     assertTrue(result.success(), "gather_facts failed: " + result.message() + " - " + result.data());
-    //
-    //     Map<String, Object> facts = variableManager.getVariablesForHost("localhost");
-    //     assertTrue(facts.containsKey("ansible_facts"), "ansible_facts should be populated in variable manager");
-    //     Map<String, Object> ansibleFacts = (Map<String, Object>) facts.get("ansible_facts");
-    //     assertTrue(ansibleFacts.containsKey("ansible_os_family"));
-    // }
+    @Test
+    void testGatherFactsModule() {
+        Task task = new Task("test_gather_facts", "gather_facts", Map.of());
+
+        // gather_facts is an Action Plugin.
+        // We use TaskQueueManager to properly handle the results (adding facts to VariableManager)
+        TaskQueueManager tqm = new TaskQueueManager(taskExecutor, (h, v) -> connection);
+        Map<String, List<TaskResult>> results = new HashMap<>();
+
+        Play playWithGatherFacts = new Play("gather facts play", "all", List.of(task));
+        tqm.executePlay(playWithGatherFacts, inventory, variableManager, results, false);
+
+        List<TaskResult> hostResults = results.get("localhost");
+        assertNotNull(hostResults);
+        TaskResult result = hostResults.get(0);
+        assertTrue(result.success(), "gather_facts failed: " + result.message() + " - " + result.data());
+
+        Map<String, Object> facts = variableManager.getVariablesForHost("localhost");
+        assertTrue(facts.containsKey("ansible_facts"), "ansible_facts should be populated in variable manager: " + facts);
+        Map<String, Object> ansibleFacts = (Map<String, Object>) facts.get("ansible_facts");
+        // gather_facts should produce _ansible_facts_gathered
+        assertTrue(ansibleFacts.containsKey("_ansible_facts_gathered"), "Gathered flag missing: " + ansibleFacts);
+    }
 
     @Test
     void testGetUrlModule() throws IOException {
@@ -94,10 +95,16 @@ class LocalModuleIntegrationTest {
         Files.writeString(srcFile, "get_url content");
         Path destFile = tempDir.resolve("get_url_dest.txt");
 
-        String url = srcFile.toUri().toString();
+        String url = srcFile.toAbsolutePath().toString();
+        if (System.getProperty("os.name").toLowerCase().contains("win")) {
+            url = url.replace("\\", "/");
+            if (!url.startsWith("/")) {
+                url = "/" + url;
+            }
+        }
 
         Task task = new Task("test_get_url", "get_url", Map.of(
-                "url", url,
+                "url", "file://" + url,
                 "dest", destFile.toAbsolutePath().toString()
         ));
 
@@ -145,18 +152,18 @@ class LocalModuleIntegrationTest {
         assertTrue(result.data().get("stdout").toString().contains("hello from script"));
     }
 
-    // @Test
-    // void testPackageFactsModule() {
-    //     Task task = new Task("test_package_facts", "package_facts", Map.of());
-    //
-    //     // package_facts may need a play for become logic in TaskExecutor.execute
-    //     TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, connection, null);
-    //
-    //     assertTrue(result.success(), "package_facts should succeed: " + (result.data().containsKey("msg") ? result.data().get("msg") : result.message()) + " - " + result.data());
-    //     Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
-    //     assertNotNull(facts);
-    //     assertTrue(facts.containsKey("packages"));
-    // }
+    @Test
+    void testPackageFactsModule() {
+        Task task = new Task("test_package_facts", "package_facts", Map.of());
+
+        // package_facts may need a play for become logic in TaskExecutor.execute
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, connection, null);
+
+        assertTrue(result.success(), "package_facts should succeed: " + (result.data().containsKey("msg") ? result.data().get("msg") : result.message()) + " - " + result.data());
+        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
+        assertNotNull(facts);
+        assertTrue(facts.containsKey("packages"));
+    }
 
     @Test
     void testAddHostModule() {

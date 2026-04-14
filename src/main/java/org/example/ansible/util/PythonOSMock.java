@@ -96,11 +96,50 @@ public class PythonOSMock {
             java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
             for (int i = 0; i < s.length(); i++) {
                 char c = s.charAt(i);
-                if (c == '\\' && i + 3 < s.length() && s.charAt(i + 1) == 'x') {
-                    out.write(Integer.parseInt(s.substring(i + 2, i + 4), 16));
-                    i += 3;
+                if (c == '\\' && i + 1 < s.length()) {
+                    char next = s.charAt(i + 1);
+                    switch (next) {
+                        case 'x':
+                            if (i + 3 < s.length()) {
+                                try {
+                                    out.write(Integer.parseInt(s.substring(i + 2, i + 4), 16));
+                                    i += 3;
+                                } catch (NumberFormatException e) {
+                                    out.write('\\');
+                                }
+                            } else {
+                                out.write('\\');
+                            }
+                            break;
+                        case '\\': out.write('\\'); i++; break;
+                        case 'n': out.write('\n'); i++; break;
+                        case 'r': out.write('\r'); i++; break;
+                        case 't': out.write('\t'); i++; break;
+                        case 'b': out.write('\b'); i++; break;
+                        case 'f': out.write('\f'); i++; break;
+                        case '\'': out.write('\''); i++; break;
+                        case '"': out.write('"'); i++; break;
+                        default:
+                            if (next >= '0' && next <= '7') {
+                                int j = i + 1;
+                                int octal = 0;
+                                for (; j < i + 4 && j < s.length(); j++) {
+                                    char digit = s.charAt(j);
+                                    if (digit >= '0' && digit <= '7') {
+                                        octal = octal * 8 + (digit - '0');
+                                    } else {
+                                        break;
+                                    }
+                                }
+                                out.write(octal);
+                                i = j - 1;
+                            } else {
+                                out.write('\\');
+                            }
+                    }
                 } else {
-                    out.write(c);
+                    String charStr = String.valueOf(c);
+                    out.write(charStr.getBytes(java.nio.charset.StandardCharsets.UTF_8));
                 }
             }
             return new String(out.toByteArray(), java.nio.charset.StandardCharsets.UTF_8);
@@ -113,17 +152,23 @@ public class PythonOSMock {
         boolean isWin = System.getProperty("os.name").toLowerCase().contains("win");
 
         // Handle /C:/style paths from some Python/Java interop
-        if (s.length() > 2 && (s.charAt(0) == '/' || s.charAt(0) == '\\') && s.charAt(2) == ':' && Character.isLetter(s.charAt(1))) {
+        if (s.length() >= 3 && (s.charAt(0) == '/' || s.charAt(0) == '\\') && s.charAt(2) == ':' && Character.isLetter(s.charAt(1))) {
             s = s.substring(1);
         }
 
         if (isWin) {
             s = s.replace('/', '\\');
+            if (s.length() > 2) {
+                String prefix = s.startsWith("\\\\") ? "\\\\" : "";
+                String rest = s.startsWith("\\\\") ? s.substring(2) : s;
+                s = prefix + rest.replaceAll("\\\\+", "\\\\");
+            }
         } else {
-            // On Unix, only convert backslash if it looks like a mistaken Windows path
-            if (s.contains("\\") && !s.contains("/")) {
+            // On Unix, only convert backslash if it strongly looks like a Windows path (e.g. C:\...)
+            if (s.contains("\\") && !s.contains("/") && s.length() >= 3 && s.charAt(1) == ':' && Character.isLetter(s.charAt(0))) {
                 s = s.replace('\\', '/');
             }
+            s = s.replaceAll("/+", "/");
         }
         return s;
     }

@@ -28,12 +28,24 @@ os.stat = os_java.statPython
 
 # Determine if we are on Windows
 _is_windows = os.name == 'nt' or (sys.platform == 'win32')
+try:
+    import java.lang.System
+    _os_name = java.lang.System.getProperty("os.name").lower()
+    _is_windows = _is_windows or "win" in _os_name
+except: pass
 
 # Ensure os.path is appropriate for the platform to avoid basename/join issues
 if _is_windows:
     import ntpath
     os.path = ntpath
     sys.modules['os.path'] = ntpath
+    os.sep = '\\'
+    os.pathsep = ';'
+    os.altsep = '/'
+    os.name = 'nt'
+    # Force os_java to know it's windows if it doesn't already
+    try: java.lang.System.setProperty("os.name", "Windows")
+    except: pass
 
 os.geteuid = os_java.geteuid
 os.getuid = os_java.getuid
@@ -449,6 +461,15 @@ class AnsibleModule:
     def makedirs_safe(self, path, mode=None):
         self._java_mock.makedirs_safe(path, mode)
 
+    def fetch_url(self, url, data=None, headers=None, method=None, use_proxy=True, force=False, last_mod_time=None, timeout=10, client_cert=None, client_key=None, ca_path=None, validate_certs=True, user=None, password=None, force_basic_auth=False):
+        import urllib.request
+        try:
+            req = urllib.request.Request(url, data=data, headers=headers or {}, method=method)
+            response = urllib.request.urlopen(req)
+            return response, {'status': 200, 'msg': 'OK', 'url': url}
+        except Exception as e:
+            return None, {'status': -1, 'msg': str(e), 'url': url}
+
 # --- Mock Application ---
 
 def apply_mocks():
@@ -649,7 +670,14 @@ def apply_mocks():
             m.ReplacingMarkerBehavior = type('RMB', (), {'emit_warnings': lambda *a: None})
             m.RoutingMarkerBehavior = type('RoMB', (), {'__init__': lambda *a, **kw: None})
 
-    # 8. Module Utils
+    # 8. Module Utils & Executor
+    create_mock('ansible.executor')
+    create_mock('ansible.executor.powershell')
+    create_mock('ansible.executor.powershell.module_manifest')
+    create_mock('ansible.executor.module_common', {
+        '_apply_action_arg_defaults': lambda fact_module, task, mod_args, templar: mod_args
+    })
+
     for mname in ['ansible', 'ansible.module_utils', 'ansible.module_utils.common', 'ansible.module_utils.compat', 'ansible.module_utils._internal', 'ansible.module_utils.parsing', 'ansible.plugins', 'ansible.plugins.action']:
         attrs = {}
         if mname == 'ansible.module_utils._internal':
@@ -671,6 +699,35 @@ def apply_mocks():
         return MockCollector()
     create_mock('ansible.module_utils.facts.ansible_collector', {
         'get_ansible_collector': mock_get_ansible_collector
+    })
+
+    # Mock fetch_url for get_url
+    def mock_fetch_url(module, url, *args, **kwargs):
+        import urllib.request
+        try:
+            req = urllib.request.Request(url)
+            response = urllib.request.urlopen(req)
+            return response, {'status': 200, 'msg': 'OK', 'url': url}
+        except Exception as e:
+            return None, {'status': -1, 'msg': str(e), 'url': url}
+
+    create_mock('ansible.module_utils.urls', {
+        'fetch_url': mock_fetch_url,
+        'url_argument_spec': lambda: {
+            'url': dict(type='str', required=True),
+            'force': dict(type='bool', default=False),
+            'http_agent': dict(type='str'),
+            'use_proxy': dict(type='bool', default=True),
+            'validate_certs': dict(type='bool', default=True),
+            'client_cert': dict(type='path'),
+            'client_key': dict(type='path'),
+            'ca_path': dict(type='path'),
+            'force_basic_auth': dict(type='bool', default=False),
+            'url_username': dict(type='str', aliases=['user']),
+            'url_password': dict(type='str', aliases=['password'], no_log=True),
+            'headers': dict(type='dict'),
+            'timeout': dict(type='int', default=10),
+        }
     })
 
     if mocks_applied: return
@@ -731,38 +788,47 @@ def apply_mocks():
 
     # Mocking for package_facts
     class PkgMgrMock:
-        def __init__(self, available=False): self.available = available
-        def is_available(self): return self.available
+        def __init__(self, module=None):
+            self.module = module
+        def is_available(self, *args, **kwargs): return getattr(self, 'available', False)
+        def get_packages(self, *args, **kwargs):
+            if getattr(self, 'available', False):
+                return {'test-pkg': [{'name': 'test-pkg', 'version': '1.0'}]}
+            return {}
         def list_installed(self): return {}
 
-    class PkgDict(dict):
-        def __getitem__(self, key):
-            if key in self: return super().__getitem__(key)
-            return lambda: PkgMgrMock(False)
+    def create_pkg_mgr(name, available=False):
+        return type(name.capitalize() + 'PkgMgr', (PkgMgrMock,), {
+            'available': available
+        })
+
+    _pkg_managers = {
+        'apk': create_pkg_mgr('apk', False),
+        'apt': create_pkg_mgr('apt', True),
+        'dnf': create_pkg_mgr('dnf', False),
+        'dnf5': create_pkg_mgr('dnf5', False),
+        'openbsd_pkg': create_pkg_mgr('openbsd_pkg', False),
+        'pacman': create_pkg_mgr('pacman', False),
+        'pkg': create_pkg_mgr('pkg', False),
+        'pkg5': create_pkg_mgr('pkg5', False),
+        'pkg_info': create_pkg_mgr('pkg_info', False),
+        'pkgng': create_pkg_mgr('pkgng', False),
+        'portage': create_pkg_mgr('portage', False),
+        'rpm': create_pkg_mgr('rpm', False),
+        'yum': create_pkg_mgr('yum', False),
+        'zypper': create_pkg_mgr('zypper', False),
+    }
 
     create_mock('ansible.module_utils.facts.packages', {
-        'CLIMgr': type('CLIMgr', (), {}),
-        'LibMgr': type('LibMgr', (), {}),
-        'RespawningLibMgr': type('RespawningLibMgr', (), {}),
-        'get_all_pkg_managers': lambda: PkgDict({
-            'apk': lambda: PkgMgrMock(False),
-            'apt': lambda: PkgMgrMock(True),
-            'dnf': lambda: PkgMgrMock(False),
-            'dnf5': lambda: PkgMgrMock(False),
-            'openbsd_pkg': lambda: PkgMgrMock(False),
-            'pacman': lambda: PkgMgrMock(False),
-            'pkg': lambda: PkgMgrMock(False),
-            'pkg5': lambda: PkgMgrMock(False),
-            'pkg_info': lambda: PkgMgrMock(False),
-            'pkgng': lambda: PkgMgrMock(False),
-            'portage': lambda: PkgMgrMock(False),
-            'rpm': lambda: PkgMgrMock(False),
-            'yum': lambda: PkgMgrMock(False),
-            'zypper': lambda: PkgMgrMock(False),
-        })
+        'CLIMgr': PkgMgrMock,
+        'LibMgr': PkgMgrMock,
+        'RespawningLibMgr': PkgMgrMock,
+        'get_all_pkg_managers': lambda: _pkg_managers,
+        'PkgMgr': PkgMgrMock,
+        'ALIASES': {}
     })
-    create_mock('ansible.module_utils.facts.packages.apt', {'Apt': type('Apt', (), {'is_available': lambda self: True, 'list_installed': lambda self: {}})})
-    create_mock('ansible.module_utils.facts.packages.rpm', {'Rpm': type('Rpm', (), {'is_available': lambda self: False})})
+    create_mock('ansible.module_utils.facts.packages.apt', {'Apt': _pkg_managers['apt']})
+    create_mock('ansible.module_utils.facts.packages.rpm', {'Rpm': _pkg_managers['rpm']})
 
     # 9. Password/Group System Mocks
     import collections

@@ -101,10 +101,22 @@ public class LocalConnection implements Connection {
         });
     }
 
+    private Path safePath(String path) {
+        if (path == null) return null;
+        if (System.getProperty("os.name").toLowerCase().contains("win")) {
+            // Handle /C:/style paths
+            if (path.length() >= 3 && (path.startsWith("/") || path.startsWith("\\")) && path.charAt(2) == ':' && Character.isLetter(path.charAt(1))) {
+                path = path.substring(1);
+            }
+            path = path.replace('/', '\\');
+        }
+        return Path.of(path);
+    }
+
     @Override
     public void putFile(Path localPath, String remotePath) {
         try {
-            Path target = Path.of(remotePath);
+            Path target = safePath(remotePath);
             if (Files.exists(target) && Files.isDirectory(target)) {
                 target = target.resolve(localPath.getFileName());
             }
@@ -113,21 +125,21 @@ public class LocalConnection implements Connection {
             }
             Files.copy(localPath, target, StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException e) {
-            throw new RuntimeException("Failed to copy file locally (putFile): " + e.getMessage(), e);
+            throw new RuntimeException("Failed to copy file locally (putFile) from " + localPath + " to " + remotePath + ": " + e.getMessage(), e);
         }
     }
 
     @Override
     public void fetchFile(String remotePath, Path localPath) {
         try {
-            Path src = Path.of(remotePath);
+            Path src = safePath(remotePath);
             Path target = localPath;
-            if (Files.isDirectory(target)) {
+            if (Files.exists(target) && Files.isDirectory(target)) {
                 target = target.resolve(src.getFileName());
             }
             Files.copy(src, target, StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException e) {
-            throw new RuntimeException("Failed to copy file locally (fetchFile): " + e.getMessage(), e);
+            throw new RuntimeException("Failed to copy file locally (fetchFile) from " + remotePath + " to " + localPath + ": " + e.getMessage(), e);
         }
     }
 
