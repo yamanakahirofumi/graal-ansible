@@ -2,6 +2,7 @@ package org.example.ansible.inventory;
 
 import java.util.Map;
 import java.util.Collections;
+import java.util.HashMap;
 
 /**
  * Represents a single target host in the inventory.
@@ -10,6 +11,10 @@ import java.util.Collections;
  * @param variables Host-specific variables.
  */
 public record Host(String name, Map<String, Object> variables) {
+    public Host {
+        variables = variables != null ? new HashMap<>(variables) : new HashMap<>();
+    }
+
     public Host(String name) {
         this(name, Collections.emptyMap());
     }

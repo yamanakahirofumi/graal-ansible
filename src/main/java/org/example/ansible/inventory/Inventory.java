@@ -100,7 +100,7 @@ public record Inventory(Group all) {
         }
     }
 
-    private Optional<Host> findHost(String hostName) {
+    public Optional<Host> findHost(String hostName) {
         return findHostInGroup(all, hostName);
     }
 
@@ -116,5 +116,45 @@ public record Inventory(Group all) {
             }
         }
         return Optional.empty();
+    }
+
+    public Group findGroup(Group root, String name) {
+        if (root == null) return null;
+        if (root.name().equals(name)) return root;
+        for (Group child : root.children()) {
+            Group found = findGroup(child, name);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    public void addHostToGroup(String hostName, String groupName, Map<String, Object> variables, List<String> parentGroups) {
+        Host host = findHost(hostName).orElse(new Host(hostName, variables));
+        if (variables != null) {
+            host.variables().putAll(variables);
+        }
+
+        Group group = getOrCreateGroup(groupName);
+        if (group.hosts().stream().noneMatch(h -> h.name().equals(hostName))) {
+            group.hosts().add(host);
+        }
+
+        if (parentGroups != null) {
+            for (String parentName : parentGroups) {
+                Group parent = getOrCreateGroup(parentName);
+                if (parent.children().stream().noneMatch(g -> g.name().equals(groupName))) {
+                    parent.children().add(group);
+                }
+            }
+        }
+    }
+
+    public Group getOrCreateGroup(String groupName) {
+        Group group = findGroup(all, groupName);
+        if (group == null) {
+            group = new Group(groupName);
+            all.children().add(group);
+        }
+        return group;
     }
 }
