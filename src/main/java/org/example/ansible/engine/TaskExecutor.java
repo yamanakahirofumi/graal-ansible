@@ -622,8 +622,10 @@ public class TaskExecutor implements ITaskExecutor {
             Map<String, Object> data = new HashMap<>(result.data());
             data.put("failed", !result.success());
             data.put("changed", result.changed());
-            if (result.message() != null && !result.message().isEmpty()) {
-                data.put("msg", result.message());
+            String msg = result.message() != null ? result.message() : "";
+            data.put("msg", msg);
+            if (!result.success()) {
+                data.put("exception", msg);
             }
             return data;
         } catch (Throwable t) {

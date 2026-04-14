@@ -8,8 +8,6 @@ import java.util.Optional;
 
 /**
  * Represents the entire inventory.
- *
- * @param all The root group containing all hosts and groups.
  */
 public record Inventory(Group all) {
 
@@ -100,7 +98,7 @@ public record Inventory(Group all) {
         }
     }
 
-    private Optional<Host> findHost(String hostName) {
+    public Optional<Host> findHost(String hostName) {
         return findHostInGroup(all, hostName);
     }
 
@@ -116,5 +114,22 @@ public record Inventory(Group all) {
             }
         }
         return Optional.empty();
+    }
+
+    public Group findGroup(String groupName) {
+        return findGroupInHierarchy(all, groupName);
+    }
+
+    private Group findGroupInHierarchy(Group current, String groupName) {
+        if (current.name().equals(groupName)) {
+            return current;
+        }
+        for (Group child : current.children()) {
+            Group found = findGroupInHierarchy(child, groupName);
+            if (found != null) {
+                return found;
+            }
+        }
+        return null;
     }
 }

@@ -99,9 +99,10 @@ def bind_task(complex_args, connection_java, become_context_java, environment_ja
 
 def setup_sys_path(site_packages):
     if site_packages:
-        for p in site_packages:
+        for p in reversed(site_packages):
             p_str = _normalize_path(p)
-            if p_str not in sys.path: sys.path.append(p_str)
+            if p_str in sys.path: sys.path.remove(p_str)
+            sys.path.insert(0, p_str)
             for mname in ['ansible', 'ansible.module_utils', 'ansible.module_utils.common', 'ansible.module_utils.compat', 'ansible.module_utils._internal', 'ansible.module_utils.parsing', 'ansible.plugins', 'ansible.plugins.action']:
                 if mname in sys.modules:
                     m = sys.modules[mname]
@@ -183,6 +184,12 @@ class Display:
     def warning(self, *args, **kwargs): pass
     def error(self, *args, **kwargs): pass
     def deprecated(self, *args, **kwargs): pass
+    def v(self, *args, **kwargs): pass
+    def vv(self, *args, **kwargs): pass
+    def vvv(self, *args, **kwargs): pass
+    def vvvv(self, *args, **kwargs): pass
+    def vvvvv(self, *args, **kwargs): pass
+    def vvvvvv(self, *args, **kwargs): pass
 Display.verbosity = 10
 
 class PlayContext:
@@ -201,6 +208,14 @@ class ActionBase:
         self._supports_async = False
     def run(self, tmp=None, task_vars=None):
         return {'changed': False, 'failed': False}
+    def _compute_environment_string(self, env_dict):
+        if not env_dict: return ""
+        return " ".join([f"{k}={v}" for k, v in env_dict.items()])
+    def _low_level_execute_command(self, cmd, in_data=None, executable=None, shell=None, chdir=None, *args, **kwargs):
+        conn = self._connection
+        if hasattr(conn, '_obj'): conn = conn._obj
+        res = conn.execCommand(cmd, _current_task_context.get('become_context_java'), _current_task_context.get('environment_java'))
+        return {'rc': res.exitCode(), 'stdout': res.stdout(), 'stderr': res.stderr()}
     def validate_argument_spec(self, argument_spec, *args, **kwargs):
         res = {}
         input_args = self._task.args or {}
@@ -291,13 +306,14 @@ class Task:
         self.tags = []
         self.implicit = False
         self.resolved_action = None
-        self._parent = None
+        self._parent = types.SimpleNamespace(_play=types.SimpleNamespace(_action_groups={}))
         self.diff = False
         self.check_mode = False
         self.no_log = False
         self.delegate_to = None
         self.delegate_facts = False
         self.environment = {}
+        self.module_defaults = []
         self._role = None
         self._original_basename = None
     def get_name(self): return "mock_task"
@@ -313,7 +329,8 @@ class Templar:
         self._engine = type('Eng', (), {
             'tvars': variables or {},
             'extend': lambda *a, **kw: self._engine,
-            'evaluate_expression': lambda expr, *a, **kw: self._engine.tvars.get(expr, expr)
+            'evaluate_expression': lambda expr, *a, **kw: self._engine.tvars.get(expr, expr),
+            'resolve_to_container': lambda x, *a, **kw: x
         })
         self.available_variables = variables or {}
         self.environment = {}
@@ -446,7 +463,13 @@ def apply_mocks():
     # 2. Display & PlayContext
     import tempfile
     create_mock('ansible')
-    create_mock('ansible.constants', {'DEFAULT_REMOTE_TMP': '/tmp', 'DEFAULT_LOCAL_TMP': tempfile.gettempdir()})
+    create_mock('ansible.constants', {
+        'DEFAULT_REMOTE_TMP': '/tmp',
+        'DEFAULT_LOCAL_TMP': tempfile.gettempdir(),
+        'DEFAULT_KEEP_REMOTE_FILES': False,
+        'config': type('Config', (), {'get_config_value': lambda *a, **kw: ['setup']}),
+        '_ACTION_SETUP': frozenset(['setup', 'gather_facts'])
+    })
     create_mock('ansible.config', {'ConfigManager': type('CM', (), {'get_config_value': lambda *a, **kw: None})})
     create_mock('ansible.config.manager', {'ConfigManager': type('CM', (), {'get_config_value': lambda *a, **kw: None}), 'ensure_type': lambda x, t: x})
     create_mock('ansible.utils')
@@ -494,10 +517,26 @@ def apply_mocks():
         'is_subpath': mock_is_subpath
     })
     create_mock('ansible.utils.fqcn', {'add_internal_fqcns': lambda *a, **kw: None})
+    create_mock('ansible.utils.collection_loader._collection_finder', {
+        '_get_collection_metadata': lambda *a, **kw: None,
+        '_nested_dict_get': lambda *a, **kw: None
+    })
+    create_mock('ansible.utils.plugin_docs', {'get_versioned_doclink': lambda *a, **kw: ""})
+    def mock_merge_hash(a, b, *args, **kwargs):
+        res = dict(a)
+        if b:
+            for k, v in b.items(): res[k] = v
+        return res
+    def mock_combine_vars(a, b, *args, **kwargs):
+        res = dict(a)
+        if b:
+            for k, v in b.items(): res[k] = v
+        return res
+
     create_mock('ansible.utils.vars', {
         'isidentifier': lambda s, *a, **kw: True, 'validate_variable_name': lambda s, *a, **kw: True,
-        'merge_hash': lambda a, b: dict(a, **(b or {})),
-        'combine_vars': lambda a, b, *args, **kwargs: {**a, **b}
+        'merge_hash': mock_merge_hash,
+        'combine_vars': mock_combine_vars
     })
 
     # 4. Errors
@@ -529,11 +568,13 @@ def apply_mocks():
     })
 
     # 5. Plugins & Loader
-    create_mock('ansible.plugins')
+    create_mock('ansible.plugins', {'AnsiblePlugin': type('AnsiblePlugin', (), {})})
     create_mock('ansible.plugins.action', {'ActionBase': ActionBase})
 
     action_loader_obj = types.SimpleNamespace()
     action_loader_obj.action_loader = action_loader_obj
+    action_loader_obj.module_loader = types.SimpleNamespace()
+    action_loader_obj.module_loader.find_plugin_with_context = lambda *a, **kw: types.SimpleNamespace(resolved_fqcn='ansible.builtin.setup')
     def action_loader_get(name, *args, **kwargs):
         import ansible_bridge
         return ansible_bridge._create_action_plugin(
@@ -545,7 +586,9 @@ def apply_mocks():
 
     create_mock('ansible.plugins.loader', {
         'action_loader': action_loader_obj,
-        'module_loader': type('ML', (), {'find_plugin': lambda name: None})
+        'module_loader': type('ML', (), {'find_plugin': lambda name: None}),
+        'ps_module_utils_loader': type('PML', (), {'find_plugin': lambda name: None}),
+        'module_utils_loader': type('MUL', (), {'find_plugin': lambda name: None})
     })
 
     # 6. Playbook
@@ -559,10 +602,12 @@ def apply_mocks():
     create_mock('ansible._internal', {
         'get_controller_serialize_map': lambda: {}
     })
+    create_mock('ansible._internal._ansiballz', {'_builder': types.SimpleNamespace(), '_wrapper': types.SimpleNamespace()})
+    create_mock('ansible._internal._errors', {'_error_utils': types.SimpleNamespace(result_dict_from_captured_errors=lambda *a, **kw: {})})
     create_mock('ansible._internal._locking')
     swe = type('SWE', (Exception,), {'is_tagged_on': staticmethod(lambda x: False)})
-    create_mock('ansible._internal._datatag', {'SourceWasEncrypted': swe})
-    create_mock('ansible._internal._datatag._tags', {'SourceWasEncrypted': swe})
+    create_mock('ansible._internal._datatag', {'SourceWasEncrypted': swe, '_utils': types.SimpleNamespace()})
+    create_mock('ansible._internal._datatag._tags', {'SourceWasEncrypted': swe, 'Origin': types.SimpleNamespace(), 'TrustedAsTemplate': types.SimpleNamespace()})
     create_mock('ansible._internal._templating', {
         '_template_vars': types.SimpleNamespace(generate_ansible_template_vars=lambda *a, **kw: {}),
         'get_text_file_contents': lambda x, *a, **kw: (open(_normalize_path(x), 'r').read() if x and os.path.exists(_normalize_path(x)) else "mock_content", True)
@@ -571,6 +616,7 @@ def apply_mocks():
         m = create_mock(mname)
         if mname.endswith('_engine'):
             m.TemplateEngine = type('TE', (), {})
+            m.TemplateOptions = type('TO', (), {})
         elif mname.endswith('_jinja_common'):
             m.UndefinedMarker = type('UM', (), {})
             m.TruncationMarker = type('TM', (), {})
@@ -586,6 +632,18 @@ def apply_mocks():
         if mname == 'ansible.module_utils._internal':
             attrs['get_controller_serialize_map'] = lambda: {}
         create_mock(mname, attributes=attrs, is_package=True)
+
+    create_mock('ansible.module_utils.facts', {
+        'BaseFactCollector': type('BaseFactCollector', (), {})
+    })
+    create_mock('ansible.module_utils.facts.namespace')
+    create_mock('ansible.module_utils.facts.prefix')
+    create_mock('ansible.module_utils.facts.default_collectors', {
+        'collectors': []
+    })
+    create_mock('ansible.module_utils.facts.ansible_collector', {
+        'get_ansible_collector': lambda *a, **kw: type('Coll', (), {'collect': lambda *a, **kw: {'ansible_os_family': 'Linux', 'ansible_system': 'Linux'}})()
+    })
 
     if mocks_applied: return
 
@@ -642,6 +700,21 @@ def apply_mocks():
         'get_distribution': mock_get_distribution,
         'is_executable': lambda x: True
     })
+
+    # Mocking for package_facts
+    create_mock('ansible.module_utils.facts.packages', {
+        'CLIMgr': type('CLIMgr', (), {}),
+        'LibMgr': type('LibMgr', (), {}),
+        'RespawningLibMgr': type('RespawningLibMgr', (), {}),
+        'get_all_pkg_managers': lambda: {
+            'apt': type('Apt', (), {'is_available': lambda self: True, 'list_installed': lambda self: {}}),
+            'rpm': type('Rpm', (), {'is_available': lambda self: False}),
+            'pkg': type('Pkg', (), {'is_available': lambda self: False}),
+            'pkg_info': type('PkgInfo', (), {'is_available': lambda self: False})
+        }
+    })
+    create_mock('ansible.module_utils.facts.packages.apt', {'Apt': type('Apt', (), {'is_available': lambda self: True, 'list_installed': lambda self: {}})})
+    create_mock('ansible.module_utils.facts.packages.rpm', {'Rpm': type('Rpm', (), {'is_available': lambda self: False})})
 
     # 9. Password/Group System Mocks
     import collections
@@ -775,6 +848,24 @@ def initialize(site_packages=None, env_vars=None, complex_args=None, connection_
     setup_sys_path(site_packages)
     setup_env(env_vars)
     bind_task(complex_args or {}, connection_java, become_context_java, env_vars)
+
+import time
+import datetime
+
+_orig_strftime = time.strftime
+def _patched_strftime(format, t=None):
+    if format == '%s':
+        if t is None: t = time.localtime()
+        return str(int(time.mktime(t)))
+    return _orig_strftime(format, t)
+time.strftime = _patched_strftime
+
+_orig_dt_strftime = datetime.datetime.strftime
+def _patched_dt_strftime(self, format):
+    if format == '%s':
+        return str(int(self.timestamp()))
+    return _orig_dt_strftime(self, format)
+datetime.datetime.strftime = _patched_dt_strftime
 
 # Early initialization
 apply_mocks()

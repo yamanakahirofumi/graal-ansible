@@ -621,4 +621,85 @@ class ActualModuleIntegrationTest {
         assertNotNull(facts, "ansible_facts should be present. Full data: " + result.data());
         assertEquals("actual_value", facts.get("my_actual_fact"));
     }
+
+    @Test
+    void testActualFailModule() {
+        Task task = new Task("test_fail", "fail", Map.of("msg", "Intentional Failure"));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(!result.success(), "Fail module should return failure");
+        assertEquals("Intentional Failure", result.data().get("msg"));
+    }
+
+    @Test
+    void testActualGetUrlModule() {
+        String remoteSrcPath = "/tmp/get_url_src.txt";
+        connection.execCommand("echo 'get_url content' > " + remoteSrcPath, BecomeContext.empty(), null);
+        String remoteDestPath = "/tmp/get_url_dest.txt";
+
+        Task task = new Task("test_get_url", "get_url", Map.of(
+                "url", "file://" + remoteSrcPath,
+                "dest", remoteDestPath
+        ));
+
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "get_url should succeed: " + result.message());
+        var execResult = connection.execCommand("cat " + remoteDestPath, BecomeContext.empty(), null);
+        assertEquals("get_url content", execResult.stdout().trim());
+    }
+
+    @Test
+    void testActualAssembleModule() {
+        connection.execCommand("mkdir -p /tmp/assemble_src && echo 'part1' > /tmp/assemble_src/f1.txt && echo 'part2' > /tmp/assemble_src/f2.txt", BecomeContext.empty(), null);
+        String remoteDestPath = "/tmp/assembled.txt";
+
+        Task task = new Task("test_assemble", "assemble", Map.of(
+                "src", "/tmp/assemble_src",
+                "dest", remoteDestPath
+        ));
+
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "assemble should succeed: " + result.message());
+        var execResult = connection.execCommand("cat " + remoteDestPath, BecomeContext.empty(), null);
+        assertTrue(execResult.stdout().contains("part1"));
+        assertTrue(execResult.stdout().contains("part2"));
+    }
+
+    @Test
+    void testActualScriptModule() throws IOException {
+        Path localScript = tempDir.resolve("myscript.sh");
+        Files.writeString(localScript, "#!/bin/sh\necho 'hello from actual script'");
+
+        Task task = new Task("test_script", "script", Map.of(
+                "_raw_params", localScript.toString()
+        ));
+
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "script should succeed: " + result.message());
+        assertTrue(result.data().get("stdout").toString().contains("hello from actual script"));
+    }
+
+    @Test
+    void testActualAddHostModule() {
+        Task task = new Task("test_add_host", "add_host", Map.of(
+                "name", "new_actual_host",
+                "groups", "actual_dynamic_group",
+                "actual_var", "actual_val"
+        ));
+
+        Inventory inventory = new Inventory(new Group("all", List.of(new Host("localhost")), List.of(), Map.of()));
+        VariableManager vm = new VariableManager(inventory, Map.of(), tempDir);
+        TaskQueueManager tqm = new TaskQueueManager(taskExecutor, (h, v) -> connection);
+        Map<String, List<TaskResult>> results = new HashMap<>();
+
+        Play play = new Play("add host play", "all", List.of(task));
+        tqm.executePlay(play, inventory, vm, results, false);
+
+        Host newHost = inventory.findHost("new_actual_host").orElse(null);
+        assertNotNull(newHost, "Host should be added");
+        assertEquals("actual_val", newHost.variables().get("actual_var"));
+    }
 }
