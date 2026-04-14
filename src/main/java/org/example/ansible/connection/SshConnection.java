@@ -92,8 +92,10 @@ public class SshConnection implements Connection {
             channel.setErr(err);
             channel.open().verify(timeout);
             
-            // Wait for channel to close or timeout
-            channel.waitFor(java.util.EnumSet.of(org.apache.sshd.client.channel.ClientChannelEvent.CLOSED), timeout);
+            // Wait for channel to close and exit status to be received
+            channel.waitFor(java.util.EnumSet.of(
+                    org.apache.sshd.client.channel.ClientChannelEvent.CLOSED,
+                    org.apache.sshd.client.channel.ClientChannelEvent.EXIT_STATUS), timeout);
             
             Integer exitStatus = channel.getExitStatus();
             return new ConnectionResult(

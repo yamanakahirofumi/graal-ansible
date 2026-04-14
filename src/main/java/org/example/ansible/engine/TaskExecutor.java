@@ -587,7 +587,11 @@ public class TaskExecutor implements ITaskExecutor {
                 if (resultMap.containsKey("traceback")) {
                     System.err.println(resultMap.get("traceback"));
                 }
-                return new TaskResult(false, false, "Action Plugin failed: " + resultMap.get("msg"), resultMap);
+                String msg = "Action Plugin failed: " + resultMap.get("msg");
+                if (resultMap.containsKey("stderr") && resultMap.get("stderr") != null && !resultMap.get("stderr").toString().isEmpty()) {
+                    msg += ". stderr: " + resultMap.get("stderr");
+                }
+                return new TaskResult(false, false, msg, resultMap);
             }
             return TaskResult.success(resultMap);
 

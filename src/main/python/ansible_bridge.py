@@ -296,7 +296,13 @@ class ActionBase:
             conn.putFile(Paths.get(str(lp)), str(rp))
         import hashlib
         return hashlib.sha1(open(lp, 'rb').read()).hexdigest()
-    def _fixup_perms2(self, *args, **kwargs): pass
+    def _fixup_perms2(self, paths, *args, **kwargs):
+        conn = _current_task_context.get('connection_java')
+        if conn:
+            for p in paths:
+                try:
+                    conn.execCommand(f"chmod +x {p}", _current_task_context.get('become_context_java'), None)
+                except: pass
 
 class Task:
     def __init__(self):
@@ -641,8 +647,13 @@ def apply_mocks():
     create_mock('ansible.module_utils.facts.default_collectors', {
         'collectors': []
     })
+    def mock_get_ansible_collector(*args, **kwargs):
+        class MockCollector:
+            def collect(self, *args, **kwargs):
+                return {'ansible_os_family': 'Linux', 'ansible_system': 'Linux'}
+        return MockCollector()
     create_mock('ansible.module_utils.facts.ansible_collector', {
-        'get_ansible_collector': lambda *a, **kw: type('Coll', (), {'collect': lambda *a, **kw: {'ansible_os_family': 'Linux', 'ansible_system': 'Linux'}})()
+        'get_ansible_collector': mock_get_ansible_collector
     })
 
     if mocks_applied: return
@@ -702,16 +713,24 @@ def apply_mocks():
     })
 
     # Mocking for package_facts
+    class PkgMgrMock:
+        def __init__(self, available=False): self.available = available
+        def is_available(self): return self.available
+        def list_installed(self): return {}
+
+    class PkgDict(dict):
+        def __getitem__(self, key):
+            if key in self: return super().__getitem__(key)
+            return lambda: PkgMgrMock(False)
+
     create_mock('ansible.module_utils.facts.packages', {
         'CLIMgr': type('CLIMgr', (), {}),
         'LibMgr': type('LibMgr', (), {}),
         'RespawningLibMgr': type('RespawningLibMgr', (), {}),
-        'get_all_pkg_managers': lambda: {
-            'apt': type('Apt', (), {'is_available': lambda self: True, 'list_installed': lambda self: {}}),
-            'rpm': type('Rpm', (), {'is_available': lambda self: False}),
-            'pkg': type('Pkg', (), {'is_available': lambda self: False}),
-            'pkg_info': type('PkgInfo', (), {'is_available': lambda self: False})
-        }
+        'get_all_pkg_managers': lambda: PkgDict({
+            'apt': lambda: PkgMgrMock(True),
+            'rpm': lambda: PkgMgrMock(False)
+        })
     })
     create_mock('ansible.module_utils.facts.packages.apt', {'Apt': type('Apt', (), {'is_available': lambda self: True, 'list_installed': lambda self: {}})})
     create_mock('ansible.module_utils.facts.packages.rpm', {'Rpm': type('Rpm', (), {'is_available': lambda self: False})})

@@ -25,14 +25,14 @@ def run_action_plugin():
         from ansible.template import Templar
 
         # Flatten common arguments if they are single-element lists
-        for key in ['dest', 'src', 'path', 'name']:
+        for key in ['dest', 'src', 'path', 'name', '_raw_params']:
             if key in module_args and isinstance(module_args[key], list) and len(module_args[key]) == 1:
                 module_args[key] = module_args[key][0]
 
         mock_task = Task()
         mock_task.action, mock_task.args = action_name, module_args
         # Initialize internal fields required by some Action Plugins (like copy)
-        src_val = module_args.get('src', '')
+        src_val = module_args.get('src') or module_args.get('_raw_params', '')
         if isinstance(src_val, list) and len(src_val) > 0: src_val = src_val[0]
         mock_task._original_basename = os.path.basename(str(src_val))
 

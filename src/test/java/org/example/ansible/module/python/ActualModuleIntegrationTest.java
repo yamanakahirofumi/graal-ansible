@@ -671,6 +671,7 @@ class ActualModuleIntegrationTest {
     void testActualScriptModule() throws IOException {
         Path localScript = tempDir.resolve("myscript.sh");
         Files.writeString(localScript, "#!/bin/sh\necho 'hello from actual script'");
+        localScript.toFile().setExecutable(true);
 
         Task task = new Task("test_script", "script", Map.of(
                 "_raw_params", localScript.toString()

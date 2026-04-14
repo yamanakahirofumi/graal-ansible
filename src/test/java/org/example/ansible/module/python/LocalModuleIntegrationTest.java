@@ -80,7 +80,7 @@ class LocalModuleIntegrationTest {
     //     List<TaskResult> hostResults = results.get("localhost");
     //     assertNotNull(hostResults);
     //     TaskResult result = hostResults.get(0);
-    //     assertTrue(result.success(), "gather_facts failed: " + result.data());
+    //     assertTrue(result.success(), "gather_facts failed: " + result.message() + " - " + result.data());
     //
     //     Map<String, Object> facts = variableManager.getVariablesForHost("localhost");
     //     assertTrue(facts.containsKey("ansible_facts"), "ansible_facts should be populated in variable manager");
