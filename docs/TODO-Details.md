@@ -34,7 +34,8 @@
 - **完了日**: 2026-03-25
 - **概要**: [実際のコレクションを使ったテスト方法の設計](tech/Actual-Collection-Testing.md) に基づき、主要なモジュールのテストを統合。
 - **解決策**:
-    - `ping`, `copy`, `file`, `stat`, `template`, `debug`, `command`, `shell`, `setup`, `lineinfile`, `replace`, `user`, `group`, `find`, `tempfile`, `hostname`, `slurp`, `assert`, `blockinfile`, `getent`, `fetch`, `uri`, `unarchive`, `include_vars`, `include_tasks`, `import_tasks`, `set_fact`, `fail`, `get_url`, `assemble`, `script`, `add_host`, `group_by`, `gather_facts`, `package_facts` の計 35 モジュールの統合テストを CI 環境へ統合済み。
+    - `ping`, `copy`, `file`, `stat`, `template`, `debug`, `command`, `shell`, `setup`, `lineinfile`, `replace`, `user`, `group`, `find`, `tempfile`, `hostname`, `slurp`, `assert`, `blockinfile`, `getent`, `fetch`, `uri`, `unarchive`, `include_vars`, `include_tasks`, `import_tasks`, `set_fact` の計 27 モジュールの統合テストを CI 環境へ統合済み。
+    - また、`fail`, `gather_facts`, `add_host`, `assemble`, `group_by`, `get_url`, `script`, `package_facts` 等についても動作を確認済み。
     - GraalPy および `ansible-core` のセットアップを GitHub Actions 上で自動化済み。
 
 ### [✓] Action Plugin の互換性向上 (Python-first)
