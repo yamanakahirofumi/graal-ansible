@@ -732,4 +732,33 @@ class ActualModuleIntegrationTest {
         assertTrue(inventory.getGroupsMap().get("value_abc").contains(targetNode.getHost()),
                 "Target host should be member of the new group");
     }
+
+    @Test
+    void testActualGatherFacts() {
+        Task task = new Task("gather", "gather_facts", Map.of());
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
+        assertNotNull(facts, "ansible_facts should be present");
+        assertTrue(facts.containsKey("ansible_os_family"), "Should contain OS family fact");
+    }
+
+    @Test
+    void testActualPackageFacts() {
+        // First gather facts to get become info if needed
+        Task gatherTask = new Task("gather", "setup", Map.of());
+        taskExecutor.execute(gatherTask, BecomeContext.empty(), connection, null);
+
+        Task task = new Task("pkg_facts", "package_facts", Map.of("manager", "auto"));
+        // package_facts needs a Play object in the current context for some logic
+        Play play = new Play("test play", "all", List.of(task));
+
+        TaskResult result = taskExecutor.execute(play, new Host(targetNode.getHost()), task, new VariableManager(null, Map.of()), false, null, null, connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
+        assertNotNull(facts, "ansible_facts should be present");
+        assertTrue(facts.containsKey("packages"), "Should contain packages fact");
+    }
 }
