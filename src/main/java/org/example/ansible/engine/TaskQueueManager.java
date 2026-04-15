@@ -600,18 +600,24 @@ public class TaskQueueManager {
 
     private void processAddHost(TaskResult result, Inventory inventory) {
         Object addHostData = result.data().get("add_host");
-        String hostName;
-        Object groupsObj;
+        String hostName = null;
+        Object groupsObj = null;
 
         if (addHostData instanceof Map<?, ?> map) {
-            Object nameObj = map.get("host_name");
+            // Standard Ansible: nested map under add_host
+            Object nameObj = map.get("name");
+            if (nameObj == null) nameObj = map.get("host_name");
+            if (nameObj != null) {
+                hostName = nameObj.toString();
+                groupsObj = map.get("groups");
+            }
+        }
+
+        if (hostName == null) {
+            // Fallback: top-level keys
+            Object nameObj = result.data().get("name");
             if (nameObj == null) nameObj = result.data().get("host_name");
-            if (nameObj == null) return;
-            hostName = nameObj.toString();
-            groupsObj = map.get("groups");
-        } else {
-            Object nameObj = result.data().get("add_host");
-            if (nameObj == null) nameObj = result.data().get("host_name");
+            if (nameObj == null) nameObj = result.data().get("add_host"); // String case
             if (nameObj == null) return;
             hostName = nameObj.toString();
             groupsObj = result.data().get("groups");

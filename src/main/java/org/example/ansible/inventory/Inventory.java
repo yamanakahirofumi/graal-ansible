@@ -56,7 +56,8 @@ public record Inventory(Group all) {
         if (host == null) {
             host = new Host(hostName);
             // Every host must be a member of the 'all' group
-            if (!all.hosts().contains(host)) {
+            // We check by name to ensure uniqueness
+            if (all.hosts().stream().noneMatch(h -> h.name().equals(hostName))) {
                 all.hosts().add(host);
             }
         }
