@@ -1,11 +1,11 @@
 package org.example.ansible.util;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.ansible.connection.BecomeContext;
 import org.example.ansible.connection.Connection;
 import org.example.ansible.connection.ConnectionResult;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Value;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -16,7 +16,11 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
-import java.util.*;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 /**
  * Java implementation of AnsibleModule logic for GraalPy bridge.
@@ -39,9 +43,9 @@ public class PythonAnsibleModuleMock implements Serializable {
     private final Map<String, Object> storedFileArgs = new HashMap<>();
 
     public PythonAnsibleModuleMock(Map<String, Object> argumentSpec, Map<String, Object> inputArgs,
-                                 Map<String, Object> kwargs, PythonOSMock osMock,
-                                 Connection connection, BecomeContext becomeContext,
-                                 Map<String, String> environment, Value pythonPrint, Value pythonExit) {
+                                   Map<String, Object> kwargs, PythonOSMock osMock,
+                                   Connection connection, BecomeContext becomeContext,
+                                   Map<String, String> environment, Value pythonPrint, Value pythonExit) {
         this.osMock = osMock;
         this.connection = connection;
         this.becomeContext = becomeContext;
@@ -122,7 +126,8 @@ public class PythonAnsibleModuleMock implements Serializable {
                     } else if ("int".equals(type)) {
                         try {
                             val = Integer.parseInt(v.toString());
-                        } catch (Exception ignored) {}
+                        } catch (Exception ignored) {
+                        }
                     }
                 }
 
@@ -151,9 +156,17 @@ public class PythonAnsibleModuleMock implements Serializable {
         return params;
     }
 
-    public boolean getCheck_mode() { return checkMode; }
-    public boolean get_debug() { return debug; }
-    public boolean get_diff() { return diff; }
+    public boolean getCheck_mode() {
+        return checkMode;
+    }
+
+    public boolean get_debug() {
+        return debug;
+    }
+
+    public boolean get_diff() {
+        return diff;
+    }
 
     public boolean boolean_value(Object v) {
         return Truthiness.isTrue(v);
@@ -200,14 +213,16 @@ public class PythonAnsibleModuleMock implements Serializable {
             if (pythonExit != null) {
                 try {
                     pythonExit.execute(1);
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                }
             }
         } catch (Exception e) {
             e.printStackTrace();
             if (pythonExit != null) {
                 try {
                     pythonExit.execute(1);
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                }
             }
         }
     }
@@ -226,7 +241,8 @@ public class PythonAnsibleModuleMock implements Serializable {
                 String key = list.size() > 2 ? list.get(2).toString() : null;
                 if ("passwd".equals(db)) {
                     if ("root".equals(key)) return new Object[]{0, "root:x:0:0:root:/root:/bin/bash\n", ""};
-                    if (key == null) return new Object[]{0, "root:x:0:0:root:/root:/bin/bash\ntestuser:x:1001:1001:testuser:/home/testuser:/bin/bash\n", ""};
+                    if (key == null)
+                        return new Object[]{0, "root:x:0:0:root:/root:/bin/bash\ntestuser:x:1001:1001:testuser:/home/testuser:/bin/bash\n", ""};
                 } else if ("group".equals(db)) {
                     if ("root".equals(key)) return new Object[]{0, "root:x:0:\n", ""};
                     if (key == null) return new Object[]{0, "root:x:0:\ntestgroup:x:1001:\n", ""};
@@ -250,9 +266,17 @@ public class PythonAnsibleModuleMock implements Serializable {
         }
     }
 
-    public String sha1(Object path) { return hashFile(path, "SHA-1"); }
-    public String md5(Object path) { return hashFile(path, "MD5"); }
-    public String sha256(Object path) { return hashFile(path, "SHA-256"); }
+    public String sha1(Object path) {
+        return hashFile(path, "SHA-1");
+    }
+
+    public String md5(Object path) {
+        return hashFile(path, "MD5");
+    }
+
+    public String sha256(Object path) {
+        return hashFile(path, "SHA-256");
+    }
 
     private String hashFile(Object path, String algorithm) {
         String p = osMock.normalizePath(path);
@@ -351,15 +375,21 @@ public class PythonAnsibleModuleMock implements Serializable {
         return Objects.toString(arg);
     }
 
-    public void debug(Object msg) { }
-    public void warn(Object msg) { }
-    public void deprecate(Object msg, Object version, Object date, Object collectionName) { }
+    public void debug(Object msg) {
+    }
+
+    public void warn(Object msg) {
+    }
+
+    public void deprecate(Object msg, Object version, Object date, Object collectionName) {
+    }
 
     public void makedirs_safe(Object path, Object mode) {
         try {
             int m = mode instanceof Number ? ((Number) mode).intValue() : 0777;
             osMock.makedirs(path, m, true);
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
     }
 
     public static class Factory {
@@ -370,9 +400,9 @@ public class PythonAnsibleModuleMock implements Serializable {
         }
 
         public PythonAnsibleModuleMock create(Map<String, Object> argumentSpec, Map<String, Object> inputArgs,
-                                            Map<String, Object> kwargs, Connection connection,
-                                            BecomeContext becomeContext, Map<String, String> environment,
-                                            Value pythonPrint, Value pythonExit) {
+                                              Map<String, Object> kwargs, Connection connection,
+                                              BecomeContext becomeContext, Map<String, String> environment,
+                                              Value pythonPrint, Value pythonExit) {
             return new PythonAnsibleModuleMock(argumentSpec, inputArgs, kwargs, osMock, connection, becomeContext, environment, pythonPrint, pythonExit);
         }
     }

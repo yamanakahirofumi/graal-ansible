@@ -16,7 +16,7 @@
         <jackson.version>2.17.0</jackson.version>
         <junit.version>5.10.2</junit.version>
         <sshd.version>2.12.1</sshd.version>
-        <jinjava.version>2.7.6</jinjava.version>
+        <jinjava.version>2.8.3</jinjava.version>
         <mockito.version>5.11.0</mockito.version>
         <testcontainers.version>2.0.2</testcontainers.version>
     </properties>

@@ -1,5 +1,7 @@
 package org.example.ansible.util;
 
+import org.graalvm.polyglot.Value;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -10,7 +12,6 @@ import java.nio.file.attribute.PosixFilePermission;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import org.graalvm.polyglot.Value;
 
 /**
  * Java implementation of os module functions for Python bridge.
@@ -56,22 +57,58 @@ public class PythonOSMock {
             this.st_mtime = mtime;
             this.st_ctime = ctime;
             // Order must match Python's os.stat_result tuple
-            add(st_mode); add(st_ino); add(st_dev); add(st_nlink);
-            add(st_uid); add(st_gid); add(st_size);
-            add(st_atime); add(st_mtime); add(st_ctime);
+            add(st_mode);
+            add(st_ino);
+            add(st_dev);
+            add(st_nlink);
+            add(st_uid);
+            add(st_gid);
+            add(st_size);
+            add(st_atime);
+            add(st_mtime);
+            add(st_ctime);
         }
 
         // Record-style getters for attribute access via GraalPy
-        public long st_mode() { return st_mode; }
-        public long st_ino() { return st_ino; }
-        public long st_dev() { return st_dev; }
-        public long st_nlink() { return st_nlink; }
-        public long st_uid() { return st_uid; }
-        public long st_gid() { return st_gid; }
-        public long st_size() { return st_size; }
-        public double st_atime() { return st_atime; }
-        public double st_mtime() { return st_mtime; }
-        public double st_ctime() { return st_ctime; }
+        public long st_mode() {
+            return st_mode;
+        }
+
+        public long st_ino() {
+            return st_ino;
+        }
+
+        public long st_dev() {
+            return st_dev;
+        }
+
+        public long st_nlink() {
+            return st_nlink;
+        }
+
+        public long st_uid() {
+            return st_uid;
+        }
+
+        public long st_gid() {
+            return st_gid;
+        }
+
+        public long st_size() {
+            return st_size;
+        }
+
+        public double st_atime() {
+            return st_atime;
+        }
+
+        public double st_mtime() {
+            return st_mtime;
+        }
+
+        public double st_ctime() {
+            return st_ctime;
+        }
     }
 
     private String convertToString(Object o) {
@@ -104,7 +141,9 @@ public class PythonOSMock {
                 }
             }
             return new String(out.toByteArray(), java.nio.charset.StandardCharsets.UTF_8);
-        } catch (Exception e) { return s; }
+        } catch (Exception e) {
+            return s;
+        }
     }
 
     public String normalizePath(Object path) {
@@ -130,7 +169,9 @@ public class PythonOSMock {
         try {
             Path p = toPath(path);
             return p != null && Files.exists(p);
-        } catch (Exception e) { return false; }
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     public void makedirs(Object name, int mode, boolean exist_ok) throws IOException {
@@ -139,14 +180,23 @@ public class PythonOSMock {
         if (exist_ok && Files.exists(p)) return;
         Files.createDirectories(p);
     }
-    public void makedirs(Object name, int mode) throws IOException { makedirs(name, mode, false); }
-    public void makedirs(Object name) throws IOException { makedirs(name, 0777, false); }
+
+    public void makedirs(Object name, int mode) throws IOException {
+        makedirs(name, mode, false);
+    }
+
+    public void makedirs(Object name) throws IOException {
+        makedirs(name, 0777, false);
+    }
 
     public void mkdir(Object path, int mode) throws IOException {
         Path p = toPath(path);
         if (p != null) Files.createDirectory(p);
     }
-    public void mkdir(Object path) throws IOException { mkdir(path, 0777); }
+
+    public void mkdir(Object path) throws IOException {
+        mkdir(path, 0777);
+    }
 
     /**
      * Native Java implementation of stat. Returns StatResult.
@@ -164,10 +214,10 @@ public class PythonOSMock {
             }
 
             return new StatResult(
-                mode, attrs.size(),
-                attrs.lastAccessTime().toMillis() / 1000.0,
-                attrs.lastModifiedTime().toMillis() / 1000.0,
-                attrs.creationTime().toMillis() / 1000.0
+                    mode, attrs.size(),
+                    attrs.lastAccessTime().toMillis() / 1000.0,
+                    attrs.lastModifiedTime().toMillis() / 1000.0,
+                    attrs.creationTime().toMillis() / 1000.0
             );
         } catch (IOException e) {
             return null;
@@ -217,15 +267,40 @@ public class PythonOSMock {
         return mode;
     }
 
-    public int geteuid() { return 0; }
-    public int getuid() { return 0; }
-    public int getegid() { return 0; }
-    public int getgid() { return 0; }
-    public void chown(Object path, int uid, int gid) { }
-    public void lchown(Object path, int uid, int gid) { }
-    public void lchmod(Object path, int mode) { }
-    public void setegid(int gid) { }
-    public void seteuid(int uid) { }
-    public void setgid(int gid) { }
-    public void setuid(int uid) { }
+    public int geteuid() {
+        return 0;
+    }
+
+    public int getuid() {
+        return 0;
+    }
+
+    public int getegid() {
+        return 0;
+    }
+
+    public int getgid() {
+        return 0;
+    }
+
+    public void chown(Object path, int uid, int gid) {
+    }
+
+    public void lchown(Object path, int uid, int gid) {
+    }
+
+    public void lchmod(Object path, int mode) {
+    }
+
+    public void setegid(int gid) {
+    }
+
+    public void seteuid(int uid) {
+    }
+
+    public void setgid(int gid) {
+    }
+
+    public void setuid(int uid) {
+    }
 }
