@@ -180,6 +180,12 @@ class Display:
     def display(self, *args, **kwargs): pass
     def debug(self, *args, **kwargs): pass
     def verbose(self, *args, **kwargs): pass
+    def v(self, *args, **kwargs): pass
+    def vv(self, *args, **kwargs): pass
+    def vvv(self, *args, **kwargs): pass
+    def vvvv(self, *args, **kwargs): pass
+    def vvvvv(self, *args, **kwargs): pass
+    def vvvvvv(self, *args, **kwargs): pass
     def warning(self, *args, **kwargs): pass
     def error(self, *args, **kwargs): pass
     def deprecated(self, *args, **kwargs): pass
@@ -562,7 +568,7 @@ def apply_mocks():
     create_mock('ansible._internal._locking')
     swe = type('SWE', (Exception,), {'is_tagged_on': staticmethod(lambda x: False)})
     create_mock('ansible._internal._datatag', {'SourceWasEncrypted': swe})
-    create_mock('ansible._internal._datatag._tags', {'SourceWasEncrypted': swe})
+    create_mock('ansible._internal._datatag._tags', {'SourceWasEncrypted': swe, 'Origin': type('Origin', (), {})})
     create_mock('ansible._internal._templating', {
         '_template_vars': types.SimpleNamespace(generate_ansible_template_vars=lambda *a, **kw: {}),
         'get_text_file_contents': lambda x, *a, **kw: (open(_normalize_path(x), 'r').read() if x and os.path.exists(_normalize_path(x)) else "mock_content", True)
