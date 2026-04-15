@@ -57,16 +57,7 @@ public class PythonOSMock {
             this.st_mtime = mtime;
             this.st_ctime = ctime;
             // Order must match Python's os.stat_result tuple
-            add(st_mode);
-            add(st_ino);
-            add(st_dev);
-            add(st_nlink);
-            add(st_uid);
-            add(st_gid);
-            add(st_size);
-            add(st_atime);
-            add(st_mtime);
-            add(st_ctime);
+            addAll(List.of(st_mode, st_ino, st_dev, st_nlink, st_uid, st_gid, st_size, st_atime, st_mtime, st_ctime));
         }
 
         // Record-style getters for attribute access via GraalPy
@@ -113,17 +104,14 @@ public class PythonOSMock {
 
     private String convertToString(Object o) {
         if (o == null) return null;
-        String s;
-        if (o instanceof String) {
-            s = (String) o;
-        } else if (o instanceof byte[]) {
-            s = new String((byte[]) o, java.nio.charset.StandardCharsets.UTF_8);
-        } else {
-            s = o.toString();
-        }
+        String s = switch (o) {
+            case String str -> str;
+            case byte[] bytes -> new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
+            default -> o.toString();
+        };
+
         if (s.startsWith("b'") && s.endsWith("'") && s.length() >= 3) {
-            s = s.substring(2, s.length() - 1);
-            return unescape(s);
+            return unescape(s.substring(2, s.length() - 1));
         }
         return s;
     }
@@ -133,14 +121,40 @@ public class PythonOSMock {
             java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
             for (int i = 0; i < s.length(); i++) {
                 char c = s.charAt(i);
-                if (c == '\\' && i + 3 < s.length() && s.charAt(i + 1) == 'x') {
-                    out.write(Integer.parseInt(s.substring(i + 2, i + 4), 16));
-                    i += 3;
-                } else {
-                    out.write(c);
+                if (c == '\\' && i + 1 < s.length()) {
+                    char next = s.charAt(i + 1);
+                    if (next == 'x' && i + 3 < s.length()) {
+                        out.write(Integer.parseInt(s.substring(i + 2, i + 4), 16));
+                        i += 3;
+                        continue;
+                    } else if (next >= '0' && next <= '7') {
+                        int j = i + 1;
+                        while (j < s.length() && j < i + 4 && s.charAt(j) >= '0' && s.charAt(j) <= '7') {
+                            j++;
+                        }
+                        out.write(Integer.parseInt(s.substring(i + 1, j), 8));
+                        i = j - 1;
+                        continue;
+                    } else {
+                        int escape = switch (next) {
+                            case 'n' -> '\n';
+                            case 'r' -> '\r';
+                            case 't' -> '\t';
+                            case '\\' -> '\\';
+                            case '\'' -> '\'';
+                            case '\"' -> '\"';
+                            default -> -1;
+                        };
+                        if (escape != -1) {
+                            out.write(escape);
+                            i++;
+                            continue;
+                        }
+                    }
                 }
+                out.write(c);
             }
-            return new String(out.toByteArray(), java.nio.charset.StandardCharsets.UTF_8);
+            return out.toString(java.nio.charset.StandardCharsets.UTF_8);
         } catch (Exception e) {
             return s;
         }
@@ -152,7 +166,7 @@ public class PythonOSMock {
         if (s.length() > 2 && (s.charAt(0) == '/' || s.charAt(0) == '\\') && s.charAt(2) == ':' && Character.isLetter(s.charAt(1))) {
             s = s.substring(1);
         }
-        if (System.getProperty("os.name").toLowerCase().contains("win")) {
+        if ("Windows".equals(osHandler.getOSFamily())) {
             if (s.contains(":")) s = s.replace('/', '\\');
         } else {
             if (s.startsWith("/") || s.contains("/")) s = s.replace('\\', '/');
@@ -237,33 +251,26 @@ public class PythonOSMock {
         }
 
         if (statResultFactory != null) {
-            List<Object> tuple = new ArrayList<>();
-            tuple.add(res.st_mode);
-            tuple.add(res.st_ino);
-            tuple.add(res.st_dev);
-            tuple.add(res.st_nlink);
-            tuple.add(res.st_uid);
-            tuple.add(res.st_gid);
-            tuple.add(res.st_size);
-            tuple.add(res.st_atime);
-            tuple.add(res.st_mtime);
-            tuple.add(res.st_ctime);
-            return statResultFactory.execute(tuple);
+            return statResultFactory.execute(List.copyOf(res));
         }
         return res;
     }
 
     private int decodePermissions(Set<PosixFilePermission> permissions) {
         int mode = 0;
-        if (permissions.contains(PosixFilePermission.OWNER_READ)) mode |= 0400;
-        if (permissions.contains(PosixFilePermission.OWNER_WRITE)) mode |= 0200;
-        if (permissions.contains(PosixFilePermission.OWNER_EXECUTE)) mode |= 0100;
-        if (permissions.contains(PosixFilePermission.GROUP_READ)) mode |= 0040;
-        if (permissions.contains(PosixFilePermission.GROUP_WRITE)) mode |= 0020;
-        if (permissions.contains(PosixFilePermission.GROUP_EXECUTE)) mode |= 0010;
-        if (permissions.contains(PosixFilePermission.OTHERS_READ)) mode |= 0004;
-        if (permissions.contains(PosixFilePermission.OTHERS_WRITE)) mode |= 0002;
-        if (permissions.contains(PosixFilePermission.OTHERS_EXECUTE)) mode |= 0001;
+        for (PosixFilePermission p : permissions) {
+            mode |= switch (p) {
+                case OWNER_READ -> 0400;
+                case OWNER_WRITE -> 0200;
+                case OWNER_EXECUTE -> 0100;
+                case GROUP_READ -> 0040;
+                case GROUP_WRITE -> 0020;
+                case GROUP_EXECUTE -> 0010;
+                case OTHERS_READ -> 0004;
+                case OTHERS_WRITE -> 0002;
+                case OTHERS_EXECUTE -> 0001;
+            };
+        }
         return mode;
     }
 

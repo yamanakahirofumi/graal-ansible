@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
  * Java implementation of AnsibleModule logic for GraalPy bridge.
@@ -54,10 +55,21 @@ public class PythonAnsibleModuleMock implements Serializable {
         this.pythonExit = pythonExit;
 
         // Initialize flags from inputArgs
-        this.checkMode = inputArgs != null && Truthiness.isTrue(inputArgs.get("_ansible_check_mode"));
-        this.debug = inputArgs != null && Truthiness.isTrue(inputArgs.get("_ansible_debug"));
-        this.diff = inputArgs != null && Truthiness.isTrue(inputArgs.get("_ansible_diff"));
+        this.checkMode = isFlagTrue(inputArgs, "_ansible_check_mode");
+        this.debug = isFlagTrue(inputArgs, "_ansible_debug");
+        this.diff = isFlagTrue(inputArgs, "_ansible_diff");
 
+        Map<String, Object> effectiveSpec = initializeEffectiveSpec(argumentSpec, kwargs);
+        initializeAliasesAndDefaults(effectiveSpec);
+        parseInputArguments(inputArgs, effectiveSpec);
+        finalizeParams(inputArgs);
+    }
+
+    private boolean isFlagTrue(Map<String, Object> inputArgs, String key) {
+        return inputArgs != null && Truthiness.isTrue(inputArgs.get(key));
+    }
+
+    private Map<String, Object> initializeEffectiveSpec(Map<String, Object> argumentSpec, Map<String, Object> kwargs) {
         Map<String, Object> effectiveSpec = new HashMap<>();
         if (argumentSpec != null) {
             effectiveSpec.putAll(argumentSpec);
@@ -76,8 +88,10 @@ public class PythonAnsibleModuleMock implements Serializable {
             effectiveSpec.put("attributes", Map.of("type", "str", "aliases", List.of("attr")));
             effectiveSpec.put("unsafe_writes", Map.of("type", "bool", "default", false));
         }
+        return effectiveSpec;
+    }
 
-        // Setup aliases and defaults
+    private void initializeAliasesAndDefaults(Map<String, Object> effectiveSpec) {
         for (Map.Entry<String, Object> entry : effectiveSpec.entrySet()) {
             String k = entry.getKey();
             Object v = entry.getValue();
@@ -94,50 +108,58 @@ public class PythonAnsibleModuleMock implements Serializable {
                 params.put(k, null);
             }
         }
+    }
 
-        // Parse input args
-        if (inputArgs != null) {
-            for (Map.Entry<String, Object> entry : inputArgs.entrySet()) {
-                String k = entry.getKey();
-                Object v = entry.getValue();
-                String targetKey = aliases.getOrDefault(k, k);
+    private void parseInputArguments(Map<String, Object> inputArgs, Map<String, Object> effectiveSpec) {
+        if (inputArgs == null) return;
 
-                Object val = v;
-                Object specObj = effectiveSpec.get(targetKey);
-                if (specObj instanceof Map) {
-                    Map<?, ?> spec = (Map<?, ?>) specObj;
-                    String type = Objects.toString(spec.get("type"), "str");
-                    if ("list".equals(type)) {
-                        if (!(v instanceof List) && !(v instanceof Object[])) {
-                            val = Collections.singletonList(v);
-                        }
-                    } else if ("str".equals(type) || "path".equals(type)) {
-                        String s;
-                        if (v instanceof List && !((List<?>) v).isEmpty()) {
-                            s = Objects.toString(((List<?>) v).get(0));
-                        } else if (v instanceof Object[] && ((Object[]) v).length > 0) {
-                            s = Objects.toString(((Object[]) v)[0]);
-                        } else {
-                            s = Objects.toString(v);
-                        }
-                        val = osMock.normalizePath(s);
-                    } else if ("bool".equals(type)) {
-                        val = Truthiness.isTrue(v);
-                    } else if ("int".equals(type)) {
-                        try {
-                            val = Integer.parseInt(v.toString());
-                        } catch (Exception ignored) {
-                        }
-                    }
-                }
+        for (Map.Entry<String, Object> entry : inputArgs.entrySet()) {
+            String k = entry.getKey();
+            Object v = entry.getValue();
+            String targetKey = aliases.getOrDefault(k, k);
 
-                params.put(targetKey, val);
-                if (!targetKey.equals(k)) {
-                    params.put(k, val);
-                }
+            Object val = v;
+            Object specObj = effectiveSpec.get(targetKey);
+            if (specObj instanceof Map) {
+                Map<?, ?> spec = (Map<?, ?>) specObj;
+                String type = Objects.toString(spec.get("type"), "str");
+                val = convertType(v, type);
+            }
+
+            params.put(targetKey, val);
+            if (!targetKey.equals(k)) {
+                params.put(k, val);
             }
         }
+    }
 
+    private Object convertType(Object v, String type) {
+        if ("list".equals(type)) {
+            if (!(v instanceof List) && !(v instanceof Object[])) {
+                return Collections.singletonList(v);
+            }
+        } else if ("str".equals(type) || "path".equals(type)) {
+            String s;
+            if (v instanceof List && !((List<?>) v).isEmpty()) {
+                s = Objects.toString(((List<?>) v).get(0));
+            } else if (v instanceof Object[] && ((Object[]) v).length > 0) {
+                s = Objects.toString(((Object[]) v)[0]);
+            } else {
+                s = Objects.toString(v);
+            }
+            return osMock.normalizePath(s);
+        } else if ("bool".equals(type)) {
+            return Truthiness.isTrue(v);
+        } else if ("int".equals(type)) {
+            try {
+                return Integer.parseInt(v.toString());
+            } catch (Exception ignored) {
+            }
+        }
+        return v;
+    }
+
+    private void finalizeParams(Map<String, Object> inputArgs) {
         // Special path handling
         if (params.get("path") == null) {
             if (params.get("dest") != null) params.put("path", params.get("dest"));
@@ -209,20 +231,18 @@ public class PythonAnsibleModuleMock implements Serializable {
             if (e.isExit()) {
                 throw e;
             }
-            e.printStackTrace();
-            if (pythonExit != null) {
-                try {
-                    pythonExit.execute(1);
-                } catch (Exception ignored) {
-                }
-            }
+            handleExitException(e);
         } catch (Exception e) {
-            e.printStackTrace();
-            if (pythonExit != null) {
-                try {
-                    pythonExit.execute(1);
-                } catch (Exception ignored) {
-                }
+            handleExitException(e);
+        }
+    }
+
+    private void handleExitException(Exception e) {
+        e.printStackTrace();
+        if (pythonExit != null) {
+            try {
+                pythonExit.execute(1);
+            } catch (Exception ignored) {
             }
         }
     }
@@ -235,25 +255,9 @@ public class PythonAnsibleModuleMock implements Serializable {
         String command;
         if (argsObj instanceof List) {
             List<?> list = (List<?>) argsObj;
-            // Handle getent mock if needed (logic from Python)
-            if (list.size() >= 2 && "getent".equals(list.get(0).toString())) {
-                String db = list.get(1).toString();
-                String key = list.size() > 2 ? list.get(2).toString() : null;
-                if ("passwd".equals(db)) {
-                    if ("root".equals(key)) return new Object[]{0, "root:x:0:0:root:/root:/bin/bash\n", ""};
-                    if (key == null)
-                        return new Object[]{0, "root:x:0:0:root:/root:/bin/bash\ntestuser:x:1001:1001:testuser:/home/testuser:/bin/bash\n", ""};
-                } else if ("group".equals(db)) {
-                    if ("root".equals(key)) return new Object[]{0, "root:x:0:\n", ""};
-                    if (key == null) return new Object[]{0, "root:x:0:\ntestgroup:x:1001:\n", ""};
-                }
-            }
-            StringBuilder sb = new StringBuilder();
-            for (Object o : list) {
-                if (sb.length() > 0) sb.append(" ");
-                sb.append(o.toString());
-            }
-            command = sb.toString();
+            Object[] mockRes = handleGetentMock(list);
+            if (mockRes != null) return mockRes;
+            command = list.stream().map(Object::toString).collect(Collectors.joining(" "));
         } else {
             command = argsObj.toString();
         }
@@ -264,6 +268,22 @@ public class PythonAnsibleModuleMock implements Serializable {
         } catch (Exception e) {
             return new Object[]{-1, "", "Failed to execute command: " + e.getMessage()};
         }
+    }
+
+    private Object[] handleGetentMock(List<?> list) {
+        if (list.size() >= 2 && "getent".equals(list.get(0).toString())) {
+            String db = list.get(1).toString();
+            String key = list.size() > 2 ? list.get(2).toString() : null;
+            if ("passwd".equals(db)) {
+                if ("root".equals(key)) return new Object[]{0, "root:x:0:0:root:/root:/bin/bash\n", ""};
+                if (key == null)
+                    return new Object[]{0, "root:x:0:0:root:/root:/bin/bash\ntestuser:x:1001:1001:testuser:/home/testuser:/bin/bash\n", ""};
+            } else if ("group".equals(db)) {
+                if ("root".equals(key)) return new Object[]{0, "root:x:0:\n", ""};
+                if (key == null) return new Object[]{0, "root:x:0:\ntestgroup:x:1001:\n", ""};
+            }
+        }
+        return null;
     }
 
     public String sha1(Object path) {
@@ -296,10 +316,12 @@ public class PythonAnsibleModuleMock implements Serializable {
 
     public String digest_from_file(Object filename, Object algorithm) {
         if (algorithm == null) return null;
-        // Ansible algorithm names might differ from Java's
         String javaAlg = algorithm.toString().toUpperCase();
-        if ("SHA1".equals(javaAlg)) javaAlg = "SHA-1";
-        else if ("SHA256".equals(javaAlg)) javaAlg = "SHA-256";
+        javaAlg = switch (javaAlg) {
+            case "SHA1" -> "SHA-1";
+            case "SHA256" -> "SHA-256";
+            default -> javaAlg;
+        };
         return hashFile(filename, javaAlg);
     }
 
