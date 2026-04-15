@@ -205,12 +205,19 @@ class TaskControlTest {
                       debug:
                         msg: "not really failed"
                       failed_when: true
+                      ignore_errors: true
+                    - name: succeed me
+                      debug:
+                        msg: "actually failed"
+                      failed_when: false
+                      ignore_errors: true # just in case, but failed_when: false should win
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
 
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
 
         assertFalse(results.get("host1").get(0).success());
+        assertTrue(results.get("host1").get(1).success());
     }
 
     @Test
@@ -323,9 +330,16 @@ class TaskControlTest {
                 - name: test failed_when list
                   hosts: all
                   tasks:
-                    - name: fail me if any is true
+                    - name: fail me if all are true
                       debug:
                         msg: "fail"
+                      failed_when:
+                        - true
+                        - true
+                      ignore_errors: true
+                    - name: don't fail if any is false
+                      debug:
+                        msg: "no fail"
                       failed_when:
                         - false
                         - true
@@ -335,6 +349,7 @@ class TaskControlTest {
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
 
         assertFalse(results.get("host1").get(0).success());
+        assertTrue(results.get("host1").get(1).success());
     }
 
     @Test
