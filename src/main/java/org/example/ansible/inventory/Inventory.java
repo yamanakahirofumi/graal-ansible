@@ -14,6 +14,60 @@ import java.util.Optional;
 public record Inventory(Group all) {
 
     /**
+     * Finds a host by name in the inventory.
+     * @param hostName The name of the host.
+     * @return The Host object, or null if not found.
+     */
+    public Host getHost(String hostName) {
+        return findHost(hostName).orElse(null);
+    }
+
+    /**
+     * Finds a group by name in the inventory.
+     * @param groupName The name of the group.
+     * @return The Group object, or null if not found.
+     */
+    public Group getGroup(String groupName) {
+        return findGroupInInventory(all, groupName);
+    }
+
+    private Group findGroupInInventory(Group group, String groupName) {
+        if (group.name().equals(groupName)) return group;
+        for (Group child : group.children()) {
+            Group found = findGroupInInventory(child, groupName);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    /**
+     * Adds a host to a specific group, creating the group if it doesn't exist.
+     * @param hostName The name of the host.
+     * @param groupName The name of the group.
+     */
+    public void addHostToGroup(String hostName, String groupName) {
+        Group group = getGroup(groupName);
+        if (group == null) {
+            group = new Group(groupName);
+            all.children().add(group);
+        }
+
+        Host host = getHost(hostName);
+        if (host == null) {
+            host = new Host(hostName);
+            // Every host must be a member of the 'all' group
+            if (!all.hosts().contains(host)) {
+                all.hosts().add(host);
+            }
+        }
+
+        final Host finalHost = host;
+        if (group.hosts().stream().noneMatch(h -> h.name().equals(hostName))) {
+            group.hosts().add(finalHost);
+        }
+    }
+
+    /**
      * Resolves all variables for a given host by name.
      * Follows the priority: all group < parent groups < child groups < host variables.
      *

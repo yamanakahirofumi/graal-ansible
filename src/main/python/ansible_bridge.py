@@ -529,7 +529,7 @@ def apply_mocks():
     })
 
     # 5. Plugins & Loader
-    create_mock('ansible.plugins')
+    create_mock('ansible.plugins', {'AnsiblePlugin': type('AnsiblePlugin', (), {})})
     create_mock('ansible.plugins.action', {'ActionBase': ActionBase})
 
     action_loader_obj = types.SimpleNamespace()
