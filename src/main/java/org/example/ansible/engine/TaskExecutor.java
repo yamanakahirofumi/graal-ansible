@@ -456,13 +456,15 @@ public class TaskExecutor implements ITaskExecutor {
                 conditions = List.of(task.failedWhen());
             }
 
+            boolean allFailed = true;
             for (Object condition : conditions) {
                 Object conditionResult = variableResolver.resolveValue(variableResolver.wrapInJinja(condition), evalVars);
-                if (Truthiness.isTrue(conditionResult)) {
-                    success = false;
+                if (!Truthiness.isTrue(conditionResult)) {
+                    allFailed = false;
                     break;
                 }
             }
+            success = !allFailed;
         }
 
         if (task.changedWhen() != null) {
