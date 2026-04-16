@@ -693,4 +693,31 @@ class ActualModuleIntegrationTest {
         assertTrue(groups.containsKey(groupName), "Dynamic group should be created");
         assertTrue(groups.get(groupName).contains(newHostName), "Host should be in the dynamic group");
     }
+
+    @Test
+    void testActualGroupByModule() {
+        String groupName = "environment_production";
+
+        Play play = new Play("group by play", "all", List.of(
+                new Task("group hosts by environment", "group_by", Map.of(
+                        "key", groupName
+                ))
+        ));
+
+        Inventory inventory = new Inventory(new Group("all", List.of(new Host(targetNode.getHost())), List.of(), Map.of()));
+        VariableManager vm = new VariableManager(inventory, Map.of(), tempDir);
+        TaskQueueManager tqm = new TaskQueueManager(taskExecutor, (host, vars) -> connection);
+        Map<String, List<TaskResult>> results = new HashMap<>();
+
+        // Act
+        tqm.executePlay(play, inventory, vm, results, false);
+
+        // Assert
+        assertTrue(results.get(targetNode.getHost()).get(0).success());
+
+        // Verify group membership
+        Map<String, List<String>> groups = inventory.getGroupsMap();
+        assertTrue(groups.containsKey(groupName), "Dynamic group should be created");
+        assertTrue(groups.get(groupName).contains(targetNode.getHost()), "Host should be in the dynamic group");
+    }
 }
