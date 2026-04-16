@@ -167,3 +167,20 @@
 - **検討内容**:
     - 変数の優先順位（22 段階）の完全な実装とテスト（詳細は [Variables-Templating.md](implementation/Variables-Templating.md) を参照）。
     - 動的インベントリの完全なサポート。
+
+## 6. ドキュメントの更新と不整合の解消 (Documentation Update & Inconsistency Resolution)
+
+### [ ] インベントリシステムの動的更新に関する記述の修正
+- **概要**: `docs/implementation/Inventory-System.md` においてインベントリが不変（Immutable）であると記載されているが、実際には `add_host` や `group_by` による動的更新をサポートするために可変（Mutable）な実装に変更されているため、これに合わせてドキュメントを更新する。
+
+### [ ] Truthiness 判定ルールの明文化
+- **概要**: `org.example.ansible.util.Truthiness` クラスに実装されている Ansible 互換の真偽判定ルール（`no`, `off`, `false` の扱い等）を `docs/implementation/Task-Control.md` 等に追記する。
+
+### [ ] Java 版 Action Plugin インターフェースの扱いに関する整理
+- **概要**: ドキュメント上は廃止されたと記載されているが、コードベースには依然として `ActionPlugin` インターフェースやそれを利用するロジックが残存している。これらを完全に削除するか、あるいは「内部的な拡張ポイント」として再定義し、ドキュメントとの不整合を解消する。
+
+### [ ] エラーハンドリング方針の詳細化
+- **概要**: `docs/tech/Error-Handling-Policy.md` を更新し、`ConnectionResult` による結果返却メカニズムや、`UnreachableException` による接続失敗時の挙動、および `meta: flush_handlers` の実行エンジンレベルでの処理詳細について具体的に記載する。
+
+### [ ] モジュールサポート状態の同期
+- **概要**: `docs/features/Module-Support-Status.md` の統合テスト済みモジュール数（現在 30 と記載）を、最新の実装状況（31 モジュール）に合わせて更新し、一覧との整合性を確保する。
