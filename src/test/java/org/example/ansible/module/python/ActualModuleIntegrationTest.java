@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -80,6 +81,16 @@ class ActualModuleIntegrationTest {
         if (taskExecutor != null) {
             taskExecutor.close();
         }
+    }
+
+    @Test
+    void testActualFailModule() {
+        String msg = "Custom fail message";
+        Task task = new Task("test_fail", "fail", Map.of("msg", msg));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertFalse(result.success(), "Fail module should fail");
+        assertEquals("Action Plugin failed: " + msg, result.message());
     }
 
     @Test
