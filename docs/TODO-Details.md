@@ -171,9 +171,14 @@
 - **概要**: `PlaybookExecutor` および `TaskQueueManager`, `TaskExecutor` の責務の明確化と抽象化。
 - **解決策**:
     - **コネクション解決の抽象化**: `ConnectionFactory` インターフェースを導入し、`ansible_connection` に基づく動的なコネクション生成を `TaskQueueManager` で管理。
-    - **ループ処理の分離**: `TaskExecutor` 内で `executeLoopTask`, `resolveLoopItems`, `executeLoopIteration` にメソッドを分割し、可読性を向上。
+    - **ループ処理の分離**: `TaskExecutor` 内で `executeLoopTask`, `resolveLoopItems`, `executeLoopIteration` にメソッドを分割し、可読性を向上.
     - **条件評価の集約**: `when` 句の評価ロジックを `VariableResolver` へ集約し、呼び出し側（TQM, Worker）のコードを簡素化。
     - **委譲 (delegate_to) の実装**: コネクションの動的な切り替えと、委譲先ホストに応じた変数解決の基盤を実装。
+
+### [✓] Java 版 Action Plugin インターフェースの削除と整理
+- **完了日**: 2026-04-16
+- **概要**: ドキュメントとの不整合を解消するため、使用されていなかった `ActionPlugin` Java インターフェースおよび `TaskExecutor` 内の関連ロジックを完全に削除。
+- **解決策**: Action Plugin の実行を GraalPy による Python-first 実装に一本化し、不要になった Java 側のインフラを排除。
 
 ## 5. 今後のリファクタリング検討事項 (Future Refactoring Items)
 
@@ -185,8 +190,6 @@
 
 ## 6. ドキュメントの更新と不整合の解消 (Documentation Update & Inconsistency Resolution)
 
-### [ ] Java 版 Action Plugin インターフェースの扱いに関する整理
-- **概要**: ドキュメント上は廃止されたと記載されているが、コードベースには依然として `ActionPlugin` インターフェースやそれを利用するロジックが残存している。これらを完全に削除するか、あるいは「内部的な拡張ポイント」として再定義し、ドキュメントとの不整合を解消する。
 
 ### [ ] エラーハンドリング方針の詳細化
 - **概要**: `docs/tech/Error-Handling-Policy.md` を更新し、`ConnectionResult` による結果返却メカニズムや、`UnreachableException` による接続失敗時の挙動、および `meta: flush_handlers` の実行エンジンレベルでの処理詳細について具体的に記載する。
