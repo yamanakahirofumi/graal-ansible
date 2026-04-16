@@ -30,11 +30,26 @@
 
 ## 3. 完了済みの項目 (Completed)
 
+### [✓] インベントリシステムの動的更新に関する記述の修正
+- **完了日**: 2026-04-16
+- **概要**: `docs/implementation/Inventory-System.md` においてインベントリが不変（Immutable）であると記載されていた不整合を解消。
+- **解決策**: 実行時の動的更新（`add_host`, `group_by`）をサポートするため、内部コレクションが可変（Mutable）である旨を明記。
+
+### [✓] Truthiness 判定ルールの明文化
+- **完了日**: 2026-04-16
+- **概要**: `org.example.ansible.util.Truthiness` に実装されている判定ルールをドキュメント化。
+- **解決策**: `docs/implementation/Task-Control.md` に「14. 真偽判定 (Truthiness)」セクションを追加。
+
+### [✓] モジュールサポート状態の同期
+- **完了日**: 2026-04-16
+- **概要**: `docs/features/Module-Support-Status.md` および本ドキュメントのテスト済みモジュール数を最新化。
+- **解決策**: 統合テスト済みモジュール数を 31 に更新し、`group_by` を一覧に含める形で同期。
+
 ### [✓] 実際の Ansible コレクションを使ったテストの実施
 - **完了日**: 2026-03-25
 - **概要**: [実際のコレクションを使ったテスト方法の設計](tech/Actual-Collection-Testing.md) に基づき、主要なモジュールのテストを統合。
 - **解決策**:
-    - `ping`, `copy`, `file`, `stat`, `template`, `debug`, `command`, `shell`, `setup`, `lineinfile`, `replace`, `user`, `group`, `find`, `tempfile`, `hostname`, `slurp`, `assert`, `blockinfile`, `getent`, `fetch`, `uri`, `unarchive`, `include_vars`, `include_tasks`, `import_tasks`, `set_fact`, `add_host`, `fail`, `get_url` の計 30 モジュールの統合テストを CI 環境へ統合済み。
+    - `ping`, `copy`, `file`, `stat`, `template`, `debug`, `command`, `shell`, `setup`, `lineinfile`, `replace`, `user`, `group`, `find`, `tempfile`, `hostname`, `slurp`, `assert`, `blockinfile`, `getent`, `fetch`, `uri`, `unarchive`, `include_vars`, `include_tasks`, `import_tasks`, `set_fact`, `add_host`, `fail`, `get_url`, `group_by` の計 31 モジュールの統合テストを CI 環境へ統合済み。
     - また、`fail`, `gather_facts`, `add_host`, `assemble`, `group_by`, `get_url`, `script`, `package_facts` 等についても動作を確認済み。
     - GraalPy および `ansible-core` のセットアップを GitHub Actions 上で自動化済み。
 
@@ -170,17 +185,9 @@
 
 ## 6. ドキュメントの更新と不整合の解消 (Documentation Update & Inconsistency Resolution)
 
-### [ ] インベントリシステムの動的更新に関する記述の修正
-- **概要**: `docs/implementation/Inventory-System.md` においてインベントリが不変（Immutable）であると記載されているが、実際には `add_host` や `group_by` による動的更新をサポートするために可変（Mutable）な実装に変更されているため、これに合わせてドキュメントを更新する。
-
-### [ ] Truthiness 判定ルールの明文化
-- **概要**: `org.example.ansible.util.Truthiness` クラスに実装されている Ansible 互換の真偽判定ルール（`no`, `off`, `false` の扱い等）を `docs/implementation/Task-Control.md` 等に追記する。
-
 ### [ ] Java 版 Action Plugin インターフェースの扱いに関する整理
 - **概要**: ドキュメント上は廃止されたと記載されているが、コードベースには依然として `ActionPlugin` インターフェースやそれを利用するロジックが残存している。これらを完全に削除するか、あるいは「内部的な拡張ポイント」として再定義し、ドキュメントとの不整合を解消する。
 
 ### [ ] エラーハンドリング方針の詳細化
 - **概要**: `docs/tech/Error-Handling-Policy.md` を更新し、`ConnectionResult` による結果返却メカニズムや、`UnreachableException` による接続失敗時の挙動、および `meta: flush_handlers` の実行エンジンレベルでの処理詳細について具体的に記載する。
 
-### [ ] モジュールサポート状態の同期
-- **概要**: `docs/features/Module-Support-Status.md` の統合テスト済みモジュール数（現在 30 と記載）を、最新の実装状況（31 モジュール）に合わせて更新し、一覧との整合性を確保する。
