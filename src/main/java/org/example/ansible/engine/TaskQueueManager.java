@@ -645,12 +645,19 @@ public class TaskQueueManager {
         Optional<Host> hostOpt = inventory.getHost(name);
         if (hostOpt.isPresent()) {
             Host host = hostOpt.get();
+            Map<String, Object> varsToAdd = new HashMap<>();
+            Object hostVarsObj = addHostData.get("host_vars");
+            if (hostVarsObj instanceof Map) {
+                varsToAdd.putAll((Map<String, Object>) hostVarsObj);
+            }
+
             for (Map.Entry<String, Object> entry : addHostData.entrySet()) {
                 String key = entry.getKey();
-                if (!List.of("name", "host_name", "groups", "changed", "failed").contains(key)) {
-                    host.variables().put(key, entry.getValue());
+                if (!List.of("name", "host_name", "groups", "host_vars", "changed", "failed").contains(key)) {
+                    varsToAdd.put(key, entry.getValue());
                 }
             }
+            host.variables().putAll(varsToAdd);
         }
     }
 
@@ -658,9 +665,12 @@ public class TaskQueueManager {
         Map<String, Object> data = result.data();
         if (data == null) return;
 
-        String key = (String) data.get("key");
-        if (key == null) return;
+        String groupName = (String) data.get("add_group");
+        if (groupName == null) {
+            groupName = (String) data.get("key");
+        }
+        if (groupName == null) return;
 
-        inventory.addHostToGroup(currentHostName, key);
+        inventory.addHostToGroup(currentHostName, groupName);
     }
 }
