@@ -152,4 +152,23 @@ class TaskQueueManagerTest {
         verify(taskExecutor).execute(eq(play), any(), eq(task), any(), anyBoolean(), any(), any(), any(), any(), any(), any());
         verify(taskExecutor).execute(eq(play), any(), eq(handlerTask), any(), anyBoolean(), any(), any(), any(), any(), any(), any());
     }
+
+    @Test
+    void testProcessGroupBy() {
+        // Arrange
+        Task task = new Task("group by task", "group_by", Map.of("key", "new_group"));
+        Play play = new Play("test play", "all", List.of(task));
+        VariableManager variableManager = new VariableManager(inventory, Collections.emptyMap());
+        Map<String, List<TaskResult>> results = new HashMap<>();
+
+        when(taskExecutor.execute(any(), any(), any(), any(), anyBoolean(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(TaskResult.success(Map.of("add_group", "new_group")));
+
+        // Act
+        tqm.executePlay(play, inventory, variableManager, results, false);
+
+        // Assert
+        assertTrue(inventory.getGroupsMap().containsKey("new_group"));
+        assertTrue(inventory.getGroupsMap().get("new_group").contains("host1"));
+    }
 }
