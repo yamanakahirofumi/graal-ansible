@@ -183,6 +183,12 @@ class Display:
     def warning(self, *args, **kwargs): pass
     def error(self, *args, **kwargs): pass
     def deprecated(self, *args, **kwargs): pass
+    def v(self, *args, **kwargs): pass
+    def vv(self, *args, **kwargs): pass
+    def vvv(self, *args, **kwargs): pass
+    def vvvv(self, *args, **kwargs): pass
+    def vvvvv(self, *args, **kwargs): pass
+    def vvvvvv(self, *args, **kwargs): pass
 Display.verbosity = 10
 
 class PlayContext:

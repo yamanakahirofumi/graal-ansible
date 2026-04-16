@@ -31,6 +31,7 @@ import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -631,5 +632,40 @@ class ActualModuleIntegrationTest {
         Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
         assertNotNull(facts, "ansible_facts should be present. Full data: " + result.data());
         assertEquals("actual_value", facts.get("my_actual_fact"));
+    }
+
+    @Test
+    void testActualAddHostModule() {
+        String newHostName = "dynamically_added_host";
+        String groupName = "dynamic_group";
+
+        Play play = new Play("add host play", "all", List.of(
+                new Task("add new host", "add_host", Map.of(
+                        "name", newHostName,
+                        "groups", groupName,
+                        "custom_var", "custom_value"
+                ))
+        ));
+
+        Inventory inventory = new Inventory(new Group("all", List.of(new Host(targetNode.getHost())), List.of(), Map.of()));
+        VariableManager vm = new VariableManager(inventory, Map.of(), tempDir);
+        TaskQueueManager tqm = new TaskQueueManager(taskExecutor, (host, vars) -> connection);
+        Map<String, List<TaskResult>> results = new HashMap<>();
+
+        // Act
+        tqm.executePlay(play, inventory, vm, results, false);
+
+        // Assert
+        assertTrue(results.get(targetNode.getHost()).get(0).success());
+
+        // Verify the host was added to the inventory
+        Optional<Host> addedHost = inventory.getHost(newHostName);
+        assertTrue(addedHost.isPresent(), "Host should be added to inventory");
+        assertEquals("custom_value", addedHost.get().variables().get("custom_var"));
+
+        // Verify group membership
+        Map<String, List<String>> groups = inventory.getGroupsMap();
+        assertTrue(groups.containsKey(groupName), "Dynamic group should be created");
+        assertTrue(groups.get(groupName).contains(newHostName), "Host should be in the dynamic group");
     }
 }

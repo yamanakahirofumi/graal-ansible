@@ -117,4 +117,62 @@ public record Inventory(Group all) {
         }
         return Optional.empty();
     }
+
+    /**
+     * Adds a host to a specific group. If the host or group doesn't exist, it handles creation/addition.
+     *
+     * @param hostName  The name of the host to add.
+     * @param groupName The name of the group to add the host to.
+     */
+    public void addHostToGroup(String hostName, String groupName) {
+        Host host = findHost(hostName).orElseGet(() -> {
+            Host newHost = new Host(hostName);
+            all.hosts().add(newHost);
+            return newHost;
+        });
+
+        if ("all".equals(groupName)) {
+            return;
+        }
+
+        Group group = getGroup(groupName).orElseGet(() -> {
+            Group newGroup = new Group(groupName);
+            all.children().add(newGroup);
+            return newGroup;
+        });
+
+        if (group.hosts().stream().noneMatch(h -> h.name().equals(hostName))) {
+            group.hosts().add(host);
+        }
+    }
+
+    /**
+     * Retrieves a host by name from the inventory.
+     *
+     * @param hostName The name of the host.
+     * @return An Optional containing the host if found.
+     */
+    public Optional<Host> getHost(String hostName) {
+        return findHost(hostName);
+    }
+
+    /**
+     * Retrieves a group by name from the inventory.
+     *
+     * @param groupName The name of the group.
+     * @return An Optional containing the group if found.
+     */
+    public Optional<Group> getGroup(String groupName) {
+        return Optional.ofNullable(findGroup(all, groupName));
+    }
+
+    private Group findGroup(Group root, String name) {
+        if (root == null) return null;
+        if (root.name().equals(name)) return root;
+        for (Group child : root.children()) {
+            Group found = findGroup(child, name);
+            if (found != null) return found;
+        }
+        return null;
+    }
 }

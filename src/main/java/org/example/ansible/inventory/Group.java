@@ -1,8 +1,9 @@
 package org.example.ansible.inventory;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Collections;
 
 /**
  * Represents a group of hosts in the inventory.
@@ -18,7 +19,13 @@ public record Group(
         List<Group> children,
         Map<String, Object> variables
 ) {
+    public Group {
+        hosts = hosts == null ? new ArrayList<>() : new ArrayList<>(hosts);
+        children = children == null ? new ArrayList<>() : new ArrayList<>(children);
+        variables = variables == null ? new HashMap<>() : new HashMap<>(variables);
+    }
+
     public Group(String name) {
-        this(name, Collections.emptyList(), Collections.emptyList(), Collections.emptyMap());
+        this(name, new ArrayList<>(), new ArrayList<>(), new HashMap<>());
     }
 }
