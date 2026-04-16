@@ -214,6 +214,13 @@ public class TaskQueueManager {
                 variableManager.registerVariable(host.name(), task.register(), result.data());
             }
 
+            String normalizedAction = task.action();
+            if (normalizedAction.startsWith("ansible.builtin.")) {
+                normalizedAction = normalizedAction.substring("ansible.builtin.".length());
+            } else if (normalizedAction.startsWith("ansible.legacy.")) {
+                normalizedAction = normalizedAction.substring("ansible.legacy.".length());
+            }
+
             // Handle collected facts or included vars
             if (result.data() != null && result.data().containsKey("ansible_facts")) {
                 @SuppressWarnings("unchecked")
@@ -225,13 +232,6 @@ public class TaskQueueManager {
                     factHost = result.data().get("_ansible_delegated_host").toString();
                 }
 
-                String normalizedAction = task.action();
-                if (normalizedAction.startsWith("ansible.builtin.")) {
-                    normalizedAction = normalizedAction.substring("ansible.builtin.".length());
-                } else if (normalizedAction.startsWith("ansible.legacy.")) {
-                    normalizedAction = normalizedAction.substring("ansible.legacy.".length());
-                }
-
                 if ("include_vars".equals(normalizedAction)) {
                     variableManager.addIncludedVars(factHost, facts);
                 } else if ("set_fact".equals(normalizedAction)) {
@@ -241,13 +241,13 @@ public class TaskQueueManager {
                 } else {
                     variableManager.addFacts(factHost, facts);
                 }
+            }
 
-                // Handle dynamic inventory updates
-                if (result.success() && "add_host".equals(normalizedAction)) {
-                    processAddHost(result, inventory);
-                } else if (result.success() && "group_by".equals(normalizedAction)) {
-                    processGroupBy(result, inventory, host.name());
-                }
+            // Handle dynamic inventory updates
+            if (result.success() && "add_host".equals(normalizedAction)) {
+                processAddHost(result, inventory);
+            } else if (result.success() && "group_by".equals(normalizedAction)) {
+                processGroupBy(result, inventory, host.name());
             }
 
             if (result.changed() && !task.notifications().isEmpty()) {
@@ -613,13 +613,19 @@ public class TaskQueueManager {
         Map<String, Object> data = result.data();
         if (data == null) return;
 
-        String name = (String) data.get("name");
+        // In Ansible, add_host returns data under 'add_host' key
+        Map<String, Object> addHostData = (Map<String, Object>) data.get("add_host");
+        if (addHostData == null) {
+            addHostData = data;
+        }
+
+        String name = (String) addHostData.get("name");
         if (name == null) {
-            name = (String) data.get("host_name");
+            name = (String) addHostData.get("host_name");
         }
         if (name == null) return;
 
-        Object groupsObj = data.get("groups");
+        Object groupsObj = addHostData.get("groups");
         List<String> groups = new ArrayList<>();
         if (groupsObj instanceof List<?> list) {
             for (Object o : list) groups.add(o.toString());
@@ -639,7 +645,7 @@ public class TaskQueueManager {
         Optional<Host> hostOpt = inventory.getHost(name);
         if (hostOpt.isPresent()) {
             Host host = hostOpt.get();
-            for (Map.Entry<String, Object> entry : data.entrySet()) {
+            for (Map.Entry<String, Object> entry : addHostData.entrySet()) {
                 String key = entry.getKey();
                 if (!List.of("name", "host_name", "groups", "changed", "failed").contains(key)) {
                     host.variables().put(key, entry.getValue());
