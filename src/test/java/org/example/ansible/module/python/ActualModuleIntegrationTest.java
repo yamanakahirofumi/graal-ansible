@@ -507,10 +507,35 @@ class ActualModuleIntegrationTest {
         TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
 
         // Clean up the server
-        connection.execCommand("pkill -f 'python3 -m http.server'", BecomeContext.empty(), null);
+        connection.execCommand("pkill -f 'python3 -m http.server 8080'", BecomeContext.empty(), null);
 
         assertTrue(result.success(), "Execution failed: " + result.message());
         assertTrue(((String) result.data().get("content")).contains("hello"));
+    }
+
+    @Test
+    void testActualGetUrlModule() {
+        // Start a simple HTTP server in the container background
+        connection.execCommand("sh -c \"echo 'get_url content' > /tmp/download.txt && cd /tmp && (python3 -m http.server 8081 &)\"", BecomeContext.empty(), null);
+
+        // Wait a bit for server to start
+        try { Thread.sleep(2000); } catch (InterruptedException e) {}
+
+        String destPath = "/tmp/downloaded-by-get-url.txt";
+        Task task = new Task("test_get_url", "get_url", Map.of(
+                "url", "http://localhost:8081/download.txt",
+                "dest", destPath
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        // Clean up the server
+        connection.execCommand("pkill -f 'python3 -m http.server 8081'", BecomeContext.empty(), null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        assertTrue(result.changed());
+
+        var execResult = connection.execCommand("cat " + destPath, BecomeContext.empty(), null);
+        assertEquals("get_url content", execResult.stdout().trim());
     }
 
     @Test
