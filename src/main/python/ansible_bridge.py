@@ -586,7 +586,7 @@ def apply_mocks() -> None:
     create_mock('ansible._internal._ansiballz._builder')
     swe = type('SWE', (Exception,), {'is_tagged_on': staticmethod(lambda x: False)})
     create_mock('ansible._internal._datatag', {'SourceWasEncrypted': swe})
-    create_mock('ansible._internal._datatag._tags', {'SourceWasEncrypted': swe})
+    create_mock('ansible._internal._datatag._tags', {'SourceWasEncrypted': swe, 'Origin': type('Origin', (), {}), 'TrustedAsTemplate': type('TAT', (), {})})
     create_mock('ansible._internal._datatag._utils')
     create_mock('ansible._internal._templating', {
         '_template_vars': types.SimpleNamespace(generate_ansible_template_vars=lambda *a, **kw: {}),
