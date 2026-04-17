@@ -210,6 +210,10 @@ class PlayContext:
         self.check_mode = False
         self.diff = False
 
+class AnsiblePlugin:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        pass
+
 class ActionBase:
     def __init__(self, task: 'Task', connection: Any, play_context: 'PlayContext', loader: 'MockLoader', templar: 'Templar', shared_loader_obj: Any) -> None:
         self._task, self._connection, self._play_context = task, connection, play_context
@@ -551,7 +555,7 @@ def apply_mocks() -> None:
     })
 
     # 5. Plugins & Loader
-    create_mock('ansible.plugins')
+    create_mock('ansible.plugins', {'AnsiblePlugin': AnsiblePlugin})
     create_mock('ansible.plugins.action', {'ActionBase': ActionBase})
 
     action_loader_obj = types.SimpleNamespace()
@@ -567,7 +571,8 @@ def apply_mocks() -> None:
 
     create_mock('ansible.plugins.loader', {
         'action_loader': action_loader_obj,
-        'module_loader': type('ML', (), {'find_plugin': lambda name: None})
+        'module_loader': type('ML', (), {'find_plugin': lambda name: None}),
+        'ps_module_utils_loader': type('PML', (), {'find_plugin': lambda name: None})
     })
 
     # 6. Playbook
@@ -582,9 +587,16 @@ def apply_mocks() -> None:
         'get_controller_serialize_map': lambda: {}
     })
     create_mock('ansible._internal._locking')
+    create_mock('ansible._internal._ansiballz')
+    create_mock('ansible._internal._ansiballz._builder')
     swe = type('SWE', (Exception,), {'is_tagged_on': staticmethod(lambda x: False)})
     create_mock('ansible._internal._datatag', {'SourceWasEncrypted': swe})
-    create_mock('ansible._internal._datatag._tags', {'SourceWasEncrypted': swe})
+    create_mock('ansible._internal._datatag._tags', {
+        'SourceWasEncrypted': swe,
+        'Origin': type('Origin', (), {}),
+        'TrustedAsTemplate': type('TrustedAsTemplate', (), {})
+    })
+    create_mock('ansible._internal._datatag._utils')
     create_mock('ansible._internal._templating', {
         '_template_vars': types.SimpleNamespace(generate_ansible_template_vars=lambda *a, **kw: {}),
         'get_text_file_contents': lambda x, *a, **kw: (open(_normalize_path(x), 'r').read() if x and os.path.exists(_normalize_path(x)) else "mock_content", True)
