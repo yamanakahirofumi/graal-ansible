@@ -18,7 +18,17 @@
 
 ### 2.2 タスク実行時
 - **モジュール実行失敗**：戻り値の `failed` フラグを真とし、エラーメッセージを収集します。
-- **接続タイムアウト**：SSH接続等の失敗を適切に検知し、リトライまたはターゲットノードの除外を行います。
+- **接続失敗と到達不能 (Unreachable)**：
+    - 接続確立時やコマンド実行時に `UnreachableException` がスローされた場合、対象ホストをプレイから除外します。
+    - ただし、タスクに `ignore_unreachable: true` が設定されている場合は、エラーを無視して後続のタスクを継続します。この際、結果は `unreachable` 状態として記録されます。
+- **接続結果の返却 (`ConnectionResult`)**：
+    - すべての接続プラグイン（Local, SSH等）は、実行結果を `ConnectionResult` オブジェクトとして返却します。
+    - `ConnectionResult` には `stdout`, `stderr`, `exitCode` が含まれ、これらはモジュール実行結果の `rc`, `stdout`, `stderr` にマッピングされます。
+
+### 2.3 特殊なタスク制御
+- **ハンドラーの即時実行 (`meta: flush_handlers`)**：
+    - 実行エンジン（`TaskQueueManager`）レベルで処理されます。
+    - タスクの `action` が `meta` かつ引数が `flush_handlers` の場合、その時点で対象ホストに対して通知（notify）されているすべてのハンドラーを即座に実行（flush）します。
 
 ## 3. 関連ドキュメント
 - [ロギング方針](Logging-Policy.md)：エラー発生時のログ出力詳細
