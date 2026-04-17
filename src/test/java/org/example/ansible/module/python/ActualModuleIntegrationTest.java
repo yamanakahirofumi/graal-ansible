@@ -660,6 +660,17 @@ class ActualModuleIntegrationTest {
     }
 
     @Test
+    void testActualGatherFactsModule() {
+        Task task = new Task("test_gather_facts", "gather_facts", Map.of());
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
+        assertNotNull(facts, "ansible_facts should be present");
+        assertTrue(facts.containsKey("ansible_os_family"), "Should contain ansible_os_family fact");
+    }
+
+    @Test
     void testActualAddHostModule() {
         String newHostName = "dynamically_added_host";
         String groupName = "dynamic_group";
@@ -692,6 +703,48 @@ class ActualModuleIntegrationTest {
         Map<String, List<String>> groups = inventory.getGroupsMap();
         assertTrue(groups.containsKey(groupName), "Dynamic group should be created");
         assertTrue(groups.get(groupName).contains(newHostName), "Host should be in the dynamic group");
+    }
+
+    @Test
+    void testActualAssembleModule() {
+        String srcDir = "/tmp/assemble_src";
+        String destFile = "/tmp/assembled_file.txt";
+
+        // Setup source directory and files on remote node
+        connection.execCommand("mkdir -p " + srcDir, BecomeContext.empty(), null);
+        connection.execCommand("echo 'part1' > " + srcDir + "/01_file.txt", BecomeContext.empty(), null);
+        connection.execCommand("echo 'part2' > " + srcDir + "/02_file.txt", BecomeContext.empty(), null);
+
+        Task task = new Task("test_assemble", "assemble", Map.of(
+                "src", srcDir,
+                "dest", destFile
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        assertTrue(result.changed());
+
+        var execResult = connection.execCommand("cat " + destFile, BecomeContext.empty(), null);
+        String output = execResult.stdout().trim();
+        assertTrue(output.contains("part1") && output.contains("part2"), "Assembled file should contain content from both source files. Output: " + output);
+
+        // Cleanup
+        connection.execCommand("rm -rf " + srcDir + " " + destFile, BecomeContext.empty(), null);
+    }
+
+    @Test
+    void testActualScriptModule() throws IOException {
+        Path scriptFile = tempDir.resolve("test_script.sh");
+        Files.writeString(scriptFile, "#!/bin/sh\necho \"script_output_expected\"\n");
+
+        Task task = new Task("test_script", "script", Map.of(
+                "_raw_params", scriptFile.toString()
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        assertTrue(result.changed());
+        assertTrue(((String) result.data().get("stdout")).contains("script_output_expected"));
     }
 
     @Test
