@@ -286,19 +286,19 @@ public class PythonAnsibleModuleMock implements Serializable {
         return null;
     }
 
-    public String sha1(Object path) {
+    public String sha1(String path) {
         return hashFile(path, "SHA-1");
     }
 
-    public String md5(Object path) {
+    public String md5(String path) {
         return hashFile(path, "MD5");
     }
 
-    public String sha256(Object path) {
+    public String sha256(String path) {
         return hashFile(path, "SHA-256");
     }
 
-    private String hashFile(Object path, String algorithm) {
+    private String hashFile(String path, String algorithm) {
         String p = osMock.normalizePath(path);
         if (p == null) return null;
         try (InputStream is = new FileInputStream(p)) {
@@ -314,9 +314,9 @@ public class PythonAnsibleModuleMock implements Serializable {
         }
     }
 
-    public String digest_from_file(Object filename, Object algorithm) {
+    public String digest_from_file(String filename, String algorithm) {
         if (algorithm == null) return null;
-        String javaAlg = algorithm.toString().toUpperCase();
+        String javaAlg = algorithm.toUpperCase();
         javaAlg = switch (javaAlg) {
             case "SHA1" -> "SHA-1";
             case "SHA256" -> "SHA-256";
@@ -333,7 +333,7 @@ public class PythonAnsibleModuleMock implements Serializable {
         return sb.toString();
     }
 
-    public void atomic_move(Object src, Object dest) throws IOException {
+    public void atomic_move(String src, String dest) throws IOException {
         String sPath = osMock.normalizePath(src);
         String dPath = osMock.normalizePath(dest);
         if (sPath == null || dPath == null) return;
@@ -342,7 +342,7 @@ public class PythonAnsibleModuleMock implements Serializable {
         Files.move(s, d, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
     }
 
-    public Map<String, Object> get_file_attributes(Object path) {
+    public Map<String, Object> get_file_attributes(String path) {
         String p = osMock.normalizePath(path);
         if (!osMock.exists(p)) return Collections.emptyMap();
 
@@ -359,26 +359,28 @@ public class PythonAnsibleModuleMock implements Serializable {
         return attrs;
     }
 
-    public Map<String, Object> load_file_common_arguments(Map<String, Object> params, Object path) {
+    public Map<String, Object> load_file_common_arguments(Map<String, Object> params, String path) {
         Map<String, Object> res = new HashMap<>();
         String[] keys = {"mode", "owner", "group", "seuser", "serole", "setype", "selevel", "attributes", "unsafe_writes"};
         for (String k : keys) {
             if (params.containsKey(k)) res.put(k, params.get(k));
         }
-        Object actualPath = path;
+        String actualPath = path;
         if (actualPath == null) {
-            actualPath = params.get("path");
-            if (actualPath == null) actualPath = params.get("dest");
-            if (actualPath == null) actualPath = params.get("name");
+            Object p = params.get("path");
+            if (p == null) p = params.get("dest");
+            if (p == null) p = params.get("name");
+
+            if (p != null) {
+                if (p instanceof List && !((List<?>) p).isEmpty()) {
+                    actualPath = Objects.toString(((List<?>) p).get(0));
+                } else {
+                    actualPath = Objects.toString(p);
+                }
+            }
         }
         if (actualPath != null) {
-            String s;
-            if (actualPath instanceof List && !((List<?>) actualPath).isEmpty()) {
-                s = Objects.toString(((List<?>) actualPath).get(0));
-            } else {
-                s = Objects.toString(actualPath);
-            }
-            res.put("path", osMock.normalizePath(s));
+            res.put("path", osMock.normalizePath(actualPath));
         }
         return res;
     }
@@ -393,20 +395,20 @@ public class PythonAnsibleModuleMock implements Serializable {
         set_file_attributes_if_different(fileArgs, changed);
     }
 
-    public String get_bin_path(Object arg, boolean required, List<Object> optDirs) {
-        return Objects.toString(arg);
+    public String get_bin_path(String arg, boolean required, List<String> optDirs) {
+        return arg;
     }
 
-    public void debug(Object msg) {
+    public void debug(String msg) {
     }
 
-    public void warn(Object msg) {
+    public void warn(String msg) {
     }
 
-    public void deprecate(Object msg, Object version, Object date, Object collectionName) {
+    public void deprecate(String msg, String version, String date, String collectionName) {
     }
 
-    public void makedirs_safe(Object path, Object mode) {
+    public void makedirs_safe(String path, Object mode) {
         try {
             int m = mode instanceof Number ? ((Number) mode).intValue() : 0777;
             osMock.makedirs(path, m, true);

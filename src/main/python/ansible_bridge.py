@@ -20,18 +20,25 @@ def _raise_file_not_found(msg):
 # Initialize Java-based os mock with Python classes
 os_java.setPythonClasses(os.stat_result, _raise_file_not_found)
 
+def _to_java_str(p):
+    if p is None: return None
+    if isinstance(p, bytes):
+        try: return p.decode('utf-8')
+        except: return p.decode('latin-1')
+    return str(p)
+
 # Override os functions to use Java-based mocks
-os.makedirs = os_java.makedirs
-os.mkdir = os_java.mkdir
-os.path.exists = os_java.exists
-os.stat = os_java.statPython
+os.makedirs = lambda name, mode=0o777, exist_ok=False: os_java.makedirs(_to_java_str(name), mode, exist_ok)
+os.mkdir = lambda path, mode=0o777: os_java.mkdir(_to_java_str(path), mode)
+os.path.exists = lambda path: os_java.exists(_to_java_str(path))
+os.stat = lambda path, *args, **kwargs: os_java.statPython(_to_java_str(path), *args)
 os.geteuid = os_java.geteuid
 os.getuid = os_java.getuid
 os.getegid = os_java.getegid
 os.getgid = os_java.getgid
-os.chown = os_java.chown
-os.lchown = os_java.lchown
-os.lchmod = os_java.lchmod
+os.chown = lambda path, uid, gid: os_java.chown(_to_java_str(path), uid, gid)
+os.lchown = lambda path, uid, gid: os_java.lchown(_to_java_str(path), uid, gid)
+os.lchmod = lambda path, mode: os_java.lchmod(_to_java_str(path), mode)
 os.setegid = os_java.setegid
 os.seteuid = os_java.seteuid
 os.setgid = os_java.setgid
@@ -46,7 +53,7 @@ _current_task_context = {
 }
 
 def _normalize_path(p):
-    return os_java.normalizePath(p)
+    return os_java.normalizePath(_to_java_str(p))
 
 def _deep_convert(obj):
     if obj is None: return None
@@ -382,28 +389,28 @@ class AnsibleModule:
         return (int(res[0]), str(res[1]), str(res[2]))
 
     def get_bin_path(self, arg, required=False, opt_dirs=None):
-        return self._java_mock.get_bin_path(arg, required, opt_dirs or [])
+        return self._java_mock.get_bin_path(_to_java_str(arg), required, [_to_java_str(d) for d in (opt_dirs or [])])
 
-    def sha1(self, path): return self._java_mock.sha1(path)
-    def md5(self, path): return self._java_mock.md5(path)
-    def sha256(self, path): return self._java_mock.sha256(path)
+    def sha1(self, path): return self._java_mock.sha1(_to_java_str(path))
+    def md5(self, path): return self._java_mock.md5(_to_java_str(path))
+    def sha256(self, path): return self._java_mock.sha256(_to_java_str(path))
 
     def atomic_move(self, src, dest, unsafe_writes=False, **kwargs):
-        self._java_mock.atomic_move(src, dest)
+        self._java_mock.atomic_move(_to_java_str(src), _to_java_str(dest))
 
-    def debug(self, msg): self._java_mock.debug(msg)
-    def warn(self, msg): self._java_mock.warn(msg)
+    def debug(self, msg): self._java_mock.debug(_to_java_str(msg))
+    def warn(self, msg): self._java_mock.warn(_to_java_str(msg))
     def deprecate(self, msg, version=None, date=None, collection_name=None):
-        self._java_mock.deprecate(msg, version, date, collection_name)
+        self._java_mock.deprecate(_to_java_str(msg), _to_java_str(version), _to_java_str(date), _to_java_str(collection_name))
 
     def digest_from_file(self, filename, algorithm):
-        return self._java_mock.digest_from_file(filename, algorithm)
+        return self._java_mock.digest_from_file(_to_java_str(filename), _to_java_str(algorithm))
 
     def get_file_attributes(self, path):
-        return _deep_convert(self._java_mock.get_file_attributes(path))
+        return _deep_convert(self._java_mock.get_file_attributes(_to_java_str(path)))
 
     def load_file_common_arguments(self, params, path=None):
-        return _deep_convert(self._java_mock.load_file_common_arguments(params, path))
+        return _deep_convert(self._java_mock.load_file_common_arguments(params, _to_java_str(path)))
 
     def set_fs_attributes_if_different(self, file_args, changed, diff=None, expand=True):
         self._java_mock.set_fs_attributes_if_different(file_args, changed)
@@ -413,7 +420,7 @@ class AnsibleModule:
         return changed
 
     def makedirs_safe(self, path, mode=None):
-        self._java_mock.makedirs_safe(path, mode)
+        self._java_mock.makedirs_safe(_to_java_str(path), mode)
 
 # --- Mock Application ---
 

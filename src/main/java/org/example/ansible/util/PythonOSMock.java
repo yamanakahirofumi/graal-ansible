@@ -38,7 +38,7 @@ public class PythonOSMock {
     /**
      * Sequence and attribute compatible stat result for Python.
      */
-    public static class StatResult extends ArrayList<Object> {
+    public static class StatResult extends ArrayList<Number> {
         public long st_mode;
         public long st_ino = 0;
         public long st_dev = 0;
@@ -102,20 +102,6 @@ public class PythonOSMock {
         }
     }
 
-    private String convertToString(Object o) {
-        if (o == null) return null;
-        String s = switch (o) {
-            case String str -> str;
-            case byte[] bytes -> new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
-            default -> o.toString();
-        };
-
-        if (s.startsWith("b'") && s.endsWith("'") && s.length() >= 3) {
-            return unescape(s.substring(2, s.length() - 1));
-        }
-        return s;
-    }
-
     private String unescape(String s) {
         try {
             java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
@@ -160,9 +146,12 @@ public class PythonOSMock {
         }
     }
 
-    public String normalizePath(Object path) {
-        String s = convertToString(path);
-        if (s == null) return null;
+    public String normalizePath(String path) {
+        if (path == null) return null;
+        String s = path;
+        if (s.startsWith("b'") && s.endsWith("'") && s.length() >= 3) {
+            s = unescape(s.substring(2, s.length() - 1));
+        }
         if (s.length() > 2 && (s.charAt(0) == '/' || s.charAt(0) == '\\') && s.charAt(2) == ':' && Character.isLetter(s.charAt(1))) {
             s = s.substring(1);
         }
@@ -174,12 +163,12 @@ public class PythonOSMock {
         return s;
     }
 
-    private Path toPath(Object p) {
+    private Path toPath(String p) {
         String s = normalizePath(p);
         return s != null ? Paths.get(s) : null;
     }
 
-    public boolean exists(Object path) {
+    public boolean exists(String path) {
         try {
             Path p = toPath(path);
             return p != null && Files.exists(p);
@@ -188,34 +177,34 @@ public class PythonOSMock {
         }
     }
 
-    public void makedirs(Object name, int mode, boolean exist_ok) throws IOException {
+    public void makedirs(String name, int mode, boolean exist_ok) throws IOException {
         Path p = toPath(name);
         if (p == null) return;
         if (exist_ok && Files.exists(p)) return;
         Files.createDirectories(p);
     }
 
-    public void makedirs(Object name, int mode) throws IOException {
+    public void makedirs(String name, int mode) throws IOException {
         makedirs(name, mode, false);
     }
 
-    public void makedirs(Object name) throws IOException {
+    public void makedirs(String name) throws IOException {
         makedirs(name, 0777, false);
     }
 
-    public void mkdir(Object path, int mode) throws IOException {
+    public void mkdir(String path, int mode) throws IOException {
         Path p = toPath(path);
         if (p != null) Files.createDirectory(p);
     }
 
-    public void mkdir(Object path) throws IOException {
+    public void mkdir(String path) throws IOException {
         mkdir(path, 0777);
     }
 
     /**
      * Native Java implementation of stat. Returns StatResult.
      */
-    public StatResult stat(Object path) {
+    public StatResult stat(String path) {
         Path p = toPath(path);
         if (p == null || !Files.exists(p)) return null;
         try {
@@ -241,7 +230,7 @@ public class PythonOSMock {
     /**
      * Python-compatible stat implementation. Uses factories to return os.stat_result.
      */
-    public Object statPython(Object path, Object... args) {
+    public Object statPython(String path, Object... args) {
         StatResult res = stat(path);
         if (res == null) {
             if (exceptionHandler != null) {
@@ -290,13 +279,13 @@ public class PythonOSMock {
         return 0;
     }
 
-    public void chown(Object path, int uid, int gid) {
+    public void chown(String path, int uid, int gid) {
     }
 
-    public void lchown(Object path, int uid, int gid) {
+    public void lchown(String path, int uid, int gid) {
     }
 
-    public void lchmod(Object path, int mode) {
+    public void lchmod(String path, int mode) {
     }
 
     public void setegid(int gid) {
