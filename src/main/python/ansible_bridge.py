@@ -4,6 +4,13 @@ import os
 import types
 import re
 from io import StringIO
+from typing import Any, Dict, List, Optional, Tuple, Union, Set, Type, TYPE_CHECKING, Iterable
+
+if TYPE_CHECKING:
+    # These are injected by GraalVM context in TaskExecutor.java
+    os_java: Any
+    AnsibleModuleJava: Any
+    task_executor_java: Any
 
 # Fail early if necessary mocks are not available in GraalPy context
 if 'os_java' not in globals():
@@ -11,7 +18,7 @@ if 'os_java' not in globals():
 if 'AnsibleModuleJava' not in globals():
     raise ImportError("AnsibleModuleJava factory not found. Ensure TaskExecutor correctly injects PythonAnsibleModuleMock.Factory.")
 
-def _raise_file_not_found(msg):
+def _raise_file_not_found(msg: str) -> None:
     # This helper is necessary because Java cannot directly 'raise' a Python exception.
     # By calling this function, Java triggers a Python-level raise statement,
     # ensuring the exception is correctly caught as a FileNotFoundError in Python.
@@ -20,7 +27,7 @@ def _raise_file_not_found(msg):
 # Initialize Java-based os mock with Python classes
 os_java.setPythonClasses(os.stat_result, _raise_file_not_found)
 
-def _to_java_str(p):
+def _to_java_str(p: Any) -> Optional[str]:
     if p is None: return None
     if isinstance(p, bytes):
         try: return p.decode('utf-8')
@@ -45,27 +52,26 @@ os.setgid = os_java.setgid
 os.setuid = os_java.setuid
 
 # Global context to hold current task state
-_current_task_context = {
+_current_task_context: Dict[str, Any] = {
     'complex_args': {},
     'connection_java': None,
     'become_context_java': None,
     'environment_java': None
 }
 
-def _normalize_path(p):
-    return os_java.normalizePath(_to_java_str(p))
+def _normalize_path(p: Any) -> str:
+    return str(os_java.normalizePath(_to_java_str(p)))
 
-def _deep_convert(obj):
+def _deep_convert(obj: Any) -> Any:
     if obj is None: return None
-    if isinstance(obj, str): return _normalize_path(obj)
-    if isinstance(obj, bytes): return _normalize_path(obj)
+    if isinstance(obj, (str, bytes)): return _normalize_path(obj)
     if isinstance(obj, (int, float, bool)): return obj
 
     if hasattr(obj, 'getClass'):
-        from java.util import Map, List, Set
+        from java.util import Map, List as JavaList, Set as JavaSet
         if isinstance(obj, Map):
             return {str(k): _deep_convert(v) for k, v in obj.items()}
-        if isinstance(obj, (List, Set)):
+        if isinstance(obj, (JavaList, JavaSet)):
             return [_deep_convert(i) for i in obj]
 
         class_name = obj.getClass().getName()
@@ -89,7 +95,7 @@ def _deep_convert(obj):
         return [_deep_convert(i) for i in obj]
     return obj
 
-def bind_task(complex_args, connection_java, become_context_java, environment_java):
+def bind_task(complex_args: Any, connection_java: Any, become_context_java: Any, environment_java: Any) -> None:
     args = complex_args
     if hasattr(complex_args, 'getClass') and 'Map' in complex_args.getClass().getName():
         from java.util import HashMap
@@ -104,7 +110,7 @@ def bind_task(complex_args, connection_java, become_context_java, environment_ja
         'environment_java': environment_java
     })
 
-def setup_sys_path(site_packages):
+def setup_sys_path(site_packages: Optional[List[str]]) -> None:
     if site_packages:
         for p in site_packages:
             p_str = _normalize_path(p)
@@ -125,33 +131,33 @@ def setup_sys_path(site_packages):
                                     m.__dict__['__file__'] = target_file
                                 except: pass
 
-def setup_env(env_vars):
+def setup_env(env_vars: Optional[Dict[str, Any]]) -> None:
     if env_vars:
         for k, v in dict(env_vars).items(): os.environ[str(k)] = str(v)
 
 # --- Mock Classes ---
 
 class MockLoader:
-    def __init__(self):
-        self.path_finder = None
-        self._basedir = os.getcwd()
-    def get_basedir(self):
+    def __init__(self) -> None:
+        self.path_finder: Any = None
+        self._basedir: str = os.getcwd()
+    def get_basedir(self) -> str:
         return self._basedir
-    def set_basedir(self, basedir):
+    def set_basedir(self, basedir: str) -> None:
         self._basedir = basedir
-    def get_real_file(self, file_path, decrypt=True):
+    def get_real_file(self, file_path: str, decrypt: bool = True) -> str:
         return file_path
-    def get_text_file_contents(self, file_path, loader=None):
+    def get_text_file_contents(self, file_path: str, loader: Any = None) -> Tuple[str, bool]:
         fp = _normalize_path(file_path)
         if fp and os.path.exists(fp):
             with open(fp, 'r', encoding='utf-8', errors='surrogateescape') as f:
                 return f.read(), True
         return "", False
-    def cleanup_tmp_file(self, *args, **kwargs):
+    def cleanup_tmp_file(self, *args: Any, **kwargs: Any) -> None:
         pass
-    def path_dwim(self, path):
+    def path_dwim(self, path: str) -> str:
         return _normalize_path(path)
-    def load_from_file(self, file_path, *args, **kwargs):
+    def load_from_file(self, file_path: str, *args: Any, **kwargs: Any) -> Optional[Any]:
         fp = _normalize_path(file_path)
         if fp and os.path.exists(fp):
             with open(fp, 'r', encoding='utf-8') as f:
@@ -160,15 +166,15 @@ class MockLoader:
         return None
 
 class MockShell:
-    def __init__(self):
+    def __init__(self) -> None:
         import tempfile
-        self.tmpdir = tempfile.gettempdir()
-    def path_has_trailing_slash(self, path):
+        self.tmpdir: str = tempfile.gettempdir()
+    def path_has_trailing_slash(self, path: Union[str, List[str]]) -> bool:
         if isinstance(path, list):
             if len(path) > 0: path = path[0]
             else: return False
         return str(path).endswith('/') or str(path).endswith('\\')
-    def join_path(self, *args):
+    def join_path(self, *args: Any) -> str:
         cleaned_args = []
         for a in args:
             if isinstance(a, list):
@@ -176,45 +182,45 @@ class MockShell:
                 else: a = ""
             cleaned_args.append(str(a))
         return os.path.join(*cleaned_args)
-    def expand_user(self, path, *args, **kwargs):
+    def expand_user(self, path: str, *args: Any, **kwargs: Any) -> str:
         return path
 
 class Display:
-    def __init__(self, *args, **kwargs):
+    verbosity: int = 10
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         self.verbosity = 10
         self.columns = 79
         self.color = False
-    def display(self, *args, **kwargs): pass
-    def debug(self, *args, **kwargs): pass
-    def verbose(self, *args, **kwargs): pass
-    def warning(self, *args, **kwargs): pass
-    def error(self, *args, **kwargs): pass
-    def deprecated(self, *args, **kwargs): pass
-    def v(self, *args, **kwargs): pass
-    def vv(self, *args, **kwargs): pass
-    def vvv(self, *args, **kwargs): pass
-    def vvvv(self, *args, **kwargs): pass
-    def vvvvv(self, *args, **kwargs): pass
-    def vvvvvv(self, *args, **kwargs): pass
-Display.verbosity = 10
+    def display(self, *args: Any, **kwargs: Any) -> None: pass
+    def debug(self, *args: Any, **kwargs: Any) -> None: pass
+    def verbose(self, *args: Any, **kwargs: Any) -> None: pass
+    def warning(self, *args: Any, **kwargs: Any) -> None: pass
+    def error(self, *args: Any, **kwargs: Any) -> None: pass
+    def deprecated(self, *args: Any, **kwargs: Any) -> None: pass
+    def v(self, *args: Any, **kwargs: Any) -> None: pass
+    def vv(self, *args: Any, **kwargs: Any) -> None: pass
+    def vvv(self, *args: Any, **kwargs: Any) -> None: pass
+    def vvvv(self, *args, **kwargs: Any) -> None: pass
+    def vvvvv(self, *args: Any, **kwargs: Any) -> None: pass
+    def vvvvvv(self, *args: Any, **kwargs: Any) -> None: pass
 
 class PlayContext:
-    def __init__(self):
+    def __init__(self) -> None:
         self.verbosity = 10
         self.check_mode = False
         self.diff = False
 
 class ActionBase:
-    def __init__(self, task, connection, play_context, loader, templar, shared_loader_obj):
+    def __init__(self, task: 'Task', connection: Any, play_context: 'PlayContext', loader: 'MockLoader', templar: 'Templar', shared_loader_obj: Any) -> None:
         self._task, self._connection, self._play_context = task, connection, play_context
         self._loader, self._templar = loader, templar
         self._shared_loader_obj = shared_loader_obj
         self._display = self.display = sys.modules.get('ansible.utils.display', types.SimpleNamespace(display=Display())).display
         self._supports_check_mode = True
         self._supports_async = False
-    def run(self, tmp=None, task_vars=None):
+    def run(self, tmp: Optional[str] = None, task_vars: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         return {'changed': False, 'failed': False}
-    def validate_argument_spec(self, argument_spec, *args, **kwargs):
+    def validate_argument_spec(self, argument_spec: Dict[str, Any], *args: Any, **kwargs: Any) -> Tuple[Any, Dict[str, Any]]:
         res = {}
         input_args = self._task.args or {}
         for k, v in argument_spec.items():
@@ -223,7 +229,7 @@ class ActionBase:
             elif isinstance(v, dict) and v.get('required'): res[k] = None
             else: res[k] = None
         return types.SimpleNamespace(error=None, warning=None), res
-    def _execute_module(self, module_name=None, module_args=None, tmp=None, task_vars=None, *args, **kwargs):
+    def _execute_module(self, module_name: Optional[str] = None, module_args: Optional[Dict[str, Any]] = None, tmp: Optional[str] = None, task_vars: Optional[Dict[str, Any]] = None, *args: Any, **kwargs: Any) -> Dict[str, Any]:
         m_name = module_name or self._task.action
         m_args = module_args or self._task.args
         if 'task_executor_java' in globals():
@@ -247,14 +253,14 @@ class ActionBase:
                 return r_dict
             return {'changed': True}
         return {'failed': True, 'msg': 'task_executor_java not available'}
-    def _remove_tmp_path(self, *args, **kwargs): pass
-    def _find_needle(self, name, needle, *args, **kwargs):
+    def _remove_tmp_path(self, *args: Any, **kwargs: Any) -> None: pass
+    def _find_needle(self, name: str, needle: str, *args: Any, **kwargs: Any) -> str:
         if needle and 'task_executor_java' in globals():
             res = task_executor_java.resolveLocalPath(needle)
             if res: return _normalize_path(res)
         return _normalize_path(needle)
-    def _remote_expand_user(self, path, *args, **kwargs): return path
-    def _execute_remote_stat(self, path, all_vars, follow=False, *args, **kwargs):
+    def _remote_expand_user(self, path: str, *args: Any, **kwargs: Any) -> str: return path
+    def _execute_remote_stat(self, path: str, all_vars: Any, follow: bool = False, *args: Any, **kwargs: Any) -> Dict[str, Any]:
         import hashlib
         p = _normalize_path(path)
         conn = _current_task_context.get('connection_java')
@@ -286,35 +292,38 @@ class ActionBase:
             except: pass
             return {'exists': True, 'checksum': csum, 'isdir': os.path.isdir(p), 'isreg': os.path.isfile(p), 'islnk': os.path.islink(p)}
         return {'exists': False, 'checksum': None, 'isdir': False, 'isreg': False, 'islnk': False}
-    def _transfer_file(self, local_path, remote_path):
+    def _transfer_file(self, local_path: str, remote_path: str) -> str:
         conn = _current_task_context['connection_java']
         lp, rp = _normalize_path(local_path), _normalize_path(remote_path)
         if conn:
             from java.nio.file import Paths
             conn.putFile(Paths.get(str(lp)), str(rp))
         import hashlib
-        return hashlib.sha1(open(lp, 'rb').read()).hexdigest()
-    def _fixup_perms2(self, *args, **kwargs): pass
+        with open(lp, 'rb') as f:
+            return hashlib.sha1(f.read()).hexdigest()
+    def _fixup_perms2(self, *args: Any, **kwargs: Any) -> None: pass
 
 class Task:
-    def __init__(self):
-        self.action, self.args, self.async_val = None, {}, 0
+    def __init__(self) -> None:
+        self.action: Optional[str] = None
+        self.args: Dict[str, Any] = {}
+        self.async_val: int = 0
         self._origin = types.SimpleNamespace(path=None)
-        self.collections = []
-        self.tags = []
-        self.implicit = False
-        self.resolved_action = None
-        self._parent = None
-        self.diff = False
-        self.check_mode = False
-        self.no_log = False
-        self.delegate_to = None
-        self.delegate_facts = False
-        self.environment = {}
-        self._role = None
-        self._original_basename = None
-    def get_name(self): return "mock_task"
-    def copy(self):
+        self.collections: List[str] = []
+        self.tags: List[str] = []
+        self.implicit: bool = False
+        self.resolved_action: Optional[str] = None
+        self._parent: Any = None
+        self.diff: bool = False
+        self.check_mode: bool = False
+        self.no_log: bool = False
+        self.delegate_to: Optional[str] = None
+        self.delegate_facts: bool = False
+        self.environment: Dict[str, Any] = {}
+        self._role: Any = None
+        self._original_basename: Optional[str] = None
+    def get_name(self) -> str: return "mock_task"
+    def copy(self) -> 'Task':
         new_task = Task()
         new_task.action = self.action
         new_task.args = (self.args or {}).copy()
@@ -322,15 +331,15 @@ class Task:
         return new_task
 
 class Templar:
-    def __init__(self, loader=None, variables=None):
+    def __init__(self, loader: Optional[Any] = None, variables: Optional[Dict[str, Any]] = None) -> None:
         self._engine = type('Eng', (), {
             'tvars': variables or {},
             'extend': lambda *a, **kw: self._engine,
             'evaluate_expression': lambda expr, *a, **kw: self._engine.tvars.get(expr, expr)
         })
-        self.available_variables = variables or {}
-        self.environment = {}
-    def template(self, msg, *args, **kwargs):
+        self.available_variables: Dict[str, Any] = variables or {}
+        self.environment: Dict[str, Any] = {}
+    def template(self, msg: Any, *args: Any, **kwargs: Any) -> Any:
         if msg is None: return None
         if isinstance(msg, (tuple, list)): msg = msg[0]
         if not isinstance(msg, str): return msg
@@ -341,19 +350,19 @@ class Templar:
             return t.render(**self.available_variables)
         except Exception:
             import re
-            def repl(match):
+            def repl(match: Any) -> str:
                 var_name = match.group(1).strip()
                 return str(self.available_variables.get(var_name, match.group(0)))
             return re.sub(r'\{\{\s*(.*?)\s*\}\}', repl, msg)
-    def evaluate_conditional(self, conditional, *args, **kwargs):
+    def evaluate_conditional(self, conditional: Any, *args: Any, **kwargs: Any) -> bool:
         try:
-            return eval(str(conditional), {}, self.available_variables)
+            return bool(eval(str(conditional), {}, self.available_variables))
         except:
             return False
-    def copy_with_new_env(self, *args, **kwargs): return self
+    def copy_with_new_env(self, *args: Any, **kwargs: Any) -> 'Templar': return self
 
 class AnsibleModule:
-    def __init__(self, argument_spec, *args, **kwargs):
+    def __init__(self, argument_spec: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
         input_args = _current_task_context['complex_args'] or {}
         spec_conv = _deep_convert(argument_spec)
         kwargs_conv = _deep_convert(kwargs)
@@ -365,69 +374,69 @@ class AnsibleModule:
             _current_task_context.get('environment_java'),
             print, sys.exit
         )
-        self.params = _deep_convert(self._java_mock.getParams())
-        self.check_mode = self._java_mock.getCheck_mode()
-        self._debug = self._java_mock.get_debug()
-        self._diff = self._java_mock.get_diff()
+        self.params: Dict[str, Any] = _deep_convert(self._java_mock.getParams())
+        self.check_mode: bool = bool(self._java_mock.getCheck_mode())
+        self._debug: bool = bool(self._java_mock.get_debug())
+        self._diff: bool = bool(self._java_mock.get_diff())
         self.boolean = self.boolean_value
 
-    def boolean_value(self, x):
-        return self._java_mock.boolean_value(x)
+    def boolean_value(self, x: Any) -> bool:
+        return bool(self._java_mock.boolean_value(x))
 
     @property
-    def tmpdir(self):
-        return self._java_mock.getTmpdir()
+    def tmpdir(self) -> str:
+        return str(self._java_mock.getTmpdir())
 
-    def exit_json(self, **kwargs):
+    def exit_json(self, **kwargs: Any) -> None:
         self._java_mock.exit_json(_deep_convert(kwargs))
 
-    def fail_json(self, **kwargs):
+    def fail_json(self, **kwargs: Any) -> None:
         self._java_mock.fail_json(_deep_convert(kwargs))
 
-    def run_command(self, args, **kwargs):
+    def run_command(self, args: Union[str, List[str]], **kwargs: Any) -> Tuple[int, str, str]:
         res = self._java_mock.run_command(args)
         return (int(res[0]), str(res[1]), str(res[2]))
 
-    def get_bin_path(self, arg, required=False, opt_dirs=None):
-        return self._java_mock.get_bin_path(_to_java_str(arg), required, [_to_java_str(d) for d in (opt_dirs or [])])
+    def get_bin_path(self, arg: str, required: bool = False, opt_dirs: Optional[List[str]] = None) -> Optional[str]:
+        return _to_java_str(self._java_mock.get_bin_path(_to_java_str(arg), required, [_to_java_str(d) for d in (opt_dirs or [])]))
 
-    def sha1(self, path): return self._java_mock.sha1(_to_java_str(path))
-    def md5(self, path): return self._java_mock.md5(_to_java_str(path))
-    def sha256(self, path): return self._java_mock.sha256(_to_java_str(path))
+    def sha1(self, path: str) -> str: return str(self._java_mock.sha1(_to_java_str(path)))
+    def md5(self, path: str) -> str: return str(self._java_mock.md5(_to_java_str(path)))
+    def sha256(self, path: str) -> str: return str(self._java_mock.sha256(_to_java_str(path)))
 
-    def atomic_move(self, src, dest, unsafe_writes=False, **kwargs):
+    def atomic_move(self, src: str, dest: str, unsafe_writes: bool = False, **kwargs: Any) -> None:
         self._java_mock.atomic_move(_to_java_str(src), _to_java_str(dest))
 
-    def debug(self, msg): self._java_mock.debug(_to_java_str(msg))
-    def warn(self, msg): self._java_mock.warn(_to_java_str(msg))
-    def deprecate(self, msg, version=None, date=None, collection_name=None):
+    def debug(self, msg: str) -> None: self._java_mock.debug(_to_java_str(msg))
+    def warn(self, msg: str) -> None: self._java_mock.warn(_to_java_str(msg))
+    def deprecate(self, msg: str, version: Optional[str] = None, date: Optional[str] = None, collection_name: Optional[str] = None) -> None:
         self._java_mock.deprecate(_to_java_str(msg), _to_java_str(version), _to_java_str(date), _to_java_str(collection_name))
 
-    def digest_from_file(self, filename, algorithm):
-        return self._java_mock.digest_from_file(_to_java_str(filename), _to_java_str(algorithm))
+    def digest_from_file(self, filename: str, algorithm: str) -> str:
+        return str(self._java_mock.digest_from_file(_to_java_str(filename), _to_java_str(algorithm)))
 
-    def get_file_attributes(self, path):
+    def get_file_attributes(self, path: str) -> Dict[str, Any]:
         return _deep_convert(self._java_mock.get_file_attributes(_to_java_str(path)))
 
-    def load_file_common_arguments(self, params, path=None):
+    def load_file_common_arguments(self, params: Dict[str, Any], path: Optional[str] = None) -> Dict[str, Any]:
         return _deep_convert(self._java_mock.load_file_common_arguments(params, _to_java_str(path)))
 
-    def set_fs_attributes_if_different(self, file_args, changed, diff=None, expand=True):
+    def set_fs_attributes_if_different(self, file_args: Dict[str, Any], changed: bool, diff: Optional[Any] = None, expand: bool = True) -> bool:
         self._java_mock.set_fs_attributes_if_different(file_args, changed)
         return changed
-    def set_file_attributes_if_different(self, file_args, changed, diff=None, expand=True):
+    def set_file_attributes_if_different(self, file_args: Dict[str, Any], changed: bool, diff: Optional[Any] = None, expand: bool = True) -> bool:
         self._java_mock.set_file_attributes_if_different(file_args, changed)
         return changed
 
-    def makedirs_safe(self, path, mode=None):
+    def makedirs_safe(self, path: str, mode: Optional[int] = None) -> None:
         self._java_mock.makedirs_safe(_to_java_str(path), mode)
 
 # --- Mock Application ---
 
-def apply_mocks():
+def apply_mocks() -> None:
     mocks_applied = getattr(sys, '_ansible_bridge_mocks_applied', False)
 
-    def create_mock(mname, attributes=None, is_package=True):
+    def create_mock(mname: str, attributes: Optional[Dict[str, Any]] = None, is_package: bool = True) -> types.ModuleType:
         if mname in sys.modules:
             m = sys.modules[mname]
         else:
@@ -465,17 +474,17 @@ def apply_mocks():
     create_mock('ansible.utils')
     create_mock('ansible.utils.display', {'Display': Display, 'display': Display(), 'PlayContext': PlayContext})
 
-    def real_checksum(path, *args, **kwargs):
+    def real_checksum(path: str, *args: Any, **kwargs: Any) -> Optional[str]:
         import hashlib
         p = _normalize_path(path)
         if not os.path.exists(p): return None
         with open(p, 'rb') as f: return hashlib.sha1(f.read()).hexdigest()
-    def real_checksum_s(s, *args, **kwargs):
+    def real_checksum_s(s: Union[str, bytes], *args: Any, **kwargs: Any) -> str:
         import hashlib
         if isinstance(s, str): s = s.encode('utf-8')
         return hashlib.sha1(s).hexdigest()
 
-    def real_md5(path, *args, **kwargs):
+    def real_md5(path: str, *args: Any, **kwargs: Any) -> Optional[str]:
         import hashlib
         p = _normalize_path(path)
         if not os.path.exists(p): return None
@@ -490,13 +499,13 @@ def apply_mocks():
     })
 
     # 3. Utils
-    def mock_makedirs_safe(path, mode=None, *args, **kwargs):
+    def mock_makedirs_safe(path: str, mode: Optional[int] = None, *args: Any, **kwargs: Any) -> None:
         p = _normalize_path(path)
         if not os.path.exists(p):
             try: os.makedirs(p, mode=mode if mode is not None else 0o777)
             except: pass
 
-    def mock_is_subpath(path, base, *args, **kwargs):
+    def mock_is_subpath(path: str, base: str, *args: Any, **kwargs: Any) -> bool:
         p, b = _normalize_path(path), _normalize_path(base)
         return os.path.abspath(p).startswith(os.path.abspath(b))
 
@@ -515,7 +524,7 @@ def apply_mocks():
 
     # 4. Errors
     class AnsibleError(Exception):
-        def __init__(self, message="", obj=None, show_content=True, suppress_extended_error=False, orig_exception=None, **kwargs):
+        def __init__(self, message: str = "", obj: Any = None, show_content: bool = True, suppress_extended_error: bool = False, orig_exception: Optional[Exception] = None, **kwargs: Any) -> None:
             super().__init__(message)
             for k, v in kwargs.items(): setattr(self, k, v)
     class AnsibleValueOmittedError(AnsibleError): pass
@@ -547,7 +556,7 @@ def apply_mocks():
 
     action_loader_obj = types.SimpleNamespace()
     action_loader_obj.action_loader = action_loader_obj
-    def action_loader_get(name, *args, **kwargs):
+    def action_loader_get(name: str, *args: Any, **kwargs: Any) -> Any:
         import ansible_bridge
         return ansible_bridge._create_action_plugin(
             name, kwargs.get('task'), kwargs.get('connection'),
@@ -603,7 +612,7 @@ def apply_mocks():
     if mocks_applied: return
 
     create_mock('ansible.module_utils.common.sentinel', {'Sentinel': type('Sentinel', (), {})})
-    def mock_get_distribution():
+    def mock_get_distribution() -> str:
         import platform
         try: sys_type = platform.system()
         except: sys_type = 'Linux'
@@ -636,10 +645,10 @@ def apply_mocks():
         'attributes': dict(type='str', aliases=['attr']),
         'unsafe_writes': dict(type='bool', default=False),
     }
-    def mock_get_bin_path(arg, required=False, opt_dirs=None):
+    def mock_get_bin_path(arg: str, required: bool = False, opt_dirs: Optional[List[str]] = None) -> str:
         if arg == 'python': return sys.executable
         return arg
-    def mock_load_params():
+    def mock_load_params() -> Tuple[Dict[str, Any], str]:
         args = _current_task_context['complex_args']
         if not args: return {}, 'main'
         return args, 'main'
@@ -660,11 +669,11 @@ def apply_mocks():
     import collections
     passwd, group = collections.namedtuple('passwd', ['pw_name', 'pw_passwd', 'pw_uid', 'pw_gid', 'pw_gecos', 'pw_dir', 'pw_shell']), collections.namedtuple('group', ['gr_name', 'gr_passwd', 'gr_gid', 'gr_mem'])
 
-    def mock_getgrnam(name):
+    def mock_getgrnam(name: str) -> Any:
         if name == 'root': return group('root', 'x', 0, [])
         return group(str(name), 'x', 1001, [])
 
-    def mock_getpwnam(name):
+    def mock_getpwnam(name: str) -> Any:
         if name == 'root': return passwd('root', 'x', 0, 0, 'root', '/root', '/bin/bash')
         return passwd(str(name), 'x', 1001, 1001, str(name), f'/home/{name}', '/bin/bash')
 
@@ -679,7 +688,7 @@ def apply_mocks():
     # 10. JSON handling
     if not hasattr(json, '_graal_ansible_patched'):
         class AnsibleEncoder(json.JSONEncoder):
-            def default(self, o):
+            def default(self, o: Any) -> Any:
                 if isinstance(o, bytes):
                     try: return o.decode('utf-8')
                     except: return o.decode('latin-1')
@@ -701,7 +710,7 @@ def apply_mocks():
 
     sys._ansible_bridge_mocks_applied = True
 
-def _create_action_plugin(action_name, task, connection, play_context, loader, templar, shared_loader_obj):
+def _create_action_plugin(action_name: str, task: Any, connection: Any, play_context: Any, loader: Any, templar: Any, shared_loader_obj: Any) -> Any:
     import importlib.util
     import __main__
     base_name = action_name
@@ -722,7 +731,7 @@ def _create_action_plugin(action_name, task, connection, play_context, loader, t
 
     if not path:
         class ModuleAction(ActionBase):
-            def run(self, tmp=None, task_vars=None):
+            def run(self, tmp: Optional[str] = None, task_vars: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
                 return self._execute_module(module_name=action_name, module_args=self._task.args, task_vars=task_vars)
         return ModuleAction(task, connection, play_context, loader, templar, shared_loader_obj)
 
@@ -731,22 +740,25 @@ def _create_action_plugin(action_name, task, connection, play_context, loader, t
         mod = sys.modules[fqcn]
     else:
         spec = importlib.util.spec_from_file_location(fqcn, path)
-        mod = importlib.util.module_from_spec(spec)
-        sys.modules[spec.name] = mod
-        spec.loader.exec_module(mod)
+        if spec and spec.loader:
+            mod = importlib.util.module_from_spec(spec)
+            sys.modules[spec.name] = mod
+            spec.loader.exec_module(mod)
+        else:
+            raise ImportError(f"Could not load action plugin {action_name}")
 
     l = loader or MockLoader()
 
     c = connection
     if not hasattr(c, '_shell') or not hasattr(c._shell, 'path_has_trailing_slash'):
         class Proxy:
-            def __init__(self, obj):
+            def __init__(self, obj: Any) -> None:
                 self._obj, self._shell = obj, MockShell()
                 self.become = False
-            def __getattr__(self, name):
+            def __getattr__(self, name: str) -> Any:
                 if name == 'become': return self.become
                 return getattr(self._obj, name)
-            def fetch_file(self, remote_path, local_path):
+            def fetch_file(self, remote_path: str, local_path: str) -> None:
                 rp, lp = _normalize_path(remote_path), _normalize_path(local_path)
                 from java.nio.file import Paths
                 self._obj.fetchFile(str(rp), Paths.get(str(lp)))
@@ -754,10 +766,10 @@ def _create_action_plugin(action_name, task, connection, play_context, loader, t
 
     return mod.ActionModule(task, c, play_context, l, templar, shared_loader_obj)
 
-def execute_module(module_name, complex_args, module_code=None):
+def execute_module(module_name: str, complex_args: Dict[str, Any], module_code: Optional[str] = None) -> str:
     import __main__
-    __main__._module_fqn = f"ansible.builtin.{module_name}"
-    __main__.complex_args = complex_args
+    setattr(__main__, '_module_fqn', f"ansible.builtin.{module_name}")
+    setattr(__main__, 'complex_args', complex_args)
     old_stdout, sys.stdout = sys.stdout, StringIO()
     try:
         if module_code:
@@ -783,7 +795,7 @@ def execute_module(module_name, complex_args, module_code=None):
     finally:
         sys.stdout = old_stdout
 
-def initialize(site_packages=None, env_vars=None, complex_args=None, connection_java=None, become_context_java=None):
+def initialize(site_packages: Optional[List[str]] = None, env_vars: Optional[Dict[str, Any]] = None, complex_args: Optional[Dict[str, Any]] = None, connection_java: Any = None, become_context_java: Any = None) -> None:
     apply_mocks()
     setup_sys_path(site_packages)
     setup_env(env_vars)
