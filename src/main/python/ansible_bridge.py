@@ -582,6 +582,8 @@ def apply_mocks() -> None:
         'get_controller_serialize_map': lambda: {}
     })
     create_mock('ansible._internal._locking')
+    create_mock('ansible._internal._ansiballz')
+    create_mock('ansible._internal._ansiballz._builder')
     swe = type('SWE', (Exception,), {'is_tagged_on': staticmethod(lambda x: False)})
     create_mock('ansible._internal._datatag', {'SourceWasEncrypted': swe})
     create_mock('ansible._internal._datatag._tags', {'SourceWasEncrypted': swe})
