@@ -13,7 +13,6 @@ import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Source;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import org.example.ansible.plugin.ActionPlugin;
 import org.example.ansible.module.python.PythonModule;
 import org.example.ansible.util.PythonAnsibleModuleMock;
 import org.example.ansible.util.PythonEnv;
@@ -95,7 +94,6 @@ public class TaskExecutor implements ITaskExecutor {
             "command", "shell"
     );
     private final Map<String, org.example.ansible.module.Module> modules = new HashMap<>();
-    private final Map<String, ActionPlugin> builtInActionPlugins = new HashMap<>();
     private final Map<String, Boolean> actionPluginCache = new ConcurrentHashMap<>();
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final OSHandler osHandler;
@@ -356,7 +354,7 @@ public class TaskExecutor implements ITaskExecutor {
         }
 
         final String finalBaseName = baseName;
-        if (builtInActionPlugins.containsKey(finalBaseName) || WELL_KNOWN_ACTION_PLUGINS.contains(finalBaseName)) {
+        if (WELL_KNOWN_ACTION_PLUGINS.contains(finalBaseName)) {
             return true;
         }
         return actionPluginCache.computeIfAbsent(finalBaseName, a -> {
@@ -539,22 +537,6 @@ public class TaskExecutor implements ITaskExecutor {
             actionName = actionName.substring("ansible.builtin.".length());
         } else if (actionName.startsWith("ansible.legacy.")) {
             actionName = actionName.substring("ansible.legacy.".length());
-        }
-
-        ActionPlugin builtInPlugin = builtInActionPlugins.get(actionName);
-        if (builtInPlugin != null) {
-            setCurrentConnection(connection);
-            setCurrentEnvironment(environment);
-            setCurrentBecomeContext(becomeContext);
-            try {
-                return builtInPlugin.execute(task, taskVars, this);
-            } catch (Exception e) {
-                return TaskResult.failure("Built-in Action Plugin execution failed: " + e.getMessage());
-            } finally {
-                clearCurrentConnection();
-                clearCurrentEnvironment();
-                clearCurrentBecomeContext();
-            }
         }
 
         setCurrentConnection(connection);
