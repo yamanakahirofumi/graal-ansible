@@ -516,6 +516,7 @@ def apply_mocks() -> None:
         'is_subpath': mock_is_subpath
     })
     create_mock('ansible.utils.fqcn', {'add_internal_fqcns': lambda *a, **kw: None})
+    create_mock('ansible.utils.plugin_docs', {'get_versioned_doclink': lambda *a, **kw: 'http://docs.ansible.com'})
     create_mock('ansible.utils.vars', {
         'isidentifier': lambda s, *a, **kw: True, 'validate_variable_name': lambda s, *a, **kw: True,
         'merge_hash': lambda a, b: dict(a, **(b or {})),
