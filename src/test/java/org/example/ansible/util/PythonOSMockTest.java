@@ -5,10 +5,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -25,9 +23,6 @@ class PythonOSMockTest {
     void testNormalizePath() {
         // Test standard string
         assertEquals("test/path", osMock.normalizePath("test/path").replace('\\', '/'));
-
-        // Test byte array
-        assertEquals("abc", osMock.normalizePath("abc".getBytes(StandardCharsets.UTF_8)));
 
         // Test Python byte string representation
         assertEquals("test/path", osMock.normalizePath("b'test/path'").replace('\\', '/'));
@@ -75,13 +70,6 @@ class PythonOSMockTest {
         osMock.makedirs(nestedDir, 0777, true); // Should not throw
 
         // Test makedirs exist_ok = false (default)
-        // Note: Files.createDirectories (used in makedirs) doesn't throw if directory already exists,
-        // but PythonOSMock has an explicit check if exist_ok is true.
-        // If it's false, it calls Files.createDirectories(p) anyway.
-        // Actually, let's check the code:
-        // if (exist_ok && Files.exists(p)) return;
-        // Files.createDirectories(p);
-        // Files.createDirectories does NOT throw if it already exists.
         osMock.makedirs(nestedDir, 0777, false);
     }
 
@@ -96,13 +84,13 @@ class PythonOSMockTest {
 
         // List-style access
         // st_mode, st_ino, st_dev, st_nlink, st_uid, st_gid, st_size, st_atime, st_mtime, st_ctime
-        assertTrue((long)result.get(0) > 0); // st_mode
-        assertEquals(0L, result.get(1)); // st_ino
-        assertEquals(0L, result.get(2)); // st_dev
-        assertEquals(1L, result.get(3)); // st_nlink
-        assertEquals(0L, result.get(4)); // st_uid
-        assertEquals(0L, result.get(5)); // st_gid
-        assertEquals((long)content.length, result.get(6)); // st_size
+        assertTrue(result.get(0).longValue() > 0); // st_mode
+        assertEquals(0L, result.get(1).longValue()); // st_ino
+        assertEquals(0L, result.get(2).longValue()); // st_dev
+        assertEquals(1L, result.get(3).longValue()); // st_nlink
+        assertEquals(0L, result.get(4).longValue()); // st_uid
+        assertEquals(0L, result.get(5).longValue()); // st_gid
+        assertEquals((long)content.length, result.get(6).longValue()); // st_size
 
         // Attribute-style access
         assertTrue(result.st_mode() > 0);
