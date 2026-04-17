@@ -180,6 +180,11 @@
 - **概要**: ドキュメントとの不整合を解消するため、使用されていなかった `ActionPlugin` Java インターフェースおよび `TaskExecutor` 内の関連ロジックを完全に削除。
 - **解決策**: Action Plugin の実行を GraalPy による Python-first 実装に一本化し、不要になった Java 側のインフラを排除。
 
+### [✓] エラーハンドリング方針の詳細化
+- **完了日**: 2026-04-17
+- **概要**: `docs/tech/Error-Handling-Policy.md` を更新し、`ConnectionResult` による結果返却メカニズムや、`UnreachableException` による接続失敗時の挙動、および `meta: flush_handlers` の実行エンジンレベルでの処理詳細について具体的に記載。
+- **解決策**: 実行エンジンの実装に基づき、接続失敗時の `ignore_unreachable` の挙動、`ConnectionResult` による標準出力・標準エラー・終了コードの返却、および `meta: flush_handlers` によるハンドラーの即時実行仕様を明文化。
+
 ## 5. 今後のリファクタリング検討事項 (Future Refactoring Items)
 
 ### [ ] PlaybookExecutor および実行エンジンのさらなる整理
@@ -189,8 +194,4 @@
     - 動的インベントリの完全なサポート。
 
 ## 6. ドキュメントの更新と不整合の解消 (Documentation Update & Inconsistency Resolution)
-
-
-### [ ] エラーハンドリング方針の詳細化
-- **概要**: `docs/tech/Error-Handling-Policy.md` を更新し、`ConnectionResult` による結果返却メカニズムや、`UnreachableException` による接続失敗時の挙動、および `meta: flush_handlers` の実行エンジンレベルでの処理詳細について具体的に記載する。
 
