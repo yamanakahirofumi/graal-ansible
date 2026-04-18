@@ -720,4 +720,15 @@ class ActualModuleIntegrationTest {
         assertTrue(groups.containsKey(groupName), "Dynamic group should be created");
         assertTrue(groups.get(groupName).contains(targetNode.getHost()), "Host should be in the dynamic group");
     }
+
+    @Test
+    void testActualGatherFactsModule() {
+        Task task = new Task("test_gather_facts", "gather_facts", Map.of());
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
+        assertNotNull(facts, "ansible_facts should be present");
+        assertTrue(facts.containsKey("ansible_os_family"), "Should contain ansible_os_family fact");
+    }
 }
