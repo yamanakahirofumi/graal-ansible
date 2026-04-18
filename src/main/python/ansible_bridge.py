@@ -582,7 +582,7 @@ def apply_mocks() -> None:
     create_mock('ansible.playbook')
     create_mock('ansible.playbook.task', {'Task': Task})
     create_mock('ansible.playbook.play_context', {'PlayContext': PlayContext})
-    create_mock('ansible.executor.powershell')
+    create_mock('ansible.executor.powershell', {'module_manifest': types.SimpleNamespace()})
     create_mock('ansible.executor.module_common', {'_apply_action_arg_defaults': lambda *a, **kw: None})
 
     # 7. Templating
@@ -602,6 +602,8 @@ def apply_mocks() -> None:
         'TrustedAsTemplate': type('TrustedAsTemplate', (), {})
     })
     create_mock('ansible._internal._datatag._utils')
+    create_mock('ansible._internal._errors')
+    create_mock('ansible._internal._errors._error_utils')
     create_mock('ansible._internal._templating', {
         '_template_vars': types.SimpleNamespace(generate_ansible_template_vars=lambda *a, **kw: {}),
         'get_text_file_contents': lambda x, *a, **kw: (open(_normalize_path(x), 'r').read() if x and os.path.exists(_normalize_path(x)) else "mock_content", True)
