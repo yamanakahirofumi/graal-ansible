@@ -49,7 +49,7 @@
 - **完了日**: 2026-03-25
 - **概要**: [実際のコレクションを使ったテスト方法の設計](tech/Actual-Collection-Testing.md) に基づき、主要なモジュールのテストを統合。
 - **解決策**:
-    - `ping`, `copy`, `file`, `stat`, `template`, `debug`, `command`, `shell`, `setup`, `lineinfile`, `replace`, `user`, `group`, `find`, `tempfile`, `hostname`, `slurp`, `assert`, `blockinfile`, `getent`, `fetch`, `unarchive`, `include_vars`, `include_tasks`, `import_tasks`, `set_fact`, `add_host`, `fail`, `get_url`, `group_by`, `gather_facts`, `uri` の計 32 モジュールの統合テストを CI 環境へ統合済み。
+    - `ping`, `copy`, `file`, `stat`, `template`, `debug`, `command`, `shell`, `setup`, `lineinfile`, `replace`, `user`, `group`, `find`, `tempfile`, `hostname`, `slurp`, `assert`, `blockinfile`, `getent`, `fetch`, `unarchive`, `uri`, `include_vars`, `include_tasks`, `import_tasks`, `set_fact`, `add_host`, `fail`, `get_url`, `group_by`, `gather_facts` の計 32 モジュールの統合テストを CI 環境へ統合済み。
     - また、`fail`, `gather_facts`, `add_host`, `assemble`, `group_by`, `get_url`, `script`, `package_facts` 等についても動作を確認済み。
     - GraalPy および `ansible-core` のセットアップを GitHub Actions 上で自動化済み。
 
