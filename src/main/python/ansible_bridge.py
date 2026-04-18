@@ -569,6 +569,7 @@ def apply_mocks() -> None:
     create_mock('ansible.plugins.loader', {
         'action_loader': action_loader_obj,
         'module_loader': type('ML', (), {'find_plugin': lambda name: None}),
+        'module_utils_loader': type('MUL', (), {'find_plugin': lambda name: None}),
         'ps_module_utils_loader': type('PSML', (), {'find_plugin': lambda name: None})
     })
 
