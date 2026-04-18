@@ -720,4 +720,37 @@ class ActualModuleIntegrationTest {
         assertTrue(groups.containsKey(groupName), "Dynamic group should be created");
         assertTrue(groups.get(groupName).contains(targetNode.getHost()), "Host should be in the dynamic group");
     }
+
+    @Test
+    void testActualGatherFactsModule() {
+        Task task = new Task("test_gather_facts", "gather_facts", Map.of());
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
+        assertNotNull(facts, "ansible_facts should be present");
+        assertTrue(facts.containsKey("ansible_os_family"), "Should contain ansible_os_family");
+    }
+
+    @Test
+    void testActualCheckMode() {
+        String testPath = "/tmp/check_mode_test.txt";
+        // Ensure file does not exist
+        connection.execCommand("rm -f " + testPath, BecomeContext.empty(), null);
+
+        // Run file module in check mode to create a file
+        Task task = new Task("test_check_mode", "file", Map.of(
+                "path", testPath,
+                "state", "touch",
+                "_ansible_check_mode", true
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        assertTrue(result.changed(), "Should report changed: true in check mode");
+
+        // Verify the file was NOT actually created
+        var execResult = connection.execCommand("ls " + testPath, BecomeContext.empty(), null);
+        assertFalse(execResult.exitCode() == 0, "File should NOT be created in check mode");
+    }
 }
