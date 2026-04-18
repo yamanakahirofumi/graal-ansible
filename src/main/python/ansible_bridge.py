@@ -306,6 +306,7 @@ class ActionBase:
         with open(lp, 'rb') as f:
             return hashlib.sha1(f.read()).hexdigest()
     def _fixup_perms2(self, *args: Any, **kwargs: Any) -> None: pass
+    def _compute_environment_string(self) -> str: return ""
 
 class Task:
     def __init__(self) -> None:
@@ -519,7 +520,9 @@ def apply_mocks() -> None:
         'get_real_file': lambda s, *a, **kw: s,
         'is_subpath': mock_is_subpath
     })
+    create_mock('ansible.utils.plugin_docs', {'get_versioned_doclink': lambda *a, **kw: "https://docs.ansible.com"})
     create_mock('ansible.utils.fqcn', {'add_internal_fqcns': lambda *a, **kw: None})
+    create_mock('ansible.module_utils.urls', {'url_argument_spec': lambda: {}})
     create_mock('ansible.utils.vars', {
         'isidentifier': lambda s, *a, **kw: True, 'validate_variable_name': lambda s, *a, **kw: True,
         'merge_hash': lambda a, b: dict(a, **(b or {})),
@@ -579,6 +582,8 @@ def apply_mocks() -> None:
     create_mock('ansible.playbook')
     create_mock('ansible.playbook.task', {'Task': Task})
     create_mock('ansible.playbook.play_context', {'PlayContext': PlayContext})
+    create_mock('ansible.executor.powershell')
+    create_mock('ansible.executor.module_common', {'_apply_action_arg_defaults': lambda *a, **kw: None})
 
     # 7. Templating
     create_mock('ansible.template', {'Templar': Templar, 'trust_as_template': lambda x: x})
