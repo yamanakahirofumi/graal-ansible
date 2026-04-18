@@ -521,6 +521,7 @@ def apply_mocks() -> None:
         'is_subpath': mock_is_subpath
     })
     create_mock('ansible.utils.fqcn', {'add_internal_fqcns': lambda *a, **kw: None})
+    create_mock('ansible.utils.plugin_docs', {'get_versioned_doclink': lambda *a, **kw: ""})
     create_mock('ansible.utils.collection_loader._collection_finder', {
         '_get_collection_metadata': lambda *a, **kw: {},
         '_nested_dict_get': lambda *a, **kw: None
