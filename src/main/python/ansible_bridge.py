@@ -595,6 +595,7 @@ def apply_mocks() -> None:
     })
     create_mock('ansible._internal._locking')
     create_mock('ansible._internal._errors')
+    create_mock('ansible._internal._errors._error_utils')
     ansiballz = create_mock('ansible._internal._ansiballz')
     # Mock __file__ to avoid FileNotFoundError when executor tries to read _wrapper.py relative to it
     if hasattr(ansiballz, '__file__'):
