@@ -599,6 +599,7 @@ def apply_mocks() -> None:
         m = create_mock(mname)
         if mname.endswith('_engine'):
             m.TemplateEngine = type('TE', (), {})
+            m.TemplateOptions = type('TO', (), {})
         elif mname.endswith('_jinja_common'):
             m.UndefinedMarker = type('UM', (), {})
             m.TruncationMarker = type('TM', (), {})
