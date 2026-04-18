@@ -590,7 +590,12 @@ def apply_mocks() -> None:
         'get_controller_serialize_map': lambda: {}
     })
     create_mock('ansible._internal._locking')
-    create_mock('ansible._internal._ansiballz')
+    ansiballz = create_mock('ansible._internal._ansiballz')
+    # Mock __file__ to avoid FileNotFoundError when executor tries to read _wrapper.py relative to it
+    if hasattr(ansiballz, '__file__'):
+        wrapper_path = os.path.join(os.path.dirname(ansiballz.__file__), '_wrapper.py')
+        if not os.path.exists(wrapper_path):
+            with open(wrapper_path, 'w') as f: f.write("# mock wrapper")
     create_mock('ansible._internal._ansiballz._builder')
     swe = type('SWE', (Exception,), {'is_tagged_on': staticmethod(lambda x: False)})
     create_mock('ansible._internal._datatag', {'SourceWasEncrypted': swe})
