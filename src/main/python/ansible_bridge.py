@@ -442,6 +442,11 @@ def apply_mocks() -> None:
         else:
             m = types.ModuleType(mname)
             sys.modules[mname] = m
+            # Robustly link child to parent module if parent already exists
+            if '.' in mname:
+                pname, sub = mname.rsplit('.', 1)
+                if pname in sys.modules:
+                    setattr(sys.modules[pname], sub, m)
         if is_package:
             if not hasattr(m, '__path__') or not isinstance(m.__path__, list):
                 m.__path__ = []
@@ -516,6 +521,10 @@ def apply_mocks() -> None:
         'is_subpath': mock_is_subpath
     })
     create_mock('ansible.utils.fqcn', {'add_internal_fqcns': lambda *a, **kw: None})
+    create_mock('ansible.utils.collection_loader._collection_finder', {
+        '_get_collection_metadata': lambda *a, **kw: {},
+        '_nested_dict_get': lambda *a, **kw: None
+    })
     create_mock('ansible.utils.vars', {
         'isidentifier': lambda s, *a, **kw: True, 'validate_variable_name': lambda s, *a, **kw: True,
         'merge_hash': lambda a, b: dict(a, **(b or {})),
@@ -584,7 +593,12 @@ def apply_mocks() -> None:
     create_mock('ansible._internal._locking')
     swe = type('SWE', (Exception,), {'is_tagged_on': staticmethod(lambda x: False)})
     create_mock('ansible._internal._datatag', {'SourceWasEncrypted': swe})
-    create_mock('ansible._internal._datatag._tags', {'SourceWasEncrypted': swe})
+    create_mock('ansible._internal._datatag._utils', {}, is_package=False)
+    create_mock('ansible._internal._datatag._tags', {
+        'SourceWasEncrypted': swe,
+        'Origin': type('Origin', (), {}),
+        'TrustedAsTemplate': type('TrustedAsTemplate', (), {})
+    }, is_package=False)
     create_mock('ansible._internal._templating', {
         '_template_vars': types.SimpleNamespace(generate_ansible_template_vars=lambda *a, **kw: {}),
         'get_text_file_contents': lambda x, *a, **kw: (open(_normalize_path(x), 'r').read() if x and os.path.exists(_normalize_path(x)) else "mock_content", True)
@@ -593,6 +607,7 @@ def apply_mocks() -> None:
         m = create_mock(mname)
         if mname.endswith('_engine'):
             m.TemplateEngine = type('TE', (), {})
+            m.TemplateOptions = type('TemplateOptions', (), {})
         elif mname.endswith('_jinja_common'):
             m.UndefinedMarker = type('UM', (), {})
             m.TruncationMarker = type('TM', (), {})
@@ -607,7 +622,20 @@ def apply_mocks() -> None:
         'ansible', 'ansible.module_utils', 'ansible.module_utils.common',
         'ansible.module_utils.compat', 'ansible.module_utils._internal',
         'ansible.module_utils.parsing', 'ansible.plugins', 'ansible.plugins.action',
-        'ansible._internal', 'ansible._internal._ansiballz', 'ansible._internal._ansiballz._builder'
+        'ansible._internal', 'ansible._internal._ansiballz'
+    ]:
+        attrs = {}
+        if mname == 'ansible.module_utils._internal':
+            attrs['get_controller_serialize_map'] = lambda: {}
+        create_mock(mname, attributes=attrs, is_package=True)
+
+    create_mock('ansible._internal._ansiballz._builder', {}, is_package=False)
+    create_mock('ansible._internal._ansiballz._wrapper', {}, is_package=False)
+
+    for mname in [
+        'ansible', 'ansible.module_utils', 'ansible.module_utils.common',
+        'ansible.module_utils.compat', 'ansible.module_utils._internal',
+        'ansible.module_utils.parsing', 'ansible.plugins', 'ansible.plugins.action'
     ]:
         attrs = {}
         if mname == 'ansible.module_utils._internal':
