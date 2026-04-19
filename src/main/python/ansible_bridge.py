@@ -471,11 +471,12 @@ def apply_mocks() -> None:
     constants = create_mock('ansible.constants', {
         'DEFAULT_REMOTE_TMP': '/tmp',
         'DEFAULT_LOCAL_TMP': tempfile.gettempdir(),
-        'DEFAULT_KEEP_REMOTE_FILES': False
+        'DEFAULT_KEEP_REMOTE_FILES': False,
+        '_ACTION_SETUP': ['ansible.builtin.setup', 'ansible.legacy.setup', 'setup']
     })
     config_mock = create_mock('ansible.config', {
         'ConfigManager': type('CM', (), {'get_config_value': lambda *a, **kw: None}),
-        'get_config_value': lambda *a, **kw: None
+        'get_config_value': lambda k, *a, **kw: ['ansible.legacy.setup'] if k == 'FACTS_MODULES' else None
     })
     setattr(constants, 'config', config_mock)
     create_mock('ansible.config.manager', {'ConfigManager': type('CM', (), {'get_config_value': lambda *a, **kw: None}), 'ensure_type': lambda x, t: x})
@@ -599,7 +600,9 @@ def apply_mocks() -> None:
     })
     create_mock('ansible._internal._locking')
     create_mock('ansible._internal._errors')
-    create_mock('ansible._internal._errors._error_utils')
+    create_mock('ansible._internal._errors._error_utils', {
+        'result_dict_from_captured_errors': lambda *a, **kw: {}
+    })
     ansiballz = create_mock('ansible._internal._ansiballz')
     # Mock __file__ to avoid FileNotFoundError when executor tries to read _wrapper.py relative to it
     if hasattr(ansiballz, '__file__'):
