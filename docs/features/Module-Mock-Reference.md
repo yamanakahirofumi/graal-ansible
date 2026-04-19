@@ -1,52 +1,82 @@
 # モジュールとモックの対応リファレンス (Module & Mock Reference)
 
-`graal-ansible` は、Ansible のオリジナル Python コードを GraalPy 上で実行するために、多層的なモック（依存関係のエミュレーション）を提供しています。本ドキュメントでは、各モジュールが利用する主要なモックコンポーネントとその役割をまとめます。
+`graal-ansible` は、Ansible のオリジナル Python コードを GraalPy 上で実行するために、多層的なモック（依存関係のエミュレーション）を提供しています。本ドキュメントでは、各モジュールが実際に依存しているモック関数・コンポーネントを詳細な一覧としてまとめます。
 
 ## 1. モックアーキテクチャの概要
 
-モックは大きく分けて、Python 側のブリッジ層 (`ansible_bridge.py`) と、Java 側のネイティブ実装層 (`PythonOSMock`, `PythonAnsibleModuleMock`) の 2 段階で構成されています。
+モックは以下の 3 つの主要コンポーネントで構成されています。
 
-### 1.1 Python 側のブリッジ (`ansible_bridge.py`)
-Ansible が依存する外部ライブラリや内部モジュールを Python レベルで置換します。
-- **システムモジュール置換**: `fcntl`, `resource`, `termios`, `syslog`, `grp`, `pwd` などのネイティブ拡張が必要な標準ライブラリをダミーまたは Java ブリッジに置換。
-- **Ansible 内部クラスの置換**: `Display`, `Templar`, `MockLoader`, `MockShell` など、実行エンジンと密結合するクラスを軽量なモックに置換。
-- **Action Plugin 基盤**: `ActionBase` を提供し、`_execute_module` を通じて Java 側の `TaskExecutor` を再帰的に呼び出す仕組みを構築。
-
-### 1.2 Java 側のネイティブ実装
-重厚な処理や OS 固有の操作を Java 側で安全かつ高速に実行します。
-- **PythonOSMock**: `os` モジュールの低レベル関数 (`stat`, `exists`, `makedirs` 等) を Java の `java.nio.file` を用いて再実装。クロスプラットフォームなパス正規化も担当。
-- **PythonAnsibleModuleMock**: `AnsibleModule` クラスの主要メソッド (`exit_json`, `fail_json`, `run_command`, `atomic_move` 等) を実装。
+1.  **Bridge Mocks (Python)**: `ansible_bridge.py` で定義。Ansible 内部クラス (`Display`, `Templar`) や標準ライブラリ (`fcntl`, `grp`, `pwd`) の置換。
+2.  **AnsibleModule Mocks (Java)**: `PythonAnsibleModuleMock.java` で定義。`AnsibleModule` クラスの主要メソッドの実装。
+3.  **OS Mocks (Java)**: `PythonOSMock.java` で定義。`os` モジュールの低レベル関数を Java でエミュレート。
 
 ---
 
-## 2. モジュールカテゴリ別のモック利用状況
+## 2. モジュール別・依存モック詳細一覧
 
-| モジュールカテゴリ | 主要なモジュール | 利用される主要モック・エミュレーション |
-| :--- | :--- | :--- |
-| **ファイル操作** | `file`, `copy`, `stat`, `find`, `tempfile` | `PythonOSMock` (stat, exists), `AnsibleModule` (atomic_move, get_file_attributes) |
-| **コマンド実行** | `command`, `shell` | `AnsibleModule.run_command` (Java 側の `Connection` インターフェース経由) |
-| **システム管理** | `user`, `group`, `getent` | `grp`, `pwd` (Python 側モック), `getent` (Java 側の `run_command` 内でのエミュレーション) |
-| **テンプレート・変数** | `template`, `set_fact`, `include_vars` | `Templar` (Jinja2 エミュレーション), `MockLoader` (YAML/ファイル読み込み) |
-| **ネットワーク・通信** | `uri`, `get_url`, `ping` | `AnsibleModule.run_command` (curl/wget エミュレーション等), `Connection` プロキシ |
-| **制御・デバッグ** | `debug`, `assert`, `fail` | `Display` (標準出力ブリッジ), `AnsibleModule.exit_json/fail_json` |
+各モジュールが動作するために最低限必要とする、または頻繁に利用するモックの詳細です。
+
+| モジュール | Bridge Mocks (Python) | AnsibleModule Mocks (Java) | OS Mocks (Java) |
+| :--- | :--- | :--- | :--- |
+| **ping** | - | `exit_json` | - |
+| **debug** | `Display` | `exit_json` | - |
+| **fail** | - | `fail_json` | - |
+| **assert** | `Templar` (条件評価) | `exit_json`, `fail_json` | - |
+| **command / shell** | - | `run_command` | - |
+| **file** | - | `exit_json`, `set_file_attributes_if_different`, `load_file_common_arguments` | `stat`, `exists`, `chown` |
+| **copy** | `ActionBase` (Action型) | `atomic_move`, `sha1`, `get_file_attributes` | `stat`, `exists`, `makedirs` |
+| **stat** | - | `exit_json`, `get_file_attributes` | `stat`, `exists` |
+| **find** | - | `exit_json` | `stat`, `exists` |
+| **tempfile** | - | `exit_json` | `makedirs` |
+| **template** | `Templar` (展開), `ActionBase` | `run_command` (内部的) | `stat`, `exists`, `makedirs` |
+| **lineinfile** | - | `run_command` (sed/grep等) | `stat`, `exists` |
+| **replace** | - | `run_command` | `stat`, `exists` |
+| **blockinfile** | - | `run_command` | `stat`, `exists` |
+| **user** | `pwd`, `grp` | `run_command` (useradd/getent) | - |
+| **group** | `grp` | `run_command` (groupadd/getent) | - |
+| **getent** | - | `run_command` (getent エミュレーション) | - |
+| **slurp** | - | `exit_json` | `stat`, `exists` |
+| **uri / get_url** | `ActionBase` (一部) | `run_command` (curl/wget), `exit_json` | `stat`, `exists` |
+| **fetch** | `ActionBase` | `exit_json` | `stat`, `exists` |
+| **unarchive** | `ActionBase` | `run_command` (tar/unzip) | `stat`, `exists`, `makedirs` |
+| **setup** | - | `exit_json` | `stat` (facts収集用) |
+| **set_fact** | `Templar` | `exit_json` | - |
+| **include_vars** | `MockLoader` (YAML) | `exit_json` | `exists` |
+| **add_host** | - | `exit_json` (結果返却) | - |
+| **group_by** | - | `exit_json` (結果返却) | - |
 
 ---
 
-## 3. 主要なモックコンポーネントの詳細
+## 3. モックコンポーネントの機能詳細
 
-### 3.1 AnsibleModule Mock (Java)
-`ansible.module_utils.basic.AnsibleModule` の実体として機能します。
-- **`run_command`**: ターゲットノードに対するコマンド実行を、Java 側の `Connection` オブジェクトへ委譲します。
-- **`exit_json` / `fail_json`**: 実行結果を JSON 形式でシリアライズし、Java 側の実行エンジンへ返します。
-- **`sha1` / `md5` / `sha256`**: ファイルのチェックサム計算を Java 側で実行します。
+### 3.1 Bridge Mocks (Python)
+- **`Display`**: `v`, `vv`, `debug`, `warning` 等のメソッドを Java 出力へブリッジ。
+- **`Templar`**: `template()`, `evaluate_conditional()` を提供。
+- **`MockLoader`**: `get_text_file_contents()`, `load_from_file()` による Playbook パス解決。
+- **`ActionBase`**: 管理ノード側ロジックを持つモジュール (`copy`, `template`, `fetch` 等) のための基底クラス。
 
-### 3.2 OS Mock (Java)
-Python の `os` および `os.path` モジュールの一部の関数をオーバーライドします。
-- **パス正規化**: Windows と Linux のパス区切り文字の差異を吸収します。
-- **Stat 互換性**: `os.stat_result` と互換性のあるオブジェクトを Java 側で生成して返却します。
+### 3.2 AnsibleModule Mocks (Java)
+- **`run_command(args)`**: ターゲットへの SSH コマンド実行。`getent` の特殊なエミュレーション（rootユーザー情報の返却等）を含む。
+- **`atomic_move(src, dest)`**: `java.nio.file.Files.move` を使用したアトミックな書き換え。
+- **`hashFile(path, alg)`**: `SHA-1`, `MD5`, `SHA-256` の計算。
+- **`get_file_attributes(path)`**: モード、オーナー、グループ等のメタデータ取得。
 
-### 3.3 Bridge Mocks (Python)
-Ansible のプラグインシステムやユーティリティをエミュレートします。
-- **Templar**: Jinja2 テンプレートの評価を、環境に合わせて軽量に実行します。
-- **Display**: Ansible の冗長度 (`-vvv` 等) に応じたログ出力を制御します。
-- **ActionBase**: `copy` や `template` などのアクションプラグインが、管理ノード側で実行される際の基底クラスを提供します。
+### 3.3 OS Mocks (Java)
+- **`stat(path)`**: `os.stat_result` と互換性のある構造体を返却。
+- **`normalizePath(path)`**: Windows 形式 (`\`) と Linux 形式 (`/`) の相互変換、および `b'...'` リテラルの処理。
+- **`makedirs(name, mode, exist_ok)`**: ディレクトリの再帰的作成。
+
+---
+
+## 4. 今後のモック拡張予定 (Roadmap)
+
+現在、ロード確認済み (△) または検証予定 (？) のモジュールをサポートするために、以下のモック強化が計画されています。
+
+- **パッケージ管理モック (`apt`, `dnf`, `yum`)**:
+    - 各パッケージマネージャーの Python ライブラリ呼び出しを Java 側のパッケージ管理サービスへ委譲。
+- **サービス管理モック (`service`, `systemd`)**:
+    - `systemctl` コマンドの結果を OS 抽象化レイヤー経由でパースする機能の強化。
+- **Windows 固有モック**:
+    - `win_` 系のモジュールが必要とする Windows レジストリや権限操作のエミュレーション。
+- **Native Image 対応の強化**:
+    - リフレクションを必要とするモックポイントの静的定義への移行。
