@@ -468,12 +468,13 @@ def apply_mocks() -> None:
     # 2. Display & PlayContext
     import tempfile
     create_mock('ansible')
-    create_mock('ansible.constants', {
+    constants = create_mock('ansible.constants', {
         'DEFAULT_REMOTE_TMP': '/tmp',
         'DEFAULT_LOCAL_TMP': tempfile.gettempdir(),
         'DEFAULT_KEEP_REMOTE_FILES': False
     })
-    create_mock('ansible.config', {'ConfigManager': type('CM', (), {'get_config_value': lambda *a, **kw: None})})
+    config_mock = create_mock('ansible.config', {'ConfigManager': type('CM', (), {'get_config_value': lambda *a, **kw: None})})
+    setattr(constants, 'config', config_mock)
     create_mock('ansible.config.manager', {'ConfigManager': type('CM', (), {'get_config_value': lambda *a, **kw: None}), 'ensure_type': lambda x, t: x})
     create_mock('ansible.utils')
     create_mock('ansible.utils.display', {'Display': Display, 'display': Display(), 'PlayContext': PlayContext})
