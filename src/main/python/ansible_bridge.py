@@ -535,8 +535,8 @@ def apply_mocks() -> None:
     })
     create_mock('ansible.utils.vars', {
         'isidentifier': lambda s, *a, **kw: True, 'validate_variable_name': lambda s, *a, **kw: True,
-        'merge_hash': lambda a, b: dict(a, **(b or {})),
-        'combine_vars': lambda a, b, *args, **kwargs: {**a, **b}
+        'merge_hash': lambda a, b, *args, **kwargs: dict(a, **(b or {})),
+        'combine_vars': lambda a, b, *args, **kwargs: {**(a or {}), **(b or {})}
     })
 
     # 4. Errors
