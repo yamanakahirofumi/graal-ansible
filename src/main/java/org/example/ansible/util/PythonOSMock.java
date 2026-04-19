@@ -12,6 +12,7 @@ import java.nio.file.attribute.PosixFilePermission;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Java implementation of os module functions for Python bridge.
@@ -199,6 +200,19 @@ public class PythonOSMock {
 
     public void mkdir(String path) throws IOException {
         mkdir(path, 0777);
+    }
+
+    public List<String> listdir(String path) throws IOException {
+        Path p = toPath(path);
+        if (p == null || !Files.exists(p)) {
+            if (exceptionHandler != null) {
+                exceptionHandler.execute("[Errno 2] No such file or directory: '" + path + "'");
+            }
+            return null;
+        }
+        try (var stream = Files.list(p)) {
+            return stream.map(Path::getFileName).map(Path::toString).collect(Collectors.toList());
+        }
     }
 
     /**

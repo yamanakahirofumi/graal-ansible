@@ -731,4 +731,33 @@ class ActualModuleIntegrationTest {
         assertTrue(groups.containsKey(groupName), "Dynamic group should be created");
         assertTrue(groups.get(groupName).contains(targetNode.getHost()), "Host should be in the dynamic group");
     }
+
+    @Test
+    void testActualAssembleModule() {
+        String remoteSrcDir = "/tmp/assemble-src";
+        String remoteDestPath = "/tmp/assemble-dest.txt";
+
+        // 1. Prepare fragments on the remote node
+        connection.execCommand("mkdir -p " + remoteSrcDir, BecomeContext.empty(), null);
+        connection.execCommand("echo 'fragment1' > " + remoteSrcDir + "/01_file.txt", BecomeContext.empty(), null);
+        connection.execCommand("echo 'fragment2' > " + remoteSrcDir + "/02_file.txt", BecomeContext.empty(), null);
+
+        // 2. Execute assemble module
+        Task task = new Task("test_assemble", "assemble", Map.of(
+                "src", remoteSrcDir,
+                "dest", remoteDestPath,
+                "remote_src", true
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        assertTrue(result.changed(), "File should have been assembled (changed=true)");
+
+        // 3. Verify assembled content
+        var execResult = connection.execCommand("cat " + remoteDestPath, BecomeContext.empty(), null);
+        assertEquals(0, execResult.exitCode());
+        // Assemble adds newline between fragments by default if they don't end with one
+        String expected = "fragment1\nfragment2";
+        assertEquals(expected, execResult.stdout().trim());
+    }
 }
