@@ -473,7 +473,10 @@ def apply_mocks() -> None:
         'DEFAULT_LOCAL_TMP': tempfile.gettempdir(),
         'DEFAULT_KEEP_REMOTE_FILES': False
     })
-    config_mock = create_mock('ansible.config', {'ConfigManager': type('CM', (), {'get_config_value': lambda *a, **kw: None})})
+    config_mock = create_mock('ansible.config', {
+        'ConfigManager': type('CM', (), {'get_config_value': lambda *a, **kw: None}),
+        'get_config_value': lambda *a, **kw: None
+    })
     setattr(constants, 'config', config_mock)
     create_mock('ansible.config.manager', {'ConfigManager': type('CM', (), {'get_config_value': lambda *a, **kw: None}), 'ensure_type': lambda x, t: x})
     create_mock('ansible.utils')
