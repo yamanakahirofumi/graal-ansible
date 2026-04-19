@@ -571,6 +571,9 @@ def apply_mocks() -> None:
 
     action_loader_obj = types.SimpleNamespace()
     action_loader_obj.action_loader = action_loader_obj
+    action_loader_obj.module_loader = type('ML', (), {'find_plugin': lambda name: None})()
+    action_loader_obj.module_utils_loader = type('MUL', (), {'find_plugin': lambda name: None})()
+    action_loader_obj.ps_module_utils_loader = type('PSML', (), {'find_plugin': lambda name: None})()
     def action_loader_get(name: str, *args: Any, **kwargs: Any) -> Any:
         import ansible_bridge
         return ansible_bridge._create_action_plugin(
@@ -582,9 +585,9 @@ def apply_mocks() -> None:
 
     create_mock('ansible.plugins.loader', {
         'action_loader': action_loader_obj,
-        'module_loader': type('ML', (), {'find_plugin': lambda name: None}),
-        'module_utils_loader': type('MUL', (), {'find_plugin': lambda name: None}),
-        'ps_module_utils_loader': type('PSML', (), {'find_plugin': lambda name: None})
+        'module_loader': action_loader_obj.module_loader,
+        'module_utils_loader': action_loader_obj.module_utils_loader,
+        'ps_module_utils_loader': action_loader_obj.ps_module_utils_loader
     })
 
     # 6. Playbook

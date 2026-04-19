@@ -62,7 +62,7 @@ def run_action_plugin() -> Dict[str, Any]:
             play_context=PlayContext(),
             loader=l,
             templar=Templar(variables=task_vars),
-            shared_loader_obj=sys.modules['ansible.plugins.loader'].action_loader
+            shared_loader_obj=sys.modules['ansible.plugins.loader']
         )
         res: Dict[str, Any] = plugin.run(tmp=None, task_vars=task_vars)
         return res
