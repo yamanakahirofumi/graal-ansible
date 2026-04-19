@@ -336,7 +336,8 @@ class Templar:
         self._engine = type('Eng', (), {
             'tvars': variables or {},
             'extend': lambda *a, **kw: self._engine,
-            'evaluate_expression': lambda expr, *a, **kw: self._engine.tvars.get(expr, expr)
+            'evaluate_expression': lambda expr, *a, **kw: self._engine.tvars.get(expr, expr),
+            'resolve_to_container': lambda x, *a, **kw: x
         })
         self.available_variables: Dict[str, Any] = variables or {}
         self.environment: Dict[str, Any] = {}
