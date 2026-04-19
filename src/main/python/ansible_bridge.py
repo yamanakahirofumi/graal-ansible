@@ -313,7 +313,7 @@ class Task:
         self.tags: List[str] = []
         self.implicit: bool = False
         self.resolved_action: Optional[str] = None
-        self._parent: Any = None
+        self._parent: Any = types.SimpleNamespace(_play=types.SimpleNamespace())
         self.diff: bool = False
         self.check_mode: bool = False
         self.no_log: bool = False
