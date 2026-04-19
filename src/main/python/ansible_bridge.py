@@ -322,6 +322,7 @@ class Task:
         self.environment: Dict[str, Any] = {}
         self._role: Any = None
         self._original_basename: Optional[str] = None
+        self.module_defaults: Dict[str, Any] = {}
     def get_name(self) -> str: return "mock_task"
     def copy(self) -> 'Task':
         new_task = Task()
