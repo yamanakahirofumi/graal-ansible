@@ -192,6 +192,17 @@ class ActualModuleIntegrationTest {
     }
 
     @Test
+    void testActualGatherFactsModule() {
+        Task task = new Task("test_gather_facts", "gather_facts", Map.of());
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
+        assertNotNull(facts);
+        assertTrue(facts.containsKey("ansible_os_family"));
+    }
+
+    @Test
     void testActualCommandModule() {
         Task task = new Task("test_command", "command", Map.of("_raw_params", "echo hello_command"));
         TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
