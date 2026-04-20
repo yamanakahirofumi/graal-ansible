@@ -8,6 +8,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -89,5 +92,22 @@ class ActionPluginTest {
         Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
         assertNotNull(facts);
         assertEquals("integration_value", facts.get("integration_fact"));
+    }
+
+    @Test
+    void testScriptActionPlugin() throws IOException {
+        Path tempScript = Files.createTempFile("test_script", ".sh");
+        Files.writeString(tempScript, "#!/bin/sh\necho 'hello world'");
+        tempScript.toFile().setExecutable(true);
+
+        try {
+            Task task = new Task("Test Script", "script", Map.of("_raw_params", tempScript.toString()));
+            TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+            assertTrue(result.success(), result.message());
+            assertTrue(result.changed());
+            assertTrue(result.data().get("stdout").toString().contains("hello world"));
+        } finally {
+            Files.deleteIfExists(tempScript);
+        }
     }
 }
