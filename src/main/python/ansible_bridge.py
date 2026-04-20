@@ -170,6 +170,9 @@ class MockShell:
     def __init__(self) -> None:
         import tempfile
         self.tmpdir: str = tempfile.gettempdir()
+    def env_prefix(self, **kwargs):
+        if not kwargs: return ""
+        return " ".join(["%s=%s" % (k, v) for k, v in kwargs.items()]) + " "
     def path_has_trailing_slash(self, path: Union[str, List[str]]) -> bool:
         if isinstance(path, list):
             if len(path) > 0: path = path[0]
@@ -301,6 +304,22 @@ class ActionBase:
             conn.putFile(Paths.get(str(lp)), str(rp))
         return rp
     def _fixup_perms2(self, *args: Any, **kwargs: Any) -> None: pass
+
+    def _compute_environment_string(self, raw_environment_out=None):
+        final_environment = dict()
+        if self._task.environment:
+            environments = self._task.environment
+            if not isinstance(environments, list):
+                environments = [environments]
+            for environment in environments:
+                if environment:
+                    final_environment.update(self._templar.template(environment))
+
+        if raw_environment_out is not None:
+            raw_environment_out.clear()
+            raw_environment_out.update(final_environment)
+
+        return self._connection._shell.env_prefix(**final_environment)
 
 class Task:
     def __init__(self) -> None:
