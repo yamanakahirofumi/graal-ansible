@@ -1,5 +1,6 @@
 import json
 import sys
+import shlex
 import os
 import types
 import re
@@ -170,6 +171,9 @@ class MockShell:
     def __init__(self) -> None:
         import tempfile
         self.tmpdir: str = tempfile.gettempdir()
+    def env_prefix(self, **kwargs):
+        if not kwargs: return ""
+        return " ".join(["%s=%s" % (k, v) for k, v in kwargs.items()]) + " "
     def path_has_trailing_slash(self, path: Union[str, List[str]]) -> bool:
         if isinstance(path, list):
             if len(path) > 0: path = path[0]
@@ -301,6 +305,28 @@ class ActionBase:
             conn.putFile(Paths.get(str(lp)), str(rp))
         return rp
     def _fixup_perms2(self, *args: Any, **kwargs: Any) -> None: pass
+
+    def _low_level_execute_command(self, cmd: str, sudoable: bool = True, in_data: Any = None, executable: str = None, encoding_errors: str = 'surrogate_then_replace', chdir: str = None) -> Dict[str, Any]:
+        if chdir:
+            cmd = f"cd {chdir} && {cmd}"
+        rc, stdout, stderr = self._connection.exec_command(cmd, in_data=in_data, sudoable=sudoable)
+        return dict(rc=rc, stdout=stdout, stdout_lines=stdout.splitlines(), stderr=stderr, stderr_lines=stderr.splitlines())
+
+    def _compute_environment_string(self, raw_environment_out=None):
+        final_environment = dict()
+        if self._task.environment:
+            environments = self._task.environment
+            if not isinstance(environments, list):
+                environments = [environments]
+            for environment in environments:
+                if environment:
+                    final_environment.update(self._templar.template(environment))
+
+        if raw_environment_out is not None:
+            raw_environment_out.clear()
+            raw_environment_out.update(final_environment)
+
+        return self._connection._shell.env_prefix(**final_environment)
 
 class Task:
     def __init__(self) -> None:
@@ -756,6 +782,19 @@ def apply_mocks() -> None:
         json.dumps = lambda obj, **kw: _orig_dumps(obj, **(dict({'cls': AnsibleEncoder}, **kw)))
         json._graal_ansible_patched = True
 
+    # 12. shlex monkeypatch for Windows paths
+    if not hasattr(shlex, '_graal_ansible_patched'):
+        _orig_split = shlex.split
+        def patched_split(s, comments=False, posix=None):
+            # If s contains Windows-style path (Drive letter and backslash), force posix=False
+            # This prevents shlex from consuming backslashes as escape characters.
+            force_posix = posix
+            if isinstance(s, str) and re.match(r'^[a-zA-Z]:\\', s):
+                force_posix = False
+            return _orig_split(s, comments=comments, posix=force_posix)
+        shlex.split = patched_split
+        shlex._graal_ansible_patched = True
+
     sys._ansible_bridge_mocks_applied = True
 
 def _create_action_plugin(action_name: str, task: Any, connection: Any, play_context: Any, loader: Any, templar: Any, shared_loader_obj: Any) -> Any:
@@ -810,6 +849,10 @@ def _create_action_plugin(action_name: str, task: Any, connection: Any, play_con
                 rp, lp = _normalize_path(remote_path), _normalize_path(local_path)
                 from java.nio.file import Paths
                 self._obj.fetchFile(str(rp), Paths.get(str(lp)))
+            def exec_command(self, cmd: str, in_data: Any = None, sudoable: bool = True) -> Tuple[int, str, str]:
+                bc = _current_task_context.get('become_context_java')
+                res = self._obj.execCommand(str(cmd), bc if sudoable else None, _current_task_context.get('environment_java'))
+                return int(res.exitCode()), str(res.stdout()), str(res.stderr())
         c = Proxy(connection)
 
     return mod.ActionModule(task, c, play_context, l, templar, shared_loader_obj)

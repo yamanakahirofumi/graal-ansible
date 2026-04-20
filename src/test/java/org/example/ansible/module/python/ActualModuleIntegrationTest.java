@@ -760,4 +760,20 @@ class ActualModuleIntegrationTest {
         String expected = "fragment1\nfragment2";
         assertEquals(expected, execResult.stdout().trim());
     }
+
+    @Test
+    void testActualScriptModule() throws IOException {
+        Path localScript = tempDir.resolve("test_script.sh");
+        Files.writeString(localScript, "#!/bin/sh\necho 'hello from script'\n");
+        localScript.toFile().setExecutable(true);
+
+        Task task = new Task("test_script", "script", Map.of(
+                "_raw_params", localScript.toAbsolutePath().toString()
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        assertTrue(result.changed(), "Script execution should report changed=true");
+        assertTrue(result.data().get("stdout").toString().contains("hello from script"));
+    }
 }
