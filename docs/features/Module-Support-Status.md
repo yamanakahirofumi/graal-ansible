@@ -42,7 +42,7 @@
 | - `apt` | △ | ？ | - | ロード確認済。 |
 | - `apt_key` | △ | ？ | - | ロード確認済。 |
 | - `apt_repository` | △ | ？ | - | ロード確認済。 |
-| - `assemble` | ○ | ？ | - | オリジナル Python ソースコードにより検証済。 |
+| - `assemble` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
 | - `async_status` | △ | ？ | ？ | ロード確認済。 |
 | - `async_wrapper` | △ | ？ | ？ | ロード確認済。 |
 | - `blockinfile` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |

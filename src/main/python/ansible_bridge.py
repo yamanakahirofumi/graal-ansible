@@ -37,6 +37,7 @@ def _to_java_str(p: Any) -> Optional[str]:
 # Override os functions to use Java-based mocks
 os.makedirs = lambda name, mode=0o777, exist_ok=False: os_java.makedirs(_to_java_str(name), mode, exist_ok)
 os.mkdir = lambda path, mode=0o777: os_java.mkdir(_to_java_str(path), mode)
+os.listdir = lambda path: os_java.listdir(_to_java_str(path))
 os.path.exists = lambda path: os_java.exists(_to_java_str(path))
 os.stat = lambda path, *args, **kwargs: os_java.statPython(_to_java_str(path), *args)
 os.geteuid = os_java.geteuid
@@ -298,9 +299,7 @@ class ActionBase:
         if conn:
             from java.nio.file import Paths
             conn.putFile(Paths.get(str(lp)), str(rp))
-        import hashlib
-        with open(lp, 'rb') as f:
-            return hashlib.sha1(f.read()).hexdigest()
+        return rp
     def _fixup_perms2(self, *args: Any, **kwargs: Any) -> None: pass
 
 class Task:
@@ -723,7 +722,18 @@ def apply_mocks() -> None:
         'LOG_NOTICE': 5, 'LOG_INFO': 6, 'LOG_DEBUG': 7, 'LOG_ERR': 3, 'LOG_WARNING': 4
     }, False)
 
-    # 10. JSON handling
+    # 10. Codecs monkeypatch for escape_decode (used by assemble)
+    import codecs
+    if not hasattr(codecs, '_graal_ansible_patched'):
+        _orig_escape_decode = codecs.escape_decode
+        def patched_escape_decode(obj, errors='strict'):
+            if isinstance(obj, str):
+                return _orig_escape_decode(obj.encode('utf-8'), errors)
+            return _orig_escape_decode(obj, errors)
+        codecs.escape_decode = patched_escape_decode
+        codecs._graal_ansible_patched = True
+
+    # 11. JSON handling
     if not hasattr(json, '_graal_ansible_patched'):
         class AnsibleEncoder(json.JSONEncoder):
             def default(self, o: Any) -> Any:
