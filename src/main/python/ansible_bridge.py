@@ -1,5 +1,6 @@
 import json
 import sys
+import shlex
 import os
 import types
 import re
@@ -780,6 +781,19 @@ def apply_mocks() -> None:
         _orig_dumps = json.dumps
         json.dumps = lambda obj, **kw: _orig_dumps(obj, **(dict({'cls': AnsibleEncoder}, **kw)))
         json._graal_ansible_patched = True
+
+    # 12. shlex monkeypatch for Windows paths
+    if not hasattr(shlex, '_graal_ansible_patched'):
+        _orig_split = shlex.split
+        def patched_split(s, comments=False, posix=None):
+            # If s contains Windows-style path (Drive letter and backslash), force posix=False
+            # This prevents shlex from consuming backslashes as escape characters.
+            force_posix = posix
+            if isinstance(s, str) and re.match(r'^[a-zA-Z]:\\', s):
+                force_posix = False
+            return _orig_split(s, comments=comments, posix=force_posix)
+        shlex.split = patched_split
+        shlex._graal_ansible_patched = True
 
     sys._ansible_bridge_mocks_applied = True
 

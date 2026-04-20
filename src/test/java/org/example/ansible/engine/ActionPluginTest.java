@@ -7,6 +7,8 @@ import org.example.ansible.inventory.Inventory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -95,6 +97,7 @@ class ActionPluginTest {
     }
 
     @Test
+    @DisabledOnOs(OS.WINDOWS)
     void testScriptActionPlugin() throws IOException {
         Path tempScript = Files.createTempFile("test_script", ".sh");
         Files.writeString(tempScript, "#!/bin/sh\necho 'hello world'");
