@@ -666,11 +666,18 @@ def apply_mocks() -> None:
             m.RoutingMarkerBehavior = type('RoMB', (), {'__init__': lambda *a, **kw: None})
 
     # 8. Module Utils
-    for mname in ['ansible', 'ansible.module_utils', 'ansible.module_utils.common', 'ansible.module_utils.compat', 'ansible.module_utils._internal', 'ansible.module_utils.parsing', 'ansible.plugins', 'ansible.plugins.action']:
+    for mname in ['ansible', 'ansible.module_utils', 'ansible.module_utils.common', 'ansible.module_utils.compat', 'ansible.module_utils._internal', 'ansible.module_utils.parsing', 'ansible.plugins', 'ansible.plugins.action', 'ansible.module_utils.facts']:
         attrs = {}
         if mname == 'ansible.module_utils._internal':
             attrs['get_controller_serialize_map'] = lambda: {}
         create_mock(mname, attributes=attrs, is_package=True)
+
+    create_mock('ansible.module_utils.facts.ansible_collector', {
+        'get_ansible_collector': lambda *a, **kw: type('Coll', (), {'collect': lambda *a, **kw: {}})()
+    })
+    create_mock('ansible.module_utils.facts.default_collectors', {
+        'collectors': []
+    })
 
     if mocks_applied: return
 

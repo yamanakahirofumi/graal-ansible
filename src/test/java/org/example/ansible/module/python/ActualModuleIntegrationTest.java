@@ -776,4 +776,43 @@ class ActualModuleIntegrationTest {
         assertTrue(result.changed(), "Script execution should report changed=true");
         assertTrue(result.data().get("stdout").toString().contains("hello from script"));
     }
+
+    @Test
+    void testActualCheckMode() {
+        String remotePath = "/tmp/check-mode-test.txt";
+
+        // Ensure file does not exist
+        connection.execCommand("rm -f " + remotePath, BecomeContext.empty(), null);
+
+        Task task = new Task("test_check_mode", "file", Map.of(
+                "path", remotePath,
+                "state", "touch",
+                "_ansible_check_mode", true
+        ));
+
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        assertTrue(result.changed(), "Check mode should report changed=true for new file");
+
+        // Verify file was NOT created on target node
+        var execResult = connection.execCommand("ls " + remotePath, BecomeContext.empty(), null);
+        assertFalse(execResult.exitCode() == 0, "File should NOT have been created in check mode");
+    }
+
+    @Test
+    void testActualPackageFactsModule() {
+        Task task = new Task("test_package_facts", "package_facts", Map.of());
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
+        assertNotNull(facts, "ansible_facts should be present");
+        Map<String, Object> packages = (Map<String, Object>) facts.get("packages");
+        assertNotNull(packages, "packages fact should be present");
+
+        // Our mock returns bash and coreutils
+        assertTrue(packages.containsKey("bash"), "bash should be in package facts");
+        assertTrue(packages.containsKey("coreutils"), "coreutils should be in package facts");
+    }
 }
