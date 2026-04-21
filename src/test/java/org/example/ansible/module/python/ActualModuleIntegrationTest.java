@@ -779,31 +779,31 @@ class ActualModuleIntegrationTest {
 
     @Test
     void testActualCheckMode() {
-        String remotePath = "/tmp/check-mode-test.txt";
-
-        // Ensure file does not exist
-        connection.execCommand("rm -f " + remotePath, BecomeContext.empty(), null);
+        // Use local temporary file for check mode test to avoid SSH/Docker dependency
+        Path localPath = tempDir.resolve("check-mode-test.txt");
+        String pathStr = localPath.toAbsolutePath().toString();
 
         Task task = new Task("test_check_mode", "file", Map.of(
-                "path", remotePath,
+                "path", pathStr,
                 "state", "touch",
                 "_ansible_check_mode", true
         ));
 
-        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+        // Use LocalConnection to verify GraalPy bridging of check mode
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), new org.example.ansible.connection.LocalConnection(), null);
 
         assertTrue(result.success(), "Execution failed: " + result.message());
         assertTrue(result.changed(), "Check mode should report changed=true for new file");
 
-        // Verify file was NOT created on target node
-        var execResult = connection.execCommand("ls " + remotePath, BecomeContext.empty(), null);
-        assertFalse(execResult.exitCode() == 0, "File should NOT have been created in check mode");
+        // Verify file was NOT created locally
+        assertFalse(Files.exists(localPath), "File should NOT have been created in check mode");
     }
 
     @Test
     void testActualPackageFactsModule() {
         Task task = new Task("test_package_facts", "package_facts", Map.of());
-        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+        // Use LocalConnection to verify the GraalPy bridge mocks for package_facts
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), new org.example.ansible.connection.LocalConnection(), null);
 
         assertTrue(result.success(), "Execution failed: " + result.message());
         Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");

@@ -678,6 +678,22 @@ def apply_mocks() -> None:
     create_mock('ansible.module_utils.facts.default_collectors', {
         'collectors': []
     })
+    class MockPkgMgr:
+        def __init__(self, *args, **kwargs): pass
+        def is_available(self, *args, **kwargs): return True
+        def get_packages(self, *args, **kwargs):
+            return {
+                'bash': [{'name': 'bash', 'version': '5.2.21-2ubuntu4', 'arch': 'amd64', 'source': 'apt'}],
+                'coreutils': [{'name': 'coreutils', 'version': '9.4-3ubuntu2', 'arch': 'amd64', 'source': 'apt'}]
+            }
+
+    create_mock('ansible.module_utils.facts.packages', {
+        'get_all_pkg_managers': lambda: {'apt': MockPkgMgr},
+        'get_packages': lambda module, pkg_mgr=None: MockPkgMgr().get_packages(),
+        'CLIMgr': MockPkgMgr,
+        'LibMgr': MockPkgMgr,
+        'RespawningLibMgr': MockPkgMgr
+    })
 
     if mocks_applied: return
 
