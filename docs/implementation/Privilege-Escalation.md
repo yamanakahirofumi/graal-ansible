@@ -17,9 +17,30 @@
 | `become_user` | 昇格後のユーザー名 | `root` |
 | `become_flags` | 昇格用コマンドに渡す追加のフラグ（例: `-H -S`） | なし |
 
-## 3. 実装方針
+## 3. CLI インテグレーションと優先順位
 
-### 3.1 コネクションプラグインとの連携
+コマンドライン引数（CLI）で指定された権限昇格設定は、Playbook 内の定義を上書き、あるいはデフォルト値として機能します。
+
+### 3.1 CLI 変数の注入
+`PlaybookCli` は、受け取った引数を以下の「CLI 変数（優先度 Level 1）」として `VariableManager` に登録します。
+
+- `-b` / `--become` -> `ansible_become` (Boolean)
+- `--become-method` -> `ansible_become_method` (String)
+- `--become-user` -> `ansible_become_user` (String)
+- `--become-flags` -> `ansible_become_flags` (String)
+
+### 3.2 優先順位の解決ロジック
+`VariableResolver.resolveBecomeContext` は、以下の順序で設定を解決します（下に行くほど優先）。
+
+1. **CLI 変数**: コマンドラインで指定されたデフォルト設定。
+2. **Play レベル**: Playbook の `become: ...` 定義。
+3. **Task レベル**: 各タスクの `become: ...` 定義。
+
+ただし、Ansible の仕様に基づき、**CLI で `--become` (`-b`) が明示的に指定された場合、Playbook 側に `become` の記述がなくても、すべてのタスクで昇格が有効になります。** 一方で、特定のタスクで `become: no` が指定されている場合は、CLI の指定に関わらずそのタスクでは昇格を行いません。
+
+## 4. 実装方針
+
+### 4.1 コネクションプラグインとの連携
 権限昇格は、[コネクションプラグイン](Connection-Plugins.md) の `execCommand` メソッド内で処理されます。
 
 - `execCommand` の引数として `BecomeContext`（昇格要否、メソッド、ユーザー等の情報を保持する Record）を導入し、統合済みです。
@@ -34,18 +55,18 @@
 sudo -p "BECOME-PROMPT" -u root /bin/sh -c "/usr/bin/python3 /tmp/ansible_module.py"
 ```
 
-### 3.2 OS 抽象化レイヤーとの連携
+### 4.2 OS 抽象化レイヤーとの連携
 [OS 抽象化レイヤー](OS-Abstraction.md) の `OSHandler` が、その OS で利用可能な権限昇格メソッドを提供します。
 
 - Linux: `sudo`, `su`
 - Windows: `runas`
 - macOS: `sudo`
 
-### 3.3 パスワードのハンドリング
+### 4.3 パスワードのハンドリング
 - `-K` / `--ask-become-pass` オプションが指定された場合、ユーザーにパスワードをプロンプトで問い合せます。
 - 取得したパスワードは、メモリ内で安全に保持し、実行時に権限昇格コマンドの標準入力（または `sudo -S` 等の引数）を介して渡します。
 
-## 4. 実行順序における適用タイミング
+## 5. 実行順序における適用タイミング
 
 [PlaybookExecutor](Task-Control.md) および [タスク実行エンジン](Task-Executor.md) において、以下のタイミングで適用されます。
 
@@ -54,7 +75,7 @@ sudo -p "BECOME-PROMPT" -u root /bin/sh -c "/usr/bin/python3 /tmp/ansible_module
 3. `Connection.execCommand` を呼び出す際、`BecomeContext` として昇格情報を付与。
 4. モジュール実行完了後、結果を取得。
 
-## 5. 制約事項と留意点
+## 6. 制約事項と留意点
 
 - **インターラクティブな入力**: 本プロジェクトでは、権限昇格時のプロンプト応答（パスワード入力等）を自動化することを前提とします。
 - **セキュリティ**: パスワードの平文でのログ出力や、一時ファイルへの保存は厳禁とします。
