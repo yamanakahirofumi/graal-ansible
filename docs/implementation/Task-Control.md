@@ -182,7 +182,7 @@
 
 - **ステータス**:
     - `include_tasks`, `import_tasks`: 実装済み (◎)
-    - `include_role`, `import_role`: 実装済み (◎)
+    - `include_role`, `import_role`: 実装済み (○)
 - **実装方針**:
     - `include_tasks` または `import_tasks` キーに指定されたファイルパス（テンプレート可）を解決します。
     - ファイル内のタスクリストを読み込み、現在の実行コンテキスト（変数、タグ等）を継承させつつ実行します。

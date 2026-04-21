@@ -59,9 +59,9 @@
 | - `git` | △ | ？ | - | ロード確認済。 |
 | - `group_by` | ◎ | ？ | ？ | オリジナル Python ソースコードにより検証済。 |
 | - `import_playbook` | ？ | ？ | ？ | 検証予定。 |
-| - `import_role` | ◎ | ？ | ？ | オリジナル Java エンジンにより検証済。 |
+| - `import_role` | ○ | ？ | ？ | オリジナル Java エンジンにより検証済。 |
 | - `import_tasks` | ◎ | ？ | ？ | オリジナル Python ソースコードにより検証済。 |
-| - `include_role` | ◎ | ？ | ？ | オリジナル Java エンジンにより検証済。 |
+| - `include_role` | ○ | ？ | ？ | オリジナル Java エンジンにより検証済。 |
 | - `include_tasks` | ◎ | ？ | ？ | オリジナル Python ソースコードにより検証済。 |
 | - `include_vars` | ◎ | ○ | ○ | オリジナル Python ソースコードにより検証済。 |
 | - `iptables` | △ | ？ | - | ロード確認済。 |
