@@ -3,6 +3,10 @@ import sys
 import shlex
 import os
 import types
+
+# Save original os functions for internal use before monkeypatching
+_real_os = os
+_real_open = open
 import re
 from io import StringIO
 from typing import Any, Dict, List, Optional, Tuple, Union, Set, Type, TYPE_CHECKING, Iterable
@@ -473,7 +477,8 @@ def apply_mocks() -> None:
             if not hasattr(m, '__path__') or not isinstance(m.__path__, list):
                 m.__path__ = []
             if not hasattr(m, '__file__') or not m.__file__:
-                placeholder_file = os.path.join(os.getcwd(), mname.replace('.', '/'), '__init__.py')
+                # Use _real_os and os.sep for cross-platform compatibility
+                placeholder_file = _real_os.path.join(_real_os.getcwd(), mname.replace('.', _real_os.sep), '__init__.py')
                 setattr(m, '__file__', placeholder_file)
                 m.__dict__['__file__'] = placeholder_file
         if attributes:
@@ -636,12 +641,20 @@ def apply_mocks() -> None:
     create_mock('ansible._internal._errors._error_utils', {
         'result_dict_from_captured_errors': lambda *a, **kw: {}
     })
-    ansiballz = create_mock('ansible._internal._ansiballz')
-    # Mock __file__ to avoid FileNotFoundError when executor tries to read _wrapper.py relative to it
-    if hasattr(ansiballz, '__file__'):
-        wrapper_path = os.path.join(os.path.dirname(ansiballz.__file__), '_wrapper.py')
-        if not os.path.exists(wrapper_path):
-            with open(wrapper_path, 'w') as f: f.write("# mock wrapper")
+    try:
+        ansiballz = create_mock('ansible._internal._ansiballz')
+        # Mock __file__ to avoid FileNotFoundError when executor tries to read _wrapper.py relative to it
+        if hasattr(ansiballz, '__file__'):
+            ansiballz_dir = _real_os.path.dirname(ansiballz.__file__)
+            # Ensure the path is absolute and uses correct separators for the host OS
+            ansiballz_dir = _real_os.path.abspath(ansiballz_dir)
+            if not _real_os.path.exists(ansiballz_dir):
+                _real_os.makedirs(ansiballz_dir, exist_ok=True)
+            wrapper_path = _real_os.path.join(ansiballz_dir, '_wrapper.py')
+            if not _real_os.path.exists(wrapper_path):
+                with _real_open(wrapper_path, 'w') as f: f.write("# mock wrapper")
+    except Exception:
+        pass # Best effort to create the wrapper file
     create_mock('ansible._internal._ansiballz._builder')
     swe = type('SWE', (Exception,), {'is_tagged_on': staticmethod(lambda x: False)})
     create_mock('ansible._internal._datatag', {'SourceWasEncrypted': swe})
