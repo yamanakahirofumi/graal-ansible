@@ -327,17 +327,17 @@ class ActualModuleIntegrationTest {
 
     @Test
     void testActualHostnameModule() {
+        // Get current hostname to ensure idempotency and success in container environment
+        var getHostname = connection.execCommand("hostname", BecomeContext.empty(), null);
+        String currentHostname = getHostname.stdout().trim();
 
         Task task = new Task("test_hostname", "hostname", Map.of(
-                "name", "new-hostname"
+                "name", currentHostname
         ));
-        // hostname module usually requires root, but in this container it might fail to actually set it
-        // We just want to see if it executes correctly.
         TaskResult result = taskExecutor.execute(task, new BecomeContext(true, "sudo", "root", ""), connection, null);
 
-        // It might fail because Docker containers don't always allow changing hostname easily
-        // but we check if it didn't fail due to bridge/launcher issues.
-        assertNotNull(result);
+        assertTrue(result.success(), "Hostname module failed: " + result.message());
+        assertFalse(result.changed(), "Hostname should not have changed");
     }
 
     @Test
@@ -432,11 +432,7 @@ class ActualModuleIntegrationTest {
         ));
         TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
 
-        if (!result.success()) {
-            System.err.println("Getent failed: " + result.message());
-            System.err.println("Full Data: " + result.data());
-        }
-        assertTrue(result.success(), "Execution failed: " + result.message());
+        assertTrue(result.success(), () -> "Execution failed: " + result.message() + ". Full data: " + result.data());
         Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
         assertNotNull(facts, "ansible_facts should be present. Full data: " + result.data());
         Map<String, Object> getent = (Map<String, Object>) facts.get("getent_passwd");
@@ -779,43 +775,36 @@ class ActualModuleIntegrationTest {
 
     @Test
     void testActualCheckMode() {
-        // Use local temporary file for check mode test to avoid SSH/Docker dependency
-        Path localPath = tempDir.resolve("check-mode-test.txt");
-        String pathStr = localPath.toAbsolutePath().toString();
+        String remotePath = "/tmp/check-mode-test.txt";
 
         Task task = new Task("test_check_mode", "file", Map.of(
-                "path", pathStr,
+                "path", remotePath,
                 "state", "touch",
                 "_ansible_check_mode", true
         ));
 
-        // Use LocalConnection to verify GraalPy bridging of check mode
-        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), new org.example.ansible.connection.LocalConnection(), null);
+        // Use SSH connection to verify GraalPy bridging of check mode in container
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
 
         assertTrue(result.success(), "Execution failed: " + result.message());
         assertTrue(result.changed(), "Check mode should report changed=true for new file");
 
-        // Verify file was NOT created locally
-        assertFalse(Files.exists(localPath), "File should NOT have been created in check mode");
+        // Verify file was NOT created in container
+        var execResult = connection.execCommand("ls " + remotePath, BecomeContext.empty(), null);
+        assertFalse(execResult.exitCode() == 0, "File should NOT have been created in check mode");
     }
 
     @Test
     void testActualPackageFactsModule() {
         Task task = new Task("test_package_facts", "package_facts", Map.of());
-        // Use LocalConnection to verify the GraalPy bridge for package_facts
-        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), new org.example.ansible.connection.LocalConnection(), null);
+        // Use SSH connection to verify package_facts on the actual target node
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
 
-        // Verification of package_facts might fail if no package manager or Python libraries are present,
-        // but it should not fail due to bridging errors.
-        if (result.success()) {
-            Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
-            assertNotNull(facts, "ansible_facts should be present");
-            Map<String, Object> packages = (Map<String, Object>) facts.get("packages");
-            assertNotNull(packages, "packages fact should be present");
-        } else {
-            // If it fails, it should be a known failure from the module (e.g. no pkg mgr found), not a bridge error.
-            assertTrue(result.message().contains("Could not detect a supported package manager") ||
-                       result.message().contains("Request failed"), "Unexpected failure message: " + result.message());
-        }
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
+        assertNotNull(facts, "ansible_facts should be present");
+        Map<String, Object> packages = (Map<String, Object>) facts.get("packages");
+        assertNotNull(packages, "packages fact should be present");
+        assertFalse(packages.isEmpty(), "Package list should not be empty on the target node");
     }
 }
