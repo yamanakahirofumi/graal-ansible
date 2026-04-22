@@ -776,4 +776,15 @@ class ActualModuleIntegrationTest {
         assertTrue(result.changed(), "Script execution should report changed=true");
         assertTrue(result.data().get("stdout").toString().contains("hello from script"));
     }
+
+    @Test
+    void testActualPackageFactsModule() {
+        Task task = new Task("test_package_facts", "package_facts", Map.of());
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
+        assertNotNull(facts, "ansible_facts should be present");
+        assertTrue(facts.containsKey("packages"), "packages should be present in ansible_facts");
+    }
 }
