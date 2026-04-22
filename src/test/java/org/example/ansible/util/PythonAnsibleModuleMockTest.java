@@ -56,23 +56,6 @@ class PythonAnsibleModuleMockTest {
         });
     }
 
-    @Test
-    void testPkgMgrMock() {
-        PythonAnsibleModuleMock mock = new PythonAnsibleModuleMock(
-                null, null, null, osMock, connection, becomeContext, environment, pythonPrint, pythonExit
-        );
-
-        // dpkg-query (Debian/Ubuntu)
-        Object[] res1 = mock.run_command("dpkg-query -l bash");
-        assertEquals(0, res1[0]);
-        assertTrue(res1[1].toString().contains("bash"));
-        assertTrue(res1[1].toString().contains("installed"));
-
-        // rpm (RedHat/CentOS)
-        Object[] res2 = mock.run_command("rpm -qa bash");
-        assertEquals(0, res2[0]);
-        assertTrue(res2[1].toString().contains("bash"));
-    }
 
     @Test
     void testBasicStructure() {

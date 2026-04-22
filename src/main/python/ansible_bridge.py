@@ -121,7 +121,7 @@ def setup_sys_path(site_packages: Optional[List[str]]) -> None:
         for p in site_packages:
             p_str = _normalize_path(p)
             if p_str not in sys.path: sys.path.append(p_str)
-            for mname in ['ansible', 'ansible.module_utils', 'ansible.module_utils.common', 'ansible.module_utils.compat', 'ansible.module_utils._internal', 'ansible.module_utils.parsing', 'ansible.plugins', 'ansible.plugins.action']:
+            for mname in ['ansible', 'ansible.module_utils', 'ansible.module_utils.common', 'ansible.module_utils.compat', 'ansible.module_utils._internal', 'ansible.module_utils.parsing', 'ansible.plugins', 'ansible.plugins.action', 'ansible.module_utils.facts']:
                 if mname in sys.modules:
                     m = sys.modules[mname]
                     if hasattr(m, '__path__') and isinstance(m.__path__, list):
@@ -691,22 +691,9 @@ def apply_mocks() -> None:
     create_mock('ansible.module_utils.facts.default_collectors', {
         'collectors': []
     })
-    class MockPkgMgr:
-        def __init__(self, *args, **kwargs): pass
-        def is_available(self, *args, **kwargs): return True
-        def get_packages(self, *args, **kwargs):
-            return {
-                'bash': [{'name': 'bash', 'version': '5.2.21-2ubuntu4', 'arch': 'amd64', 'source': 'apt'}],
-                'coreutils': [{'name': 'coreutils', 'version': '9.4-3ubuntu2', 'arch': 'amd64', 'source': 'apt'}]
-            }
 
-    create_mock('ansible.module_utils.facts.packages', {
-        'get_all_pkg_managers': lambda: {'apt': MockPkgMgr},
-        'get_packages': lambda module, pkg_mgr=None: MockPkgMgr().get_packages(),
-        'CLIMgr': MockPkgMgr,
-        'LibMgr': MockPkgMgr,
-        'RespawningLibMgr': MockPkgMgr
-    })
+    # Ensure facts sub-packages can be loaded from site-packages
+    # We don't mock 'ansible.module_utils.facts.packages' to let it be loaded from disk.
 
     if mocks_applied: return
 
@@ -746,6 +733,15 @@ def apply_mocks() -> None:
     }
     def mock_get_bin_path(arg: str, required: bool = False, opt_dirs: Optional[List[str]] = None) -> str:
         if arg == 'python': return sys.executable
+        import shutil
+        bin_path = shutil.which(str(arg))
+        if bin_path:
+            return bin_path
+        if opt_dirs:
+            for d in opt_dirs:
+                cand = os.path.join(_normalize_path(d), str(arg))
+                if os.path.exists(cand):
+                    return cand
         return arg
     def mock_load_params() -> Tuple[Dict[str, Any], str]:
         args = _current_task_context['complex_args']

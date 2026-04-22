@@ -262,9 +262,6 @@ public class PythonAnsibleModuleMock implements Serializable {
             command = argsObj.toString();
         }
 
-        Object[] pkgMockRes = handlePkgMgrMock(command);
-        if (pkgMockRes != null) return pkgMockRes;
-
         try {
             ConnectionResult res = connection.execCommand(command, becomeContext, environment);
             return new Object[]{res.exitCode(), res.stdout(), res.stderr()};
@@ -285,17 +282,6 @@ public class PythonAnsibleModuleMock implements Serializable {
                 if ("root".equals(key)) return new Object[]{0, "root:x:0:\n", ""};
                 if (key == null) return new Object[]{0, "root:x:0:\ntestgroup:x:1001:\n", ""};
             }
-        }
-        return null;
-    }
-
-    private Object[] handlePkgMgrMock(String command) {
-        if (command.contains("dpkg-query")) {
-            // Mock output for package_facts on Debian/Ubuntu
-            return new Object[]{0, "bash 5.2.21-2ubuntu4 amd64 install ok installed\ncoreutils 9.4-3ubuntu2 amd64 install ok installed\n", ""};
-        } else if (command.contains("rpm -qa")) {
-            // Mock output for package_facts on RedHat/CentOS
-            return new Object[]{0, "bash-5.2.21-2.el9.x86_64\ncoreutils-9.4-3.el9.x86_64\n", ""};
         }
         return null;
     }
