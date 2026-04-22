@@ -56,20 +56,11 @@ class ActionPluginDestListTest {
 
         VariableManager vm = new VariableManager(inventory, Map.of("target_path", List.of(destDir.toString() + "/")), tempDir);
 
-        TaskResult result = taskExecutor.execute(play, host, task, vm, false, null, Map.of(), null, null, null, null);
+        // We use a LocalConnection to make the test pass even without SSH
+        TaskResult result = taskExecutor.execute(play, host, task, vm, false, null, Map.of(), null, null, new org.example.ansible.connection.LocalConnection(), null);
 
-        // We expect the operation to succeed or at least not fail with AttributeError
-        if (!result.success()) {
-            String message = result.message();
-            String traceback = (String) result.data().get("traceback");
-            assertFalse(message != null && message.contains("AttributeError"), "Should not have AttributeError: " + message);
-            assertFalse(traceback != null && traceback.contains("AttributeError"), "Should not have AttributeError in traceback: " + traceback);
-
-            // If it failed for other reasons (like 'Source None/.source.txt not found' in mock environment),
-            // as long as it's not AttributeError, we consider the fix verified for this specific issue.
-            System.out.println("Execution failed as expected in mock environment, but without AttributeError: " + message);
-        } else {
-            assertTrue(Files.exists(destDir.resolve("source.txt")));
-        }
+        // Operation should succeed because dest is now automatically flattened to a string in the action launcher
+        assertTrue(result.success(), () -> "Copy failed: " + result.message() + ". Traceback: " + result.data().get("traceback"));
+        assertTrue(Files.exists(destDir.resolve("source.txt")), "Dest file should exist");
     }
 }

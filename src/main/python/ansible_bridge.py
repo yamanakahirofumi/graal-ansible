@@ -692,6 +692,68 @@ def apply_mocks() -> None:
         'collectors': []
     })
 
+    # High-fidelity mocks for apt and rpm libraries using bridged connection.
+    # These classes are defined here but used to mock 'apt' and 'rpm' modules.
+    class AptMock:
+        class Package:
+            def __init__(self, data):
+                self.installed = data
+                self.is_installed = True if data else False
+        class Cache:
+            def __init__(self):
+                self._pkgs = {}
+                try:
+                    conn = _current_task_context.get('connection_java')
+                    if conn:
+                        # Use a more reliable way to list installed packages with details
+                        res = conn.execCommand("dpkg-query -W -f='${Package}\\t${Version}\\t${Architecture}\\t${Section}\\n'",
+                                             _current_task_context.get('become_context_java'), None)
+                        if int(res.exitCode()) == 0:
+                            for line in str(res.stdout()).splitlines():
+                                parts = line.split('\t')
+                                if len(parts) >= 3:
+                                    name = parts[0]
+                                    self._pkgs[name] = types.SimpleNamespace(
+                                        version=parts[1],
+                                        architecture=parts[2],
+                                        section=parts[3] if len(parts) > 3 else 'unknown',
+                                        origins=[types.SimpleNamespace(origin='debian')]
+                                    )
+                except: pass
+            def keys(self): return self._pkgs.keys()
+            def __getitem__(self, key):
+                return AptMock.Package(self._pkgs.get(key))
+
+    class RpmMock:
+        class TransactionSet:
+            def dbMatch(self):
+                pkgs = []
+                try:
+                    conn = _current_task_context.get('connection_java')
+                    if conn:
+                        res = conn.execCommand("rpm -qa --queryformat '%{NAME}\\t%{VERSION}\\t%{RELEASE}\\t%{EPOCH}\\t%{ARCH}\\n'",
+                                             _current_task_context.get('become_context_java'), None)
+                        if int(res.exitCode()) == 0:
+                            for line in str(res.stdout()).splitlines():
+                                parts = line.split('\t')
+                                if len(parts) >= 5:
+                                    pkgs.append({
+                                        1000: parts[0], # RPMTAG_NAME
+                                        1001: parts[1], # RPMTAG_VERSION
+                                        1002: parts[2], # RPMTAG_RELEASE
+                                        1003: parts[3], # RPMTAG_EPOCH
+                                        1022: parts[4]  # RPMTAG_ARCH
+                                    })
+                except: pass
+                return pkgs
+
+    create_mock('apt', {'Cache': AptMock.Cache})
+    create_mock('rpm', {
+        'TransactionSet': RpmMock.TransactionSet,
+        'RPMTAG_NAME': 1000, 'RPMTAG_VERSION': 1001, 'RPMTAG_RELEASE': 1002,
+        'RPMTAG_EPOCH': 1003, 'RPMTAG_ARCH': 1022
+    })
+
     # Ensure facts sub-packages can be loaded from site-packages
     # We don't mock 'ansible.module_utils.facts.packages' to let it be loaded from disk.
 
