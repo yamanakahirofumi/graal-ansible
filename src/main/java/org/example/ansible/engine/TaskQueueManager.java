@@ -211,7 +211,13 @@ public class TaskQueueManager {
             }
 
             if (task.register() != null) {
-                variableManager.registerVariable(host.name(), task.register(), result.data());
+                Map<String, Object> registerData = new HashMap<>(result.data());
+                registerData.put("changed", result.changed());
+                registerData.put("failed", !result.success());
+                if (result.isSkipped()) {
+                    registerData.put("skipped", true);
+                }
+                variableManager.registerVariable(host.name(), task.register(), registerData);
             }
 
             String normalizedAction = task.action();

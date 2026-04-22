@@ -43,13 +43,13 @@
 ### [✓] モジュールサポート状態の同期
 - **完了日**: 2026-07-26
 - **概要**: `docs/features/Module-Support-Status.md` および本ドキュメントのテスト済みモジュール数を最新化。
-- **解決策**: 統合テスト済みモジュール数を 35 に更新し、`package_facts` を含める形で同期。
+- **解決策**: 統合テスト済みモジュール数を 36 に更新し、`apt` を含める形で同期。
 
 ### [✓] 実際の Ansible コレクションを使ったテストの実施
 - **完了日**: 2026-07-26
 - **概要**: [実際のコレクションを使ったテスト方法の設計](tech/Actual-Collection-Testing.md) に基づき、主要なモジュールのテストを統合。
 - **解決策**:
-    - `ping`, `copy`, `file`, `stat`, `template`, `debug`, `command`, `shell`, `setup`, `lineinfile`, `replace`, `user`, `group`, `find`, `tempfile`, `hostname`, `slurp`, `assert`, `blockinfile`, `getent`, `fetch`, `uri`, `unarchive`, `include_vars`, `include_tasks`, `import_tasks`, `set_fact`, `add_host`, `fail`, `get_url`, `group_by`, `gather_facts`, `assemble`, `script`, `package_facts` の計 35 モジュールの統合テストを CI 環境へ統合済み。
+    - `ping`, `copy`, `file`, `stat`, `template`, `debug`, `command`, `shell`, `setup`, `lineinfile`, `replace`, `user`, `group`, `find`, `tempfile`, `hostname`, `slurp`, `assert`, `blockinfile`, `getent`, `fetch`, `uri`, `unarchive`, `include_vars`, `include_tasks`, `import_tasks`, `set_fact`, `add_host`, `fail`, `get_url`, `group_by`, `gather_facts`, `assemble`, `script`, `package_facts`, `apt` の計 36 モジュールの統合テストを CI 環境へ統合済み。
     - GraalPy および `ansible-core` のセットアップを GitHub Actions 上で自動化済み。
 
 ### [✓] Action Plugin の互換性向上 (Python-first)
