@@ -2,6 +2,7 @@ import json
 import sys
 import shlex
 import os
+import shutil
 import types
 import re
 from io import StringIO
@@ -63,6 +64,17 @@ _current_task_context: Dict[str, Any] = {
 
 def _normalize_path(p: Any) -> str:
     return str(os_java.normalizePath(_to_java_str(p)))
+
+def mock_get_bin_path(arg: str, required: bool = False, opt_dirs: Optional[List[str]] = None) -> str:
+    if arg == 'python': return sys.executable
+    # Try to find absolute path using shutil.which
+    found = shutil.which(arg)
+    if found: return found
+    if required:
+        # If required but not found, we return the arg and let the module handle it
+        # or we could raise an error here if we wanted to be more strict.
+        return arg
+    return arg
 
 def _deep_convert(obj: Any) -> Any:
     if obj is None: return None
@@ -425,7 +437,7 @@ class AnsibleModule:
         return (int(res[0]), str(res[1]), str(res[2]))
 
     def get_bin_path(self, arg: str, required: bool = False, opt_dirs: Optional[List[str]] = None) -> Optional[str]:
-        return _to_java_str(self._java_mock.get_bin_path(_to_java_str(arg), required, [_to_java_str(d) for d in (opt_dirs or [])]))
+        return mock_get_bin_path(arg, required, opt_dirs)
 
     def sha1(self, path: str) -> str: return str(self._java_mock.sha1(_to_java_str(path)))
     def md5(self, path: str) -> str: return str(self._java_mock.md5(_to_java_str(path)))
@@ -708,9 +720,6 @@ def apply_mocks() -> None:
         'attributes': dict(type='str', aliases=['attr']),
         'unsafe_writes': dict(type='bool', default=False),
     }
-    def mock_get_bin_path(arg: str, required: bool = False, opt_dirs: Optional[List[str]] = None) -> str:
-        if arg == 'python': return sys.executable
-        return arg
     def mock_load_params() -> Tuple[Dict[str, Any], str]:
         args = _current_task_context['complex_args']
         if not args: return {}, 'main'
