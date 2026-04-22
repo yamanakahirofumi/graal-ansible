@@ -91,7 +91,7 @@ public class TaskExecutor implements ITaskExecutor {
             "debug", "set_fact", "copy", "template", "assemble", "group_by",
             "include_vars", "fetch", "pause", "wait_for_connection", "gather_facts",
             "unarchive", "uri", "script", "reboot", "async_status", "add_host", "assert",
-            "command", "shell"
+            "command", "shell", "package_facts"
     );
     private final Map<String, org.example.ansible.module.Module> modules = new HashMap<>();
     private final Map<String, Boolean> actionPluginCache = new ConcurrentHashMap<>();

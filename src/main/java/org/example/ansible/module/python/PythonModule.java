@@ -44,6 +44,10 @@ public class PythonModule implements Module {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private static final Map<String, Path> dependencyZipCache = new ConcurrentHashMap<>();
 
+    private static final List<String> FORCED_LOCAL_MODULES = List.of(
+            "package_facts"
+    );
+
     public PythonModule(String moduleName) {
         this(moduleName, null);
     }
@@ -57,7 +61,7 @@ public class PythonModule implements Module {
     public TaskResult execute(final Map<String, Object> args, BecomeContext becomeContext, Context context) {
         Connection connection = TaskExecutor.getCurrentConnection();
 
-        if (connection != null && !(connection instanceof LocalConnection)) {
+        if (connection != null && !(connection instanceof LocalConnection) && !FORCED_LOCAL_MODULES.contains(moduleName)) {
             return executeRemotely(args, becomeContext, connection);
         }
 
