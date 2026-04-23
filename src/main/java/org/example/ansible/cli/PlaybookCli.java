@@ -63,6 +63,18 @@ public class PlaybookCli implements Callable<Integer> {
     @Option(names = {"-C", "--check"}, description = "Don't make any changes; instead, try to predict some of the changes that may occur.")
     private boolean check;
 
+    @Option(names = {"-b", "--become"}, description = "Run operations with become (does not imply password prompting).")
+    private boolean become;
+
+    @Option(names = "--become-method", description = "Privilege escalation method to use (default=%s)", defaultValue = "sudo")
+    private String becomeMethod;
+
+    @Option(names = "--become-user", description = "Run operations as this user (default=%s)", defaultValue = "root")
+    private String becomeUser;
+
+    @Option(names = "--become-flags", description = "Privilege escalation flags to use")
+    private String becomeFlags;
+
     @Override
     public Integer call() {
         int verbosity = verbose == null ? 0 : verbose.length;
@@ -116,6 +128,14 @@ public class PlaybookCli implements Callable<Integer> {
                 java.nio.file.Path baseDir = playbookFile.getAbsoluteFile().getParentFile().toPath();
                 Map<String, Object> cliVars = new HashMap<>();
                 cliVars.put("ansible_check_mode", check);
+                cliVars.put("ansible_become", become);
+                cliVars.put("ansible_become_method", becomeMethod);
+                cliVars.put("ansible_become_user", becomeUser);
+                if (becomeFlags != null) {
+                    cliVars.put("ansible_become_flags", becomeFlags);
+                }
+                cliVars.put("ansible_verbosity", verbosity);
+
                 VariableManager variableManager = new VariableManager(inventory, cliVars, parsedExtraVars, baseDir, null);
                 Map<String, List<TaskResult>> results = executor.execute(playbook, inventory, variableManager, check, tags, skipTags, limit);
 
