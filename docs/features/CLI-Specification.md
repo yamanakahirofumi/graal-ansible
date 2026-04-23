@@ -20,9 +20,9 @@ graal-ansible [options] playbook.yml
 | `--check` | `-C` | 変更を加えずに実行（ドライラン） | ◎ |
 | `--diff` | `-D` | ファイルの変更内容を表示 | △ |
 | `--verbose` | `-v` | 詳細ログを表示 (`-vvv` 等の複数指定をサポート) | ◎ |
-| `--become` | `-b` | 権限昇格を有効にする | △ |
-| `--become-method` | - | 権限昇格に使用するメソッドを指定 (sudo, su等) | △ |
-| `--become-user` | - | 昇格後のユーザーを指定 (デフォルト: root) | △ |
+| `--become` | `-b` | 権限昇格を有効にする | △ (計画中) |
+| `--become-method` | - | 権限昇格に使用するメソッドを指定 (sudo, su等) | △ (計画中) |
+| `--become-user` | - | 昇格後のユーザーを指定 (デフォルト: root) | △ (計画中) |
 | `--ask-become-pass` | `-K` | 権限昇格パスワードをプロンプトで問い合せる | △ |
 | `--version` | - | バージョン情報を表示 | ◎ |
 | `--collections-path` | - | コレクションの探索パスを指定 | △ |

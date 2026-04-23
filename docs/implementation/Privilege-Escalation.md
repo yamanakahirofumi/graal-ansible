@@ -21,8 +21,8 @@
 
 コマンドライン引数（CLI）で指定された権限昇格設定は、Playbook 内の定義を上書き、あるいはデフォルト値として機能します。
 
-### 3.1 CLI 変数の注入
-`PlaybookCli` は、受け取った引数を以下の「CLI 変数（優先度 Level 1）」として `VariableManager` に登録します。
+### 3.1 CLI 変数の注入 (計画中)
+現在、`PlaybookCli` における以下の権限昇格用オプションの実装は**計画中**です。将来的に、受け取った引数を以下の「CLI 変数（優先度 Level 1）」として `VariableManager` に登録する予定です。
 
 - `-b` / `--become` -> `ansible_become` (Boolean)
 - `--become-method` -> `ansible_become_method` (String)

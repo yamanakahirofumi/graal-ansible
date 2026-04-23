@@ -7,7 +7,7 @@
 > `graal-ansible` では、**本家 Ansible の Python 実装（Action Plugin）をそのまま利用する「Python-first」アーキテクチャ** を採用しています。
 > GraalPy 上で動作を阻害する依存関係については、`ansible_bridge.py` による **Dependency Emulation Strategy**（最小限のモック化）で対応し、プラグイン本体のロジックを改変せずに動作させることを最優先します。
 >
-> 以前存在した Java による Action Plugin エミュレータは、本家との完全な互換性を確保するために**すべて削除されました。**
+> 以前存在した Java による Action Plugin エミュレータは、本家との完全な互換性を確保するために**原則として削除されました。** ただし、`debug` など一部のプラグインについては、移行期や特定の実行環境におけるフォールバック用として、Java による簡易実装が限定的に残されている場合があります。
 
 ## 1. Action Plugin の概要
 
@@ -143,12 +143,12 @@ Windows 管理ノード対応などのため、Linux 固有のモジュール（
 | `include_vars` | Python (Actual) | 動的な変数ファイルの読み込み。 |
 | その他 | Python (Actual) | `ansible_bridge.py` 経由での実行。 |
 
-## 8. Java によるエミュレータの廃止
+## 8. Java によるエミュレータの段階的廃止
 
 > [!IMPORTANT]
-> **本プロジェクトでは、以前存在した Java ベースの Action Plugin エミュレータは完全に廃止されました。**
->
-> 以前は `debug`, `set_fact`, `copy` などの主要なアクションを Java で再実装していましたが、本家 Ansible との完全な互換性を確保し、保守コストを削減するために、現在はすべての標準アクションプラグインを Python (Actual) 方式で実行しています。
+> **本プロジェクトでは、以前存在した Java ベースの Action Plugin エミュレータは、Python-first 方針への移行に伴い原則として廃止されました。**
+
+以前は `set_fact`, `copy`, `template` などの主要なアクションを Java で再実装していましたが、現在はオリジナルの Python ソースコード実行に一本化されています。ただし、`debug` モジュールなどの一部の機能については、簡易的な出力を目的として Java 側でのフォールバック実装が併用されている箇所があります。
 
 ## 9. 関連ドキュメント
 - [GraalPy 互換性テクニカルリファレンス](Action-Plugins-Investigation.md)
