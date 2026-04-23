@@ -165,17 +165,17 @@ public class VariableResolver {
      * @return The resolved become context.
      */
     public BecomeContext resolveBecomeContext(Play play, Task task, Map<String, Object> variables) {
-        Object becomeObj = task.become() != null ? task.become() : play.become();
+        Object becomeObj = task.become() != null ? task.become() : (play.become() != null ? play.become() : variables.get("ansible_become"));
         boolean become = Truthiness.isTrue(resolveValue(becomeObj, variables));
 
-        String method = task.becomeMethod() != null ? task.becomeMethod() : play.becomeMethod();
-        Object resolvedMethod = resolveValue(method != null ? method : "sudo", variables);
+        Object methodObj = task.becomeMethod() != null ? task.becomeMethod() : (play.becomeMethod() != null ? play.becomeMethod() : variables.get("ansible_become_method"));
+        Object resolvedMethod = resolveValue(methodObj != null ? methodObj : "sudo", variables);
 
-        String user = task.becomeUser() != null ? task.becomeUser() : play.becomeUser();
-        Object resolvedUser = resolveValue(user != null ? user : "root", variables);
+        Object userObj = task.becomeUser() != null ? task.becomeUser() : (play.becomeUser() != null ? play.becomeUser() : variables.get("ansible_become_user"));
+        Object resolvedUser = resolveValue(userObj != null ? userObj : "root", variables);
 
-        String flags = task.becomeFlags() != null ? task.becomeFlags() : play.becomeFlags();
-        Object resolvedFlags = resolveValue(flags != null ? flags : "", variables);
+        Object flagsObj = task.becomeFlags() != null ? task.becomeFlags() : (play.becomeFlags() != null ? play.becomeFlags() : variables.get("ansible_become_flags"));
+        Object resolvedFlags = resolveValue(flagsObj != null ? flagsObj : "", variables);
 
         return new BecomeContext(
                 become,
