@@ -178,12 +178,86 @@ public class TaskExecutor implements ITaskExecutor {
         if (task.loop() != null) {
             return executeLoopTask(play, host, task, variableManager, allVars, inheritedCheckMode, inheritedEnvironment, blockVars, roleParams, includeParams, connection, connectionFactory);
         } else {
-            TaskResult result = executeSingleTask(play, host, task, allVars, variableManager, inheritedCheckMode, inheritedEnvironment, blockVars, roleParams, includeParams, connection, connectionFactory);
-            if (result != null && task.until() == null && !result.isSkipped()) {
-                result = evaluateResultCustomization(task, result, allVars);
+            return executeTaskWithRetry(play, host, task, allVars, variableManager, inheritedCheckMode, inheritedEnvironment, blockVars, roleParams, includeParams, connection, connectionFactory);
+        }
+    }
+
+    private TaskResult executeTaskWithRetry(Play play, Host host, Task task, Map<String, Object> variables, VariableManager variableManager, boolean inheritedCheckMode, Object inheritedEnvironment, Map<String, Object> blockVars, Map<String, Object> roleParams, Map<String, Object> includeParams, Connection connection, ConnectionFactory connectionFactory) {
+        if (task.until() == null) {
+            TaskResult result = executeSingleTask(play, host, task, variables, variableManager, inheritedCheckMode, inheritedEnvironment, blockVars, roleParams, includeParams, connection, connectionFactory);
+            if (result != null && !result.isSkipped()) {
+                result = evaluateResultCustomization(task, result, variables);
             }
             return result;
         }
+
+        // Retry logic
+        TaskResult lastResult = null;
+        int attempts = 0;
+        List<Map<String, Object>> results = new ArrayList<>();
+        Map<String, Object> currentVars = new HashMap<>(variables);
+
+        for (int i = 0; i < task.retries(); i++) {
+            attempts++;
+            lastResult = executeSingleTask(play, host, task, currentVars, variableManager, inheritedCheckMode, inheritedEnvironment, blockVars, roleParams, includeParams, connection, connectionFactory);
+            if (lastResult.isSkipped()) return lastResult;
+
+            // Apply failed_when / changed_when to each attempt
+            lastResult = evaluateResultCustomization(task, lastResult, currentVars);
+
+            Map<String, Object> resultData = new HashMap<>(lastResult.data());
+            resultData.put("attempts", attempts);
+            resultData.put("failed", !lastResult.success());
+            resultData.put("changed", lastResult.changed());
+            results.add(resultData);
+
+            if (task.register() != null && variableManager != null) {
+                // Update variable manager so it's available for other hosts (if needed) and current host
+                variableManager.registerVariable(host.name(), task.register(), resultData);
+                // Update local currentVars for next iteration's until check
+                currentVars.put(task.register(), resultData);
+            }
+
+            Map<String, Object> evalVars = new HashMap<>(currentVars);
+            evalVars.putAll(lastResult.data());
+            Object untilResult = variableResolver.resolveValue(variableResolver.wrapInJinja(task.until()), evalVars);
+
+            if (Truthiness.isTrue(untilResult)) {
+                break;
+            }
+
+            if (i < task.retries() - 1) {
+                try {
+                    Thread.sleep(task.delay() * 1000L);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }
+
+        boolean anyChanged = results.stream().anyMatch(r -> Boolean.TRUE.equals(r.get("changed")));
+
+        // Final evaluation of until condition
+        Map<String, Object> finalEvalVars = new HashMap<>(currentVars);
+        finalEvalVars.putAll(lastResult.data());
+        Object finalUntilResult = variableResolver.resolveValue(variableResolver.wrapInJinja(task.until()), finalEvalVars);
+
+        boolean metUntil = Truthiness.isTrue(finalUntilResult);
+        boolean success = lastResult.success() && metUntil;
+        String message = lastResult.message();
+
+        if (!metUntil) {
+            message = "Until condition not met after " + task.retries() + " retries";
+        }
+
+        Map<String, Object> finalData = new HashMap<>(lastResult.data());
+        finalData.put("attempts", attempts);
+        finalData.put("results", results);
+        finalData.put("failed", !success);
+        finalData.put("changed", anyChanged);
+
+        return new TaskResult(success, anyChanged, message, finalData);
     }
 
     private TaskResult executeSingleTask(Play play, Host host, Task task, Map<String, Object> variables, VariableManager variableManager, boolean inheritedCheckMode, Object inheritedEnvironment, Map<String, Object> blockVars, Map<String, Object> roleParams, Map<String, Object> includeParams, Connection connection, ConnectionFactory connectionFactory) {
@@ -256,83 +330,13 @@ public class TaskExecutor implements ITaskExecutor {
                 clearCurrentVariableManager();
             }
 
-            if (task.until() == null) {
-                TaskResult result = execute(resolvedTask, becomeContext, effectiveConnection, resolvedEnvironment);
-                if (resolvedDelegateTo != null) {
-                    Map<String, Object> dataWithDelegate = new HashMap<>(result.data());
-                    dataWithDelegate.put("_ansible_delegated_host", resolvedDelegateTo);
-                    result = new TaskResult(result.success(), result.changed(), result.message(), dataWithDelegate);
-                }
-                return result;
+            TaskResult result = execute(resolvedTask, becomeContext, effectiveConnection, resolvedEnvironment);
+            if (resolvedDelegateTo != null) {
+                Map<String, Object> dataWithDelegate = new HashMap<>(result.data());
+                dataWithDelegate.put("_ansible_delegated_host", resolvedDelegateTo);
+                result = new TaskResult(result.success(), result.changed(), result.message(), dataWithDelegate);
             }
-
-            // Retry logic
-            TaskResult lastResult = null;
-            int attempts = 0;
-            List<Map<String, Object>> results = new ArrayList<>();
-
-            for (int i = 0; i < task.retries(); i++) {
-                attempts++;
-                lastResult = execute(resolvedTask, becomeContext, effectiveConnection, resolvedEnvironment);
-                if (resolvedDelegateTo != null) {
-                    Map<String, Object> dataWithDelegate = new HashMap<>(lastResult.data());
-                    dataWithDelegate.put("_ansible_delegated_host", resolvedDelegateTo);
-                    lastResult = new TaskResult(lastResult.success(), lastResult.changed(), lastResult.message(), dataWithDelegate);
-                }
-
-                // Apply failed_when / changed_when to each attempt
-                lastResult = evaluateResultCustomization(task, lastResult, variables);
-
-                Map<String, Object> resultData = new HashMap<>(lastResult.data());
-                resultData.put("attempts", attempts);
-                resultData.put("failed", !lastResult.success());
-                resultData.put("changed", lastResult.changed());
-                results.add(resultData);
-
-                if (task.register() != null && variableManager != null) {
-                    variableManager.registerVariable(host.name(), task.register(), resultData);
-                    variables = variableManager.getAllVariables(play, host, task, blockVars, roleParams, includeParams);
-                }
-
-                Map<String, Object> evalVars = new HashMap<>(variables);
-                evalVars.putAll(lastResult.data());
-                Object untilResult = variableResolver.resolveValue(variableResolver.wrapInJinja(task.until()), evalVars);
-
-                if (Truthiness.isTrue(untilResult)) {
-                    break;
-                }
-
-                if (i < task.retries() - 1) {
-                    try {
-                        Thread.sleep(task.delay() * 1000L);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        break;
-                    }
-                }
-            }
-
-            Map<String, Object> finalData = new HashMap<>(lastResult.data());
-            finalData.put("attempts", attempts);
-            finalData.put("results", results);
-
-            boolean anyChanged = results.stream().anyMatch(r -> Boolean.TRUE.equals(r.get("changed")));
-            finalData.put("changed", anyChanged);
-
-            // If loop ended, check if until condition was actually met
-            Map<String, Object> finalEvalVars = new HashMap<>(variables);
-            finalEvalVars.putAll(lastResult.data());
-            Object finalUntilResult = variableResolver.resolveValue(variableResolver.wrapInJinja(task.until()), finalEvalVars);
-
-            boolean metUntil = Truthiness.isTrue(finalUntilResult);
-            boolean success = lastResult.success() && metUntil;
-            String message = lastResult.message();
-
-            if (!metUntil) {
-                message = "Until condition not met after " + task.retries() + " retries";
-            }
-
-            return new TaskResult(success, anyChanged, message, finalData);
+            return result;
         } finally {
             if (closeDelegatedConnection && effectiveConnection != null) {
                 try {

@@ -787,4 +787,31 @@ class ActualModuleIntegrationTest {
         assertNotNull(facts, "ansible_facts should be present");
         assertTrue(facts.containsKey("packages"), "packages should be present in ansible_facts");
     }
+
+    @Test
+    void testActualAptModule() {
+        // 1. Test update_cache in check_mode
+        Task taskCheck = new Task("test_apt_update_check", "apt", Map.of(
+                "update_cache", "yes"
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null); // check_mode: true
+
+        TaskResult resultCheck = taskExecutor.execute(taskCheck, new BecomeContext(true, "sudo", "root", ""), connection, null);
+        assertTrue(resultCheck.success(), "Apt update in check mode failed: " + resultCheck.message());
+
+        // 2. Test installing a small package (e.g., 'nano' or 'vim-tiny')
+        // We use 'sl' if available or just something small like 'ed'
+        Task taskInstall = new Task("test_apt_install", "apt", Map.of(
+                "name", "ed",
+                "state", "present"
+        ));
+
+        TaskResult resultInstall = taskExecutor.execute(taskInstall, new BecomeContext(true, "sudo", "root", ""), connection, null);
+        assertTrue(resultInstall.success(), "Apt install failed: " + resultInstall.message());
+
+        // Verify installation
+        var execResult = connection.execCommand("which ed", BecomeContext.empty(), null);
+        assertEquals(0, execResult.exitCode(), "Package 'ed' should be installed");
+    }
 }
