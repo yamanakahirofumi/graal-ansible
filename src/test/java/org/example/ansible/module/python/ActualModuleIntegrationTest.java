@@ -814,4 +814,117 @@ class ActualModuleIntegrationTest {
         var execResult = connection.execCommand("which ed", BecomeContext.empty(), null);
         assertEquals(0, execResult.exitCode(), "Package 'ed' should be installed");
     }
+
+    @Test
+    void testActualAptKeyModule() {
+        // Use Nginx signing key content to avoid network/cert issues
+        String keyData = "-----BEGIN PGP PUBLIC KEY BLOCK-----\n" +
+                "\n" +
+                "mQENBE5OMmIBCAD+FPYKGriGGf7NqwKfWC83cBV01gabgVWQmZbMcFzeW+hMsgxH\n" +
+                "W6iimD0RsfZ9oEbfJCPG0CRSZ7ppq5pKamYs2+EJ8Q2ysOFHHwpGrA2C8zyNAs4I\n" +
+                "QxnZZIbETgcSwFtDun0XiqPwPZgyuXVm9PAbLZRbfBzm8wR/3SWygqZBBLdQk5TE\n" +
+                "fDR+Eny/M1RVR4xClECONF9UBB2ejFdI1LD45APbP2hsN/piFByU1t7yK2gpFyRt\n" +
+                "97WzGHn9MV5/TL7AmRPM4pcr3JacmtCnxXeCZ8nLqedoSuHFuhwyDnlAbu8I16O5\n" +
+                "XRrfzhrHRJFM1JnIiGmzZi6zBvH0ItfyX6ttABEBAAG0KW5naW54IHNpZ25pbmcg\n" +
+                "a2V5IDxzaWduaW5nLWtleUBuZ2lueC5jb20+iQE+BBMBAgAoBQJOTjJiAhsDBQkJ\n" +
+                "ZgGABgsJCAcDAgYVCAIJCgsEFgIDAQIeAQIXgAAKCRCr9b2Ce9m/YpvjB/98uV4t\n" +
+                "94d0oEh5XlqEZzVMrcTgPQ3BZt05N5xVuYaglv7OQtdlErMXmRWaFZEqDaMHdniC\n" +
+                "sF63jWMd29vC4xpzIfmsLK3ce9oYo4t9o4WWqBUdf0Ff1LMz1dfLG2HDtKPfYg3C\n" +
+                "8NESud09zuP5NohaE8Qzj/4p6rWDiRpuZ++4fnL3Dt3N6jXILwr/TM/Ma7jvaXGP\n" +
+                "DO3kzm4dNKp5b5bn2nT2QWLPnEKxvOg5Zoej8l9+KFsUnXoWoYCkMQ2QTpZQFNwF\n" +
+                "xwJGoAz8K3PwVPUrIL6b1lsiNovDgcgP0eDgzvwLynWKBPkRRjtgmWLoeaS9FAZV\n" +
+                "ccXJMmANXJFuCf26iQFVBBMBCAA/AhsDBgsJCAcDAgYVCAIJCgsEFgIDAQIeAQIX\n" +
+                "gBYhBFc7/Ws9j7xkEHmmq6v1vYJ72b9iBQJmULK1BQkdphrTAAoJEKv1vYJ72b9i\n" +
+                "2+AH/RSX5voZXtSAl0fxVc9GDrGesOsykkSELnailOkWiFEHZS842U1EQst9Omki\n" +
+                "OC14xk9fY36gK8bxXnLwww4hnnh/fpj7vJkJpVCi2uO3RKizyN6rp+7xbZ2lCKfp\n" +
+                "5tsDg5U4iaaziTNtb4ISq79gLmLY/gqBwGksRozmChsl2QOVgg0KDTI5TP+41IwW\n" +
+                "AFuO+XzHZ7OEegxwHta65KeVNipYjCarTRcRhGxA0rpLdBynkZ/OaI5+J6UZVfna\n" +
+                "2eyDgHPlMo+v12+g/wOFOwShVWo4PwIsZw1jzBCLhspgezn7IolQFMHtVxCJAkgw\n" +
+                "XhLgogChbe885HzTB6GlMowXclGJATMEEAEIAB0WIQRzOJcwae0/RD9NN9+mT9Wx\n" +
+                "ets5qAUCZlcuRQAKCRCmT9Wxets5qD1GB/4/NIcvCRj3LvFbrtmtbExBoBP6Hv/8\n" +
+                "U4wUpuJbAAxImJ9uNKKaH+cmvoshkWTSUBXTvNjAQW3SM9oW+V3G7wicUtH+7cnd\n" +
+                "xExuqf5e6f6IGqKCgrV25g0WWvJZG6ynMDDkgnyu3fTE7GkVKwoWQ6qV6Akar8oV\n" +
+                "29P+xe2U7AWPvw+O+SBghl32x8DA/nUjIyLbvBQuXb6BjHOxrTw3WOJDfwHwOyMd\n" +
+                "P7NHe7RE70cSj/TNabuNw9c31H0+PAj+UWfvgs5diPVJ9Fd/PK4pWQoh/4poMEbc\n" +
+                "/1Ol0G7SItUKO6v4aHn89g00xnqUxrfwbCWCEF9EjnfFtlsDbGSWIdz8iQE+BBMB\n" +
+                "AgAoAhsDBgsJCAcDAgYVCAIJCgsEFgIDAQIeAQIXgAUCV2K1+AUJGB4fQQAKCRCr\n" +
+                "9b2Ce9m/YloaB/9XGrolkocm7l/tsVjaBQCteXKuwsm4XhCuAQ6YAwA1L1UheGOG\n" +
+                "/aa2xJvrXE8X32tgcTjrKoYoXWcdxaFjlXGTt6jV85qRguUzvMOxxSEM2Dn115et\n" +
+                "N9piPl0Zz+4rkx8+2vJGF+eMlruPXg/zd88NvyLq5gGHEsFRBMVufYmHtNfcp4ok\n" +
+                "C1klWiRIRSdp4QY1wdrN1O+/oCTl8Bzy6hcHjLIq3aoumcLxMjtBoclc/5OTioLD\n" +
+                "wSDfVx7rWyfRhcBzVbwDoe/PD08AoAA6fxXvWjSxy+dGhEaXoTHjkCbz/l6NxrK3\n" +
+                "JFyauDgU4K4MytsZ1HDiMgMW8hZXxszoICTTiQEcBBABAgAGBQJOTkelAAoJEKZP\n" +
+                "1bF62zmo79oH/1XDb29SYtWp+MTJTPFEwlWRiyRuDXy3wBd/BpwBRIWfWzMs1gnC\n" +
+                "jNjk0EVBVGa2grvy9JtxJKMd6l/PWXVucSt+U/+GO8rBkw14SdhqxaS2l14v6gyM\n" +
+                "eUrSbY3XfToGfwHC4sa/Thn8X4jFaQ2XN5dAIzJGU1s5JA0tjEzUwCnmrKmyMlXZ\n" +
+                "aoQVrmORGjCuH0I0aAFkRS0UtnB9HPpxhGVbs24xXZQnZDNbUQeulFxS4uP3OLDB\n" +
+                "AeCHl+v4t/uotIad8v6JSO93vc1evIje6lguE81HHmJn9noxPItvOvSMb2yPsE8m\n" +
+                "H4cJHRTFNSEhPW6ghmlfWa9ZwiVX5igxcvaIRgQQEQIABgUCTk5b0gAKCRDs8OkL\n" +
+                "LBcgg1G+AKCnacLb/+W6cflirUIExgZdUJqoogCeNPVwXiHEIVqithAM1pdY/gca\n" +
+                "QZmIRgQQEQIABgUCTk5fYQAKCRCpN2E5pSTFPnNWAJ9gUozyiS+9jf2rJvqmJSeW\n" +
+                "uCgVRwCcCUFhXRCpQO2YVa3l3WuB+rgKjsSJAjMEEAEIAB0WIQTWeGzjA9mpAimY\n" +
+                "3GzIRk1UmvdcCgUCZldKdQAKCRDIRk1UmvdcCj1hEACv1XfhwpsBPVNzcfzMIpfY\n" +
+                "xAQF28m/VFLwD8FYKoVgb4rF2wLBtt9kaoPZxphEvV/FWHhpa3Tyr3L320r6sVk2\n" +
+                "5Ou6G/AH6kNF6vYn98chEmbCc7DE2B03G1HFFuRSOmp0ZwafJ6MYUhjpDrf6fFDL\n" +
+                "fmdkr/hjLwCYvFQsHXYiIWDFBPZ6RvVC6ozbdFr4eWj+CIPZM4jcGTgSI/u67tC6\n" +
+                "8tOdX4a8/ujdkLDjyf2xgbWT8ZxY3o0fvfLFEQVpNMUsYtiW/kTPBsq48Gq2BWow\n" +
+                "/2Ld86KjgBOyElnVy9kMLCB4d/DPnSdBkjHzWWDx2c/PDGWIGnES6O7NYvRQ9Sr0\n" +
+                "bQwtr70nvai2OkpYVszVwOqyr4vDeTIt0GFKOMRDRrscVGmlGr2mpExiCEgGyAjR\n" +
+                "Z/aZDCzEnsswfJ+6IARYzE5nB3+pbJnzQNvj9r/YL8T9HkWID4sWJnnNmaFoWEMF\n" +
+                "m+yvI8vyVMGPSqfVtN9pEpx/pzV/Q525nFYuUlEsqGgaDydnwe6AV9gZsRyA+YjE\n" +
+                "H3gI1gxGwRyupldmstzoYzTktb4o1KL/vGj/onUIk8mFKx8p1X9VPWW0+8LqnAYf\n" +
+                "Ui3jDoXE/9avsF6ipS7y1k8ga81z01NOvuhai3c9pvMAIYrNTvoQVz8vTIOtJac1\n" +
+                "PEoU6jdm8blCt2UjGp8A4okBswQQAQgAHRYhBBPIKmO2A1dhVuMKTqDqmBtmsNln\n" +
+                "BQJmV1HrAAoJEKDqmBtmsNlntoEMANBPdskGMrU4ZxHMlOTd1JX74ucp5jez0Y2o\n" +
+                "bwlxOiWroraYVBnWT9v150kNf1Tb5mDxi820qebiSPZxhlI1Kj7NrPFNxQkhhNzN\n" +
+                "7Xr/M9OGpkwxosEpcMAiWfofyAdrnwos+MA/edu/EoyVRs6zpo75nP9GKUZwVcjH\n" +
+                "KtvPMojkZYpxjxsio0aK8LW8VwDtsbwPIXDIHzE7sxUvThrMdXumrh7gKqaC6gep\n" +
+                "HZB2lL5ES0kVE3/yjZR1khmcmF1zELeC0IddJjX2R9HMcSLixdJ2V8/VFsWMb2KQ\n" +
+                "pGtDzCuRyyxbugzBIxiGV2Xb7XwOByaikc1duqFv3gtk7Vk8wgQN3YwLkZ6pztlK\n" +
+                "vCbqy2b2wlPviGjApQ2GVd6EEmlCk2gKPkjrn2lxS2BXWorM+ANSswJT+eILi9yW\n" +
+                "Q5zzmYK2vFTzL7FAMeqS/671jNhZQ8O7jvbY/mRhl66k2MY7/JgI+coP0cY+HHr2\n" +
+                "ozw9yNdOZmnk2Prj7+mBuchbT3BJOQ==\n" +
+                "=AgHy\n" +
+                "-----END PGP PUBLIC KEY BLOCK-----";
+        String fingerprint = "573BFD6B3D8FBC641079A6ABABF5BD827BD9BF62";
+
+        // 1. Ensure key is absent to guarantee 'changed=true' later
+        // We use both fingerprint and short ID for thoroughness
+        Task taskAbsent = new Task("test_apt_key_absent", "apt_key", Map.of(
+                "id", fingerprint,
+                "state", "absent"
+        ));
+        taskExecutor.execute(taskAbsent, new BecomeContext(true, "sudo", "root", ""), connection, null);
+
+        // 2. Add the key via data
+        Task taskPresent = new Task("test_apt_key_present", "apt_key", Map.of(
+                "data", keyData,
+                "state", "present"
+        ));
+
+        TaskResult result = taskExecutor.execute(taskPresent, new BecomeContext(true, "sudo", "root", ""), connection, null);
+        assertTrue(result.success(), "Apt key add failed: " + result.message());
+        assertTrue(result.changed(), "Apt key should have been added (changed=true). Result data: " + result.data());
+    }
+
+    @Test
+    void testActualAptRepositoryModule() {
+        // Add a simple deb repository
+        String repoLine = "deb http://deb.debian.org/debian bookworm-proposed-updates main";
+        Task task = new Task("test_apt_repository", "apt_repository", Map.of(
+                "repo", repoLine,
+                "state", "present",
+                "filename", "test-repo"
+        ));
+
+        TaskResult result = taskExecutor.execute(task, new BecomeContext(true, "sudo", "root", ""), connection, null);
+        assertTrue(result.success(), "Apt repository add failed: " + result.message());
+
+        // Verify the repository was added
+        var execResult = connection.execCommand("ls /etc/apt/sources.list.d/test-repo.list", BecomeContext.empty(), null);
+        assertEquals(0, execResult.exitCode(), "Repository file should exist: " + execResult.stderr());
+
+        var catResult = connection.execCommand("cat /etc/apt/sources.list.d/test-repo.list", BecomeContext.empty(), null);
+        assertTrue(catResult.stdout().contains("bookworm-proposed-updates"), "Repository file should contain the repo line");
+    }
 }
