@@ -8,6 +8,7 @@ RUN apt-get update \
     sudo \
     gnupg \
     software-properties-common \
+    ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 
 RUN useradd -m -s /bin/bash testuser \
