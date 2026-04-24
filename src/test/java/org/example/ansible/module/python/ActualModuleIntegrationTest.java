@@ -819,14 +819,24 @@ class ActualModuleIntegrationTest {
     void testActualAptKeyModule() {
         // Use a known public key URL
         String keyUrl = "https://ftp-master.debian.org/keys/archive-key-11.asc";
-        Task task = new Task("test_apt_key", "apt_key", Map.of(
+        String keyId = "73647362"; // Short ID for Debian Archive Key 11
+
+        // 1. Ensure key is absent
+        Task taskAbsent = new Task("test_apt_key_absent", "apt_key", Map.of(
+                "id", keyId,
+                "state", "absent"
+        ));
+        taskExecutor.execute(taskAbsent, new BecomeContext(true, "sudo", "root", ""), connection, null);
+
+        // 2. Add the key
+        Task taskPresent = new Task("test_apt_key_present", "apt_key", Map.of(
                 "url", keyUrl,
                 "state", "present"
         ));
 
-        TaskResult result = taskExecutor.execute(task, new BecomeContext(true, "sudo", "root", ""), connection, null);
+        TaskResult result = taskExecutor.execute(taskPresent, new BecomeContext(true, "sudo", "root", ""), connection, null);
         assertTrue(result.success(), "Apt key add failed: " + result.message());
-        assertTrue(result.changed(), "Apt key should have been added (changed=true)");
+        assertTrue(result.changed(), "Apt key should have been added (changed=true). Message: " + result.message());
     }
 
     @Test
