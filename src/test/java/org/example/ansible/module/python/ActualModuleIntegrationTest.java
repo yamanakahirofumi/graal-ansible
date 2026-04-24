@@ -927,4 +927,42 @@ class ActualModuleIntegrationTest {
         var catResult = connection.execCommand("cat /etc/apt/sources.list.d/test-repo.list", BecomeContext.empty(), null);
         assertTrue(catResult.stdout().contains("bookworm-proposed-updates"), "Repository file should contain the repo line");
     }
+
+    @Test
+    void testActualServiceFactsModule() {
+        Task task = new Task("test_service_facts", "service_facts", Map.of());
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
+        assertNotNull(facts, "ansible_facts should be present");
+        assertTrue(facts.containsKey("services"), "services should be present in ansible_facts");
+    }
+
+    @Test
+    void testActualSystemdModule() {
+        // Use check_mode: true to avoid actually changing service state in the test container
+        Task task = new Task("test_systemd", "systemd", Map.of(
+                "name", "ssh",
+                "state", "started"
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null); // check_mode: true
+
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+        assertTrue(result.success(), "Systemd module failed: " + result.message());
+    }
+
+    @Test
+    void testActualSystemdServiceModule() {
+        Task task = new Task("test_systemd_service", "systemd_service", Map.of(
+                "name", "ssh",
+                "state", "started"
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null); // check_mode: true
+
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+        assertTrue(result.success(), "Systemd_service module failed: " + result.message());
+    }
 }
