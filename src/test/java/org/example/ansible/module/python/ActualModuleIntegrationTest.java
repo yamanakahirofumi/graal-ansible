@@ -987,7 +987,8 @@ class ActualModuleIntegrationTest {
         assertTrue(result.success(), "Execution failed: " + result.message());
         Map<String, Object> ansibleStats = (Map<String, Object>) result.data().get("ansible_stats");
         assertNotNull(ansibleStats);
-        assertEquals(42, ((Map<String, Object>)ansibleStats.get("data")).get("my_stat"));
+        Map<String, Object> data = (Map<String, Object>) ansibleStats.get("data");
+        assertEquals(42, ((Number) data.get("my_stat")).intValue());
     }
 
     @Test
@@ -1024,11 +1025,20 @@ class ActualModuleIntegrationTest {
         String path = "/tmp/wait_for_test.txt";
         connection.execCommand("rm -f " + path, BecomeContext.empty(), null);
 
+        // Use a separate connection for the background task to avoid thread safety issues with SshConnection
         new Thread(() -> {
-            try {
+            try (SshConnection bgConn = new SshConnection(
+                    targetNode.getHost(),
+                    targetNode.getMappedPort(22),
+                    "testuser",
+                    "testuser"
+            )) {
+                bgConn.connect();
                 Thread.sleep(2000);
-                connection.execCommand("touch " + path, BecomeContext.empty(), null);
-            } catch (InterruptedException e) {}
+                bgConn.execCommand("touch " + path, BecomeContext.empty(), null);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }).start();
 
         Task task = new Task("test_wait_for", "wait_for", Map.of(
@@ -1055,6 +1065,7 @@ class ActualModuleIntegrationTest {
 
     @Test
     void testActualSysvinitModule() {
+        // Use become: true as service management usually requires root
         Task task = new Task("test_sysvinit", "sysvinit", Map.of(
                 "name", "ssh",
                 "state", "started"
@@ -1062,7 +1073,7 @@ class ActualModuleIntegrationTest {
                 null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
                 null, null, null, null, true, null); // check_mode: true
 
-        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+        TaskResult result = taskExecutor.execute(task, new BecomeContext(true, "sudo", "root", ""), connection, null);
         assertTrue(result.success(), "Execution failed: " + result.message());
     }
 }
