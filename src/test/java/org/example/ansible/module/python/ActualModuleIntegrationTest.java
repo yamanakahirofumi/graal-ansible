@@ -965,4 +965,116 @@ class ActualModuleIntegrationTest {
         TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
         assertTrue(result.success(), "Systemd_service module failed: " + result.message());
     }
+
+    @Test
+    void testActualRawModule() {
+        Task task = new Task("test_raw", "raw", Map.of("_raw_params", "echo hello_raw"));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        String stdout = (String) result.data().get("stdout");
+        assertNotNull(stdout);
+        assertTrue(stdout.contains("hello_raw"));
+    }
+
+    @Test
+    void testActualSetStatsModule() {
+        Task task = new Task("test_set_stats", "set_stats", Map.of(
+                "data", Map.of("my_stat", 42)
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        Map<String, Object> ansibleStats = (Map<String, Object>) result.data().get("ansible_stats");
+        assertNotNull(ansibleStats);
+        Map<String, Object> data = (Map<String, Object>) ansibleStats.get("data");
+        assertEquals(42, ((Number) data.get("my_stat")).intValue());
+    }
+
+    @Test
+    void testActualValidateArgumentSpecModule() {
+        Map<String, Object> argumentSpec = Map.of(
+                "param1", Map.of("type", "str", "required", true)
+        );
+        Map<String, Object> providedArguments = Map.of(
+                "param1", "value1"
+        );
+
+        Task task = new Task("test_validate_spec", "validate_argument_spec", Map.of(
+                "argument_spec", argumentSpec,
+                "provided_arguments", providedArguments
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+    }
+
+    @Test
+    void testActualPipModule() {
+        Task task = new Task("test_pip", "pip", Map.of(
+                "name", "six",
+                "state", "present",
+                "extra_args", "--break-system-packages"
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+    }
+
+    @Test
+    void testActualWaitForModule() {
+        String path = "/tmp/wait_for_test.txt";
+        connection.execCommand("rm -f " + path, BecomeContext.empty(), null);
+
+        // Use a separate connection for the background task to avoid thread safety issues with SshConnection
+        new Thread(() -> {
+            try (SshConnection bgConn = new SshConnection(
+                    targetNode.getHost(),
+                    targetNode.getMappedPort(22),
+                    "testuser",
+                    "testuser"
+            )) {
+                bgConn.connect();
+                Thread.sleep(2000);
+                bgConn.execCommand("touch " + path, BecomeContext.empty(), null);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }).start();
+
+        Task task = new Task("test_wait_for", "wait_for", Map.of(
+                "path", path,
+                "timeout", 10
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+    }
+
+    @Test
+    void testActualDebconfModule() {
+        Task task = new Task("test_debconf", "debconf", Map.of(
+                "name", "tzdata",
+                "question", "tzdata/Areas",
+                "vtype", "select",
+                "value", "Etc"
+        ));
+        TaskResult result = taskExecutor.execute(task, new BecomeContext(true, "sudo", "root", ""), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+    }
+
+    @Test
+    void testActualSysvinitModule() {
+        // Use become: true as service management usually requires root
+        Task task = new Task("test_sysvinit", "sysvinit", Map.of(
+                "name", "ssh",
+                "state", "started"
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null); // check_mode: true
+
+        TaskResult result = taskExecutor.execute(task, new BecomeContext(true, "sudo", "root", ""), connection, null);
+        assertTrue(result.success(), "Execution failed: " + result.message());
+    }
 }
