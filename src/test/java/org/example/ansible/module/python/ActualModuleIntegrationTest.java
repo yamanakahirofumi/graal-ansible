@@ -1013,7 +1013,8 @@ class ActualModuleIntegrationTest {
     void testActualPipModule() {
         Task task = new Task("test_pip", "pip", Map.of(
                 "name", "six",
-                "state", "present"
+                "state", "present",
+                "extra_args", "--break-system-packages"
         ));
         TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
 
