@@ -814,4 +814,39 @@ class ActualModuleIntegrationTest {
         var execResult = connection.execCommand("which ed", BecomeContext.empty(), null);
         assertEquals(0, execResult.exitCode(), "Package 'ed' should be installed");
     }
+
+    @Test
+    void testActualAptKeyModule() {
+        // Use a known public key URL
+        String keyUrl = "https://ftp-master.debian.org/keys/archive-key-11.asc";
+        Task task = new Task("test_apt_key", "apt_key", Map.of(
+                "url", keyUrl,
+                "state", "present"
+        ));
+
+        TaskResult result = taskExecutor.execute(task, new BecomeContext(true, "sudo", "root", ""), connection, null);
+        assertTrue(result.success(), "Apt key add failed: " + result.message());
+        assertTrue(result.changed(), "Apt key should have been added (changed=true)");
+    }
+
+    @Test
+    void testActualAptRepositoryModule() {
+        // Add a simple deb repository
+        String repoLine = "deb http://deb.debian.org/debian bookworm-proposed-updates main";
+        Task task = new Task("test_apt_repository", "apt_repository", Map.of(
+                "repo", repoLine,
+                "state", "present",
+                "filename", "test-repo"
+        ));
+
+        TaskResult result = taskExecutor.execute(task, new BecomeContext(true, "sudo", "root", ""), connection, null);
+        assertTrue(result.success(), "Apt repository add failed: " + result.message());
+
+        // Verify the repository was added
+        var execResult = connection.execCommand("ls /etc/apt/sources.list.d/test-repo.list", BecomeContext.empty(), null);
+        assertEquals(0, execResult.exitCode(), "Repository file should exist: " + execResult.stderr());
+
+        var catResult = connection.execCommand("cat /etc/apt/sources.list.d/test-repo.list", BecomeContext.empty(), null);
+        assertTrue(catResult.stdout().contains("bookworm-proposed-updates"), "Repository file should contain the repo line");
+    }
 }

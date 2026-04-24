@@ -6,6 +6,8 @@ RUN apt-get update \
     python3-apt \
     openssh-server \
     sudo \
+    gnupg \
+    software-properties-common \
  && rm -rf /var/lib/apt/lists/*
 
 RUN useradd -m -s /bin/bash testuser \
