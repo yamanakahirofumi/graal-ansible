@@ -6,6 +6,9 @@ import org.example.ansible.engine.Role;
 import org.example.ansible.engine.Task;
 import org.yaml.snakeyaml.Yaml;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -33,25 +36,92 @@ public class YamlParser {
     }
 
     /**
+     * Parses a Playbook from a File.
+     *
+     * @param file The playbook file.
+     * @return The parsed Playbook.
+     */
+    public Playbook parse(File file) {
+        try (InputStream is = new FileInputStream(file)) {
+            return parse(is, file.getAbsoluteFile().getParentFile());
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to load playbook: " + file, e);
+        }
+    }
+
+    /**
      * Parses a Playbook from an InputStream.
      *
      * @param inputStream The input stream of the YAML file.
      * @return The parsed Playbook.
      */
-    @SuppressWarnings("unchecked")
     public Playbook parse(InputStream inputStream) {
+        return parse(inputStream, null);
+    }
+
+    /**
+     * Parses a Playbook from an InputStream with a base directory for imports.
+     *
+     * @param inputStream The input stream of the YAML file.
+     * @param currentDir  The current directory for resolving relative imports.
+     * @return The parsed Playbook.
+     */
+    @SuppressWarnings("unchecked")
+    public Playbook parse(InputStream inputStream, File currentDir) {
         Object raw = yaml.load(inputStream);
         List<Play> plays = new ArrayList<>();
 
         if (raw instanceof List<?> list) {
             for (Object item : list) {
                 if (item instanceof Map<?, ?> map) {
-                    plays.add(parsePlay((Map<String, Object>) map));
+                    Map<String, Object> mapItem = (Map<String, Object>) map;
+                    if (mapItem.containsKey("import_playbook")) {
+                        plays.addAll(handleImportPlaybook(mapItem, currentDir));
+                    } else {
+                        plays.add(parsePlay(mapItem));
+                    }
                 }
             }
         }
 
         return new Playbook(plays);
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Play> handleImportPlaybook(Map<String, Object> map, File currentDir) {
+        String importedFile = (String) map.get("import_playbook");
+        Map<String, Object> importVars = (Map<String, Object>) map.getOrDefault("vars", Map.of());
+        // Note: Ansible also supports 'tags' and 'when' for import_playbook, but we'll start with 'vars'.
+
+        File file = new File(importedFile);
+        if (!file.isAbsolute() && currentDir != null) {
+            file = new File(currentDir, importedFile);
+        }
+
+        Playbook importedPlaybook = parse(file);
+        List<Play> plays = new ArrayList<>();
+        for (Play play : importedPlaybook.plays()) {
+            Map<String, Object> mergedVars = new HashMap<>(play.vars());
+            mergedVars.putAll(importVars);
+
+            plays.add(new Play(
+                    play.name(),
+                    play.hosts(),
+                    play.tasks(),
+                    mergedVars,
+                    play.varsFiles(),
+                    play.roles(),
+                    play.handlers(),
+                    play.become(),
+                    play.becomeMethod(),
+                    play.becomeUser(),
+                    play.becomeFlags(),
+                    play.checkMode(),
+                    play.environment(),
+                    play.tags()
+            ));
+        }
+        return plays;
     }
 
     /**
