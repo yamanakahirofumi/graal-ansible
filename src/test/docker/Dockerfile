@@ -10,6 +10,9 @@ RUN apt-get update \
     gnupg \
     software-properties-common \
     ca-certificates \
+    git \
+    cron \
+    iptables \
  && rm -rf /var/lib/apt/lists/*
 
 RUN useradd -m -s /bin/bash testuser \
