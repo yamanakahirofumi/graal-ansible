@@ -613,15 +613,19 @@ def apply_mocks() -> None:
     def mock_find(*args: Any, **kwargs: Any) -> Any: return None
     def mock_find_context(*args: Any, **kwargs: Any) -> Any:
         return type('Ctx', (), {'resolved_path': None, 'plugin_resolved_name': None, 'redirect_list': None, 'resolved_fqcn': None, 'plugin_resolved_collection': None})()
-    def mock_has_plugin(name, *args, **kwargs):
-        if not name: return False
+    def mock_has_plugin(*args, **kwargs):
+        # args[0] is self if called as method, otherwise it's name.
+        name = args[1] if len(args) > 1 else args[0]
+        if not name or not isinstance(name, str): return False
         if name.startswith('ansible.builtin.'): name = name[16:]
         elif name.startswith('ansible.legacy.'): name = name[15:]
         for p in sys.path:
             if os.path.exists(os.path.join(p, 'ansible/modules', name + '.py')): return True
         return name in ['apt', 'service', 'systemd', 'sysvinit', 'command', 'shell', 'setup']
 
-    def mock_find_plugin_with_context(name, *args, **kwargs):
+    def mock_find_plugin_with_context(*args, **kwargs):
+        name = args[1] if len(args) > 1 else args[0]
+        if not name or not isinstance(name, str): name = str(name)
         fqcn = name
         if name in ['apt', 'service', 'systemd', 'sysvinit', 'command', 'shell', 'setup'] and not name.startswith('ansible.'):
             fqcn = 'ansible.legacy.' + name
