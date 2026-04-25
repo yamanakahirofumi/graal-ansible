@@ -1083,7 +1083,8 @@ class ActualModuleIntegrationTest {
         // Generic 'package' module should use 'apt' on Debian
         Task task = new Task("test_package", "package", Map.of(
                 "name", "ed",
-                "state", "present"
+                "state", "present",
+                "update_cache", "yes"
         ), Map.of(), null, null, null, List.of(), null, null, false,
                 null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
                 true, "sudo", "root", null, false, null); // become: true
@@ -1093,10 +1094,11 @@ class ActualModuleIntegrationTest {
 
     @Test
     void testActualServiceModule() {
-        // Generic 'service' module
+        // Generic 'service' module. Explicitly use 'service' to avoid detection issues in Docker.
         Task task = new Task("test_service", "service", Map.of(
                 "name", "ssh",
-                "state", "started"
+                "state", "started",
+                "use", "service"
         ), Map.of(), null, null, null, List.of(), null, null, false,
                 null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
                 true, "sudo", "root", null, true, null); // become: true, check_mode: true
