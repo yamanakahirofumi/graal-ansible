@@ -113,3 +113,21 @@ void testIdempotency() {
 
 - **Docker の必要性**: 統合テストの実行には Docker 環境が必要です。
 - **プラットフォーム制限**: 一部のモジュール（`user`, `group` 等）はターゲットが Linux であることを前提としているため、テスト実行環境の OS 制約に注意してください。
+
+## 7. テスト実装時の Tips
+
+実際のモジュールの統合テストを Java (JUnit) で実装する際の技術的な Tips です。
+
+### 7.1 pip モジュールと PEP 668 (Debian Bookworm)
+Debian Bookworm 以降のイメージ（`debian:bookworm-slim` 等）をターゲットにする場合、システムの Python 環境保護（PEP 668）により通常の `pip install` が制限されます。
+テストでシステム環境にパッケージをインストールする場合は、`extra_args: "--break-system-packages"` を指定する必要があります。
+
+### 7.2 service モジュールの init システム自動判定
+コンテナ環境などの特殊な環境では、`service` モジュールによる init システムの自動判定が不安定になる場合があります。テストの安定性を高めるため、必要に応じて `use: "service"` (sysvinit互換) を明示的に指定することを推奨します。
+
+### 7.3 数値データの型変換
+GraalPy から返される実行結果（`TaskResult`）に含まれる数値データは、Java 側では `Number` 型（実際には `Long` や `Double`）として扱われます。
+アサーションを行う際は、`((Number) result.get("stats")).intValue()` のように適切に型変換を行ってください。
+
+### 7.4 特権実行 (become) の明示
+統合テストにおいて root 権限が必要な操作を行う場合は、`Task` オブジェクトの構築時、あるいは Playbook 内で明示的に `become: true` を設定してください。

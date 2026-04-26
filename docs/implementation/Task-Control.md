@@ -176,10 +176,20 @@
     - `changed=true` の場合、`notify` に基づきハンドラーをマークします。
 11. **エラーハンドリング (TQM)**: 失敗時に `ignore_errors` が `false` ならば、そのホストを失敗としてマークし、必要に応じて `rescue` ブロックを実行します。
 
-## 12. タスクの包含 (`include_tasks`, `import_tasks`)
+## 12. プレイブックとタスクの包含 (`import_playbook`, `include_tasks`, `import_tasks`)
 
-外部ファイルで定義されたタスクを現在の Playbook に取り込みます。
+外部ファイルで定義されたプレイブックやタスクを現在の実行フローに取り込みます。
 
+### 12.1 import_playbook
+- **ステータス**: 実装済み (◎)
+- **実装方針**:
+    - `YamlParser` において、Playbook のトップレベルでの `import_playbook` をサポートします。
+    - 指定されたパス（相対パス解決を含む）の Playbook を再帰的に解析し、現在の Playbook の実行リストに挿入します。
+    - `vars` キーによって渡された変数は、インポートされた Playbook 内のすべてのプレイにマージされます。
+- **留意点**:
+    - トップレベル以外（タスク内など）での `import_playbook` はサポート対象外です。
+
+### 12.2 タスクの包含 (include_tasks, import_tasks)
 - **ステータス**:
     - `include_tasks`, `import_tasks`: 実装済み (◎)
     - `include_role`, `import_role`: 実装済み (○)
@@ -191,7 +201,18 @@
 - **パラメータの伝播**:
     - `include_tasks` 時に渡された引数（Level 21 変数）は、取り込まれた子タスクに明示的に継承され、変数優先順位に従って解決されます。
 
-## 13. タグ (`tags`) と 実行制限 (`limit`)
+## 13. 特殊なモジュールの処理 (`pause`, `meta`)
+
+特定の実行制御を行うモジュールの実装について。
+
+- **pause**:
+    - **ステータス**: 実装済み (◎)
+    - **実装内容**: 実行を一時停止し、ユーザーの入力を待機、または指定時間スリープします。GraalPy 上での `display.prompt_until` のモック化により実現しています。
+- **meta**:
+    - **ステータス**: 実装済み (◎)
+    - **実装内容**: `flush_handlers` 等の特殊なアクションを実行エンジンレベルで直接処理します。`TaskExecutor` においてメタタスクを検知し、`TaskQueueManager` 側でハンドラーの即時実行などを行います。
+
+## 14. タグ (`tags`) と 実行制限 (`limit`)
 
 Playbook の実行対象を動的に制御する仕組みの実装について。
 
@@ -215,7 +236,7 @@ Playbook の実行対象を動的に制御する仕組みの実装について�
     - 単一のホスト名またはグループ名。
     - カンマ区切りのリスト (`host1,host2,group1`)。
 
-## 14. 真偽判定 (Truthiness)
+## 15. 真偽判定 (Truthiness)
 
 Jinja2 テンプレートや `when` 句、`failed_when` 等の評価において、Ansible 互換の真偽判定（Truthiness）を採用しています。
 
