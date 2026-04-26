@@ -1207,13 +1207,4 @@ class ActualModuleIntegrationTest {
         assertTrue(result.success(), "Pause module failed: " + result.message());
         assertTrue((end - start) >= 1000, "Pause should have waited at least 1 second");
     }
-
-    @Test
-    void testActualMetaNoopModule() {
-        Task task = new Task("test_meta_noop", "meta", Map.of("_raw_params", "noop"));
-        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
-
-        assertTrue(result.success(), "Meta noop failed: " + result.message());
-        assertEquals("noop", result.data().get("meta"));
-    }
 }

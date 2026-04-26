@@ -16,7 +16,7 @@
 
 | コレクション / モジュール | Target: Linux | Target: macOS | Target: Windows | 備考 |
 | :--- | :---: | :---: | :---: | :--- |
-| **ansible.builtin** | △ | ？ | ？ | Linux で全 72 モジュールを一覧化。うち 54 モジュールの統合テスト済。 |
+| **ansible.builtin** | △ | ？ | ？ | Linux で全 72 モジュールを一覧化。うち 57 モジュールの動作確認済。 |
 | - `debug` | ◎ | ○ | ○ | オリジナル Python ソースコードにより検証済。 |
 | - `ping` | ◎ | ○ | - | オリジナル Python ソースコードにより検証済。 |
 | - `copy` | ◎ | ○ | - | オリジナル Python ソースコードにより検証済。 |
@@ -58,15 +58,15 @@
 | - `getent` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
 | - `git` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
 | - `group_by` | ◎ | ？ | ？ | オリジナル Python ソースコードにより検証済。 |
-| - `import_playbook` | ◎ | ？ | ？ | オリジナル Java エンジンにより検証済。 |
-| - `import_role` | ○ | ？ | ？ | オリジナル Java エンジンにより検証済。 |
+ | - `import_playbook` | ○ | ？ | ？ | Java エンジンによるエミュレーション実行により検証済。 |
+ | - `import_role` | ○ | ？ | ？ | Java エンジンによるエミュレーション実行により検証済。 |
 | - `import_tasks` | ◎ | ？ | ？ | オリジナル Python ソースコードにより検証済。 |
-| - `include_role` | ○ | ？ | ？ | オリジナル Java エンジンにより検証済。 |
+ | - `include_role` | ○ | ？ | ？ | Java エンジンによるエミュレーション実行により検証済。 |
 | - `include_tasks` | ◎ | ？ | ？ | オリジナル Python ソースコードにより検証済。 |
 | - `include_vars` | ◎ | ○ | ○ | オリジナル Python ソースコードにより検証済。 |
 | - `iptables` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
 | - `known_hosts` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `meta` | ◎ | ？ | ？ | オリジナル Java エンジンにより検証済。 |
+ | - `meta` | ○ | ？ | ？ | Java エンジンによるエミュレーション実行（`flush_handlers`, `noop`等）により検証済。 |
 | - `mount_facts` | △ | ？ | - | ロード確認済。 |
 | - `package` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
 | - `package_facts` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
@@ -109,7 +109,7 @@
 
 - **フェーズ 1: Ansible 本体の完全ロードと基本動作の実現 (In Progress)**
   - Linux/macOS 上での主要モジュール（[Module-Compatibility.md](Module-Compatibility.md) の対象コレクションすべて）の動作確認。
-  - **進捗**: 54 / 72 モジュールの統合テスト済。
+  - **進捗**: 57 / 72 モジュールの動作確認済（うち 54 モジュールは統合テスト ◎、3 モジュールはエンジン検証 ○）。
   - **完了条件**:
     - ビルド時の `pip` による `ansible-core` 取得の自動化。
     - GraalPy へのライブラリパス統合。
