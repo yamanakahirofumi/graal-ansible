@@ -1196,4 +1196,19 @@ class ActualModuleIntegrationTest {
         assertTrue(execResult.stdout().contains(host), "Known hosts file should contain the host");
         assertTrue(execResult.stdout().contains("ssh-ed25519"), "Known hosts file should contain the key type");
     }
+
+    @Test
+    void testActualPauseModule() {
+        Task task = new Task("test_pause", "pause", Map.of("seconds", 1));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+        assertTrue(result.success(), "Pause module failed: " + result.message());
+    }
+
+    @Test
+    void testActualMetaModule() {
+        // meta: flush_handlers is handled in TaskQueueManager, but meta task itself is handled in TaskExecutor.executeSingleTask
+        Task task = new Task("test_meta", "meta", Map.of("_raw_params", "noop"));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+        assertTrue(result.success(), "Meta module failed: " + result.message());
+    }
 }

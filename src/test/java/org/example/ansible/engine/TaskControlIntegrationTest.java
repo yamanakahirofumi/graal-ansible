@@ -9,6 +9,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
@@ -126,5 +127,56 @@ class TaskControlIntegrationTest {
         assertFalse(result.success(), "Until task should fail if condition never met");
         assertTrue(result.message().contains("Until condition not met"), "Message should indicate until failure");
         assertEquals(3, ((Number)result.data().get("attempts")).intValue());
+    }
+
+    @Test
+    void testPauseModule() {
+        Play play = new Play("pause play", "all", List.of(
+                createTask("pause task", "pause", Map.of("seconds", 1), null, null, false)
+        ));
+
+        Map<String, List<TaskResult>> results = new HashMap<>();
+        tqm.executePlay(play, inventory, vm, results, false);
+
+        List<TaskResult> hostResults = results.get("localhost");
+        assertTrue(hostResults.get(0).success(), "Pause module should succeed");
+    }
+
+    @Test
+    void testMetaFlushHandlers() {
+        Path handlerFile = tempDir.resolve("handler_called.txt");
+
+        Task handler = createTask("my handler", "shell", Map.of("_raw_params", "touch " + handlerFile), null, null, false);
+        Task notifyTask = createTask("notify task", "shell", Map.of("_raw_params", "echo 'changed'"), null, null, false);
+        Task flushTask = createTask("flush task", "meta", Map.of("_raw_params", "flush_handlers"), null, null, false);
+        Task verifyTask = createTask("verify task", "shell", Map.of("_raw_params", "ls " + handlerFile), null, null, false);
+
+        Play play = new Play("flush_handlers play", "all",
+                List.of(notifyTask, flushTask, verifyTask),
+                Map.of(), List.of(), List.of(handler),
+                null, null, null, null, null, null);
+
+        // We need to make sure the first task actually reports 'changed' to trigger notify
+        // But in our createTask helper, changed_when is null.
+        // Let's modify notifyTask to ensure changed=true
+        notifyTask = new Task("notify task", "shell", Map.of("_raw_params", "echo 'changed'"),
+                Map.of(), null, null, null, List.of("my handler"),
+                null, "true", false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, null, null, List.of());
+
+        play = new Play("flush_handlers play", "all",
+                List.of(notifyTask, flushTask, verifyTask),
+                Map.of(), List.of(), List.of(handler),
+                null, null, null, null, null, null);
+
+        Map<String, List<TaskResult>> results = new HashMap<>();
+        tqm.executePlay(play, inventory, vm, results, false);
+
+        List<TaskResult> hostResults = results.get("localhost");
+        assertTrue(hostResults.get(0).changed(), "Notify task should have changed");
+        assertTrue(hostResults.get(1).success(), "Meta flush_handlers should succeed");
+        assertTrue(hostResults.get(2).success(), "Verify task should succeed if handler was called: " + hostResults.get(2).message());
+        assertTrue(Files.exists(handlerFile), "Handler file should exist");
     }
 }

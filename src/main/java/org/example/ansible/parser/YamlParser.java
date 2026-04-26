@@ -6,6 +6,9 @@ import org.example.ansible.engine.Role;
 import org.example.ansible.engine.Task;
 import org.yaml.snakeyaml.Yaml;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -33,25 +36,90 @@ public class YamlParser {
     }
 
     /**
+     * Parses a Playbook from a File.
+     *
+     * @param file The YAML file.
+     * @return The parsed Playbook.
+     */
+    public Playbook parse(File file) {
+        try (InputStream is = new FileInputStream(file)) {
+            return parse(is, file.getParentFile());
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to read playbook file: " + file, e);
+        }
+    }
+
+    /**
      * Parses a Playbook from an InputStream.
      *
      * @param inputStream The input stream of the YAML file.
      * @return The parsed Playbook.
      */
-    @SuppressWarnings("unchecked")
     public Playbook parse(InputStream inputStream) {
+        return parse(inputStream, null);
+    }
+
+    /**
+     * Parses a Playbook from an InputStream with a base directory for relative imports.
+     *
+     * @param inputStream The input stream of the YAML file.
+     * @param baseDir     The base directory for resolving relative paths.
+     * @return The parsed Playbook.
+     */
+    @SuppressWarnings("unchecked")
+    public Playbook parse(InputStream inputStream, File baseDir) {
         Object raw = yaml.load(inputStream);
         List<Play> plays = new ArrayList<>();
 
         if (raw instanceof List<?> list) {
             for (Object item : list) {
                 if (item instanceof Map<?, ?> map) {
-                    plays.add(parsePlay((Map<String, Object>) map));
+                    Map<String, Object> m = (Map<String, Object>) map;
+                    if (m.containsKey("import_playbook")) {
+                        plays.addAll(parseImportPlaybook(m, baseDir));
+                    } else {
+                        plays.add(parsePlay(m));
+                    }
                 }
             }
         }
 
         return new Playbook(plays);
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Play> parseImportPlaybook(Map<String, Object> map, File baseDir) {
+        String playbookName = (String) map.get("import_playbook");
+        if (playbookName == null) {
+            return List.of();
+        }
+
+        File importedFile;
+        if (new File(playbookName).isAbsolute() || baseDir == null) {
+            importedFile = new File(playbookName);
+        } else {
+            importedFile = new File(baseDir, playbookName);
+        }
+
+        Playbook importedPlaybook = parse(importedFile);
+        List<Play> importedPlays = new ArrayList<>(importedPlaybook.plays());
+
+        // Merge vars if provided
+        Map<String, Object> vars = (Map<String, Object>) map.get("vars");
+        if (vars != null && !vars.isEmpty()) {
+            for (int i = 0; i < importedPlays.size(); i++) {
+                Play p = importedPlays.get(i);
+                Map<String, Object> mergedVars = new HashMap<>(p.vars());
+                mergedVars.putAll(vars);
+                importedPlays.set(i, new Play(
+                        p.name(), p.hosts(), p.tasks(), mergedVars, p.varsFiles(),
+                        p.roles(), p.handlers(), p.become(), p.becomeMethod(),
+                        p.becomeUser(), p.becomeFlags(), p.checkMode(), p.environment(), p.tags()
+                ));
+            }
+        }
+
+        return importedPlays;
     }
 
     /**

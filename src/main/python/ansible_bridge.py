@@ -220,6 +220,9 @@ class Display:
     def vvvv(self, *args, **kwargs: Any) -> None: pass
     def vvvvv(self, *args: Any, **kwargs: Any) -> None: pass
     def vvvvvv(self, *args: Any, **kwargs: Any) -> None: pass
+    def prompt_until(self, *args: Any, **kwargs: Any) -> None:
+        # For non-interactive environments, we skip the prompt
+        pass
 
 class PlayContext:
     def __init__(self) -> None:
