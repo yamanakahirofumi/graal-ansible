@@ -500,10 +500,17 @@ public class TaskExecutor implements ITaskExecutor {
     @Override
     public TaskResult execute(Task task, BecomeContext becomeContext, Map<String, String> environment) {
         String actionName = task.action();
+        if (actionName == null) {
+            return TaskResult.failure("Task is missing action");
+        }
         if (actionName.startsWith("ansible.builtin.")) {
             actionName = actionName.substring("ansible.builtin.".length());
         } else if (actionName.startsWith("ansible.legacy.")) {
             actionName = actionName.substring("ansible.legacy.".length());
+        }
+
+        if ("meta".equals(actionName)) {
+            return TaskResult.success(false, Map.of("meta", task.args().getOrDefault("_raw_params", ""), "changed", false));
         }
 
         if (isActionPlugin(task.action()) && !modules.containsKey(actionName)) {
@@ -647,10 +654,17 @@ public class TaskExecutor implements ITaskExecutor {
      */
     private TaskResult executeModuleDirectly(Task task, BecomeContext becomeContext, Map<String, String> environment) {
         String actionName = task.action();
+        if (actionName == null) {
+            return TaskResult.failure("Task is missing action");
+        }
         if (actionName.startsWith("ansible.builtin.")) {
             actionName = actionName.substring("ansible.builtin.".length());
         } else if (actionName.startsWith("ansible.legacy.")) {
             actionName = actionName.substring("ansible.legacy.".length());
+        }
+
+        if ("meta".equals(actionName)) {
+            return TaskResult.success(false, Map.of("meta", task.args().getOrDefault("_raw_params", ""), "changed", false));
         }
 
         org.example.ansible.module.Module module = modules.get(actionName);
