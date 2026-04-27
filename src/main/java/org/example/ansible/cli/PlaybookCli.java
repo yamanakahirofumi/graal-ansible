@@ -22,6 +22,7 @@ import org.example.ansible.inventory.InventoryParser;
 import org.example.ansible.inventory.YamlInventoryParser;
 import org.example.ansible.parser.YamlParser;
 import org.graalvm.polyglot.Context;
+import org.yaml.snakeyaml.Yaml;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -150,15 +151,39 @@ public class PlaybookCli implements Callable<Integer> {
         }
     }
 
+    @SuppressWarnings("unchecked")
     private Map<String, Object> parseExtraVars(List<String> extraVars) {
         Map<String, Object> result = new HashMap<>();
+        Yaml yaml = new Yaml();
         for (String var : extraVars) {
-            if (var.contains("=")) {
-                String[] parts = var.split("=", 2);
+            String trimmedVar = var.trim();
+            if (trimmedVar.startsWith("@")) {
+                String filePath = trimmedVar.substring(1);
+                File file = new File(filePath);
+                try (InputStream is = new FileInputStream(file)) {
+                    Object data = yaml.load(is);
+                    if (data instanceof Map) {
+                        result.putAll((Map<String, Object>) data);
+                    }
+                } catch (Exception e) {
+                    throw new RuntimeException("Failed to load extra-vars from file: " + filePath, e);
+                }
+            } else if (trimmedVar.startsWith("{")) {
+                Object data = yaml.load(trimmedVar);
+                if (data instanceof Map) {
+                    result.putAll((Map<String, Object>) data);
+                }
+            } else if (trimmedVar.contains("=")) {
+                String[] parts = trimmedVar.split("=", 2);
                 result.put(parts[0].trim(), parts[1].trim());
             } else {
-                // Support for JSON/YAML extra-vars can be added here
-                // For now, only key=value is supported as per the simple implementation
+                try {
+                    Object data = yaml.load(trimmedVar);
+                    if (data instanceof Map) {
+                        result.putAll((Map<String, Object>) data);
+                    }
+                } catch (Exception ignored) {
+                }
             }
         }
         return result;
