@@ -43,13 +43,13 @@
 ### [✓] モジュールサポート状態の同期
 - **完了日**: 2026-07-26
 - **概要**: `docs/features/Module-Support-Status.md` および本ドキュメントのテスト済みモジュール数を最新化。
-- **解決策**: 統合テスト済みモジュール数を 54 に更新し、`raw`, `set_stats`, `validate_argument_spec`, `pip`, `wait_for`, `debconf`, `sysvinit`, `service_facts`, `systemd`, `systemd_service`, `package`, `service`, `git`, `cron`, `iptables`, `known_hosts` を含める形で同期。
+- **解決策**: 統合テスト済みモジュール数を 55 に更新し、`raw`, `set_stats`, `validate_argument_spec`, `pip`, `wait_for`, `debconf`, `sysvinit`, `service_facts`, `systemd`, `systemd_service`, `package`, `service`, `git`, `cron`, `iptables`, `known_hosts` を含める形で同期。
 
 ### [✓] 実際の Ansible コレクションを使ったテストの実施
 - **完了日**: 2026-07-26
 - **概要**: [実際のコレクションを使ったテスト方法の設計](tech/Actual-Collection-Testing.md) に基づき、主要なモジュールのテストを統合。
 - **解決策**:
-    - `ping`, `copy`, `file`, `stat`, `template`, `debug`, `command`, `shell`, `setup`, `lineinfile`, `replace`, `user`, `group`, `find`, `tempfile`, `hostname`, `slurp`, `assert`, `blockinfile`, `getent`, `fetch`, `uri`, `unarchive`, `include_vars`, `include_tasks`, `import_tasks`, `set_fact`, `add_host`, `fail`, `get_url`, `group_by`, `gather_facts`, `assemble`, `script`, `package_facts`, `apt`, `apt_key`, `apt_repository`, `service_facts`, `systemd`, `systemd_service`, `raw`, `set_stats`, `validate_argument_spec`, `pip`, `wait_for`, `debconf`, `sysvinit`, `package`, `service`, `git`, `cron`, `iptables`, `known_hosts`, `import_playbook`, `pause`, `meta` の計 57 モジュールの動作確認済み（うち 54 モジュールは統合テスト ◎、3 モジュールはエンジン検証 ○）。
+    - `ping`, `copy`, `file`, `stat`, `template`, `debug`, `command`, `shell`, `setup`, `lineinfile`, `replace`, `user`, `group`, `find`, `tempfile`, `hostname`, `slurp`, `assert`, `blockinfile`, `getent`, `fetch`, `uri`, `unarchive`, `include_vars`, `include_tasks`, `import_tasks`, `set_fact`, `add_host`, `fail`, `get_url`, `group_by`, `gather_facts`, `assemble`, `script`, `package_facts`, `apt`, `apt_key`, `apt_repository`, `service_facts`, `systemd`, `systemd_service`, `raw`, `set_stats`, `validate_argument_spec`, `pip`, `wait_for`, `debconf`, `sysvinit`, `package`, `service`, `git`, `cron`, `iptables`, `known_hosts`, `import_playbook`, `pause`, `meta`, `import_role`, `include_role` の計 59 モジュールの動作確認済み（うち 55 モジュールは統合テスト ◎、4 モジュールはエンジン検証 ○）。
     - GraalPy および `ansible-core` のセットアップを GitHub Actions 上で自動化済み。
 
 ### [✓] Action Plugin の互換性向上 (Python-first)

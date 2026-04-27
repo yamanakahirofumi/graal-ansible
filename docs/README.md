@@ -10,7 +10,7 @@
 - **変数解決**: Jinjava による Jinja2 互換テンプレート、22段階の変数優先順位（all, group, host, play, extra-vars等）。
 - **タスク制御 (Worker)**: `when`, `loop`, `register`, `notify/handlers`, `until/retries`, `delegate_to`, `ignore_unreachable`, `delegate_facts` 等のサポート。
 - **権限昇格**: `become` (sudo, su) の実装。
-- **コレクション対応**: フェーズ 1 進行中（ansible-core の完全ロードと Linux での主要 54 モジュールの統合テスト完了）。
+- **コレクション対応**: フェーズ 1 進行中（ansible-core の完全ロードと Linux での主要 55 モジュールの統合テスト完了）。
 - **接続 (Connection Plugin)**: `local` 接続および `ssh` (Apache MINA SSHD) の基盤。
 - **ターゲット実行 (ターゲットノード)**: Ansiballz 形式によるモジュール転送・実行モデルの実装。
 - **OS 抽象化**: `OSHandler` によるターゲット OS (Linux/Windows) 間の差異吸収。
