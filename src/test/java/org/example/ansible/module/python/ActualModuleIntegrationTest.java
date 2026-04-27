@@ -1196,4 +1196,15 @@ class ActualModuleIntegrationTest {
         assertTrue(execResult.stdout().contains(host), "Known hosts file should contain the host");
         assertTrue(execResult.stdout().contains("ssh-ed25519"), "Known hosts file should contain the key type");
     }
+
+    @Test
+    void testActualPauseModule() {
+        long start = System.currentTimeMillis();
+        Task task = new Task("test_pause", "pause", Map.of("seconds", 1));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+        long end = System.currentTimeMillis();
+
+        assertTrue(result.success(), "Pause module failed: " + result.message());
+        assertTrue((end - start) >= 1000, "Pause should have waited at least 1 second");
+    }
 }

@@ -127,4 +127,24 @@ class TaskControlIntegrationTest {
         assertTrue(result.message().contains("Until condition not met"), "Message should indicate until failure");
         assertEquals(3, ((Number)result.data().get("attempts")).intValue());
     }
+
+    @Test
+    void testPauseModule() {
+        long start = System.currentTimeMillis();
+        Task task = createTask("test pause", "pause", Map.of("seconds", 1), null, null, false);
+        TaskResult result = taskExecutor.execute(task, org.example.ansible.connection.BecomeContext.empty(), new LocalConnection(), Map.of());
+        long end = System.currentTimeMillis();
+
+        assertTrue(result.success(), "Pause module failed: " + result.message());
+        assertTrue((end - start) >= 1000, "Pause should have waited at least 1 second. Actual: " + (end - start) + "ms");
+    }
+
+    @Test
+    void testMetaNoopModule() {
+        Task task = createTask("test meta noop", "meta", Map.of("_raw_params", "noop"), null, null, false);
+        TaskResult result = taskExecutor.execute(task, org.example.ansible.connection.BecomeContext.empty(), new LocalConnection(), Map.of());
+
+        assertTrue(result.success(), "Meta noop failed: " + result.message());
+        assertEquals("noop", result.data().get("meta"));
+    }
 }

@@ -92,10 +92,7 @@ public class PlaybookCli implements Callable<Integer> {
         try {
             // Load Playbook
             YamlParser yamlParser = new YamlParser();
-            Playbook playbook;
-            try (InputStream is = new FileInputStream(playbookFile)) {
-                playbook = yamlParser.parse(is);
-            }
+            Playbook playbook = yamlParser.parse(playbookFile);
 
             // Load Inventory
             Inventory inventory;

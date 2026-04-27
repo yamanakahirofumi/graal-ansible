@@ -91,7 +91,7 @@ public class TaskExecutor implements ITaskExecutor {
             "debug", "set_fact", "copy", "template", "assemble", "group_by",
             "include_vars", "fetch", "pause", "wait_for_connection", "gather_facts",
             "unarchive", "uri", "script", "reboot", "async_status", "add_host", "assert",
-            "command", "shell"
+            "command", "shell", "meta"
     );
     private final Map<String, org.example.ansible.module.Module> modules = new HashMap<>();
     private final Map<String, Boolean> actionPluginCache = new ConcurrentHashMap<>();
@@ -504,6 +504,10 @@ public class TaskExecutor implements ITaskExecutor {
             actionName = actionName.substring("ansible.builtin.".length());
         } else if (actionName.startsWith("ansible.legacy.")) {
             actionName = actionName.substring("ansible.legacy.".length());
+        }
+
+        if ("meta".equals(actionName)) {
+            return TaskResult.success(false, Map.of("meta", task.args().getOrDefault("_raw_params", ""), "changed", false));
         }
 
         if (isActionPlugin(task.action()) && !modules.containsKey(actionName)) {

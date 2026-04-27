@@ -209,6 +209,11 @@ class Display:
         self.columns = 79
         self.color = False
     def display(self, *args: Any, **kwargs: Any) -> None: pass
+    def prompt_until(self, msg, private=False, seconds=None, complete_input=None):
+        import time
+        if seconds:
+            time.sleep(seconds)
+        return ""
     def debug(self, *args: Any, **kwargs: Any) -> None: pass
     def verbose(self, *args: Any, **kwargs: Any) -> None: pass
     def warning(self, *args: Any, **kwargs: Any) -> None: pass
