@@ -581,6 +581,20 @@ def apply_mocks() -> None:
         'combine_vars': lambda a, b, *args, **kwargs: {**(a or {}), **(b or {})}
     })
 
+    def mock_timeout(seconds=None, error_message="Timer expired"):
+        def decorator(func):
+            def wrapper(*args, **kwargs):
+                return func(*args, **kwargs)
+            return wrapper
+        if callable(seconds):
+            return seconds
+        return decorator
+
+    create_mock('ansible.module_utils.facts.timeout', {
+        'timeout': mock_timeout,
+        'TimeoutError': type('TimeoutError', (Exception,), {})
+    })
+
     # 4. Errors
     class AnsibleError(Exception):
         def __init__(self, message: str = "", obj: Any = None, show_content: bool = True, suppress_extended_error: bool = False, orig_exception: Optional[Exception] = None, **kwargs: Any) -> None:
