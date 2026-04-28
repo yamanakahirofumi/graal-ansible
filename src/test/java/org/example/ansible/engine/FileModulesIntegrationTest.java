@@ -293,4 +293,41 @@ class FileModulesIntegrationTest {
         assertTrue(Files.exists(localDest));
         assertEquals(content, Files.readString(localDest).trim());
     }
+
+    @Test
+    void testMountFactsModule() {
+        Task task = new Task("Get mount facts", "mount_facts", Map.of());
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        if (!result.success()) {
+            System.err.println("mount_facts failed: " + result.message());
+            System.err.println("Full Data: " + result.data());
+        }
+        assertTrue(result.success(), result.message());
+        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
+        assertNotNull(facts, "ansible_facts should be present");
+        // mount_facts returns mount_points and aggregate_mounts
+        assertTrue(facts.containsKey("mount_points") || facts.containsKey("mounts"), "mount info should be present in ansible_facts");
+    }
+
+    @Test
+    void testDpkgSelectionsModule() {
+        // dpkg_selections is for setting selections, let's use it in check_mode
+        Task task = new Task("Set dpkg selections", "dpkg_selections", Map.of(
+                "name", "sed",
+                "selection", "install"
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null); // check_mode: true
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        if (!result.success()) {
+            System.err.println("dpkg_selections failed: " + result.message());
+            System.err.println("Full Data: " + result.data());
+        }
+        assertTrue(result.success(), result.message());
+        assertNotNull(result.data().get("before"));
+        assertNotNull(result.data().get("after"));
+    }
 }

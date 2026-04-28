@@ -129,7 +129,7 @@ def setup_sys_path(site_packages: Optional[List[str]]) -> None:
         for p in site_packages:
             p_str = _normalize_path(p)
             if p_str not in sys.path: sys.path.append(p_str)
-            for mname in ['ansible', 'ansible.module_utils', 'ansible.module_utils.common', 'ansible.module_utils.compat', 'ansible.module_utils._internal', 'ansible.module_utils.parsing', 'ansible.plugins', 'ansible.plugins.action']:
+            for mname in ['ansible', 'ansible.module_utils', 'ansible.module_utils.common', 'ansible.module_utils.compat', 'ansible.module_utils._internal', 'ansible.module_utils.parsing', 'ansible.module_utils.facts', 'ansible.plugins', 'ansible.plugins.action']:
                 if mname in sys.modules:
                     m = sys.modules[mname]
                     if hasattr(m, '__path__') and isinstance(m.__path__, list):
@@ -704,13 +704,31 @@ def apply_mocks() -> None:
             m.RoutingMarkerBehavior = type('RoMB', (), {'__init__': lambda *a, **kw: None})
 
     # 8. Module Utils
-    for mname in ['ansible', 'ansible.module_utils', 'ansible.module_utils.common', 'ansible.module_utils.compat', 'ansible.module_utils._internal', 'ansible.module_utils.parsing', 'ansible.plugins', 'ansible.plugins.action']:
+    for mname in ['ansible', 'ansible.module_utils', 'ansible.module_utils.common', 'ansible.module_utils.compat', 'ansible.module_utils._internal', 'ansible.module_utils.parsing', 'ansible.module_utils.facts', 'ansible.plugins', 'ansible.plugins.action']:
         attrs = {}
         if mname == 'ansible.module_utils._internal':
             attrs['get_controller_serialize_map'] = lambda: {}
         create_mock(mname, attributes=attrs, is_package=True)
 
     if mocks_applied: return
+
+    # 8b. Facts & Multiprocessing
+    def mock_timeout(seconds=None, error_message="Timer expired"):
+        def decorator(func):
+            def wrapper(*args, **kwargs):
+                return func(*args, **kwargs)
+            return wrapper
+        if callable(seconds):
+            return decorator(seconds)
+        return decorator
+
+    create_mock('ansible.module_utils.facts.timeout', {
+        'timeout': mock_timeout,
+        'TimeoutError': type('TimeoutError', (Exception,), {})
+    }, is_package=False)
+
+    create_mock('multiprocessing', {'cpu_count': lambda: 1, 'current_process': lambda: types.SimpleNamespace(name='MainProcess')})
+    create_mock('multiprocessing.pool', {'ThreadPool': type('ThreadPool', (), {'__init__': lambda *a, **kw: None, 'apply_async': lambda *a, **kw: type('Res', (), {'get': lambda *a, **kw: a[0]})(), 'close': lambda *a: None, 'terminate': lambda *a: None})})
 
     create_mock('ansible.module_utils.common.sentinel', {'Sentinel': type('Sentinel', (), {})})
     def mock_get_distribution() -> str:
