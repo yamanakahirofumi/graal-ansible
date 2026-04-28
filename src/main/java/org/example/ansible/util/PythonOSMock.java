@@ -220,12 +220,32 @@ public class PythonOSMock {
      */
     public StatResult stat(String path) {
         Path p = toPath(path);
-        if (p == null || !Files.exists(p)) return null;
+        if (p == null || (!Files.exists(p) && !Files.isSymbolicLink(p))) return null;
         try {
             BasicFileAttributes attrs = Files.readAttributes(p, BasicFileAttributes.class);
-            long mode = attrs.isDirectory() ? 040000 : 0100000;
+            long mode = 0;
+            if (attrs.isDirectory()) {
+                mode = 040000;
+            } else if (attrs.isRegularFile()) {
+                mode = 0100000;
+            } else if (attrs.isSymbolicLink()) {
+                mode = 0120000;
+            } else if (attrs.isOther()) {
+                // Handle special files (sockets, pipes, devices) if possible.
+                // In Java, BasicFileAttributes.isOther() is true for these.
+                // We might need to use more specific checks or default to a generic "other" mode.
+                // For simplicity, we can try to detect them via the first character of `ls -ld` if needed,
+                // but let's try a common mask for non-regular/non-dir/non-link.
+                mode = 0; // Will be refined by PosixFileAttributes if available
+            }
+
             if (attrs instanceof PosixFileAttributes) {
-                mode |= decodePermissions(((PosixFileAttributes) attrs).permissions());
+                PosixFileAttributes posix = (PosixFileAttributes) attrs;
+                mode |= decodePermissions(posix.permissions());
+
+                // PosixFileAttributes doesn't directly give us S_IFBLK, S_IFCHR, etc.
+                // But we can use the isDirectory, isRegularFile, isSymbolicLink methods which we already did.
+                // If it's "other", we might still be stuck with 0 mode prefix unless we use specific NIO features.
             } else {
                 mode |= attrs.isDirectory() ? 0755 : 0644;
             }

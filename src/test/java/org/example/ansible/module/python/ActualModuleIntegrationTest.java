@@ -1207,4 +1207,29 @@ class ActualModuleIntegrationTest {
         assertTrue(result.success(), "Pause module failed: " + result.message());
         assertTrue((end - start) >= 1000, "Pause should have waited at least 1 second");
     }
+
+    @Test
+    void testActualMountFactsModule() {
+        Task task = new Task("test_mount_facts", "mount_facts", Map.of());
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
+        assertNotNull(facts, "ansible_facts should be present");
+        assertTrue(facts.containsKey("mounts"), "mounts should be present in ansible_facts");
+    }
+
+    @Test
+    void testActualDpkgSelectionsModule() {
+        Task task = new Task("test_dpkg_selections", "dpkg_selections", Map.of(
+                "name", "dpkg",
+                "selection", "install"
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        // dpkg_selections does not return ansible_facts, it returns before/after/changed
+        assertTrue(result.data().containsKey("before"), "before should be present in result");
+        assertTrue(result.data().containsKey("after"), "after should be present in result");
+    }
 }
