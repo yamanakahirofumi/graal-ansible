@@ -13,7 +13,7 @@ graal-ansible [options] playbook.yml
 | オプション | 短縮形 | 説明 | 実装状況 |
 | :--- | :--- | :--- | :---: |
 | `--inventory` | `-i` | インベントリファイルのパス（ターゲットノードの定義）を指定 | ◎ |
-| `--extra-vars` | `-e` | 追加の変数を設定 (key=value または JSON/YAML) | ◎ |
+| `--extra-vars` | `-e` | 追加の変数を設定 (key=value。JSON/YAML/@file は将来対応) | ○ |
 | `--limit` | `-l` | 実行対象のターゲットノードを制限 | ◎ |
 | `--tags` | `-t` | 特定のタグが付いたタスクのみ実行 | ◎ |
 | `--skip-tags` | - | 特定のタグが付いたタスクをスキップ | ◎ |
@@ -24,9 +24,9 @@ graal-ansible [options] playbook.yml
 | `--become-method` | - | 権限昇格に使用するメソッドを指定 (sudo, su等) | ◎ |
 | `--become-user` | - | 昇格後のユーザーを指定 (デフォルト: root) | ◎ |
 | `--become-flags` | - | 権限昇格に使用するフラグを指定 | ◎ |
-| `--ask-become-pass` | `-K` | 権限昇格パスワードをプロンプトで問い合せる | △ |
+| `--ask-become-pass` | `-K` | 権限昇格パスワードをプロンプトで問い合せる | ○ |
 | `--version` | - | バージョン情報を表示 | ◎ |
-| `--collections-path` | - | コレクションの探索パスを指定 | △ |
+| `--collections-path` | - | コレクションの探索パスを指定 | ○ |
 | `--help` | `-h` | ヘルプメッセージを表示 | ◎ |
 
 ※ ◎: 実装済み、○: 計画中、△: 部分的/検討中
@@ -46,7 +46,7 @@ graal-ansible [options] playbook.yml
 
 ## 4. 実装方針
 
-- **解析ライブラリ**: [picocli](https://picocli.info/) の使用を検討。
+- **解析ライブラリ**: [picocli](https://picocli.info/) を採用。
 - **Native Image 対応**: GraalVM Native Image での実行時にリフレクション設定が必要になるため、picocli のアノテーションプロセッサを活用する。
 - **互換性**: 戻り値（終了コード）についても Ansible 本家と同一の仕様とする。
     - `0`: 正常終了
