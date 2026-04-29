@@ -16,7 +16,7 @@
 
 | コレクション / モジュール | Target: Linux | Target: macOS | Target: Windows | 備考 |
 | :--- | :---: | :---: | :---: | :--- |
-| **ansible.builtin** | △ | ？ | ？ | Linux で全 72 モジュールを一覧化。うち 61 モジュールの動作確認済。 |
+| **ansible.builtin** | △ | ？ | ？ | Linux で全 72 モジュールを一覧化。うち 59 モジュールの動作確認済 。 |
 | - `debug` | ◎ | ○ | ○ | オリジナル Python ソースコードにより検証済。 |
 | - `ping` | ◎ | ○ | - | オリジナル Python ソースコードにより検証済。 |
 | - `copy` | ◎ | ○ | - | オリジナル Python ソースコードにより検証済。 |
@@ -58,15 +58,15 @@
 | - `getent` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
 | - `git` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
 | - `group_by` | ◎ | ？ | ？ | オリジナル Python ソースコードにより検証済。 |
- | - `import_playbook` | ○ | ？ | ？ | Java エンジンによるエミュレーション実行により検証済。 |
- | - `import_role` | ○ | ？ | ？ | Java エンジンによるエミュレーション実行により検証済。 |
+| - `import_playbook` | ○ | ？ | ？ | Java エンジンによるエミュレーション実行により検証済。 |
+| - `import_role` | ○ | ？ | ？ | Java エンジンによるエミュレーション実行により検証済。 |
 | - `import_tasks` | ◎ | ？ | ？ | オリジナル Python ソースコードにより検証済。 |
- | - `include_role` | ○ | ？ | ？ | Java エンジンによるエミュレーション実行により検証済。 |
+| - `include_role` | ○ | ？ | ？ | Java エンジンによるエミュレーション実行により検証済。 |
 | - `include_tasks` | ◎ | ？ | ？ | オリジナル Python ソースコードにより検証済。 |
 | - `include_vars` | ◎ | ○ | ○ | オリジナル Python ソースコードにより検証済。 |
 | - `iptables` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
 | - `known_hosts` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
- | - `meta` | ○ | ？ | ？ | Java エンジンによるエミュレーション実行（`flush_handlers`, `noop`等）により検証済。 |
+| - `meta` | ○ | ？ | ？ | Java エンジンによるエミュレーション実行（`flush_handlers`, `noop`等）により検証済。 |
 | - `mount_facts` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
 | - `package` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
 | - `package_facts` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
