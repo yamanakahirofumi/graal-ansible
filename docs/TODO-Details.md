@@ -15,7 +15,7 @@
 
 ### [ ] Ansible 本体の完全ロードと基本動作の実現 (フェーズ1)
 - **概要**: `ansible-core` を完全にロードし、Linux/macOS での全 72 モジュールの動作確認。
-- **詳細は [Module-Support-Status.md](features/Module-Support-Status.md) を参照。** (現在 59/72 モジュール検証済み: 55 ◎, 4 ○)
+- **詳細は [Module-Support-Status.md](features/Module-Support-Status.md) を参照。** (現在 61/72 モジュール検証済み: 57 ◎, 4 ○)
 - **テスト拡充戦略については [Test-Expansion-Strategy.md](tech/Test-Expansion-Strategy.md) を参照。**
 - **注意**: `python.IsolateNativeModules` と `python.PosixModuleBackend` はフェーズ 1 においては原則として固定（Linuxでは安定のため True/Native）とする。
 - **備考**: 検証には必要に応じて **Testcontainers** を**ターゲットノード**として活用する。全モジュールの検証完了をもってフェーズ 1 完了とする。
@@ -191,7 +191,6 @@
 - **検討内容**:
     - 変数の優先順位（22 段階）の完全な実装とテスト（詳細は [Variables-Templating.md](implementation/Variables-Templating.md) を参照）。
     - 動的インベントリの完全なサポート。
-    - `mount_facts` および `dpkg_selections` の統合テストの追加。
     - `--extra-vars` における JSON/YAML および `@file` 構文のサポート実装。
 
 ## 6. ドキュメントの更新と不整合の解消 (Documentation Update & Inconsistency Resolution)

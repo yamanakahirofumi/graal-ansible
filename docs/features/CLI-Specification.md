@@ -13,7 +13,7 @@ graal-ansible [options] playbook.yml
 | オプション | 短縮形 | 説明 | 実装状況 |
 | :--- | :--- | :--- | :---: |
 | `--inventory` | `-i` | インベントリファイルのパス（ターゲットノードの定義）を指定 | ◎ |
-| `--extra-vars` | `-e` | 追加の変数を設定 (key=value。JSON/YAML/@file は将来対応) | ○ |
+| `--extra-vars` | `-e` | 追加の変数を設定 (key=value。JSON/YAML/@file は将来対応) | ○/△ |
 | `--limit` | `-l` | 実行対象のターゲットノードを制限 | ◎ |
 | `--tags` | `-t` | 特定のタグが付いたタスクのみ実行 | ◎ |
 | `--skip-tags` | - | 特定のタグが付いたタスクをスキップ | ◎ |
@@ -44,7 +44,15 @@ graal-ansible [options] playbook.yml
 
 これらの変数は、`VariableManager` において「CLI変数 (Level 1)」として保持され、Play や Task で明示的に `become: no` 等が指定されない限り、実行コンテキストに適用されます。
 
-## 4. 実装方針
+## 4. エクストラ変数 (`--extra-vars`) の制限事項
+
+現在、`--extra-vars` / `-e` オプションは標準的な `key=value` 形式のみをサポートしています。
+以下の高度な構文については、将来的な拡張課題（○/△）として `docs/TODO-Details.md` に記載されています。
+
+- `@file.yml` または `@file.json`: ファイルからの変数の読み込み。
+- インライン JSON/YAML: `{"key": "value"}` 形式の直接指定。
+
+## 5. 実装方針
 
 - **解析ライブラリ**: [picocli](https://picocli.info/) を採用。
 - **Native Image 対応**: GraalVM Native Image での実行時にリフレクション設定が必要になるため、picocli のアノテーションプロセッサを活用する。
