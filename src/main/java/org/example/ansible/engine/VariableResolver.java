@@ -177,11 +177,18 @@ public class VariableResolver {
         Object flagsObj = task.becomeFlags() != null ? task.becomeFlags() : (play.becomeFlags() != null ? play.becomeFlags() : variables.get("ansible_become_flags"));
         Object resolvedFlags = resolveValue(flagsObj != null ? flagsObj : "", variables);
 
+        Object passObj = variables.get("ansible_become_password");
+        if (passObj == null) {
+            passObj = variables.get("ansible_become_pass");
+        }
+        Object resolvedPass = resolveValue(passObj, variables);
+
         return new BecomeContext(
                 become,
                 resolvedMethod != null ? resolvedMethod.toString() : "sudo",
                 resolvedUser != null ? resolvedUser.toString() : "root",
-                resolvedFlags != null ? resolvedFlags.toString() : ""
+                resolvedFlags != null ? resolvedFlags.toString() : "",
+                resolvedPass != null ? resolvedPass.toString() : null
         );
     }
 

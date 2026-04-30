@@ -42,6 +42,9 @@ public class LocalConnection implements Connection {
             String method = becomeContext.becomeMethod();
             if (method == null || "sudo".equals(method)) {
                 commandList.add("sudo");
+                if (becomeContext.becomePassword() != null) {
+                    commandList.add("-S");
+                }
                 commandList.add("-p");
                 commandList.add("BECOME-PROMPT");
                 if (becomeContext.becomeUser() != null) {
@@ -71,6 +74,13 @@ public class LocalConnection implements Connection {
         }
         try {
             Process process = pb.start();
+
+            if (becomeContext != null && becomeContext.become() && becomeContext.becomePassword() != null) {
+                try (java.io.OutputStream os = process.getOutputStream()) {
+                    os.write((becomeContext.becomePassword() + "\n").getBytes(StandardCharsets.UTF_8));
+                    os.flush();
+                }
+            }
 
             // Read stdout and stderr concurrently to avoid deadlock
             CompletableFuture<String> stdoutFuture = readStreamAsync(process.getInputStream());

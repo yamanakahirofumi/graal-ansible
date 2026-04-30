@@ -76,6 +76,9 @@ public class PlaybookCli implements Callable<Integer> {
     @Option(names = "--become-flags", description = "Privilege escalation flags to use")
     private String becomeFlags;
 
+    @Option(names = {"-K", "--ask-become-pass"}, description = "Ask for privilege escalation password")
+    private boolean askBecomePass;
+
     @Override
     public Integer call() {
         int verbosity = verbose == null ? 0 : verbose.length;
@@ -132,6 +135,12 @@ public class PlaybookCli implements Callable<Integer> {
                 if (becomeFlags != null) {
                     cliVars.put("ansible_become_flags", becomeFlags);
                 }
+
+                if (askBecomePass) {
+                    String password = new String(System.console().readPassword("BECOME password: "));
+                    cliVars.put("ansible_become_password", password);
+                }
+
                 cliVars.put("ansible_verbosity", verbosity);
 
                 VariableManager variableManager = new VariableManager(inventory, cliVars, parsedExtraVars, baseDir, null);
