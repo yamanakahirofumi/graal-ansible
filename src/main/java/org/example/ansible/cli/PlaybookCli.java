@@ -137,8 +137,14 @@ public class PlaybookCli implements Callable<Integer> {
                 }
 
                 if (askBecomePass) {
-                    String password = new String(System.console().readPassword("BECOME password: "));
-                    cliVars.put("ansible_become_password", password);
+                    java.io.Console console = System.console();
+                    if (console != null) {
+                        String password = new String(console.readPassword("BECOME password: "));
+                        cliVars.put("ansible_become_password", password);
+                    } else {
+                        System.err.println("Error: --ask-become-pass specified but no console available.");
+                        return 1;
+                    }
                 }
 
                 cliVars.put("ansible_verbosity", verbosity);

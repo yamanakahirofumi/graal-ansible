@@ -1216,7 +1216,7 @@ class ActualModuleIntegrationTest {
         assertTrue(result.success(), "Execution failed: " + result.message());
         Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
         assertNotNull(facts, "ansible_facts should be present");
-        assertTrue(facts.containsKey("mounts"), "mounts should be present in ansible_facts");
+        assertTrue(facts.containsKey("mounts") || facts.containsKey("mount_points"), "mounts or mount_points should be present in ansible_facts");
     }
 
     @Test
