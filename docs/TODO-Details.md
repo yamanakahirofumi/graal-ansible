@@ -67,6 +67,14 @@
     - `src/main/resources/META-INF/native-image/` 配下に `reflect-config.json`, `resource-config.json`, `native-image.properties` を作成済み。
     - SnakeYAML, Jackson, Picocli, および主要な Record クラスのリフレクション設定を包含。
 
+### [✓] --extra-vars における JSON/YAML および @file 構文のサポート
+- **完了日**: 2026-07-27
+- **概要**: `ansible-playbook` 互換の `--extra-vars` / `-e` オプションにおける高度な構文をサポート。
+- **解決策**:
+    - `@file.yml`, `@file.yaml`, `@file.json` によるファイルからの変数読み込みを実装。
+    - `{...}` によるインライン JSON/YAML 指定をサポート。
+    - `PlaybookCli.parseExtraVars` において SnakeYAML を用いた解析ロジックを統合。
+
 ### [✓] 権限昇格 (become) の実装
 - **完了日**: 2026-03-05
 - **概要**: [権限昇格 (become)](implementation/Privilege-Escalation.md) に基づく sudo/su 等の実行サポート。
@@ -191,7 +199,4 @@
 - **検討内容**:
     - 変数の優先順位（22 段階）の完全な実装とテスト（詳細は [Variables-Templating.md](implementation/Variables-Templating.md) を参照）。
     - 動的インベントリの完全なサポート。
-    - `--extra-vars` における JSON/YAML および `@file` 構文のサポート実装。
-
-## 6. ドキュメントの更新と不整合の解消 (Documentation Update & Inconsistency Resolution)
 
