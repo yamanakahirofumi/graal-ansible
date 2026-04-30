@@ -83,6 +83,13 @@ public class SshConnection implements Connection {
              ByteArrayOutputStream err = new ByteArrayOutputStream();
              ChannelExec channel = session.createExecChannel(effectiveCommand)) {
 
+            if (becomeContext != null && becomeContext.become() && becomeContext.becomePassword() != null) {
+                try (java.io.OutputStream os = channel.getInvertedIn()) {
+                    os.write((becomeContext.becomePassword() + "\n").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                    os.flush();
+                }
+            }
+
             if (environment != null) {
                 for (java.util.Map.Entry<String, String> entry : environment.entrySet()) {
                     channel.setEnv(entry.getKey(), entry.getValue());

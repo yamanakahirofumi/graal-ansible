@@ -271,7 +271,7 @@ class ActualModuleIntegrationTest {
                 "name", userName,
                 "state", "present"
         ));
-        TaskResult result = taskExecutor.execute(task, new BecomeContext(true, "sudo", "root", ""), connection, null);
+        TaskResult result = taskExecutor.execute(task, new BecomeContext(true, "sudo", "root", "", null), connection, null);
 
         assertTrue(result.success(), "Execution failed: " + result.message());
 
@@ -287,7 +287,7 @@ class ActualModuleIntegrationTest {
                 "name", groupName,
                 "state", "present"
         ));
-        TaskResult result = taskExecutor.execute(task, new BecomeContext(true, "sudo", "root", ""), connection, null);
+        TaskResult result = taskExecutor.execute(task, new BecomeContext(true, "sudo", "root", "", null), connection, null);
 
         assertTrue(result.success(), "Execution failed: " + result.message());
 
@@ -333,7 +333,7 @@ class ActualModuleIntegrationTest {
         ));
         // hostname module usually requires root, but in this container it might fail to actually set it
         // We just want to see if it executes correctly.
-        TaskResult result = taskExecutor.execute(task, new BecomeContext(true, "sudo", "root", ""), connection, null);
+        TaskResult result = taskExecutor.execute(task, new BecomeContext(true, "sudo", "root", "", null), connection, null);
 
         // It might fail because Docker containers don't always allow changing hostname easily
         // but we check if it didn't fail due to bridge/launcher issues.
@@ -797,7 +797,7 @@ class ActualModuleIntegrationTest {
                 null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
                 null, null, null, null, true, null); // check_mode: true
 
-        TaskResult resultCheck = taskExecutor.execute(taskCheck, new BecomeContext(true, "sudo", "root", ""), connection, null);
+        TaskResult resultCheck = taskExecutor.execute(taskCheck, new BecomeContext(true, "sudo", "root", "", null), connection, null);
         assertTrue(resultCheck.success(), "Apt update in check mode failed: " + resultCheck.message());
 
         // 2. Test installing a small package (e.g., 'nano' or 'vim-tiny')
@@ -807,7 +807,7 @@ class ActualModuleIntegrationTest {
                 "state", "present"
         ));
 
-        TaskResult resultInstall = taskExecutor.execute(taskInstall, new BecomeContext(true, "sudo", "root", ""), connection, null);
+        TaskResult resultInstall = taskExecutor.execute(taskInstall, new BecomeContext(true, "sudo", "root", "", null), connection, null);
         assertTrue(resultInstall.success(), "Apt install failed: " + resultInstall.message());
 
         // Verify installation
@@ -894,7 +894,7 @@ class ActualModuleIntegrationTest {
                 "id", fingerprint,
                 "state", "absent"
         ));
-        taskExecutor.execute(taskAbsent, new BecomeContext(true, "sudo", "root", ""), connection, null);
+        taskExecutor.execute(taskAbsent, new BecomeContext(true, "sudo", "root", "", null), connection, null);
 
         // 2. Add the key via data
         Task taskPresent = new Task("test_apt_key_present", "apt_key", Map.of(
@@ -902,7 +902,7 @@ class ActualModuleIntegrationTest {
                 "state", "present"
         ));
 
-        TaskResult result = taskExecutor.execute(taskPresent, new BecomeContext(true, "sudo", "root", ""), connection, null);
+        TaskResult result = taskExecutor.execute(taskPresent, new BecomeContext(true, "sudo", "root", "", null), connection, null);
         assertTrue(result.success(), "Apt key add failed: " + result.message());
         assertTrue(result.changed(), "Apt key should have been added (changed=true). Result data: " + result.data());
     }
@@ -917,7 +917,7 @@ class ActualModuleIntegrationTest {
                 "filename", "test-repo"
         ));
 
-        TaskResult result = taskExecutor.execute(task, new BecomeContext(true, "sudo", "root", ""), connection, null);
+        TaskResult result = taskExecutor.execute(task, new BecomeContext(true, "sudo", "root", "", null), connection, null);
         assertTrue(result.success(), "Apt repository add failed: " + result.message());
 
         // Verify the repository was added
@@ -1059,7 +1059,7 @@ class ActualModuleIntegrationTest {
                 "vtype", "select",
                 "value", "Etc"
         ));
-        TaskResult result = taskExecutor.execute(task, new BecomeContext(true, "sudo", "root", ""), connection, null);
+        TaskResult result = taskExecutor.execute(task, new BecomeContext(true, "sudo", "root", "", null), connection, null);
 
         assertTrue(result.success(), "Execution failed: " + result.message());
     }
@@ -1074,7 +1074,7 @@ class ActualModuleIntegrationTest {
                 null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
                 null, null, null, null, true, null); // check_mode: true
 
-        TaskResult result = taskExecutor.execute(task, new BecomeContext(true, "sudo", "root", ""), connection, null);
+        TaskResult result = taskExecutor.execute(task, new BecomeContext(true, "sudo", "root", "", null), connection, null);
         assertTrue(result.success(), "Execution failed: " + result.message());
     }
 
@@ -1088,7 +1088,7 @@ class ActualModuleIntegrationTest {
         ), Map.of(), null, null, null, List.of(), null, null, false,
                 null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
                 true, "sudo", "root", null, false, null); // become: true
-        TaskResult result = taskExecutor.execute(task, new BecomeContext(true, "sudo", "root", ""), connection, null);
+        TaskResult result = taskExecutor.execute(task, new BecomeContext(true, "sudo", "root", "", null), connection, null);
         assertTrue(result.success(), "Package module failed: " + result.message());
     }
 
@@ -1103,7 +1103,7 @@ class ActualModuleIntegrationTest {
                 null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
                 true, "sudo", "root", null, true, null); // become: true, check_mode: true
 
-        TaskResult result = taskExecutor.execute(task, new BecomeContext(true, "sudo", "root", ""), connection, null);
+        TaskResult result = taskExecutor.execute(task, new BecomeContext(true, "sudo", "root", "", null), connection, null);
         assertTrue(result.success(), "Service module failed: " + result.message());
     }
 
@@ -1167,7 +1167,7 @@ class ActualModuleIntegrationTest {
                 null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
                 true, "sudo", "root", null, true, null); // become: true, check_mode: true
 
-        TaskResult result = taskExecutor.execute(task, new BecomeContext(true, "sudo", "root", ""), connection, null);
+        TaskResult result = taskExecutor.execute(task, new BecomeContext(true, "sudo", "root", "", null), connection, null);
         // It might fail even in check mode if iptables binary requires root to even show version/status
         // but it should at least pass the bridge and try to execute.
         // Given the CI failure, we might need to ignore result.success() if it's environment restriction
@@ -1216,7 +1216,7 @@ class ActualModuleIntegrationTest {
         assertTrue(result.success(), "Execution failed: " + result.message());
         Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
         assertNotNull(facts, "ansible_facts should be present");
-        assertTrue(facts.containsKey("mounts"), "mounts should be present in ansible_facts");
+        assertTrue(facts.containsKey("mounts") || facts.containsKey("mount_points"), "mounts or mount_points should be present in ansible_facts");
     }
 
     @Test

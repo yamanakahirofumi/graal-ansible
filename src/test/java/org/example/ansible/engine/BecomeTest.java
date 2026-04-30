@@ -205,4 +205,45 @@ class BecomeTest {
         // Task 2: overrides CLI variable with become: no
         assertFalse(contexts.get(1).become(), "Task should override CLI variable with become: no");
     }
+
+    @Test
+    void testBecomePasswordResolution() {
+        String yaml = """
+            - name: Play with become password
+              hosts: all
+              become: yes
+              tasks:
+                - name: Task checking password
+                  debug:
+                    msg: hello
+            """;
+
+        YamlParser parser = new YamlParser();
+        Playbook playbook = parser.parse(new java.io.ByteArrayInputStream(yaml.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+
+        MockTaskExecutor taskExecutor = new MockTaskExecutor();
+        PlaybookExecutor playbookExecutor = new PlaybookExecutor(taskExecutor);
+
+        org.example.ansible.inventory.Group allGroup = new org.example.ansible.inventory.Group("all", List.of(new org.example.ansible.inventory.Host("localhost")), List.of(), Map.of());
+        Inventory inventory = new Inventory(allGroup);
+
+        // Scenario 1: ansible_become_password
+        Map<String, Object> cliVars1 = Map.of(
+                "ansible_become_password", "secret1"
+        );
+        VariableManager vm1 = new VariableManager(inventory, cliVars1, Map.of(), null, null);
+        playbookExecutor.execute(playbook, inventory, vm1, false);
+
+        assertEquals("secret1", taskExecutor.executedContexts.get(0).becomePassword());
+
+        // Scenario 2: ansible_become_pass (alias)
+        taskExecutor.executedContexts.clear();
+        Map<String, Object> cliVars2 = Map.of(
+                "ansible_become_pass", "secret2"
+        );
+        VariableManager vm2 = new VariableManager(inventory, cliVars2, Map.of(), null, null);
+        playbookExecutor.execute(playbook, inventory, vm2, false);
+
+        assertEquals("secret2", taskExecutor.executedContexts.get(0).becomePassword());
+    }
 }
