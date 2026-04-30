@@ -1232,4 +1232,78 @@ class ActualModuleIntegrationTest {
         assertTrue(result.data().containsKey("before"), "before should be present in result");
         assertTrue(result.data().containsKey("after"), "after should be present in result");
     }
+
+    @Test
+    void testActualDeb822RepositoryModule() {
+        // Ensure python3-debian is installed
+        connection.execCommand("apt-get update && apt-get install -y python3-debian", new BecomeContext(true, "sudo", "root", "", null), null);
+
+        Task task = new Task("test_deb822_repository", "deb822_repository", Map.of(
+                "name", "test-deb822",
+                "types", List.of("deb"),
+                "uris", List.of("http://deb.debian.org/debian"),
+                "suites", List.of("bookworm"),
+                "components", List.of("main"),
+                "state", "present"
+        ));
+        TaskResult result = taskExecutor.execute(task, new BecomeContext(true, "sudo", "root", "", null), connection, null);
+
+        assertTrue(result.success(), "Deb822_repository failed: " + result.message());
+        var execResult = connection.execCommand("ls /etc/apt/sources.list.d/test-deb822.sources", BecomeContext.empty(), null);
+        assertEquals(0, execResult.exitCode(), "Sources file should exist");
+    }
+
+    @Test
+    void testActualExpectModule() {
+        // Ensure python3-pexpect is installed
+        connection.execCommand("apt-get update && apt-get install -y python3-pexpect", new BecomeContext(true, "sudo", "root", "", null), null);
+
+        // Create a simple interactive script
+        String scriptPath = "/tmp/interactive.sh";
+        connection.execCommand("sh -c \"echo '#!/bin/sh\\necho -n \\\"What is your name? \\\"\\nread name\\necho \\\"Hello, $name!\\\"' > " + scriptPath + " && chmod +x " + scriptPath + "\"", BecomeContext.empty(), null);
+
+        Task task = new Task("test_expect", "expect", Map.of(
+                "command", scriptPath,
+                "responses", Map.of("What is your name?", "Ansible")
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Expect module failed: " + result.message());
+        assertTrue(result.data().get("stdout").toString().contains("Hello, Ansible!"), "Output should contain the response");
+    }
+
+    @Test
+    void testActualSubversionModule() {
+        // Ensure subversion is installed
+        connection.execCommand("apt-get update && apt-get install -y subversion", new BecomeContext(true, "sudo", "root", "", null), null);
+
+        // Note: Testing SVN usually requires a repository.
+        // We can use a local 'file://' repo for testing.
+        String repoPath = "/tmp/svn-repo";
+        String checkoutPath = "/tmp/svn-checkout";
+        connection.execCommand("rm -rf " + repoPath + " " + checkoutPath, BecomeContext.empty(), null);
+        connection.execCommand("svnadmin create " + repoPath, BecomeContext.empty(), null);
+
+        Task task = new Task("test_subversion", "subversion", Map.of(
+                "repo", "file://" + repoPath,
+                "dest", checkoutPath
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Subversion module failed: " + result.message());
+        var execResult = connection.execCommand("ls -d " + checkoutPath + "/.svn", BecomeContext.empty(), null);
+        assertEquals(0, execResult.exitCode(), "Checkout directory should be a subversion repo");
+    }
+
+    @Test
+    void testActualWaitForConnectionModule() {
+        // wait_for_connection is an Action Plugin that waits for the system to be reachable.
+        // In this environment, it should succeed immediately.
+        Task task = new Task("test_wait_for_connection", "wait_for_connection", Map.of(
+                "timeout", 5
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Wait_for_connection failed: " + result.message());
+    }
 }
