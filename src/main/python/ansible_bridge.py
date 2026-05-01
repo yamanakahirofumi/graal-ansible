@@ -84,7 +84,7 @@ def _deep_convert(obj: Any) -> Any:
     if hasattr(obj, 'getClass'):
         from java.util import Map, List as JavaList, Set as JavaSet
         if isinstance(obj, Map):
-            return {str(k): _deep_convert(v) for k, v in obj.items()}
+            return {str(k): _deep_convert(obj.get(k)) for k in obj}
         if isinstance(obj, (JavaList, JavaSet)):
             return [_deep_convert(i) for i in obj]
 
@@ -188,16 +188,18 @@ class MockShell:
         return " ".join(["%s=%s" % (k, v) for k, v in kwargs.items()]) + " "
     def path_has_trailing_slash(self, path: Union[str, List[str]]) -> bool:
         if isinstance(path, list):
-            if len(path) > 0: path = path[0]
+            if len(path) > 0: p_val = path[0]
             else: return False
-        return str(path).endswith('/') or str(path).endswith('\\')
+        else: p_val = path
+        return str(p_val).endswith('/') or str(p_val).endswith('\\')
     def join_path(self, *args: Any) -> str:
         cleaned_args = []
         for a in args:
             if isinstance(a, list):
-                if len(a) > 0: a = a[0]
-                else: a = ""
-            cleaned_args.append(str(a))
+                if len(a) > 0: a_val = a[0]
+                else: a_val = ""
+            else: a_val = a
+            cleaned_args.append(str(a_val))
         return os.path.join(*cleaned_args)
     def expand_user(self, path: str, *args: Any, **kwargs: Any) -> str:
         return path
@@ -253,25 +255,15 @@ class ActionBase:
             else: res[k] = None
         return types.SimpleNamespace(error=None, warning=None), res
     def _execute_module(self, module_name: Optional[str] = None, module_args: Optional[Dict[str, Any]] = None, tmp: Optional[str] = None, task_vars: Optional[Dict[str, Any]] = None, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+        import ansible_bridge
         m_name = module_name or self._task.action
         m_args = module_args or self._task.args
         if 'task_executor_java' in globals():
             res = task_executor_java.execute_from_python(m_name, m_args, task_vars or {})
             if res is not None:
-                try:
-                    r_dict = {str(k): v for k, v in res.items()}
-                except:
-                    try:
-                        r_dict = {str(k): v for k, v in res.data().items()}
-                        r_dict['failed'] = not res.success()
-                        r_dict['changed'] = res.changed()
-                    except:
-                        s = str(res)
-                        if 'data=' in s:
-                            r_dict = {'changed': 'changed=true' in s.lower()}
-                        else:
-                            r_dict = {'failed': True, 'msg': 'Failed to bridge module result'}
-
+                r_dict = ansible_bridge._deep_convert(res)
+                if not isinstance(r_dict, dict):
+                    r_dict = {'failed': True, 'msg': f'Failed to bridge module result: {str(r_dict)}'}
                 if 'changed' not in r_dict: r_dict['changed'] = True
                 return r_dict
             return {'changed': True}
