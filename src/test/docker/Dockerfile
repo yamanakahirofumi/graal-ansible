@@ -13,6 +13,9 @@ RUN apt-get update \
     git \
     cron \
     iptables \
+    python3-debian \
+    python3-pexpect \
+    subversion \
  && rm -rf /var/lib/apt/lists/*
 
 RUN useradd -m -s /bin/bash testuser \

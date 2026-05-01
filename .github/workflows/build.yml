@@ -21,7 +21,7 @@ jobs:
       - name: Build test Docker image
         if: runner.os == 'Linux'
         run: |
-          docker build -t mokojarasi/test-python-sshd:latest src/test/docker/
+          docker build -t graal-ansible/test-node:latest src/test/docker/
       - name: Set up GraalVM
         uses: graalvm/setup-graalvm@v1
         with:

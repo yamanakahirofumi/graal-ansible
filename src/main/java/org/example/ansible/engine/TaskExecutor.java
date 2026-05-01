@@ -577,7 +577,14 @@ public class TaskExecutor implements ITaskExecutor {
             final boolean failed = Boolean.TRUE.equals(resultMap.get("failed"));
             if (failed) {
                 if (resultMap.containsKey("traceback")) {
-                    System.err.println(resultMap.get("traceback"));
+                    int verbosity = 0;
+                    if (taskVars.containsKey("ansible_verbosity")) {
+                        Object v = taskVars.get("ansible_verbosity");
+                        if (v instanceof Number n) verbosity = n.intValue();
+                    }
+                    if (verbosity >= 3) {
+                        System.err.println(resultMap.get("traceback"));
+                    }
                 }
                 return new TaskResult(false, false, "Action Plugin failed: " + resultMap.get("msg"), resultMap);
             }

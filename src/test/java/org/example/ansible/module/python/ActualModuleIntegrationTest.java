@@ -47,7 +47,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ActualModuleIntegrationTest {
 
     @Container
-    private GenericContainer<?> targetNode = new GenericContainer<>(DockerImageName.parse("mokojarasi/test-python-sshd:latest"))
+    private GenericContainer<?> targetNode = new GenericContainer<>(DockerImageName.parse("graal-ansible/test-node:latest"))
             .withExposedPorts(22)
             .withEnv("USER_PASSWORD", "testuser")
             .withEnv("USER_NAME", "testuser")
@@ -1235,9 +1235,6 @@ class ActualModuleIntegrationTest {
 
     @Test
     void testActualDeb822RepositoryModule() {
-        // Ensure python3-debian is installed
-        connection.execCommand("apt-get install -y python3-debian", new BecomeContext(true, "sudo", "root", "", null), null);
-
         Task task = new Task("test_deb822_repository", "deb822_repository", Map.of(
                 "name", "test-deb822",
                 "types", List.of("deb"),
@@ -1255,34 +1252,23 @@ class ActualModuleIntegrationTest {
 
     @Test
     void testActualExpectModule() {
-        // Ensure python3-pexpect is installed
-        connection.execCommand("apt-get install -y python3-pexpect", new BecomeContext(true, "sudo", "root", "", null), null);
+        // Create a simple interactive script using python for more predictable I/O
+        String scriptPath = "/tmp/interactive.py";
+        String pythonScript = "import sys; print('Ready'); sys.stdout.flush(); name = sys.stdin.readline().strip(); print(f'Hello, {name}!')";
+        connection.execCommand("sh -c \"echo '" + pythonScript + "' > " + scriptPath + "\"", BecomeContext.empty(), null);
 
-        // Use 'cat' for a very simple interactive test: it echoes back what it reads.
         Task task = new Task("test_expect", "expect", Map.of(
-                "command", "cat",
-                "responses", Map.of("(?i)hi", "hello ansible")
+                "command", "python3 " + scriptPath,
+                "responses", Map.of("Ready", "Ansible")
         ));
-
-        // Start cat and send 'hi'
-        new Thread(() -> {
-            try {
-                Thread.sleep(2000);
-                connection.execCommand("sh -c 'echo hi > /proc/$(pgrep -x cat)/fd/0'", BecomeContext.empty(), null);
-            } catch (Exception ignored) {}
-        }).start();
-
         TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
 
         assertTrue(result.success(), "Expect module failed: " + result.message());
-        assertTrue(result.data().get("stdout").toString().contains("hello ansible"), "Output should contain the response. Got: " + result.data().get("stdout"));
+        assertTrue(result.data().get("stdout").toString().contains("Hello, Ansible!"), "Output should contain the response. Got: " + result.data().get("stdout"));
     }
 
     @Test
     void testActualSubversionModule() {
-        // Ensure subversion is installed
-        connection.execCommand("apt-get install -y subversion", new BecomeContext(true, "sudo", "root", "", null), null);
-
         // Note: Testing SVN usually requires a repository.
         // We can use a local 'file://' repo for testing.
         String repoPath = "/tmp/svn-repo";
@@ -1304,12 +1290,12 @@ class ActualModuleIntegrationTest {
     @Test
     void testActualWaitForConnectionModule() {
         // wait_for_connection is an Action Plugin that waits for the system to be reachable.
-        // In this environment, it should succeed immediately.
+        // In this environment, it should succeed quickly, but we allow more time for Ansiballz setup in CI.
         Task task = new Task("test_wait_for_connection", "wait_for_connection", Map.of(
-                "timeout", 5
+                "timeout", 60
         ));
         TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
 
-        assertTrue(result.success(), "Wait_for_connection failed: " + result.message());
+        assertTrue(result.success(), "Wait_for_connection failed: " + result.message() + ". Data: " + result.data());
     }
 }

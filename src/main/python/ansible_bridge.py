@@ -256,25 +256,26 @@ class ActionBase:
         m_name = module_name or self._task.action
         m_args = module_args if module_args is not None else self._task.args
         if 'task_executor_java' in globals():
-            res = task_executor_java.execute_from_python(m_name, m_args, task_vars or {})
-            if res is not None:
-                try:
-                    r_dict = {str(k): v for k, v in res.items()}
-                except:
-                    try:
-                        r_dict = {str(k): v for k, v in res.data().items()}
+            try:
+                res = task_executor_java.execute_from_python(m_name, m_args, task_vars or {})
+                if res is not None:
+                    # Polyglot Maps may not always behave exactly like dicts, convert carefully
+                    r_dict = {}
+                    if hasattr(res, 'items'):
+                        for k, v in res.items(): r_dict[str(k)] = v
+                    elif hasattr(res, 'data'):
+                        data = res.data()
+                        for k, v in data.items(): r_dict[str(k)] = v
                         r_dict['failed'] = not res.success()
                         r_dict['changed'] = res.changed()
-                    except:
-                        s = str(res)
-                        if 'data=' in s:
-                            r_dict = {'changed': 'changed=true' in s.lower()}
-                        else:
-                            r_dict = {'failed': True, 'msg': 'Failed to bridge module result'}
+                        if res.message(): r_dict['msg'] = res.message()
 
-                if 'changed' not in r_dict: r_dict['changed'] = True
-                return r_dict
-            return {'changed': True}
+                    if 'failed' not in r_dict: r_dict['failed'] = False
+                    if 'changed' not in r_dict: r_dict['changed'] = False
+                    return r_dict
+                return {'failed': True, 'msg': f'Module {m_name} returned None'}
+            except Exception as e:
+                return {'failed': True, 'msg': f'Exception during module execution: {str(e)}'}
         return {'failed': True, 'msg': 'task_executor_java not available'}
     def _remove_tmp_path(self, *args: Any, **kwargs: Any) -> None: pass
     def _find_needle(self, name: str, needle: str, *args: Any, **kwargs: Any) -> str:
@@ -627,13 +628,13 @@ def apply_mocks() -> None:
         elif name.startswith('ansible.legacy.'): name = name[15:]
         for p in sys.path:
             if os.path.exists(os.path.join(p, 'ansible/modules', name + '.py')): return True
-        return name in ['apt', 'service', 'systemd', 'sysvinit', 'command', 'shell', 'setup']
+        return name in ['apt', 'service', 'systemd', 'sysvinit', 'command', 'shell', 'setup', 'ping']
 
     def mock_find_plugin_with_context(*args, **kwargs):
         name = args[1] if len(args) > 1 else args[0]
         if not name or not isinstance(name, str): name = str(name)
         fqcn = name
-        if name in ['apt', 'service', 'systemd', 'sysvinit', 'command', 'shell', 'setup'] and not name.startswith('ansible.'):
+        if name in ['apt', 'service', 'systemd', 'sysvinit', 'command', 'shell', 'setup', 'ping'] and not name.startswith('ansible.'):
             fqcn = 'ansible.legacy.' + name
         return type('Ctx', (), {
             'resolved_path': None, 'plugin_resolved_name': name, 'redirect_list': None,
