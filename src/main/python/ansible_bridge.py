@@ -254,7 +254,7 @@ class ActionBase:
         return types.SimpleNamespace(error=None, warning=None), res
     def _execute_module(self, module_name: Optional[str] = None, module_args: Optional[Dict[str, Any]] = None, tmp: Optional[str] = None, task_vars: Optional[Dict[str, Any]] = None, *args: Any, **kwargs: Any) -> Dict[str, Any]:
         m_name = module_name or self._task.action
-        m_args = module_args or self._task.args
+        m_args = module_args if module_args is not None else self._task.args
         if 'task_executor_java' in globals():
             res = task_executor_java.execute_from_python(m_name, m_args, task_vars or {})
             if res is not None:
