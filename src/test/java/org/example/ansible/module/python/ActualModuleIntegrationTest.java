@@ -1258,18 +1258,19 @@ class ActualModuleIntegrationTest {
         // Ensure python3-pexpect is installed
         connection.execCommand("apt-get update && apt-get install -y python3-pexpect", new BecomeContext(true, "sudo", "root", "", null), null);
 
-        // Create a simple interactive script
-        String scriptPath = "/tmp/interactive.sh";
-        connection.execCommand("sh -c \"echo '#!/bin/sh\\necho -n \\\"What is your name? \\\"\\nread name\\necho \\\"Hello, $name!\\\"' > " + scriptPath + " && chmod +x " + scriptPath + "\"", BecomeContext.empty(), null);
+        // Create a simple interactive script using python for more predictable I/O
+        String scriptPath = "/tmp/interactive.py";
+        String pythonScript = "import sys; print('What is your name? ', end='', flush=True); name = sys.stdin.readline().strip(); print(f'Hello, {name}!')";
+        connection.execCommand("sh -c \"echo '" + pythonScript + "' > " + scriptPath + "\"", BecomeContext.empty(), null);
 
         Task task = new Task("test_expect", "expect", Map.of(
-                "command", scriptPath,
+                "command", "python3 " + scriptPath,
                 "responses", Map.of("What is your name?", "Ansible")
         ));
         TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
 
         assertTrue(result.success(), "Expect module failed: " + result.message());
-        assertTrue(result.data().get("stdout").toString().contains("Hello, Ansible!"), "Output should contain the response");
+        assertTrue(result.data().get("stdout").toString().contains("Hello, Ansible!"), "Output should contain the response. Got: " + result.data().get("stdout"));
     }
 
     @Test
