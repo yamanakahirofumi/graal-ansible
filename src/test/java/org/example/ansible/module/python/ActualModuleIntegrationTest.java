@@ -1232,4 +1232,74 @@ class ActualModuleIntegrationTest {
         assertTrue(result.data().containsKey("before"), "before should be present in result");
         assertTrue(result.data().containsKey("after"), "after should be present in result");
     }
+
+    @Test
+    void testActualDeb822RepositoryModule() {
+        // Install dependency
+        connection.execCommand("apt-get update && apt-get install -y python3-debian", new BecomeContext(true, "sudo", "root", "", null), null);
+
+        Task task = new Task("test_deb822_repository", "deb822_repository", Map.of(
+                "name", "test-deb822",
+                "types", "deb",
+                "uris", "http://deb.debian.org/debian",
+                "suites", "bookworm",
+                "components", "main",
+                "state", "present"
+        ));
+        TaskResult result = taskExecutor.execute(task, new BecomeContext(true, "sudo", "root", "", null), connection, null);
+
+        assertTrue(result.success(), "deb822_repository module failed: " + result.message());
+        assertTrue(result.changed());
+
+        var execResult = connection.execCommand("ls /etc/apt/sources.list.d/test-deb822.sources", BecomeContext.empty(), null);
+        assertEquals(0, execResult.exitCode(), "Repository file should exist");
+    }
+
+    @Test
+    void testActualExpectModule() {
+        // Install dependency
+        connection.execCommand("apt-get update && apt-get install -y python3-pexpect", new BecomeContext(true, "sudo", "root", "", null), null);
+
+        Task task = new Task("test_expect", "expect", Map.of(
+                "command", "python3 -c \"print(input('Enter: '))\"",
+                "responses", Map.of("Enter: ", "hello")
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "expect module failed: " + result.message());
+        assertTrue(result.data().get("stdout").toString().contains("hello"));
+    }
+
+    @Test
+    void testActualSubversionModule() {
+        // Install dependency
+        connection.execCommand("apt-get update && apt-get install -y subversion", new BecomeContext(true, "sudo", "root", "", null), null);
+
+        String repoPath = "/tmp/svn-repo";
+        String checkoutPath = "/tmp/svn-checkout";
+        connection.execCommand("rm -rf " + repoPath + " " + checkoutPath, BecomeContext.empty(), null);
+        connection.execCommand("svnadmin create " + repoPath, BecomeContext.empty(), null);
+
+        Task task = new Task("test_subversion", "subversion", Map.of(
+                "repo", "file://" + repoPath,
+                "dest", checkoutPath
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "subversion module failed: " + result.message());
+        assertTrue(result.changed());
+
+        var execResult = connection.execCommand("ls -d " + checkoutPath + "/.svn", BecomeContext.empty(), null);
+        assertEquals(0, execResult.exitCode(), "Checkout directory should exist");
+    }
+
+    @Test
+    void testActualWaitForConnectionModule() {
+        Task task = new Task("test_wait_for_connection", "wait_for_connection", Map.of(
+                "timeout", 10
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "wait_for_connection module failed: " + result.message());
+    }
 }
