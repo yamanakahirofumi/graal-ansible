@@ -16,7 +16,7 @@
 
 | コレクション / モジュール | Target: Linux | Target: macOS | Target: Windows | 備考 |
 | :--- | :---: | :---: | :---: | :--- |
-| **ansible.builtin** | △ | ？ | ？ | Linux で全 72 モジュールを一覧化。うち 61 モジュールの動作確認済 。 |
+| **ansible.builtin** | △ | ？ | ？ | Linux で全 72 モジュールを一覧化。うち 65 モジュールの動作確認済 。 |
 | - `debug` | ◎ | ○ | ○ | オリジナル Python ソースコードにより検証済。 |
 | - `ping` | ◎ | ○ | - | オリジナル Python ソースコードにより検証済。 |
 | - `copy` | ◎ | ○ | - | オリジナル Python ソースコードにより検証済。 |
@@ -45,15 +45,15 @@
 | - `assemble` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
 | - `async_status` | △ | ？ | ？ | ロード確認済。 |
 | - `async_wrapper` | △ | ？ | ？ | ロード確認済。 |
-| - `blockinfile` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `cron` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `deb822_repository` | △ | ？ | - | ロード確認済。 |
-| - `debconf` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
+| - `blockinfile` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済. |
+| - `cron` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済. |
+| - `deb822_repository` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済. |
+| - `debconf` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済. |
 | - `dnf` | △ | ？ | - | ロード確認済。現在の開発・検証環境（Debian系）では動作確認が不可能。 |
 | - `dnf5` | △ | ？ | - | ロード確認済。現在の開発・検証環境（Debian系）では動作確認が不可能。 |
-| - `dpkg_selections` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `expect` | △ | ？ | - | ロード確認済。 |
-| - `fetch` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
+| - `dpkg_selections` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済. |
+| - `expect` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済. |
+| - `fetch` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済. |
 | - `get_url` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
 | - `getent` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
 | - `git` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
@@ -76,18 +76,18 @@
 | - `reboot` | △ | ？ | ？ | ロード確認済。 |
 | - `rpm_key` | △ | ？ | - | ロード確認済。現在の開発・検証環境（Debian系）では動作確認が不可能。 |
 | - `script` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `service` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `service_facts` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `set_stats` | ◎ | ？ | ？ | オリジナル Python ソースコードにより検証済。 |
-| - `subversion` | △ | ？ | - | ロード確認済。 |
-| - `systemd` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
+| - `service` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済. |
+| - `service_facts` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済. |
+| - `set_stats` | ◎ | ？ | ？ | オリジナル Python ソースコードにより検証済. |
+| - `subversion` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済. |
+| - `systemd` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済. |
 | - `systemd_service` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
 | - `sysvinit` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
 | - `unarchive` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
 | - `uri` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `validate_argument_spec` | ◎ | ？ | ？ | オリジナル Python ソースコードにより検証済。 |
-| - `wait_for` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `wait_for_connection` | △ | ？ | ？ | ロード確認済。 |
+| - `validate_argument_spec` | ◎ | ？ | ？ | オリジナル Python ソースコードにより検証済. |
+| - `wait_for` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済. |
+| - `wait_for_connection` | ◎ | ？ | ？ | オリジナル Python ソースコードにより検証済. |
 | - `yum_repository` | △ | ？ | - | ロード確認済。現在の開発・検証環境（Debian系）では動作確認が不可能。 |
 | **ansible.posix** | ？ | ？ | - | コレクション全体のロードを検証中。 |
 | **ansible.utils** | ？ | ？ | ？ | 基本的なフィルタの動作を確認中。 |
@@ -108,8 +108,8 @@
 100% の互換性と最適化を目指し、以下の 3 つのフェーズで開発を進めています。詳細は [コレクション実装ロードマップ](../implementation/Collection-Implementation-Roadmap.md) を参照してください。
 
 - **フェーズ 1: Ansible 本体の完全ロードと基本動作の実現 (In Progress)**
-  - Linux/macOS 上での主要モジュール（[Module-Compatibility.md](Module-Compatibility.md) の対象コレクションすべて）の動作確認。
-  - **進捗**: 61 / 72 モジュールの動作確認済（うち 57 モジュールは統合テスト ◎、4 モジュールはエンジン検証 ○）。
+  - Linux/macOS 上での主要モジュール（[Module-Compatibility.md](Module-Compatibility.md) の対象コレクションすべて）の動作確認.
+  - **進捗**: 65 / 72 モジュールの動作確認済（うち 61 モジュールは統合テスト ◎、4 モジュールはエンジン検証 ○）。
   - **完了条件**:
     - ビルド時の `pip` による `ansible-core` 取得の自動化。
     - GraalPy へのライブラリパス統合。
