@@ -240,6 +240,7 @@ class ActionBase:
         self._display = self.display = sys.modules.get('ansible.utils.display', types.SimpleNamespace(display=Display())).display
         self._supports_check_mode = True
         self._supports_async = False
+        self._discovered_interpreter_key = None
     def run(self, tmp: Optional[str] = None, task_vars: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         return {'changed': False, 'failed': False}
     def validate_argument_spec(self, argument_spec: Dict[str, Any], *args: Any, **kwargs: Any) -> Tuple[Any, Dict[str, Any]]:

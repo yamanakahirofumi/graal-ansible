@@ -1238,9 +1238,11 @@ class ActualModuleIntegrationTest {
         // 1. Install dependencies
         Task installTask = new Task("install_python3_debian", "apt", Map.of(
                 "name", "python3-debian",
-                "state", "present"
+                "state", "present",
+                "update_cache", "yes"
         ));
-        taskExecutor.execute(installTask, new BecomeContext(true, "sudo", "root", "", null), connection, null);
+        TaskResult installResult = taskExecutor.execute(installTask, new BecomeContext(true, "sudo", "root", "", null), connection, null);
+        assertTrue(installResult.success(), "Failed to install python3-debian: " + installResult.message());
 
         // 2. Use deb822_repository
         String repoName = "test-deb822";
@@ -1267,9 +1269,11 @@ class ActualModuleIntegrationTest {
         // 1. Install dependencies
         Task installTask = new Task("install_python3_pexpect", "apt", Map.of(
                 "name", "python3-pexpect",
-                "state", "present"
+                "state", "present",
+                "update_cache", "yes"
         ));
-        taskExecutor.execute(installTask, new BecomeContext(true, "sudo", "root", "", null), connection, null);
+        TaskResult installResult = taskExecutor.execute(installTask, new BecomeContext(true, "sudo", "root", "", null), connection, null);
+        assertTrue(installResult.success(), "Failed to install python3-pexpect: " + installResult.message());
 
         // 2. Use expect
         Task task = new Task("test_expect", "expect", Map.of(
@@ -1287,9 +1291,11 @@ class ActualModuleIntegrationTest {
         // 1. Install dependencies
         Task installTask = new Task("install_subversion", "apt", Map.of(
                 "name", "subversion",
-                "state", "present"
+                "state", "present",
+                "update_cache", "yes"
         ));
-        taskExecutor.execute(installTask, new BecomeContext(true, "sudo", "root", "", null), connection, null);
+        TaskResult installResult = taskExecutor.execute(installTask, new BecomeContext(true, "sudo", "root", "", null), connection, null);
+        assertTrue(installResult.success(), "Failed to install subversion: " + installResult.message());
 
         // 2. Prepare local svn repo
         String repoPath = "/tmp/test-svn-repo";
