@@ -15,7 +15,7 @@
 
 ### [ ] Ansible 本体の完全ロードと基本動作の実現 (フェーズ1)
 - **概要**: `ansible-core` を完全にロードし、Linux/macOS での全 72 モジュールの動作確認。
-- **詳細は [Module-Support-Status.md](features/Module-Support-Status.md) を参照。** (現在 61/72 モジュール検証済み: 57 ◎, 4 ○)
+- **詳細は [Module-Support-Status.md](features/Module-Support-Status.md) を参照。** (現在 65/72 モジュール検証済み: 61 ◎, 4 ○)
 - **テスト拡充戦略については [Test-Expansion-Strategy.md](tech/Test-Expansion-Strategy.md) を参照。**
 - **注意**: `python.IsolateNativeModules` と `python.PosixModuleBackend` はフェーズ 1 においては原則として固定（Linuxでは安定のため True/Native）とする。
 - **備考**: 検証には必要に応じて **Testcontainers** を**ターゲットノード**として活用する。全モジュールの検証完了をもってフェーズ 1 完了とする。
@@ -49,7 +49,7 @@
 - **完了日**: 2026-07-26
 - **概要**: [実際のコレクションを使ったテスト方法の設計](tech/Actual-Collection-Testing.md) に基づき、主要なモジュールのテストを統合。
 - **解決策**:
-    - `ping`, `copy`, `file`, `stat`, `template`, `debug`, `command`, `shell`, `setup`, `lineinfile`, `replace`, `user`, `group`, `find`, `tempfile`, `hostname`, `slurp`, `assert`, `blockinfile`, `getent`, `fetch`, `uri`, `unarchive`, `include_vars`, `include_tasks`, `import_tasks`, `set_fact`, `add_host`, `fail`, `get_url`, `group_by`, `gather_facts`, `assemble`, `script`, `package_facts`, `apt`, `apt_key`, `apt_repository`, `service_facts`, `systemd`, `systemd_service`, `raw`, `set_stats`, `validate_argument_spec`, `pip`, `wait_for`, `debconf`, `sysvinit`, `package`, `service`, `git`, `cron`, `iptables`, `known_hosts`, `import_playbook`, `pause`, `meta`, `import_role`, `include_role`, `mount_facts`, `dpkg_selections` の計 61 モジュールの動作確認済み（うち 57 モジュールは統合テスト ◎、4 モジュールはエンジン検証 ○）。
+    - `ping`, `copy`, `file`, `stat`, `template`, `debug`, `command`, `shell`, `setup`, `lineinfile`, `replace`, `user`, `group`, `find`, `tempfile`, `hostname`, `slurp`, `assert`, `blockinfile`, `getent`, `fetch`, `uri`, `unarchive`, `include_vars`, `include_tasks`, `import_tasks`, `set_fact`, `add_host`, `fail`, `get_url`, `group_by`, `gather_facts`, `assemble`, `script`, `package_facts`, `apt`, `apt_key`, `apt_repository`, `service_facts`, `systemd`, `systemd_service`, `raw`, `set_stats`, `validate_argument_spec`, `pip`, `wait_for`, `debconf`, `sysvinit`, `package`, `service`, `git`, `cron`, `iptables`, `known_hosts`, `import_playbook`, `pause`, `meta`, `import_role`, `include_role`, `mount_facts`, `dpkg_selections`, `deb822_repository`, `expect`, `subversion`, `wait_for_connection` の計 65 モジュールの動作確認済み（うち 61 モジュールは統合テスト ◎、4 モジュールはエンジン検証 ○）。
     - GraalPy および `ansible-core` のセットアップを GitHub Actions 上で自動化済み。
 
 ### [✓] Action Plugin の互換性向上 (Python-first)

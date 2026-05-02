@@ -113,3 +113,17 @@ void testIdempotency() {
 
 - **Docker の必要性**: 統合テストの実行には Docker 環境が必要です。
 - **プラットフォーム制限**: 一部のモジュール（`user`, `group` 等）はターゲットが Linux であることを前提としているため、テスト実行環境の OS 制約に注意してください。
+
+## 7. システムレベルの依存関係 (System level dependencies)
+
+一部のモジュールは、ターゲットノードまたは管理ノードにおいて追加のシステムパッケージを必要とします。統合テストでは、これらのパッケージを事前にインストールする必要があります。
+
+| モジュール | 必要なシステムパッケージ / ライブラリ | 備考 |
+| :--- | :--- | :--- |
+| `deb822_repository` | `python3-debian` | APT 形式の解析に必要。 |
+| `expect` | `python3-pexpect` | インタラクティブな応答制御に必要。 |
+| `subversion` | `subversion` | SVN リポジトリ操作に必要。 |
+| `pip` | `python3-pip` | Debian Bookworm 以降では `--break-system-packages` が必要。 |
+| `git` | `git` | Git リポジトリ操作に必要。 |
+| `cron` | `cron` | cron ジョブの管理に必要。 |
+| `iptables` | `iptables` | ファイアウォールルールの操作に必要。 |

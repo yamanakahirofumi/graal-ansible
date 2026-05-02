@@ -1232,4 +1232,92 @@ class ActualModuleIntegrationTest {
         assertTrue(result.data().containsKey("before"), "before should be present in result");
         assertTrue(result.data().containsKey("after"), "after should be present in result");
     }
+
+    @Test
+    void testActualDeb822RepositoryModule() {
+        // 1. Install python3-debian
+        Task taskInstall = new Task("install_python3_debian", "apt", Map.of(
+                "name", "python3-debian",
+                "state", "present",
+                "update_cache", "yes"
+        ));
+        TaskResult resultInstall = taskExecutor.execute(taskInstall, new BecomeContext(true, "sudo", "root", "", null), connection, null);
+        assertTrue(resultInstall.success(), "Failed to install python3-debian: " + resultInstall.message());
+
+        // 2. Add repo using deb822_repository
+        Task taskRepo = new Task("test_deb822_repository", "deb822_repository", Map.of(
+                "name", "test-deb822",
+                "types", List.of("deb"),
+                "uris", List.of("http://deb.debian.org/debian"),
+                "suites", List.of("bookworm"),
+                "components", List.of("main"),
+                "state", "present"
+        ));
+        TaskResult resultRepo = taskExecutor.execute(taskRepo, new BecomeContext(true, "sudo", "root", "", null), connection, null);
+        assertTrue(resultRepo.success(), "deb822_repository failed: " + resultRepo.message());
+
+        // 3. Verify file creation
+        var execResult = connection.execCommand("ls /etc/apt/sources.list.d/test-deb822.sources", BecomeContext.empty(), null);
+        assertEquals(0, execResult.exitCode(), "Repository file should exist");
+    }
+
+    @Test
+    void testActualExpectModule() {
+        // 1. Install python3-pexpect
+        Task taskInstall = new Task("install_pexpect", "apt", Map.of(
+                "name", "python3-pexpect",
+                "state", "present",
+                "update_cache", "yes"
+        ));
+        TaskResult resultInstall = taskExecutor.execute(taskInstall, new BecomeContext(true, "sudo", "root", "", null), connection, null);
+        assertTrue(resultInstall.success(), "Failed to install python3-pexpect: " + resultInstall.message());
+
+        // 2. Run expect
+        Task taskExpect = new Task("test_expect", "expect", Map.of(
+                "command", "sh -c \"echo 'Question?'; read response; echo 'You said: ' $response\"",
+                "responses", Map.of("Question?", "Answer")
+        ));
+        TaskResult resultExpect = taskExecutor.execute(taskExpect, BecomeContext.empty(), connection, null);
+        assertTrue(resultExpect.success(), "expect module failed: " + resultExpect.message());
+        assertTrue(resultExpect.data().get("stdout").toString().contains("You said:  Answer"));
+    }
+
+    @Test
+    void testActualSubversionModule() {
+        // 1. Install subversion
+        Task taskInstall = new Task("install_svn", "apt", Map.of(
+                "name", "subversion",
+                "state", "present",
+                "update_cache", "yes"
+        ));
+        TaskResult resultInstall = taskExecutor.execute(taskInstall, new BecomeContext(true, "sudo", "root", "", null), connection, null);
+        assertTrue(resultInstall.success(), "Failed to install subversion: " + resultInstall.message());
+
+        // 2. Setup local SVN repo
+        String repoPath = "/tmp/svn-repo";
+        String checkoutPath = "/tmp/svn-checkout";
+        connection.execCommand("rm -rf " + repoPath + " " + checkoutPath, BecomeContext.empty(), null);
+        connection.execCommand("svnadmin create " + repoPath, BecomeContext.empty(), null);
+
+        // 3. Checkout using subversion module
+        Task taskSvn = new Task("test_svn", "subversion", Map.of(
+                "repo", "file://" + repoPath,
+                "dest", checkoutPath
+        ));
+        TaskResult resultSvn = taskExecutor.execute(taskSvn, BecomeContext.empty(), connection, null);
+        assertTrue(resultSvn.success(), "subversion module failed: " + resultSvn.message());
+
+        // 4. Verify checkout
+        var execResult = connection.execCommand("ls -d " + checkoutPath + "/.svn", BecomeContext.empty(), null);
+        assertEquals(0, execResult.exitCode(), "Checkout directory should exist and be an SVN working copy");
+    }
+
+    @Test
+    void testActualWaitForConnectionModule() {
+        Task task = new Task("test_wait_for_connection", "wait_for_connection", Map.of(
+                "timeout", 10
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+        assertTrue(result.success(), "wait_for_connection failed: " + result.message());
+    }
 }
