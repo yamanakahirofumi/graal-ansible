@@ -113,3 +113,39 @@ void testIdempotency() {
 
 - **Docker の必要性**: 統合テストの実行には Docker 環境が必要です。
 - **プラットフォーム制限**: 一部のモジュール（`user`, `group` 等）はターゲットが Linux であることを前提としているため、テスト実行環境の OS 制約に注意してください。
+
+## 7. モジュールテストの Tips (Tips for Module Testing)
+
+実際の環境（特に Docker コンテナ）でテストを実行する際に、ハマりやすいポイントと推奨される対策です。
+
+### 7.1 環境依存のパラメータ
+- **pip モジュール**: Debian Bookworm 以降（PEP 668）では、システム全体の Python 環境へのインストールが制限されています。統合テストで `pip` モジュールを使用する場合は、`extra_args: "--break-system-packages"` を指定する必要があります。
+- **service/systemd モジュール**: Docker コンテナ内では init システムの自動判定が不安定になる場合があります。確実な動作のためには、`use: "service"` を明示的に指定することを推奨します。
+
+### 7.2 Java 側でのアサーション
+- **数値型の扱い**: GraalPy から返される数値データは Java 側で `Number` 型として扱われますが、期待値と比較する際は `((Number) result).intValue()` のように明示的に変換してください。これは、内部的な型（Long や Integer）の差異によるテスト失敗を防ぐためです。
+- **決定論的な検証**: `check_mode` や異常系のテストでは、`if (result.success())` のような条件分岐による成功判定を避け、`assertTrue` や `assertEquals` を用いて、期待されるステータスを断定的に検証してください。
+
+### 7.3 スレッドセーフティ
+- **SSH 接続の共有回避**: `wait_for` モジュールなどのテストでバックグラウンドスレッドを使用してターゲットノードを操作する場合、メインスレッドの `SshConnection` インスタンスを共有せず、スレッドごとに新しい接続を確立してください。これにより、並列実行時のセッション競合を回避できます。
+
+### 7.4 システムレベルの依存関係
+一部のモジュールは、ターゲットノードに特定のバイナリや Python ライブラリがインストールされている必要があります。テストの実行前に `apt` モジュール等でこれらをセットアップしてください。
+
+| モジュール | 必要なシステムパッケージ / 依存関係 |
+| :--- | :--- |
+| `deb822_repository` | `python3-debian` |
+| `expect` | `python3-pexpect` |
+| `subversion` | `subversion` |
+| `git` | `git` |
+| `iptables` | `iptables` |
+
+## 8. トラブルシューティング (Troubleshooting)
+
+### 8.1 制限のある環境での実行
+サンドボックス環境や制限された CI 環境では、`ActualModuleIntegrationTest` の実行中に Docker イメージのプルや抽出に失敗（例: Ryuk や SSHD イメージでの "operation not permitted"）することがあります。
+
+このような場合、統合テスト全体をパスさせるのが困難であれば、`YamlParserTest` や `VariableManagerTest` などのスタンドアロンなユニットテストを実行することで、コアエンジンのロジックが正常であることを確認してください。
+
+### 8.2 ログの確認
+GraalPy からの例外（`AttributeError` 等）やトレースバックは、標準エラー出力または `TaskResult.message()` に含まれます。統合テストが失敗した際は、これらの詳細ログを確認して、不足しているモンキーパッチや依存関係を特定してください。
