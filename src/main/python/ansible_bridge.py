@@ -84,7 +84,14 @@ def _deep_convert(obj: Any) -> Any:
     if hasattr(obj, 'getClass'):
         from java.util import Map, List as JavaList, Set as JavaSet
         if isinstance(obj, Map):
-            return {str(k): _deep_convert(v) for k, v in obj.items()}
+            try:
+                return {str(k): _deep_convert(v) for k, v in obj.items()}
+            except (AttributeError, TypeError):
+                # Fallback for complex Java Map proxies
+                res = {}
+                for entry in obj.entrySet():
+                    res[str(entry.getKey())] = _deep_convert(entry.getValue())
+                return res
         if isinstance(obj, (JavaList, JavaSet)):
             return [_deep_convert(i) for i in obj]
 
@@ -258,20 +265,10 @@ class ActionBase:
         if 'task_executor_java' in globals():
             res = task_executor_java.execute_from_python(m_name, m_args, task_vars or {})
             if res is not None:
-                try:
-                    r_dict = {str(k): v for k, v in res.items()}
-                except:
-                    try:
-                        r_dict = {str(k): v for k, v in res.data().items()}
-                        r_dict['failed'] = not res.success()
-                        r_dict['changed'] = res.changed()
-                    except:
-                        s = str(res)
-                        if 'data=' in s:
-                            r_dict = {'changed': 'changed=true' in s.lower()}
-                        else:
-                            r_dict = {'failed': True, 'msg': 'Failed to bridge module result'}
-
+                import ansible_bridge
+                r_dict = ansible_bridge._deep_convert(res)
+                if not isinstance(r_dict, dict):
+                    r_dict = {'failed': True, 'msg': f'Action Plugin received invalid result type: {type(r_dict)}'}
                 if 'changed' not in r_dict: r_dict['changed'] = True
                 return r_dict
             return {'changed': True}

@@ -596,13 +596,11 @@ public class TaskExecutor implements ITaskExecutor {
     public Map<String, Object> execute_from_python(String moduleName, Map<String, Object> moduleArgs, Map<String, Object> taskVars) {
         try {
             // Create a temporary task for the module execution
+            // Using constructor with defaults to avoid null pointer exceptions in downstream logic
             Task subTask = new Task(
                     "execute_from_python",
                     moduleName,
-                    moduleArgs,
-                    null, null, null, null, null, null, null, false,
-                    null, 0, 0, null, false, false, false, null, null, null,
-                    null, null, null, null, null, null
+                    moduleArgs
             );
 
             // Execute as a normal module, using the current connection and environment

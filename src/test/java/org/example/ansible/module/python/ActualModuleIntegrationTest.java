@@ -1261,7 +1261,9 @@ class ActualModuleIntegrationTest {
         // 3. Verify
         var execResult = connection.execCommand("ls /etc/apt/sources.list.d/" + repoName + ".sources", BecomeContext.empty(), null);
         assertEquals(0, execResult.exitCode(), "Repository file should exist");
-        assertTrue(connection.execCommand("cat /etc/apt/sources.list.d/" + repoName + ".sources", BecomeContext.empty(), null).stdout().toLowerCase().contains("http://deb.debian.org/debian"));
+        // Use become for cat as file might have restricted permissions
+        String content = connection.execCommand("cat /etc/apt/sources.list.d/" + repoName + ".sources", new BecomeContext(true, "sudo", "root", "", null), null).stdout().toLowerCase();
+        assertTrue(content.contains("http://deb.debian.org/debian"), "Repository content should contain the URI. Content was: " + content);
     }
 
     @Test
