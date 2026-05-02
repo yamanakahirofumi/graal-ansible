@@ -627,13 +627,13 @@ def apply_mocks() -> None:
         elif name.startswith('ansible.legacy.'): name = name[15:]
         for p in sys.path:
             if os.path.exists(os.path.join(p, 'ansible/modules', name + '.py')): return True
-        return name in ['apt', 'service', 'systemd', 'sysvinit', 'command', 'shell', 'setup']
+        return name in ['apt', 'service', 'systemd', 'sysvinit', 'command', 'shell', 'setup', 'ping']
 
     def mock_find_plugin_with_context(*args, **kwargs):
         name = args[1] if len(args) > 1 else args[0]
         if not name or not isinstance(name, str): name = str(name)
         fqcn = name
-        if name in ['apt', 'service', 'systemd', 'sysvinit', 'command', 'shell', 'setup'] and not name.startswith('ansible.'):
+        if name in ['apt', 'service', 'systemd', 'sysvinit', 'command', 'shell', 'setup', 'ping'] and not name.startswith('ansible.'):
             fqcn = 'ansible.legacy.' + name
         return type('Ctx', (), {
             'resolved_path': None, 'plugin_resolved_name': name, 'redirect_list': None,

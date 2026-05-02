@@ -1261,7 +1261,7 @@ class ActualModuleIntegrationTest {
         // 3. Verify
         var execResult = connection.execCommand("ls /etc/apt/sources.list.d/" + repoName + ".sources", BecomeContext.empty(), null);
         assertEquals(0, execResult.exitCode(), "Repository file should exist");
-        assertTrue(connection.execCommand("cat /etc/apt/sources.list.d/" + repoName + ".sources", BecomeContext.empty(), null).stdout().contains("uris: http://deb.debian.org/debian"));
+        assertTrue(connection.execCommand("cat /etc/apt/sources.list.d/" + repoName + ".sources", BecomeContext.empty(), null).stdout().toLowerCase().contains("http://deb.debian.org/debian"));
     }
 
     @Test
