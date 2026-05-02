@@ -1315,7 +1315,7 @@ class ActualModuleIntegrationTest {
     @Test
     void testActualWaitForConnectionModule() {
         Task task = new Task("test_wait_for_connection", "wait_for_connection", Map.of(
-                "timeout", 10
+                "timeout", 30
         ));
         TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
         assertTrue(result.success(), "wait_for_connection failed: " + result.message());

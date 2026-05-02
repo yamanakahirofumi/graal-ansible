@@ -253,8 +253,8 @@ class ActionBase:
             else: res[k] = None
         return types.SimpleNamespace(error=None, warning=None), res
     def _execute_module(self, module_name: Optional[str] = None, module_args: Optional[Dict[str, Any]] = None, tmp: Optional[str] = None, task_vars: Optional[Dict[str, Any]] = None, *args: Any, **kwargs: Any) -> Dict[str, Any]:
-        m_name = module_name or self._task.action
-        m_args = module_args or self._task.args
+        m_name = module_name if module_name is not None else self._task.action
+        m_args = module_args if module_args is not None else self._task.args
         if 'task_executor_java' in globals():
             res = task_executor_java.execute_from_python(m_name, m_args, task_vars or {})
             if res is not None:
@@ -627,16 +627,17 @@ def apply_mocks() -> None:
         elif name.startswith('ansible.legacy.'): name = name[15:]
         for p in sys.path:
             if os.path.exists(os.path.join(p, 'ansible/modules', name + '.py')): return True
-        return name in ['apt', 'service', 'systemd', 'sysvinit', 'command', 'shell', 'setup']
+            if os.path.exists(os.path.join(p, 'ansible/modules/system', name + '.py')): return True
+        return name in ['apt', 'service', 'systemd', 'sysvinit', 'command', 'shell', 'setup', 'ping', 'wait_for']
 
     def mock_find_plugin_with_context(*args, **kwargs):
         name = args[1] if len(args) > 1 else args[0]
         if not name or not isinstance(name, str): name = str(name)
         fqcn = name
-        if name in ['apt', 'service', 'systemd', 'sysvinit', 'command', 'shell', 'setup'] and not name.startswith('ansible.'):
+        if name in ['apt', 'service', 'systemd', 'sysvinit', 'command', 'shell', 'setup', 'ping', 'wait_for'] and not name.startswith('ansible.'):
             fqcn = 'ansible.legacy.' + name
         return type('Ctx', (), {
-            'resolved_path': None, 'plugin_resolved_name': name, 'redirect_list': None,
+            'resolved_path': None, 'plugin_resolved_name': name, 'redirect_list': [],
             'resolved_fqcn': fqcn, 'plugin_resolved_collection': 'ansible.builtin'
         })()
 
@@ -907,6 +908,10 @@ def _create_action_plugin(action_name: str, task: Any, connection: Any, play_con
                 bc = _current_task_context.get('become_context_java')
                 res = self._obj.execCommand(str(cmd), bc if sudoable else None, _current_task_context.get('environment_java'))
                 return int(res.exitCode()), str(res.stdout()), str(res.stderr())
+            def reset(self): pass
+            def get_option(self, name):
+                if name == 'timeout': return 10
+                return None
         c = Proxy(connection)
 
     return mod.ActionModule(task, c, play_context, l, templar, shared_loader_obj)
