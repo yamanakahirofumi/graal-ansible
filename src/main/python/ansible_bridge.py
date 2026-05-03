@@ -240,6 +240,7 @@ class ActionBase:
         self._display = self.display = sys.modules.get('ansible.utils.display', types.SimpleNamespace(display=Display())).display
         self._supports_check_mode = True
         self._supports_async = False
+        self._discovered_interpreter_key = None
     def run(self, tmp: Optional[str] = None, task_vars: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         return {'changed': False, 'failed': False}
     def validate_argument_spec(self, argument_spec: Dict[str, Any], *args: Any, **kwargs: Any) -> Tuple[Any, Dict[str, Any]]:
@@ -252,8 +253,8 @@ class ActionBase:
             else: res[k] = None
         return types.SimpleNamespace(error=None, warning=None), res
     def _execute_module(self, module_name: Optional[str] = None, module_args: Optional[Dict[str, Any]] = None, tmp: Optional[str] = None, task_vars: Optional[Dict[str, Any]] = None, *args: Any, **kwargs: Any) -> Dict[str, Any]:
-        m_name = module_name or self._task.action
-        m_args = module_args or self._task.args
+        m_name = module_name if module_name is not None else self._task.action
+        m_args = module_args if module_args is not None else self._task.args
         if 'task_executor_java' in globals():
             res = task_executor_java.execute_from_python(m_name, m_args, task_vars or {})
             if res is not None:
@@ -626,14 +627,17 @@ def apply_mocks() -> None:
         elif name.startswith('ansible.legacy.'): name = name[15:]
         for p in sys.path:
             if os.path.exists(os.path.join(p, 'ansible/modules', name + '.py')): return True
-        return name in ['apt', 'service', 'systemd', 'sysvinit', 'command', 'shell', 'setup']
+            # Also check subdirectories like 'system'
+            for sub in ['system', 'utilities', 'files', 'net_tools']:
+                if os.path.exists(os.path.join(p, 'ansible/modules', sub, name + '.py')): return True
+        return name in ['apt', 'service', 'systemd', 'sysvinit', 'command', 'shell', 'setup', 'ping', 'wait_for']
 
     def mock_find_plugin_with_context(*args, **kwargs):
         name = args[1] if len(args) > 1 else args[0]
         if not name or not isinstance(name, str): name = str(name)
         fqcn = name
-        if name in ['apt', 'service', 'systemd', 'sysvinit', 'command', 'shell', 'setup'] and not name.startswith('ansible.'):
-            fqcn = 'ansible.legacy.' + name
+        if not name.startswith('ansible.'):
+            fqcn = 'ansible.builtin.' + name
         return type('Ctx', (), {
             'resolved_path': None, 'plugin_resolved_name': name, 'redirect_list': None,
             'resolved_fqcn': fqcn, 'plugin_resolved_collection': 'ansible.builtin'
@@ -898,6 +902,10 @@ def _create_action_plugin(action_name: str, task: Any, connection: Any, play_con
             def __getattr__(self, name: str) -> Any:
                 if name == 'become': return self.become
                 return getattr(self._obj, name)
+            def reset(self): pass
+            def get_option(self, key):
+                if key == 'timeout': return 10
+                return None
             def fetch_file(self, remote_path: str, local_path: str) -> None:
                 rp, lp = _normalize_path(remote_path), _normalize_path(local_path)
                 from java.nio.file import Paths

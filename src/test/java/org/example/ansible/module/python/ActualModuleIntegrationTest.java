@@ -1232,4 +1232,87 @@ class ActualModuleIntegrationTest {
         assertTrue(result.data().containsKey("before"), "before should be present in result");
         assertTrue(result.data().containsKey("after"), "after should be present in result");
     }
+
+    @Test
+    void testActualDeb822RepositoryModule() {
+        // 1. Install dependency
+        Task taskDep = new Task("install_dependency", "apt", Map.of(
+                "name", "python3-debian",
+                "state", "present",
+                "update_cache", "yes"
+        ));
+        taskExecutor.execute(taskDep, new BecomeContext(true, "sudo", "root", "", null), connection, null);
+
+        // 2. Execute deb822_repository
+        Task task = new Task("test_deb822_repository", "deb822_repository", Map.of(
+                "name", "test-deb822",
+                "types", "deb",
+                "uris", "http://deb.debian.org/debian",
+                "suites", "bookworm",
+                "components", "main",
+                "state", "present"
+        ));
+        TaskResult result = taskExecutor.execute(task, new BecomeContext(true, "sudo", "root", "", null), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        var execResult = connection.execCommand("ls /etc/apt/sources.list.d/test-deb822.sources", BecomeContext.empty(), null);
+        assertEquals(0, execResult.exitCode(), "Repository file should exist");
+    }
+
+    @Test
+    void testActualExpectModule() {
+        // 1. Install dependency
+        Task taskDep = new Task("install_dependency", "apt", Map.of(
+                "name", "python3-pexpect",
+                "state", "present",
+                "update_cache", "yes"
+        ));
+        taskExecutor.execute(taskDep, new BecomeContext(true, "sudo", "root", "", null), connection, null);
+
+        // 2. Execute expect
+        Task task = new Task("test_expect", "expect", Map.of(
+                "command", "python3 -c \"name = input('name: '); print('hello ' + name)\"",
+                "responses", Map.of("name: ", "ansible")
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        assertTrue(result.data().get("stdout").toString().contains("hello ansible"));
+    }
+
+    @Test
+    void testActualSubversionModule() {
+        // 1. Install dependency
+        Task taskDep = new Task("install_dependency", "apt", Map.of(
+                "name", "subversion",
+                "state", "present",
+                "update_cache", "yes"
+        ));
+        taskExecutor.execute(taskDep, new BecomeContext(true, "sudo", "root", "", null), connection, null);
+
+        // 2. Execute subversion (using a public read-only repo or mock)
+        // Since we don't want to rely on external network if possible, but subversion module usually clones.
+        // We can use a local file:// repo.
+        connection.execCommand("svnadmin create /tmp/test-svn-repo", BecomeContext.empty(), null);
+
+        Task task = new Task("test_subversion", "subversion", Map.of(
+                "repo", "file:///tmp/test-svn-repo",
+                "dest", "/tmp/test-svn-checkout"
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+        var execResult = connection.execCommand("ls -d /tmp/test-svn-checkout/.svn", BecomeContext.empty(), null);
+        assertEquals(0, execResult.exitCode(), "Checkout directory should exist");
+    }
+
+    @Test
+    void testActualWaitForConnectionModule() {
+        Task task = new Task("test_wait_for_connection", "wait_for_connection", Map.of(
+                "timeout", 30
+        ));
+        TaskResult result = taskExecutor.execute(task, BecomeContext.empty(), connection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message());
+    }
 }
