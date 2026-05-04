@@ -6,6 +6,7 @@ import org.example.ansible.connection.ConnectionFactory;
 import org.example.ansible.inventory.Host;
 import org.example.ansible.util.OSHandler;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -20,11 +21,11 @@ public interface ITaskExecutor extends AutoCloseable {
      * @param task             The task to execute.
      * @param variableManager  The variable manager.
      * @param inheritedCheckMode Inherited check mode.
-     * @param inheritedEnvironment Inherited environment.
+     * @param inheritedEnvironments Inherited environment sources.
      * @param blockVars        Accumulated block variables.
      * @return The execution result.
      */
-    TaskResult execute(Play play, Host host, Task task, VariableManager variableManager, boolean inheritedCheckMode, Object inheritedEnvironment, Map<String, Object> blockVars, Connection connection, ConnectionFactory connectionFactory);
+    TaskResult execute(Play play, Host host, Task task, VariableManager variableManager, boolean inheritedCheckMode, List<Object> inheritedEnvironments, Map<String, Object> blockVars, Connection connection, ConnectionFactory connectionFactory);
 
     /**
      * Executes the given task with role and include parameters.
@@ -34,7 +35,7 @@ public interface ITaskExecutor extends AutoCloseable {
      * @param task             The task to execute.
      * @param variableManager  The variable manager.
      * @param inheritedCheckMode Inherited check mode.
-     * @param inheritedEnvironment Inherited environment.
+     * @param inheritedEnvironments Inherited environment sources.
      * @param blockVars        Accumulated block variables.
      * @param roleParams       Role parameters (Level 20).
      * @param includeParams    Include parameters (Level 21).
@@ -42,8 +43,8 @@ public interface ITaskExecutor extends AutoCloseable {
      * @param connectionFactory The connection factory.
      * @return The execution result.
      */
-    default TaskResult execute(Play play, Host host, Task task, VariableManager variableManager, boolean inheritedCheckMode, Object inheritedEnvironment, Map<String, Object> blockVars, Map<String, Object> roleParams, Map<String, Object> includeParams, Connection connection, ConnectionFactory connectionFactory) {
-        return execute(play, host, task, variableManager, inheritedCheckMode, inheritedEnvironment, blockVars, connection, connectionFactory);
+    default TaskResult execute(Play play, Host host, Task task, VariableManager variableManager, boolean inheritedCheckMode, List<Object> inheritedEnvironments, Map<String, Object> blockVars, Map<String, Object> roleParams, Map<String, Object> includeParams, Connection connection, ConnectionFactory connectionFactory) {
+        return execute(play, host, task, variableManager, inheritedCheckMode, inheritedEnvironments, blockVars, connection, connectionFactory);
     }
 
     /**

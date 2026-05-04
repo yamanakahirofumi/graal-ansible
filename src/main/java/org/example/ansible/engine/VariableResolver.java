@@ -195,21 +195,26 @@ public class VariableResolver {
     /**
      * Resolves environment variables for a task.
      *
-     * @param play                 The play context.
-     * @param task                 The task.
-     * @param variables            The variable map.
-     * @param inheritedEnvironment Inherited environment.
+     * @param play                  The play context.
+     * @param task                  The task.
+     * @param variables             The variable map.
+     * @param inheritedEnvironments List of inherited environment objects.
      * @return The resolved environment map.
      */
     @SuppressWarnings("unchecked")
-    public Map<String, String> resolveEnvironment(Play play, Task task, Map<String, Object> variables, Object inheritedEnvironment) {
+    public Map<String, String> resolveEnvironment(Play play, Task task, Map<String, Object> variables, List<Object> inheritedEnvironments) {
         Map<String, Object> mergedEnv = new HashMap<>();
 
-        Object[] envSources = {
-                play.environment(),
-                inheritedEnvironment,
-                task.environment()
-        };
+        List<Object> envSources = new ArrayList<>();
+        if (play.environment() != null) {
+            envSources.add(play.environment());
+        }
+        if (inheritedEnvironments != null) {
+            envSources.addAll(inheritedEnvironments);
+        }
+        if (task.environment() != null) {
+            envSources.add(task.environment());
+        }
 
         for (Object source : envSources) {
             if (source == null) continue;
