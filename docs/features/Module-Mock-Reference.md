@@ -44,6 +44,8 @@
 | **include_vars** | `MockLoader` (YAML) | `exit_json` | `exists` |
 | **add_host** | - | `exit_json` (結果返却) | - |
 | **group_by** | - | `exit_json` (結果返却) | - |
+| **apt / package** | - | `run_command` (apt-get等), `exit_json` | - |
+| **service / systemd** | - | `run_command` (systemctl等), `exit_json` | - |
 
 ---
 
@@ -72,10 +74,8 @@
 
 現在、ロード確認済み (△) または検証予定 (？) のモジュールをサポートするために、以下のモック強化が計画されています。
 
-- **パッケージ管理モック (`apt`, `dnf`, `yum`)**:
+- **パッケージ管理モック (`dnf`, `yum`)**:
     - 各パッケージマネージャーの Python ライブラリ呼び出しを Java 側のパッケージ管理サービスへ委譲。
-- **サービス管理モック (`service`, `systemd`)**:
-    - `systemctl` コマンドの結果を OS 抽象化レイヤー経由でパースする機能の強化。
 - **Windows 固有モック**:
     - `win_` 系のモジュールが必要とする Windows レジストリや権限操作のエミュレーション。
 - **Native Image 対応の強化**:
