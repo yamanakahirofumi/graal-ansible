@@ -29,6 +29,7 @@ public class VariableManager {
     private final Map<String, Map<String, Object>> hostFacts = new HashMap<>();
     private final Map<String, Map<String, Object>> roleDefaults = new HashMap<>();
     private final Map<String, Map<String, Object>> roleVars = new HashMap<>();
+    private final Map<String, Object> promptVars = new HashMap<>();
     private final Path baseDir;
     private final Path inventoryDir;
     private final Yaml yaml = new Yaml();
@@ -117,6 +118,20 @@ public class VariableManager {
     }
 
     /**
+     * Registers prompt variables (Level 13).
+     *
+     * @param vars The variables to register.
+     */
+    public void addPromptVars(Map<String, Object> vars) {
+        if (vars == null || vars.isEmpty()) return;
+        promptVars.putAll(vars);
+    }
+
+    public void clearPromptVars() {
+        promptVars.clear();
+    }
+
+    /**
      * Registers facts for a specific host.
      * Facts are merged into both the top-level variables and the 'ansible_facts' key.
      *
@@ -176,10 +191,14 @@ public class VariableManager {
      * @return A merged map of all variables.
      */
     public Map<String, Object> getAllVariables(Play play, Host host, Task task, Map<String, Object> blockVars) {
-        return getAllVariables(play, host, task, blockVars, null, null);
+        return getAllVariables(play, host, task, blockVars, null, null, true);
     }
 
     public Map<String, Object> getAllVariables(Play play, Host host, Task task, Map<String, Object> blockVars, Map<String, Object> roleParams, Map<String, Object> includeParams) {
+        return getAllVariables(play, host, task, blockVars, roleParams, includeParams, true);
+    }
+
+    public Map<String, Object> getAllVariables(Play play, Host host, Task task, Map<String, Object> blockVars, Map<String, Object> roleParams, Map<String, Object> includeParams, boolean includePromptVars) {
         Map<String, Object> variables = new HashMap<>();
         String hostName = host != null ? host.name() : null;
 
@@ -275,6 +294,11 @@ public class VariableManager {
         // Level 12: Play variables
         if (play != null) {
             variables.putAll(play.vars());
+        }
+
+        // Level 13: Play vars_prompt
+        if (includePromptVars) {
+            variables.putAll(promptVars);
         }
 
         // Level 14: Play vars_files

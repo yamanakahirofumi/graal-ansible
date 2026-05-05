@@ -27,6 +27,7 @@ public record Play(
         List<Task> tasks,
         Map<String, Object> vars,
         List<String> varsFiles,
+        List<Map<String, Object>> varsPrompt,
         List<Role> roles,
         List<Task> handlers,
         Object become,
@@ -38,11 +39,11 @@ public record Play(
         List<String> tags
 ) {
     public Play(String name, String hosts, List<Task> tasks) {
-        this(name, hosts, tasks, Map.of(), List.of(), List.of(), List.of(), null, null, null, null, null, null, List.of());
+        this(name, hosts, tasks, Map.of(), List.of(), List.of(), List.of(), List.of(), null, null, null, null, null, null, List.of());
     }
 
     public Play(String name, String hosts, List<Task> tasks, Map<String, Object> vars) {
-        this(name, hosts, tasks, vars, List.of(), List.of(), List.of(), null, null, null, null, null, null, List.of());
+        this(name, hosts, tasks, vars, List.of(), List.of(), List.of(), List.of(), null, null, null, null, null, null, List.of());
     }
 
     public Play(
@@ -59,7 +60,7 @@ public record Play(
             Object checkMode,
             Object environment
     ) {
-        this(name, hosts, tasks, vars, varsFiles, List.of(), handlers, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, List.of());
+        this(name, hosts, tasks, vars, varsFiles, List.of(), List.of(), handlers, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, List.of());
     }
 
     public Play(
@@ -77,6 +78,25 @@ public record Play(
             Object environment,
             List<String> tags
     ) {
-        this(name, hosts, tasks, vars, varsFiles, List.of(), handlers, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags);
+        this(name, hosts, tasks, vars, varsFiles, List.of(), List.of(), handlers, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags);
+    }
+
+    public Play(
+            String name,
+            String hosts,
+            List<Task> tasks,
+            Map<String, Object> vars,
+            List<String> varsFiles,
+            List<Role> roles,
+            List<Task> handlers,
+            Object become,
+            String becomeMethod,
+            String becomeUser,
+            String becomeFlags,
+            Object checkMode,
+            Object environment,
+            List<String> tags
+    ) {
+        this(name, hosts, tasks, vars, varsFiles, List.of(), roles, handlers, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags);
     }
 }

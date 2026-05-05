@@ -110,6 +110,7 @@ public class YamlParser {
                     play.tasks(),
                     mergedVars,
                     play.varsFiles(),
+                    play.varsPrompt(),
                     play.roles(),
                     play.handlers(),
                     play.become(),
@@ -214,6 +215,20 @@ public class YamlParser {
             varsFiles.add(s);
         }
 
+        List<Map<String, Object>> varsPrompt = new ArrayList<>();
+        Object varsPromptObj = map.get("vars_prompt");
+        if (varsPromptObj instanceof List<?> list) {
+            for (Object item : list) {
+                if (item instanceof Map<?, ?> promptMap) {
+                    varsPrompt.add((Map<String, Object>) promptMap);
+                } else if (item instanceof String s) {
+                    varsPrompt.add(Map.of("name", s));
+                }
+            }
+        } else if (varsPromptObj instanceof Map<?, ?> promptMap) {
+            varsPrompt.add((Map<String, Object>) promptMap);
+        }
+
         Object become = map.get("become");
         String becomeMethod = (String) map.get("become_method");
         String becomeUser = (String) map.get("become_user");
@@ -221,7 +236,7 @@ public class YamlParser {
         Object checkMode = map.get("check_mode");
         Object environment = map.get("environment");
 
-        return new Play(name, hosts, tasks, vars, varsFiles, roles, handlers, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags);
+        return new Play(name, hosts, tasks, vars, varsFiles, varsPrompt, roles, handlers, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags);
     }
 
     @SuppressWarnings("unchecked")

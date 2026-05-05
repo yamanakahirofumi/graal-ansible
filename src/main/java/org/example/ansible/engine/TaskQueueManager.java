@@ -33,6 +33,7 @@ public class TaskQueueManager {
     private final ITaskExecutor taskExecutor;
     private final VariableResolver variableResolver = new VariableResolver();
     private final ConnectionFactory connectionFactory;
+    private PromptProvider promptProvider = new ConsolePromptProvider();
     private final Map<String, Connection> connectionCache = new HashMap<>();
 
     public TaskQueueManager(ITaskExecutor taskExecutor) {
@@ -42,6 +43,10 @@ public class TaskQueueManager {
     public TaskQueueManager(ITaskExecutor taskExecutor, ConnectionFactory connectionFactory) {
         this.taskExecutor = taskExecutor;
         this.connectionFactory = connectionFactory;
+    }
+
+    public void setPromptProvider(PromptProvider promptProvider) {
+        this.promptProvider = promptProvider;
     }
 
     /**
@@ -74,6 +79,10 @@ public class TaskQueueManager {
         if (targetHosts.isEmpty()) {
             return;
         }
+
+        // Resolve vars_prompt (Level 13)
+        resolveVarsPrompt(play, variableManager);
+
         Set<String> failedHosts = new HashSet<>();
         Map<String, Set<String>> hostNotifications = new HashMap<>();
 
@@ -683,5 +692,33 @@ public class TaskQueueManager {
         if (groupName == null) return;
 
         inventory.addHostToGroup(currentHostName, groupName);
+    }
+
+    private void resolveVarsPrompt(Play play, VariableManager variableManager) {
+        if (play.varsPrompt() == null || play.varsPrompt().isEmpty()) {
+            return;
+        }
+
+        Map<String, Object> promptedValues = new HashMap<>();
+        for (Map<String, Object> promptDef : play.varsPrompt()) {
+            String name = (String) promptDef.get("name");
+            if (name == null) continue;
+
+            // Check if variable is already defined in higher precedence levels (e.g. extra vars)
+            // Ansible skips prompting if the variable is already defined in extra_vars or other high-level sources.
+            // Importantly, we pass 'null' for play to EXCLUDE Play Level 12 variables from this check,
+            // as vars_prompt (Level 13) should override Play variables (Level 12).
+            Map<String, Object> higherPrecedenceVars = variableManager.getAllVariables(null, null, null, null, null, null, false);
+            if (higherPrecedenceVars.containsKey(name)) {
+                continue;
+            }
+
+            String value = promptProvider.prompt(promptDef);
+            promptedValues.put(name, value);
+        }
+
+        if (!promptedValues.isEmpty()) {
+            variableManager.addPromptVars(promptedValues);
+        }
     }
 }
