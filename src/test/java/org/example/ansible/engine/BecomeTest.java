@@ -24,7 +24,7 @@ class BecomeTest {
         public final List<Task> executedTasks = new java.util.ArrayList<>();
         public final List<BecomeContext> executedContexts = new java.util.ArrayList<>();
 
-        @Override public TaskResult execute(Play play, Host host, Task task, VariableManager variableManager, boolean inheritedCheckMode, Object inheritedEnvironment, Map<String, Object> blockVars, Connection connection, ConnectionFactory connectionFactory) {
+        @Override public TaskResult execute(Play play, Host host, Task task, VariableManager variableManager, boolean inheritedCheckMode, List<Object> inheritedEnvironments, Map<String, Object> blockVars, Connection connection, ConnectionFactory connectionFactory) {
             TaskExecutor realExecutor = new TaskExecutor() {
                 @Override
                 public TaskResult execute(Task t, BecomeContext bc, Map<String, String> env) {
@@ -40,7 +40,7 @@ class BecomeTest {
                     return TaskResult.success(Map.of());
                 }
             };
-            return realExecutor.execute(play, host, task, variableManager, inheritedCheckMode, inheritedEnvironment, blockVars, connection, connectionFactory);
+            return realExecutor.execute(play, host, task, variableManager, inheritedCheckMode, inheritedEnvironments, blockVars, connection, connectionFactory);
         }
 
         @Override

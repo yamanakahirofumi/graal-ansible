@@ -64,10 +64,10 @@ class DelegationTest {
             }
 
             @Override
-            public TaskResult execute(Play play, Host host, Task task, VariableManager variableManager, boolean inheritedCheckMode, Object inheritedEnvironment, Map<String, Object> blockVars, Connection connection, ConnectionFactory connectionFactory) {
+            public TaskResult execute(Play play, Host host, Task task, VariableManager variableManager, boolean inheritedCheckMode, List<Object> inheritedEnvironments, Map<String, Object> blockVars, Connection connection, ConnectionFactory connectionFactory) {
                 // Capture all variables resolved for the task execution
                 capturedVars.add(variableManager.getAllVariables(play, host, task, blockVars));
-                return super.execute(play, host, task, variableManager, inheritedCheckMode, inheritedEnvironment, blockVars, connection, connectionFactory);
+                return super.execute(play, host, task, variableManager, inheritedCheckMode, inheritedEnvironments, blockVars, connection, connectionFactory);
             }
         };
         taskExecutor.registerModule("ping", (args, bc, ctx) -> TaskResult.success(Map.of()));
