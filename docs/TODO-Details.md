@@ -43,7 +43,7 @@
 ### [✓] モジュールサポート状態の同期
 - **完了日**: 2026-07-26
 - **概要**: `docs/features/Module-Support-Status.md` および本ドキュメントのテスト済みモジュール数を最新化。
-- **解決策**: 統合テスト済みモジュール数を 55 に更新し、`raw`, `set_stats`, `validate_argument_spec`, `pip`, `wait_for`, `debconf`, `sysvinit`, `service_facts`, `systemd`, `systemd_service`, `package`, `service`, `git`, `cron`, `iptables`, `known_hosts` を含める形で同期。
+- 解決策: 動作確認済みモジュール数を 65（うち 61 ◎、4 ○）に更新し、`mount_facts`, `dpkg_selections`, `deb822_repository`, `expect`, `subversion`, `wait_for_connection` 等を含める形で同期。
 
 ### [✓] 実際の Ansible コレクションを使ったテストの実施
 - **完了日**: 2026-07-26
