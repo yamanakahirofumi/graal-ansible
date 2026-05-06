@@ -108,7 +108,7 @@ public class TaskQueueManager {
                     }
 
                     // Initial inherited check mode from Play level
-                    Map<String, Object> vars = variableManager.getAllVariables(play, host, task, null, null, null);
+                    Map<String, Object> vars = variableManager.getAllVariables(play, host, task, null, (List<Role>) null, null);
                     boolean playCheckMode = variableResolver.resolveCheckMode(play.checkMode(), vars, globalCheckMode);
 
                     try {
@@ -131,7 +131,7 @@ public class TaskQueueManager {
                 if (failedHosts.contains(host.name())) {
                     continue;
                 }
-                Map<String, Object> vars = variableManager.getAllVariables(play, host, null, null, null, null);
+                Map<String, Object> vars = variableManager.getAllVariables(play, host, null, null, (List<Role>) null, null);
                 boolean playCheckMode = variableResolver.resolveCheckMode(play.checkMode(), vars, globalCheckMode);
                 try {
                     Connection connection = getOrCreateConnection(host, vars);
@@ -188,21 +188,26 @@ public class TaskQueueManager {
         } while (anyNewNotified);
     }
 
-    private void executeTaskOnHost(Play play, Host host, Task task, Inventory inventory, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode, List<Object> inheritedEnvironments, Map<String, Object> blockVars, Map<String, Object> roleParams, Map<String, Object> includeParams, Connection connection, List<String> runTags, List<String> skipTags) {
+    private void executeTaskOnHost(Play play, Host host, Task task, Inventory inventory, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode, List<Object> inheritedEnvironments, Map<String, Object> blockVars, List<Role> activeRoles, Map<String, Object> includeParams, Connection connection, List<String> runTags, List<String> skipTags) {
         if (!task.block().isEmpty()) {
-            executeBlock(play, host, task, inventory, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, inheritedEnvironments, blockVars, roleParams, includeParams, connection, runTags, skipTags);
+            executeBlock(play, host, task, inventory, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, inheritedEnvironments, blockVars, activeRoles, includeParams, connection, runTags, skipTags);
             return;
         }
 
         String action = task.action();
         if ("include_tasks".equals(action) || "import_tasks".equals(action)) {
-            executeIncludeTasks(play, host, task, inventory, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, inheritedEnvironments, blockVars, roleParams, includeParams, connection, runTags, skipTags);
+            executeIncludeTasks(play, host, task, inventory, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, inheritedEnvironments, blockVars, activeRoles, includeParams, connection, runTags, skipTags);
+            return;
+        }
+
+        if ("include_role".equals(action) || "import_role".equals(action)) {
+            executeIncludeRole(play, host, task, inventory, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, inheritedEnvironments, blockVars, activeRoles, includeParams, connection, runTags, skipTags);
             return;
         }
 
         TaskResult result;
         try {
-            result = taskExecutor.execute(play, host, task, variableManager, inheritedCheckMode, inheritedEnvironments, blockVars, roleParams, includeParams, connection, connectionFactory);
+            result = taskExecutor.execute(play, host, task, variableManager, inheritedCheckMode, inheritedEnvironments, blockVars, activeRoles, includeParams, connection, connectionFactory);
         } catch (UnreachableException e) {
             if (task.ignoreUnreachable()) {
                 result = TaskResult.unreachable(e.getMessage());
@@ -279,8 +284,8 @@ public class TaskQueueManager {
         }
     }
 
-    private void executeBlock(Play play, Host host, Task blockTask, Inventory inventory, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode, List<Object> inheritedEnvironments, Map<String, Object> inheritedBlockVars, Map<String, Object> roleParams, Map<String, Object> includeParams, Connection connection, List<String> runTags, List<String> skipTags) {
-        Map<String, Object> blockVars = variableManager.getAllVariables(play, host, blockTask, inheritedBlockVars, roleParams, includeParams);
+    private void executeBlock(Play play, Host host, Task blockTask, Inventory inventory, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode, List<Object> inheritedEnvironments, Map<String, Object> inheritedBlockVars, List<Role> activeRoles, Map<String, Object> includeParams, Connection connection, List<String> runTags, List<String> skipTags) {
+        Map<String, Object> blockVars = variableManager.getAllVariables(play, host, blockTask, inheritedBlockVars, activeRoles, includeParams);
         boolean blockCheckMode = variableResolver.resolveCheckMode(blockTask.checkMode(), blockVars, inheritedCheckMode);
 
         if (!variableResolver.isWhenConditionMet(blockTask.when(), blockVars)) {
@@ -310,7 +315,7 @@ public class TaskQueueManager {
                 results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(TaskResult.skipped("Skipped due to tags"));
                 continue;
             }
-            executeTaskOnHost(play, host, task, inventory, variableManager, results, blockFailedHosts, hostNotifications, blockCheckMode, effectiveBlockEnvs, combinedBlockVars, roleParams, includeParams, connection, runTags, skipTags);
+            executeTaskOnHost(play, host, task, inventory, variableManager, results, blockFailedHosts, hostNotifications, blockCheckMode, effectiveBlockEnvs, combinedBlockVars, activeRoles, includeParams, connection, runTags, skipTags);
         }
 
         if (blockFailedHosts.contains(host.name())) {
@@ -319,12 +324,12 @@ public class TaskQueueManager {
 
         if (blockFailed) {
             for (Task task : blockTask.rescue()) {
-                executeTaskOnHost(play, host, task, inventory, variableManager, results, failedHosts, hostNotifications, blockCheckMode, effectiveBlockEnvs, combinedBlockVars, roleParams, includeParams, connection, runTags, skipTags);
+                executeTaskOnHost(play, host, task, inventory, variableManager, results, failedHosts, hostNotifications, blockCheckMode, effectiveBlockEnvs, combinedBlockVars, activeRoles, includeParams, connection, runTags, skipTags);
             }
         }
 
         for (Task task : blockTask.always()) {
-            executeTaskOnHost(play, host, task, inventory, variableManager, results, failedHosts, hostNotifications, blockCheckMode, effectiveBlockEnvs, combinedBlockVars, roleParams, includeParams, connection, runTags, skipTags);
+            executeTaskOnHost(play, host, task, inventory, variableManager, results, failedHosts, hostNotifications, blockCheckMode, effectiveBlockEnvs, combinedBlockVars, activeRoles, includeParams, connection, runTags, skipTags);
         }
 
         if (blockFailed && blockTask.rescue().isEmpty()) {
@@ -459,8 +464,8 @@ public class TaskQueueManager {
         return new ArrayList<>(distinctHosts.values());
     }
 
-    private void executeIncludeTasks(Play play, Host host, Task task, Inventory inventory, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode, List<Object> inheritedEnvironments, Map<String, Object> blockVars, Map<String, Object> roleParams, Map<String, Object> includeParams, Connection connection, List<String> runTags, List<String> skipTags) {
-        Map<String, Object> allVars = variableManager.getAllVariables(play, host, task, blockVars, roleParams, includeParams);
+    private void executeIncludeTasks(Play play, Host host, Task task, Inventory inventory, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode, List<Object> inheritedEnvironments, Map<String, Object> blockVars, List<Role> activeRoles, Map<String, Object> includeParams, Connection connection, List<String> runTags, List<String> skipTags) {
+        Map<String, Object> allVars = variableManager.getAllVariables(play, host, task, blockVars, activeRoles, includeParams);
 
         // Resolve loop if present
         List<?> items = variableResolver.resolveLoopItems(task.loop(), allVars);
@@ -470,21 +475,21 @@ public class TaskQueueManager {
                 Map<String, Object> iterationVars = new HashMap<>(allVars);
                 iterationVars.put("item", item);
                 if (variableResolver.isWhenConditionMet(task.when(), iterationVars)) {
-                    executeIncludeTasksIteration(play, host, task, iterationVars, inventory, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, inheritedEnvironments, blockVars, roleParams, includeParams, connection, runTags, skipTags);
+                    executeIncludeTasksIteration(play, host, task, iterationVars, inventory, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, inheritedEnvironments, blockVars, activeRoles, includeParams, connection, runTags, skipTags);
                 } else {
                     results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(TaskResult.skipped("Included tasks skipped due to when condition"));
                 }
             }
         } else {
             if (variableResolver.isWhenConditionMet(task.when(), allVars)) {
-                executeIncludeTasksIteration(play, host, task, allVars, inventory, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, inheritedEnvironments, blockVars, roleParams, includeParams, connection, runTags, skipTags);
+                executeIncludeTasksIteration(play, host, task, allVars, inventory, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, inheritedEnvironments, blockVars, activeRoles, includeParams, connection, runTags, skipTags);
             } else {
                 results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(TaskResult.skipped("Included tasks skipped due to when condition"));
             }
         }
     }
 
-    private void executeIncludeTasksIteration(Play play, Host host, Task task, Map<String, Object> variables, Inventory inventory, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode, List<Object> inheritedEnvironments, Map<String, Object> blockVars, Map<String, Object> roleParams, Map<String, Object> inheritedIncludeParams, Connection connection, List<String> runTags, List<String> skipTags) {
+    private void executeIncludeTasksIteration(Play play, Host host, Task task, Map<String, Object> variables, Inventory inventory, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode, List<Object> inheritedEnvironments, Map<String, Object> blockVars, List<Role> activeRoles, Map<String, Object> inheritedIncludeParams, Connection connection, List<String> runTags, List<String> skipTags) {
         Map<String, Object> resolvedArgs = variableResolver.resolve(task.args(), variables);
         String file = (String) resolvedArgs.get("file");
         if (file == null) {
@@ -529,7 +534,7 @@ public class TaskQueueManager {
 
             for (Task includedTask : includedTasks) {
                 if (failedHosts.contains(host.name())) break;
-                executeTaskOnHost(play, host, includedTask, inventory, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, inheritedEnvironments, combinedBlockVars, roleParams, includeParams, connection, runTags, skipTags);
+                executeTaskOnHost(play, host, includedTask, inventory, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, inheritedEnvironments, combinedBlockVars, activeRoles, includeParams, connection, runTags, skipTags);
             }
         } catch (Exception e) {
             results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(TaskResult.failure("Failed to load included tasks: " + e.getMessage()));
@@ -537,20 +542,8 @@ public class TaskQueueManager {
     }
 
     private void executeRole(Play play, Role role, List<Host> targetHosts, Inventory inventory, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean globalCheckMode, List<String> runTags, List<String> skipTags) {
-        Path playbookDir = variableManager.getBaseDir();
-        if (playbookDir == null) {
-            playbookDir = Path.of(".");
-        }
-        Path roleDir = playbookDir.resolve("roles").resolve(role.name());
-        if (!Files.exists(roleDir)) {
-            // Check in current directory too, as a fallback or if roles is a sibling
-            roleDir = Path.of("roles").resolve(role.name());
-            if (!Files.exists(roleDir)) {
-                // Return or throw error? Ansible usually fails if role is not found.
-                // For now, we'll try to just return to avoid crashing if it's not strictly according to layout
-                return;
-            }
-        }
+        Path roleDir = findRoleDir(role.name(), variableManager);
+        if (roleDir == null) return;
 
         // Load defaults/main.yml (Level 2)
         variableManager.addRoleDefaults(role.name(), loadRoleVarsFile(roleDir, "defaults"));
@@ -558,44 +551,120 @@ public class TaskQueueManager {
         variableManager.addRoleVars(role.name(), loadRoleVarsFile(roleDir, "vars"));
 
         // Load tasks/main.yml
-        Path tasksFile = roleDir.resolve("tasks").resolve("main.yml");
-        if (!Files.exists(tasksFile)) {
-            tasksFile = roleDir.resolve("tasks").resolve("main.yaml");
-        }
+        Path tasksFile = findRoleComponentFile(roleDir, "tasks", "main");
 
-        if (Files.exists(tasksFile)) {
+        if (tasksFile != null && Files.exists(tasksFile)) {
             try (InputStream is = new FileInputStream(tasksFile.toFile())) {
                 YamlParser parser = new YamlParser();
                 List<Task> roleTasks = parser.parseTasks(is, play.tags());
-
-                for (Task task : roleTasks) {
-                    if (!isTaskToBeExecuted(task, runTags, skipTags)) continue;
-
-                    boolean executedOnce = false;
-                    for (Host host : targetHosts) {
-                        if (failedHosts.contains(host.name())) continue;
-                        if (task.runOnce() && executedOnce) continue;
-
-                        Map<String, Object> vars = variableManager.getAllVariables(play, host, task, null, role.vars(), null);
-                        boolean playCheckMode = variableResolver.resolveCheckMode(play.checkMode(), vars, globalCheckMode);
-
-                        try {
-                            Connection connection = getOrCreateConnection(host, vars);
-                            executeTaskOnHost(play, host, task, inventory, variableManager, results, failedHosts, hostNotifications, playCheckMode, new ArrayList<>(), null, role.vars(), null, connection, runTags, skipTags);
-                        } catch (UnreachableException e) {
-                            if (task.ignoreUnreachable()) {
-                                results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(TaskResult.unreachable(e.getMessage()));
-                            } else {
-                                failedHosts.add(host.name());
-                            }
-                        }
-                        executedOnce = true;
-                    }
-                }
+                executeRoleTasks(play, List.of(role), roleTasks, targetHosts, inventory, variableManager, results, failedHosts, hostNotifications, globalCheckMode, runTags, skipTags);
             } catch (Exception e) {
                 // Log or handle task loading error
             }
         }
+    }
+
+    private void executeIncludeRole(Play play, Host host, Task task, Inventory inventory, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode, List<Object> inheritedEnvironments, Map<String, Object> blockVars, List<Role> activeRoles, Map<String, Object> includeParams, Connection connection, List<String> runTags, List<String> skipTags) {
+        Map<String, Object> allVars = variableManager.getAllVariables(play, host, task, blockVars, activeRoles, includeParams);
+        Map<String, Object> resolvedArgs = variableResolver.resolve(task.args(), allVars);
+
+        String roleName = (String) resolvedArgs.get("name");
+        if (roleName == null) {
+            results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(TaskResult.failure("include_role/import_role requires a 'name' argument"));
+            return;
+        }
+
+        Path roleDir = findRoleDir(roleName, variableManager);
+        if (roleDir == null) {
+            results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(TaskResult.failure("Role not found: " + roleName));
+            return;
+        }
+
+        // Load defaults and vars
+        variableManager.addRoleDefaults(roleName, loadRoleVarsFile(roleDir, "defaults"));
+        variableManager.addRoleVars(roleName, loadRoleVarsFile(roleDir, "vars"));
+
+        // Extract role parameters from task args
+        Map<String, Object> newRoleParams = new HashMap<>();
+        for (Map.Entry<String, Object> entry : resolvedArgs.entrySet()) {
+            if (!entry.getKey().equals("name") && !entry.getKey().equals("tasks_from")) {
+                newRoleParams.put(entry.getKey(), entry.getValue());
+            }
+        }
+        // Also add task-level vars
+        newRoleParams.putAll(task.vars());
+
+        String tasksFrom = (String) resolvedArgs.getOrDefault("tasks_from", "main");
+        Path tasksFile = findRoleComponentFile(roleDir, "tasks", tasksFrom);
+
+        if (tasksFile != null && Files.exists(tasksFile)) {
+            try (InputStream is = new FileInputStream(tasksFile.toFile())) {
+                YamlParser parser = new YamlParser();
+                List<Task> roleTasks = parser.parseTasks(is, task.tags());
+
+                Role role = new Role(roleName, newRoleParams);
+                List<Role> newActiveRoles = new ArrayList<>();
+                if (activeRoles != null) newActiveRoles.addAll(activeRoles);
+                newActiveRoles.add(role);
+
+                executeRoleTasks(play, newActiveRoles, roleTasks, List.of(host), inventory, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, runTags, skipTags);
+            } catch (Exception e) {
+                results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(TaskResult.failure("Failed to load role tasks: " + e.getMessage()));
+            }
+        } else {
+            results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(TaskResult.failure("Role tasks file not found: " + tasksFrom));
+        }
+    }
+
+    private void executeRoleTasks(Play play, List<Role> activeRoles, List<Task> roleTasks, List<Host> targetHosts, Inventory inventory, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean globalCheckMode, List<String> runTags, List<String> skipTags) {
+        for (Task task : roleTasks) {
+            if (!isTaskToBeExecuted(task, runTags, skipTags)) continue;
+
+            boolean executedOnce = false;
+            for (Host host : targetHosts) {
+                if (failedHosts.contains(host.name())) continue;
+                if (task.runOnce() && executedOnce) continue;
+
+                Map<String, Object> vars = variableManager.getAllVariables(play, host, task, null, activeRoles, null);
+                boolean playCheckMode = variableResolver.resolveCheckMode(play.checkMode(), vars, globalCheckMode);
+
+                try {
+                    Connection connection = getOrCreateConnection(host, vars);
+                    executeTaskOnHost(play, host, task, inventory, variableManager, results, failedHosts, hostNotifications, playCheckMode, new ArrayList<>(), null, activeRoles, null, connection, runTags, skipTags);
+                } catch (UnreachableException e) {
+                    if (task.ignoreUnreachable()) {
+                        results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(TaskResult.unreachable(e.getMessage()));
+                    } else {
+                        failedHosts.add(host.name());
+                    }
+                }
+                executedOnce = true;
+            }
+        }
+    }
+
+    private Path findRoleDir(String roleName, VariableManager variableManager) {
+        Path playbookDir = variableManager.getBaseDir();
+        if (playbookDir == null) {
+            playbookDir = Path.of(".");
+        }
+        Path roleDir = playbookDir.resolve("roles").resolve(roleName);
+        if (Files.exists(roleDir)) {
+            return roleDir;
+        }
+        roleDir = Path.of("roles").resolve(roleName);
+        if (Files.exists(roleDir)) {
+            return roleDir;
+        }
+        return null;
+    }
+
+    private Path findRoleComponentFile(Path roleDir, String component, String fileName) {
+        Path file = roleDir.resolve(component).resolve(fileName + ".yml");
+        if (Files.exists(file)) return file;
+        file = roleDir.resolve(component).resolve(fileName + ".yaml");
+        if (Files.exists(file)) return file;
+        return null;
     }
 
     private Map<String, Object> loadRoleVarsFile(Path roleDir, String subDir) {
