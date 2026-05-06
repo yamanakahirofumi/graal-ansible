@@ -18,6 +18,7 @@ public class PlaybookExecutor {
 
     private final ITaskExecutor taskExecutor;
     private final ConnectionFactory connectionFactory;
+    private PromptProvider promptProvider = new ConsolePromptProvider();
 
     public PlaybookExecutor(ITaskExecutor taskExecutor) {
         this(taskExecutor, new DefaultConnectionFactory());
@@ -26,6 +27,10 @@ public class PlaybookExecutor {
     public PlaybookExecutor(ITaskExecutor taskExecutor, ConnectionFactory connectionFactory) {
         this.taskExecutor = taskExecutor;
         this.connectionFactory = connectionFactory;
+    }
+
+    public void setPromptProvider(PromptProvider promptProvider) {
+        this.promptProvider = promptProvider;
     }
 
     /**
@@ -125,6 +130,7 @@ public class PlaybookExecutor {
         Map<String, List<TaskResult>> results = new HashMap<>();
 
         TaskQueueManager tqm = new TaskQueueManager(taskExecutor, connectionFactory);
+        tqm.setPromptProvider(promptProvider);
 
         for (Play play : playbook.plays()) {
             tqm.executePlay(play, inventory, variableManager, results, globalCheckMode, runTags, skipTags, limit);

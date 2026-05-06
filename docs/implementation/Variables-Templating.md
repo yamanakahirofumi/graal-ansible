@@ -36,7 +36,7 @@ Ansible (ansible-core 2.17+) は 22 段階の非常に詳細な優先順位を�
 | 10 | プレイブック `host_vars/*` | ◎ | プレイブック相対パスの検索をサポート。 |
 | 11 | ホストファクト / キャッシュされた `set_facts` | ◎ | `VariableManager.addFacts` にて管理。 |
 | 12 | プレイ変数 (`vars`) | ◎ | `Play` レコードに保持。 |
-| 13 | プレイ `vars_prompt` | × | インタラクティブ入力のため優先度低。 |
+| 13 | プレイ `vars_prompt` | ◎ | `PromptProvider` インターフェースを介した入力をサポート。 |
 | 14 | プレイ変数ファイル (`vars_files`) | ◎ | `VariableManager.loadVarsFile` にて解決。 |
 | 15 | ロール変数 (`roles/x/vars/main.yml`) | ◎ | `VariableManager` にて解決。 |
 | 16 | ブロック変数 (`block` 内の `vars`) | ◎ | 実行エンジンでのスコープ分離と伝播を実装済み。 |

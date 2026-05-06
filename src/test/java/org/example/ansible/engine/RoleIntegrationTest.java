@@ -60,7 +60,7 @@ class RoleIntegrationTest {
         );
         // Add role manually since Play is a record and we updated it
         Play playWithRole = new Play(play.name(), play.hosts(), play.tasks(), play.vars(), play.varsFiles(),
-                List.of(new Role("test_role")), play.handlers(), play.become(), play.becomeMethod(),
+                List.of(), List.of(new Role("test_role")), play.handlers(), play.become(), play.becomeMethod(),
                 play.becomeUser(), play.becomeFlags(), play.checkMode(), play.environment(), play.tags());
 
         VariableManager vm = new VariableManager(inventory, Map.of(), tempDir);
@@ -108,7 +108,7 @@ class RoleIntegrationTest {
         Role roleWithParams = new Role("param_role", Map.of("param_var", "param_val"));
         Play play = new Play("play with param role", "all", List.of());
         Play playWithRole = new Play(play.name(), play.hosts(), play.tasks(), play.vars(), play.varsFiles(),
-                List.of(roleWithParams), play.handlers(), play.become(), play.becomeMethod(),
+                List.of(), List.of(roleWithParams), play.handlers(), play.become(), play.becomeMethod(),
                 play.becomeUser(), play.becomeFlags(), play.checkMode(), play.environment(), play.tags());
 
         VariableManager vm = new VariableManager(inventory, Map.of(), tempDir);
