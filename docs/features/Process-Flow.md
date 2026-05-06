@@ -56,7 +56,7 @@ sequenceDiagram
 
 ## 2. 各コンポーネントの役割
 
-### 管理ノード (Control Node) で実行されるもの
+### 2.1 管理ノード (Control Node) で実行されるもの
 
 *   **PlaybookExecutor**: Playbook 全体の実行を管理します。Play、Block、Task の階層構造を辿り、実行をスケジュールします。
 *   **TaskQueueManager (TQM)**: 各ホストへのタスク配信や結果の集計を制御します。
@@ -64,7 +64,7 @@ sequenceDiagram
 *   **Action Plugin**: 管理ノード上で動作するプラグインです。ターゲットノードへのファイル転送の準備や、管理ノード側での複雑な処理（`template` のレンダリング等）を担当し、必要に応じてターゲットノード上でモジュールを実行させます。`graal-ansible` では、**本家 Ansible の Python 実装を GraalPy 上でそのまま動作させる「Python-first」方式**を採用しています。
 *   **Connection Plugin (ssh, local, winrm等)**: ターゲットノードとの通信を担当します。ファイルの転送やリモートコマンドの実行を抽象化します。
 
-### ターゲットノード (Target Node) で実行されるもの
+### 2.2 ターゲットノード (Target Node) で実行されるもの
 
 *   **Ansible Module**: 管理ノードから転送されてきた Python スクリプト（Ansiballz 形式）です。ターゲットノード上の Python インタプリタによって実行され、実際のシステム操作を行います。
 *   **Python インタプリタ**: 転送されたモジュールを実行するためのランタイム環境です。ターゲット側に事前にインストールされている必要があります。

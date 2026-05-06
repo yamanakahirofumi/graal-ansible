@@ -4,7 +4,7 @@
 
 ## 1. GitHub Actions 設定
 
-### ワークフローの概要
+### 1.1 ワークフローの概要
 GitHub へのプッシュ（Push）またはプルリクエスト（Pull Request）が作成された際に、以下のプロセスが自動的に実行されます。
 
 1. **チェックアウト**：リポジトリのソースコードを取得します。
@@ -14,7 +14,7 @@ GitHub へのプッシュ（Push）またはプルリクエスト（Pull Request
 5. **テスト結果の送信**: JUnit 形式のテスト結果（XML）を Codecov へ転送します（Ubuntu 環境のみ）。
 6. **Native Image ビルド**：各OS向けのネイティブバイナリを生成し、動作確認を行います。
 
-### 設定ファイルの例 (`.github/workflows/build.yml`)
+### 1.2 設定ファイルの例 (`.github/workflows/build.yml`)
 以下は、Maven を使用した標準的なワークフロー構成です。
 
 ```yaml
@@ -62,7 +62,7 @@ jobs:
 ## 2. テスト結果の可視化
 本プロジェクトでは、JUnit 形式のテスト結果を Codecov に送信することで、テストの実行状況を可視化しています。
 
-### 測定と転送の仕組み
+### 2.1 測定と転送の仕組み
 1. `mvn verify` 実行時に Maven Surefire Plugin がテストを実行し、`target/surefire-reports/` に XML レポートを生成します。
 2. GitHub Actions 上で、これらの XML レポートを Codecov サービスにアップロードします。
 3. Codecov 上でテストの成功率、失敗数、実行時間などを確認し、品質管理に役立てます。

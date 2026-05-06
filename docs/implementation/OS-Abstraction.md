@@ -26,7 +26,7 @@ Ansible モジュールやタスクが、実行対象 OS の違いを意識せ�
 - **WindowsHandler**: Windows 向けのハンドラ。
 - **MacOSHandler**: macOS 向けのハンドラ。内部的には `LinuxHandler` を継承または流用しつつ、OS Family として `Darwin` を返すなどの調整を行います（現状、`OSHandlerFactory` 内の匿名クラスとして実装されています）。
 
-### インターフェースのメソッド例
+### 3.1 インターフェースのメソッド例
 
 - `getTempDir()`: OS 固有の一時ディレクトリパスを返す。
 - `getJoinPath(String... parts)`: OS に適したパス区切り文字で結合する。
@@ -37,7 +37,7 @@ Ansible モジュールやタスクが、実行対象 OS の違いを意識せ�
 
 タスク実行開始時（または `setup` モジュール実行時）に、ターゲットノードのファクト（Facts）を収集し、適切な `OSHandler` を選択します。
 
-### 判定基準
+### 4.1 判定基準
 - `ansible_os_family`
 - `ansible_distribution`
 - `ansible_system` (uname -s 等の結果)
