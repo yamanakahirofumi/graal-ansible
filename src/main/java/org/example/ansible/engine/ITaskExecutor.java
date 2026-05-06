@@ -37,13 +37,13 @@ public interface ITaskExecutor extends AutoCloseable {
      * @param inheritedCheckMode Inherited check mode.
      * @param inheritedEnvironments Inherited environment sources.
      * @param blockVars        Accumulated block variables.
-     * @param roleParams       Role parameters (Level 20).
+     * @param activeRoles      Active roles (Level 2, 15, 20).
      * @param includeParams    Include parameters (Level 21).
      * @param connection       The connection to the target host.
      * @param connectionFactory The connection factory.
      * @return The execution result.
      */
-    default TaskResult execute(Play play, Host host, Task task, VariableManager variableManager, boolean inheritedCheckMode, List<Object> inheritedEnvironments, Map<String, Object> blockVars, Map<String, Object> roleParams, Map<String, Object> includeParams, Connection connection, ConnectionFactory connectionFactory) {
+    default TaskResult execute(Play play, Host host, Task task, VariableManager variableManager, boolean inheritedCheckMode, List<Object> inheritedEnvironments, Map<String, Object> blockVars, List<Role> activeRoles, Map<String, Object> includeParams, Connection connection, ConnectionFactory connectionFactory) {
         return execute(play, host, task, variableManager, inheritedCheckMode, inheritedEnvironments, blockVars, connection, connectionFactory);
     }
 

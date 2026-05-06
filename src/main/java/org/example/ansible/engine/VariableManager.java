@@ -186,7 +186,7 @@ public class VariableManager {
      * @param host          The current host.
      * @param task          The current task.
      * @param blockVars     Accumulated block variables.
-     * @param roleParams    Role parameters (Level 20).
+     * @param activeRoles   Active roles (for Level 2, 15, and 20).
      * @param includeParams Include parameters (Level 21).
      * @return A merged map of all variables.
      */
@@ -194,24 +194,30 @@ public class VariableManager {
         return getAllVariables(play, host, task, blockVars, null, null, true);
     }
 
-    public Map<String, Object> getAllVariables(Play play, Host host, Task task, Map<String, Object> blockVars, Map<String, Object> roleParams, Map<String, Object> includeParams) {
-        return getAllVariables(play, host, task, blockVars, roleParams, includeParams, true);
+    public Map<String, Object> getAllVariables(Play play, Host host, Task task, Map<String, Object> blockVars, List<Role> activeRoles, Map<String, Object> includeParams) {
+        return getAllVariables(play, host, task, blockVars, activeRoles, includeParams, true);
     }
 
-    public Map<String, Object> getAllVariables(Play play, Host host, Task task, Map<String, Object> blockVars, Map<String, Object> roleParams, Map<String, Object> includeParams, boolean includePromptVars) {
+    public Map<String, Object> getAllVariables(Play play, Host host, Task task, Map<String, Object> blockVars, List<Role> activeRoles, Map<String, Object> includeParams, boolean includePromptVars) {
         Map<String, Object> variables = new HashMap<>();
         String hostName = host != null ? host.name() : null;
 
         // Level 1: CLI variables
         variables.putAll(cliVars);
 
-        // Level 2: Role defaults
+        List<Role> allRoles = new ArrayList<>();
         if (play != null) {
-            for (Role role : play.roles()) {
-                Map<String, Object> defaults = roleDefaults.get(role.name());
-                if (defaults != null) {
-                    variables.putAll(defaults);
-                }
+            allRoles.addAll(play.roles());
+        }
+        if (activeRoles != null) {
+            allRoles.addAll(activeRoles);
+        }
+
+        // Level 2: Role defaults
+        for (Role role : allRoles) {
+            Map<String, Object> defaults = roleDefaults.get(role.name());
+            if (defaults != null) {
+                variables.putAll(defaults);
             }
         }
 
@@ -309,12 +315,10 @@ public class VariableManager {
         }
 
         // Level 15: Role variables
-        if (play != null) {
-            for (Role role : play.roles()) {
-                Map<String, Object> vars = roleVars.get(role.name());
-                if (vars != null) {
-                    variables.putAll(vars);
-                }
+        for (Role role : allRoles) {
+            Map<String, Object> vars = roleVars.get(role.name());
+            if (vars != null) {
+                variables.putAll(vars);
             }
         }
 
@@ -344,8 +348,8 @@ public class VariableManager {
         }
 
         // Level 20: Role parameters
-        if (roleParams != null) {
-            variables.putAll(roleParams);
+        for (Role role : allRoles) {
+            variables.putAll(role.vars());
         }
 
         // Level 21: Include parameters
