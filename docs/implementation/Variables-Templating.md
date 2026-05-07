@@ -72,6 +72,20 @@ Ansible 特有のフィルターは、Jinjava の `Filter` インターフェー
 - `to_json`: オブジェクトを JSON 文字列に変換。
 - `to_yaml`: オブジェクトを YAML 文字列に変換。
 
+### 4.1 独自フィルターの追加手順
+
+新しい Jinja2 フィルターを Java で実装してエンジンに追加する手順は以下の通りです。
+
+1.  **Filter インターフェースの実装**:
+    - `com.hubspot.jinjava.lib.filter.Filter` インターフェースを実装するクラスを `org.example.ansible.engine.filter` パッケージに作成します。
+    - `filter(Object var, JinjavaInterpreter interpreter, String... args)` メソッドをオーバーライドして、フィルタリングロジックを記述します。
+    - `getName()` メソッドをオーバーライドして、テンプレート内で使用するフィルター名を返します。
+2.  **エンジンのレジストリへの登録**:
+    - `org.example.ansible.engine.VariableResolver.java` の `registerFilters()` メソッド内に、作成したフィルタークラスのインスタンスを登録するコードを追加します。
+    - 例: `jinjava.getGlobalContext().registerFilter(new NewFilter());`
+3.  **動作確認**:
+    - Playbook 内で `{{ variable | new_filter }}` のように記述し、期待通りに動作することを確認します。
+
 ## 5. Native Image への対応
 
 - Jinjava が内部で使用するリフレクション情報を `reflect-config.json` に定義する必要があります。
