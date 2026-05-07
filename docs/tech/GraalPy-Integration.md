@@ -18,10 +18,10 @@ Ansible モジュールの多くは複雑な Python スクリプトであり、�
 
 ## 3. Python 環境の構築
 
-### sys.path の管理
+### 3.1 sys.path の管理
 ビルド時に `target/python-packages` にインストールされた `ansible-core` および依存パッケージを優先的にロードするため、実行時に Java 側からディレクトリパスを渡し、Python の `sys.path.insert(0, ...)` で動的に追加します。
 
-### 依存関係の解決
+### 3.2 依存関係の解決
 `ansible-core` が依存するライブラリ（`cryptography`, `pyyaml` 等）のうち、GraalPy 環境で動作に支障をきたすものや、ネイティブ拡張が必要なものについては、スタブ（Stub）やモック（Mock）に差し替えるか、ビルド時に適切なバイナリを配置することで解決します。
 
 ## 4. モンキーパッチとモックの実装 (Dependency Emulation Strategy)
