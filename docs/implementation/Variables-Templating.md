@@ -36,7 +36,7 @@ Ansible (ansible-core 2.17+) は 22 段階の非常に詳細な優先順位を�
 | 10 | プレイブック `host_vars/*` | ◎ | プレイブック相対パスの検索をサポート。 |
 | 11 | ホストファクト / キャッシュされた `set_facts` | ◎ | `VariableManager.addFacts` にて管理。 |
 | 12 | プレイ変数 (`vars`) | ◎ | `Play` レコードに保持。 |
-| 13 | プレイ `vars_prompt` | ◎ | `PromptProvider` インターフェースを介した入力をサポート。 |
+| 13 | プレイ `vars_prompt` | ◎ | `PromptProvider` インターフェースを介した入力をサポート. |
 | 14 | プレイ変数ファイル (`vars_files`) | ◎ | `VariableManager.loadVarsFile` にて解決。 |
 | 15 | ロール変数 (`roles/x/vars/main.yml`) | ◎ | `VariableManager` にて解決。 |
 | 16 | ブロック変数 (`block` 内の `vars`) | ◎ | 実行エンジンでのスコープ分離と伝播を実装済み。 |
@@ -86,7 +86,22 @@ Ansible 特有のフィルターは、Jinjava の `Filter` インターフェー
 3.  **動作確認**:
     - Playbook 内で `{{ variable | new_filter }}` のように記述し、期待通りに動作することを確認します。
 
-## 5. Native Image への対応
+## 5. マジック変数 (Magic Variables)
+
+Ansible において自動的に定義される特殊な変数（マジック変数）について、現在 `graal-ansible` では以下の変数をサポートしています。
+
+- `inventory_hostname`: 現在実行中のターゲットホストの名前。
+- `playbook_dir`: 実行中のプレイブックが配置されているディレクトリの絶対パス。
+- `inventory_dir`: 使用しているインベントリファイルが配置されているディレクトリの絶対パス（指定されている場合）。
+- `inventory_file`: 使用しているインベントリファイルのパス（現状 `inventory_dir` と同等）。
+- `groups`: 全てのグループとそれらに属するホストのリストを含むマップ。
+- `group_names`: 現在のホストが属しているグループ名のリスト。
+- `ansible_check_mode`: チェックモード（ドライラン）が有効な場合に `true` となる真偽値。
+- `ansible_verbosity`: 実行時の詳細度（`-v` オプションの数）。
+
+これらの変数は、`VariableManager` によって自動的に各ホストの変数セットに注入され、テンプレート内で参照可能です。
+
+## 6. Native Image への対応
 
 - Jinjava が内部で使用するリフレクション情報を `reflect-config.json` に定義する必要があります。
 - 動的なクラスロードが発生する箇所を特定し、ビルド時に静的に解決されるよう設定します。
