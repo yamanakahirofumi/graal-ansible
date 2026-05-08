@@ -148,6 +148,8 @@ public class PlaybookCli implements Callable<Integer> {
                 }
 
                 cliVars.put("ansible_verbosity", verbosity);
+                cliVars.put("ansible_run_tags", tags);
+                cliVars.put("ansible_skip_tags", skipTags);
 
                 VariableManager variableManager = new VariableManager(inventory, cliVars, parsedExtraVars, baseDir, null);
                 Map<String, List<TaskResult>> results = executor.execute(playbook, inventory, variableManager, check, tags, skipTags, limit);

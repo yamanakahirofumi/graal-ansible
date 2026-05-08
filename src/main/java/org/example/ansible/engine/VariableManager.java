@@ -248,6 +248,12 @@ public class VariableManager {
             if (cliVars.containsKey("ansible_verbosity")) {
                 variables.put("ansible_verbosity", cliVars.get("ansible_verbosity"));
             }
+            if (cliVars.containsKey("ansible_run_tags")) {
+                variables.put("ansible_run_tags", cliVars.get("ansible_run_tags"));
+            }
+            if (cliVars.containsKey("ansible_skip_tags")) {
+                variables.put("ansible_skip_tags", cliVars.get("ansible_skip_tags"));
+            }
         }
 
         // 3-10. Inventory and Directory Variables

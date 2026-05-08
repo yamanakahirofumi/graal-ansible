@@ -188,4 +188,43 @@ class VariablePrecedenceIntegrationTest {
         Map<String, List<TaskResult>> resultsFalse = playbookExecutor.execute(playbook, inventory, Map.of(), tempDir, tempDir, false);
         assertEquals(false, resultsFalse.get("host1").get(0).data().get("msg"));
     }
+
+    @Test
+    void testMagicTagsAndFilters() throws IOException {
+        String inventoryIni = "host1";
+        Inventory inventory = new IniInventoryParser().parse(new ByteArrayInputStream(inventoryIni.getBytes(StandardCharsets.UTF_8)));
+
+        String playbookYaml = """
+                - name: play
+                  hosts: all
+                  tasks:
+                    - name: check tags
+                      debug:
+                        msg: "{{ ansible_run_tags }} and {{ ansible_skip_tags }}"
+                    - name: check regex_replace
+                      debug:
+                        msg: "{{ 'hello world' | regex_replace('hello', 'bye') }}"
+                    - name: check quote
+                      debug:
+                        msg: "{{ \\"foo's bar\\" | quote }}"
+                    - name: check b64
+                      debug:
+                        msg: "{{ 'ansible' | b64encode | b64decode }}"
+                """;
+
+        Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
+
+        VariableManager vm = new VariableManager(inventory,
+            Map.of("ansible_run_tags", List.of("tag1"), "ansible_skip_tags", List.of("tag2")),
+            Map.of(), tempDir, tempDir);
+
+        // Act
+        Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory, vm, false);
+
+        // Assert
+        assertEquals("[tag1] and [tag2]", results.get("host1").get(0).data().get("msg"));
+        assertEquals("bye world", results.get("host1").get(1).data().get("msg"));
+        assertEquals("'foo'\\''s bar'", results.get("host1").get(2).data().get("msg"));
+        assertEquals("ansible", results.get("host1").get(3).data().get("msg"));
+    }
 }
