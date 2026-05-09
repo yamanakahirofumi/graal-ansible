@@ -102,6 +102,8 @@ Ansible において自動的に定義される特殊な変数（マジック変
 - `group_names`: 現在のホストが属しているグループ名のリスト。
 - `ansible_check_mode`: チェックモード（ドライラン）が有効な場合に `true` となる真偽値。
 - `ansible_verbosity`: 実行時の詳細度（`-v` オプションの数）。
+- `ansible_run_tags`: 実行時に `--tags` で指定されたタグのリスト。
+- `ansible_skip_tags`: 実行時に `--skip-tags` で指定されたタグのリスト。
 
 これらの変数は、`VariableManager` によって自動的に各ホストの変数セットに注入され、テンプレート内で参照可能です。
 
