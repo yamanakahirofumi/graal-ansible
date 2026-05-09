@@ -32,6 +32,10 @@ public class VariableResolver {
         jinjava.getGlobalContext().registerFilter(new ToJsonFilter());
         jinjava.getGlobalContext().registerFilter(new ToYamlFilter());
         jinjava.getGlobalContext().registerFilter(new CombineFilter());
+        jinjava.getGlobalContext().registerFilter(new RegexReplaceFilter());
+        jinjava.getGlobalContext().registerFilter(new QuoteFilter());
+        jinjava.getGlobalContext().registerFilter(new B64EncodeFilter());
+        jinjava.getGlobalContext().registerFilter(new B64DecodeFilter());
     }
 
     /**

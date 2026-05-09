@@ -42,8 +42,15 @@ public class YamlParser {
      * @return The parsed Playbook.
      */
     public Playbook parse(File file) {
+        return parse(file, Map.of(), List.of());
+    }
+
+    /**
+     * Parses a Playbook from a File with inherited variables and tags.
+     */
+    private Playbook parse(File file, Map<String, Object> inheritedVars, List<String> inheritedTags) {
         try (InputStream is = new FileInputStream(file)) {
-            return parse(is, file.getAbsoluteFile().getParentFile());
+            return parse(is, file.getAbsoluteFile().getParentFile(), inheritedVars, inheritedTags);
         } catch (IOException e) {
             throw new RuntimeException("Failed to load playbook: " + file, e);
         }
@@ -56,18 +63,14 @@ public class YamlParser {
      * @return The parsed Playbook.
      */
     public Playbook parse(InputStream inputStream) {
-        return parse(inputStream, null);
+        return parse(inputStream, null, Map.of(), List.of());
     }
 
     /**
      * Parses a Playbook from an InputStream with a base directory for imports.
-     *
-     * @param inputStream The input stream of the YAML file.
-     * @param currentDir  The current directory for resolving relative imports.
-     * @return The parsed Playbook.
      */
     @SuppressWarnings("unchecked")
-    public Playbook parse(InputStream inputStream, File currentDir) {
+    public Playbook parse(InputStream inputStream, File currentDir, Map<String, Object> inheritedVars, List<String> inheritedTags) {
         Object raw = yaml.load(inputStream);
         List<Play> plays = new ArrayList<>();
 
@@ -76,9 +79,31 @@ public class YamlParser {
                 if (item instanceof Map<?, ?> map) {
                     Map<String, Object> mapItem = (Map<String, Object>) map;
                     if (mapItem.containsKey("import_playbook")) {
-                        plays.addAll(handleImportPlaybook(mapItem, currentDir));
+                        plays.addAll(handleImportPlaybook(mapItem, currentDir, inheritedVars, inheritedTags));
                     } else {
-                        plays.add(parsePlay(mapItem));
+                        Play play = parsePlay(mapItem, inheritedTags);
+                        if (!inheritedVars.isEmpty()) {
+                            Map<String, Object> mergedVars = new HashMap<>(play.vars());
+                            mergedVars.putAll(inheritedVars);
+                            play = new Play(
+                                    play.name(),
+                                    play.hosts(),
+                                    play.tasks(),
+                                    mergedVars,
+                                    play.varsFiles(),
+                                    play.varsPrompt(),
+                                    play.roles(),
+                                    play.handlers(),
+                                    play.become(),
+                                    play.becomeMethod(),
+                                    play.becomeUser(),
+                                    play.becomeFlags(),
+                                    play.checkMode(),
+                                    play.environment(),
+                                    play.tags()
+                            );
+                        }
+                        plays.add(play);
                     }
                 }
             }
@@ -88,41 +113,26 @@ public class YamlParser {
     }
 
     @SuppressWarnings("unchecked")
-    private List<Play> handleImportPlaybook(Map<String, Object> map, File currentDir) {
+    private List<Play> handleImportPlaybook(Map<String, Object> map, File currentDir, Map<String, Object> inheritedVars, List<String> inheritedTags) {
         String importedFile = (String) map.get("import_playbook");
         Map<String, Object> importVars = (Map<String, Object>) map.getOrDefault("vars", Map.of());
-        // Note: Ansible also supports 'tags' and 'when' for import_playbook, but we'll start with 'vars'.
+        List<String> importTags = parseTags(map.get("tags"));
+
+        // In Ansible, vars from import_playbook statement win over anything inherited from parent import_playbook.
+        // And combined, they win over vars inside the imported plays.
+        Map<String, Object> combinedVars = new HashMap<>(inheritedVars);
+        combinedVars.putAll(importVars);
+
+        List<String> combinedTags = new ArrayList<>(inheritedTags);
+        combinedTags.addAll(importTags);
 
         File file = new File(importedFile);
         if (!file.isAbsolute() && currentDir != null) {
             file = new File(currentDir, importedFile);
         }
 
-        Playbook importedPlaybook = parse(file);
-        List<Play> plays = new ArrayList<>();
-        for (Play play : importedPlaybook.plays()) {
-            Map<String, Object> mergedVars = new HashMap<>(play.vars());
-            mergedVars.putAll(importVars);
-
-            plays.add(new Play(
-                    play.name(),
-                    play.hosts(),
-                    play.tasks(),
-                    mergedVars,
-                    play.varsFiles(),
-                    play.varsPrompt(),
-                    play.roles(),
-                    play.handlers(),
-                    play.become(),
-                    play.becomeMethod(),
-                    play.becomeUser(),
-                    play.becomeFlags(),
-                    play.checkMode(),
-                    play.environment(),
-                    play.tags()
-            ));
-        }
-        return plays;
+        Playbook importedPlaybook = parse(file, combinedVars, combinedTags);
+        return importedPlaybook.plays();
     }
 
     /**
@@ -148,10 +158,12 @@ public class YamlParser {
     }
 
     @SuppressWarnings("unchecked")
-    private Play parsePlay(Map<String, Object> map) {
+    private Play parsePlay(Map<String, Object> map, List<String> inheritedTags) {
         String name = (String) map.getOrDefault("name", "Unnamed Play");
         String hosts = (String) map.get("hosts");
-        List<String> tags = parseTags(map.get("tags"));
+
+        List<String> playTags = new ArrayList<>(inheritedTags);
+        playTags.addAll(parseTags(map.get("tags")));
 
         List<Task> tasks = new ArrayList<>();
         Object tasksObj = map.get("tasks");
@@ -159,7 +171,7 @@ public class YamlParser {
         if (tasksObj instanceof List<?> tasksList) {
             for (Object taskItem : tasksList) {
                 if (taskItem instanceof Map<?, ?> taskMap) {
-                    tasks.add(parseTask((Map<String, Object>) taskMap, tags));
+                    tasks.add(parseTask((Map<String, Object>) taskMap, playTags));
                 }
             }
         }
@@ -174,8 +186,6 @@ public class YamlParser {
                     Map<String, Object> rMap = (Map<String, Object>) roleMap;
                     String roleName = (String) rMap.get("role");
                     if (roleName == null) {
-                        // If 'role' key is missing, look for the first key that is not a reserved role parameter
-                        // (This is a simplification, Ansible has more complex role parsing)
                         for (Map.Entry<String, Object> entry : rMap.entrySet()) {
                             if (!"vars".equals(entry.getKey()) && !"tags".equals(entry.getKey()) && !"when".equals(entry.getKey())) {
                                 roleName = entry.getKey();
@@ -185,7 +195,6 @@ public class YamlParser {
                     }
                     Map<String, Object> roleVars = new HashMap<>(rMap);
                     roleVars.remove("role");
-                    // We treat all other keys as Level 20 variables for now
                     roles.add(new Role(roleName, roleVars));
                 }
             }
@@ -196,7 +205,7 @@ public class YamlParser {
         if (handlersObj instanceof List<?> handlersList) {
             for (Object handlerItem : handlersList) {
                 if (handlerItem instanceof Map<?, ?> handlerMap) {
-                    handlers.add(parseTask((Map<String, Object>) handlerMap, tags));
+                    handlers.add(parseTask((Map<String, Object>) handlerMap, playTags));
                 }
             }
         }
@@ -236,7 +245,7 @@ public class YamlParser {
         Object checkMode = map.get("check_mode");
         Object environment = map.get("environment");
 
-        return new Play(name, hosts, tasks, vars, varsFiles, varsPrompt, roles, handlers, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags);
+        return new Play(name, hosts, tasks, vars, varsFiles, varsPrompt, roles, handlers, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, playTags);
     }
 
     @SuppressWarnings("unchecked")
