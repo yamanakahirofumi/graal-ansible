@@ -30,6 +30,8 @@ public class VariableManager {
     private final Map<String, Map<String, Object>> roleDefaults = new HashMap<>();
     private final Map<String, Map<String, Object>> roleVars = new HashMap<>();
     private final Map<String, Object> promptVars = new HashMap<>();
+    private final Map<Path, Map<String, Object>> varsFileCache = new HashMap<>();
+    private final Map<String, Map<String, Object>> directoryVarsCache = new HashMap<>();
     private final Path baseDir;
     private final Path inventoryDir;
     private final Yaml yaml = new Yaml();
@@ -248,6 +250,12 @@ public class VariableManager {
             if (cliVars.containsKey("ansible_verbosity")) {
                 variables.put("ansible_verbosity", cliVars.get("ansible_verbosity"));
             }
+            if (cliVars.containsKey("ansible_run_tags")) {
+                variables.put("ansible_run_tags", cliVars.get("ansible_run_tags"));
+            }
+            if (cliVars.containsKey("ansible_skip_tags")) {
+                variables.put("ansible_skip_tags", cliVars.get("ansible_skip_tags"));
+            }
         }
 
         // 3-10. Inventory and Directory Variables
@@ -411,10 +419,15 @@ public class VariableManager {
     @SuppressWarnings("unchecked")
     private Map<String, Object> loadVarsFileFromPath(Path path) {
         if (!Files.exists(path)) return Map.of();
+        if (varsFileCache.containsKey(path)) {
+            return varsFileCache.get(path);
+        }
         try (InputStream is = new FileInputStream(path.toFile())) {
             Object raw = yaml.load(is);
             if (raw instanceof Map<?, ?> map) {
-                return (Map<String, Object>) map;
+                Map<String, Object> result = (Map<String, Object>) map;
+                varsFileCache.put(path, result);
+                return result;
             }
         } catch (IOException e) {
             throw new RuntimeException("Failed to load vars file: " + path, e);
@@ -424,6 +437,11 @@ public class VariableManager {
 
     private Map<String, Object> loadDirectoryVars(Path dir, String subDir, String name) {
         if (dir == null) return Map.of();
+        String cacheKey = dir.toString() + ":" + subDir + ":" + name;
+        if (directoryVarsCache.containsKey(cacheKey)) {
+            return directoryVarsCache.get(cacheKey);
+        }
+
         Path varsDir = dir.resolve(subDir);
         if (!Files.exists(varsDir)) return Map.of();
 
@@ -449,6 +467,7 @@ public class VariableManager {
                 // Ignore directory listing errors
             }
         }
+        directoryVarsCache.put(cacheKey, vars);
         return vars;
     }
 }

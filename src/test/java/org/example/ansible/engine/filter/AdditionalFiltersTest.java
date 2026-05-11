@@ -77,4 +77,42 @@ class AdditionalFiltersTest {
         assertTrue(result instanceof List);
         assertEquals(List.of(1, 2, 3, 4, 5), result);
     }
+
+    @Test
+    void testItems2Dict() {
+        List<Map<String, Object>> input = List.of(
+                Map.of("key", "a", "value", 1),
+                Map.of("key", "b", "value", 2)
+        );
+        Object result = resolver.resolveValue("{{ input | items2dict }}", Map.of("input", input));
+        assertEquals(Map.of("a", 1, "b", 2), result);
+
+        // Custom key/value names
+        List<Map<String, Object>> inputCustom = List.of(
+                Map.of("name", "foo", "val", "bar"),
+                Map.of("name", "baz", "val", "qux")
+        );
+        Object resultCustom = resolver.resolveValue("{{ input | items2dict(key_name='name', value_name='val') }}", Map.of("input", inputCustom));
+        assertEquals(Map.of("foo", "bar", "baz", "qux"), resultCustom);
+    }
+
+    @Test
+    void testUnique() {
+        List<Integer> input = List.of(1, 2, 2, 3, 1, 4);
+        Object result = resolver.resolveValue("{{ input | unique }}", Map.of("input", input));
+        assertEquals(List.of(1, 2, 3, 4), result);
+
+        // Unique with attribute
+        List<Map<String, Object>> inputAttr = List.of(
+                Map.of("id", 1, "name", "alice"),
+                Map.of("id", 2, "name", "bob"),
+                Map.of("id", 1, "name", "charlie")
+        );
+        Object resultAttr = resolver.resolveValue("{{ input | unique(attribute='id') }}", Map.of("input", inputAttr));
+        assertTrue(resultAttr instanceof List);
+        List<?> list = (List<?>) resultAttr;
+        assertEquals(2, list.size());
+        assertEquals("alice", ((Map<?, ?>) list.get(0)).get("name"));
+        assertEquals("bob", ((Map<?, ?>) list.get(1)).get("name"));
+    }
 }

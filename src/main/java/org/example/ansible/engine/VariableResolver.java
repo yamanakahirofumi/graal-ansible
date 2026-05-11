@@ -13,6 +13,7 @@ import org.example.ansible.engine.filter.Dict2ItemsFilter;
 import org.example.ansible.engine.filter.DirnameFilter;
 import org.example.ansible.engine.filter.FlattenFilter;
 import org.example.ansible.engine.filter.IpAddrFilter;
+import org.example.ansible.engine.filter.Items2DictFilter;
 import org.example.ansible.engine.filter.MandatoryFilter;
 import org.example.ansible.engine.filter.QuoteFilter;
 import org.example.ansible.engine.filter.RealpathFilter;
@@ -21,6 +22,7 @@ import org.example.ansible.engine.filter.SplitextFilter;
 import org.example.ansible.engine.filter.TernaryFilter;
 import org.example.ansible.engine.filter.ToJsonFilter;
 import org.example.ansible.engine.filter.ToYamlFilter;
+import org.example.ansible.engine.filter.UniqueFilter;
 import org.example.ansible.util.Truthiness;
 
 import java.util.ArrayList;
@@ -60,6 +62,8 @@ public class VariableResolver {
         jinjava.getGlobalContext().registerFilter(new RealpathFilter());
         jinjava.getGlobalContext().registerFilter(new TernaryFilter());
         jinjava.getGlobalContext().registerFilter(new FlattenFilter());
+        jinjava.getGlobalContext().registerFilter(new Items2DictFilter());
+        jinjava.getGlobalContext().registerFilter(new UniqueFilter());
     }
 
     /**
