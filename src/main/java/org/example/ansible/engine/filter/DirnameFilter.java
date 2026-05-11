@@ -2,7 +2,6 @@ package org.example.ansible.engine.filter;
 
 import com.hubspot.jinjava.interpret.JinjavaInterpreter;
 import com.hubspot.jinjava.lib.filter.Filter;
-import java.io.File;
 
 /**
  * Filter that returns the directory name of a path.
@@ -13,8 +12,18 @@ public class DirnameFilter implements Filter {
     public Object filter(Object var, JinjavaInterpreter interpreter, String... args) {
         if (var == null) return null;
         String path = var.toString();
-        String parent = new File(path).getParent();
-        return parent != null ? parent : ".";
+
+        int lastSlash = path.lastIndexOf('/');
+        int lastBackslash = path.lastIndexOf('\\');
+        int lastSeparator = Math.max(lastSlash, lastBackslash);
+
+        if (lastSeparator == -1) {
+            return ".";
+        }
+        if (lastSeparator == 0) {
+            return path.substring(0, 1);
+        }
+        return path.substring(0, lastSeparator);
     }
 
     @Override

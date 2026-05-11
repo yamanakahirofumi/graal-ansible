@@ -30,6 +30,7 @@ class AdditionalFiltersTest {
 
     @Test
     void testPathFilters() {
+        // Forward slash case
         String path = "/path/to/file.txt";
         assertEquals("file.txt", resolver.resolveValue("{{ '" + path + "' | basename }}", Map.of()));
         assertEquals("/path/to", resolver.resolveValue("{{ '" + path + "' | dirname }}", Map.of()));
@@ -41,9 +42,19 @@ class AdditionalFiltersTest {
         assertEquals("/path/to/file", list.get(0));
         assertEquals(".txt", list.get(1));
 
-        // Realpath depends on current OS, but we can verify it returns an absolute path
+        // Backslash case (Windows path emulation)
+        String winPath = "C:\\path\\to\\file.txt";
+        assertEquals("file.txt", resolver.resolveValue("{{ '" + winPath.replace("\\", "\\\\") + "' | basename }}", Map.of()));
+        assertEquals("C:\\path\\to", resolver.resolveValue("{{ '" + winPath.replace("\\", "\\\\") + "' | dirname }}", Map.of()));
+
+        // Edge case: single slash
+        assertEquals("/", resolver.resolveValue("{{ '/' | dirname }}", Map.of()));
+        assertEquals("\\", resolver.resolveValue("{{ '\\\\' | dirname }}", Map.of()));
+
+        // Realpath should return absolute path with normalized separators
         String realpathResult = (String) resolver.resolveValue("{{ 'pom.xml' | realpath }}", Map.of());
         assertTrue(new File(realpathResult).isAbsolute());
+        assertFalse(realpathResult.contains("\\"));
     }
 
     @Test

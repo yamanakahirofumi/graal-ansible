@@ -13,11 +13,13 @@ public class RealpathFilter implements Filter {
     public Object filter(Object var, JinjavaInterpreter interpreter, String... args) {
         if (var == null) return null;
         String path = var.toString();
+        String result;
         try {
-            return new File(path).getCanonicalPath();
+            result = new File(path).getCanonicalPath();
         } catch (java.io.IOException e) {
-            return new File(path).getAbsolutePath();
+            result = new File(path).getAbsolutePath();
         }
+        return result.replace('\\', '/');
     }
 
     @Override

@@ -92,7 +92,7 @@
     - `OSHandlerFactory` による実行環境に応じた動的なハンドラ切り替えを実装済み。
 
 ### 3.10 [✓] 独自 Jinja2 フィルターの拡充 (Ansible 互換)
-- **完了日**: 2026-07-28
+- **完了日**: 2026-05-11
 - **概要**: Playbook で頻繁に使用される Ansible 特有の Jinja2 フィルターを Java で実装。
 - **解決策**: `mandatory`, `basename`, `dirname`, `splitext`, `realpath`, `ternary`, `flatten` を実装し `VariableResolver` に登録。
 

@@ -24,7 +24,7 @@ public class FlattenFilter implements Filter {
 
     private void flatten(Iterable<?> iterable, List<Object> result) {
         for (Object item : iterable) {
-            if (item instanceof Iterable && !(item instanceof String)) {
+            if (item instanceof Iterable) {
                 flatten((Iterable<?>) item, result);
             } else {
                 result.add(item);
