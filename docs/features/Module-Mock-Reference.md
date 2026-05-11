@@ -44,8 +44,33 @@
 | **include_vars** | `MockLoader` (YAML) | `exit_json` | `exists` |
 | **add_host** | - | `exit_json` (結果返却) | - |
 | **group_by** | - | `exit_json` (結果返却) | - |
-| **apt / package** | - | `run_command` (apt-get等), `exit_json` | - |
-| **service / systemd** | - | `run_command` (systemctl等), `exit_json` | - |
+| **apt / package / package_facts** | - | `run_command` (apt-get等), `exit_json` | - |
+| **apt_key** | - | `run_command` (apt-key), `exit_json` | - |
+| **apt_repository** | - | `run_command` (apt-add-repository), `exit_json` | - |
+| **service / systemd / systemd_service / service_facts** | - | `run_command` (systemctl等), `exit_json` | - |
+| **assemble** | `codecs.escape_decode` | `run_command`, `exit_json` | - |
+| **cron** | - | `run_command` (crontab), `exit_json` | - |
+| **deb822_repository** | - | `run_command`, `exit_json` | - |
+| **debconf** | - | `run_command` (debconf-set-selections), `exit_json` | - |
+| **dpkg_selections** | - | `run_command` (dpkg), `exit_json` | - |
+| **expect** | - | `run_command` (pexpect使用), `exit_json` | - |
+| **git** | - | `run_command` (git), `exit_json` | - |
+| **hostname** | - | `run_command` (hostnamectl), `exit_json` | - |
+| **iptables** | - | `run_command` (iptables), `exit_json` | - |
+| **known_hosts** | - | `run_command` (ssh-keygen), `exit_json` | - |
+| **mount_facts** | - | `run_command` (mount/findmnt), `exit_json` | - |
+| **pause** | - | `exit_json` | - |
+| **pip** | - | `run_command` (pip), `exit_json` | - |
+| **script** | - | `run_command`, `exit_json` | - |
+| **subversion** | - | `run_command` (svn), `exit_json` | - |
+| **sysvinit** | - | `run_command` (service), `exit_json` | - |
+| **validate_argument_spec** | - | `exit_json` | - |
+| **wait_for** | - | `exit_json` | - |
+| **wait_for_connection** | `Proxy.reset`, `Proxy.get_option` | `exit_json` | - |
+| **import_tasks / include_tasks** | - | `exit_json` | - |
+| **gather_facts** | - | `exit_json` | `stat` |
+| **set_stats** | - | `exit_json` | - |
+| **raw** | - | - | - |
 
 ---
 
