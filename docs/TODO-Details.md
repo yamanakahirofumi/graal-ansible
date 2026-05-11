@@ -91,6 +91,11 @@
     - シェル実行コマンド (`/bin/sh -c` vs `cmd.exe /c`) や一時ディレクトリ、パス区切り文字の共通化を実現。
     - `OSHandlerFactory` による実行環境に応じた動的なハンドラ切り替えを実装済み。
 
+### 3.10 [✓] 独自 Jinja2 フィルターの拡充 (Ansible 互換)
+- **完了日**: 2026-05-11
+- **概要**: Playbook で頻繁に使用される Ansible 特有の Jinja2 フィルターを Java で実装。
+- **解決策**: `mandatory`, `basename`, `dirname`, `splitext`, `realpath`, `ternary`, `flatten` を実装し `VariableResolver` に登録。
+
 
 ### 3.10 [✓] GraalPy と Java のシームレスな統合
 - **完了日**: 2026-03-04

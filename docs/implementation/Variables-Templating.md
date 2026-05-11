@@ -75,6 +75,13 @@ Ansible 特有のフィルターは、Jinjava の `Filter` インターフェー
 - `quote`: シェルクォート処理。
 - `b64encode`: Base64 エンコード。
 - `b64decode`: Base64 デコード。
+- `mandatory`: 変数が未定義または空の場合にエラーを発生させる。
+- `basename`: パスのベース名を取得。
+- `dirname`: パスのディレクトリ名を取得。
+- `splitext`: パスを名前と拡張子に分割。
+- `realpath`: 絶対パスを取得。
+- `ternary`: 条件に応じて値を切り替える。
+- `flatten`: ネストされたリストを平坦化。
 
 ### 4.1 独自フィルターの追加手順
 

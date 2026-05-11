@@ -3,7 +3,24 @@ package org.example.ansible.engine;
 import com.hubspot.jinjava.Jinjava;
 import com.hubspot.jinjava.interpret.JinjavaInterpreter;
 import org.example.ansible.connection.BecomeContext;
-import org.example.ansible.engine.filter.*;
+import org.example.ansible.engine.filter.B64DecodeFilter;
+import org.example.ansible.engine.filter.B64EncodeFilter;
+import org.example.ansible.engine.filter.BasenameFilter;
+import org.example.ansible.engine.filter.BoolFilter;
+import org.example.ansible.engine.filter.CombineFilter;
+import org.example.ansible.engine.filter.DefaultFilter;
+import org.example.ansible.engine.filter.Dict2ItemsFilter;
+import org.example.ansible.engine.filter.DirnameFilter;
+import org.example.ansible.engine.filter.FlattenFilter;
+import org.example.ansible.engine.filter.IpAddrFilter;
+import org.example.ansible.engine.filter.MandatoryFilter;
+import org.example.ansible.engine.filter.QuoteFilter;
+import org.example.ansible.engine.filter.RealpathFilter;
+import org.example.ansible.engine.filter.RegexReplaceFilter;
+import org.example.ansible.engine.filter.SplitextFilter;
+import org.example.ansible.engine.filter.TernaryFilter;
+import org.example.ansible.engine.filter.ToJsonFilter;
+import org.example.ansible.engine.filter.ToYamlFilter;
 import org.example.ansible.util.Truthiness;
 
 import java.util.ArrayList;
@@ -36,6 +53,13 @@ public class VariableResolver {
         jinjava.getGlobalContext().registerFilter(new QuoteFilter());
         jinjava.getGlobalContext().registerFilter(new B64EncodeFilter());
         jinjava.getGlobalContext().registerFilter(new B64DecodeFilter());
+        jinjava.getGlobalContext().registerFilter(new MandatoryFilter());
+        jinjava.getGlobalContext().registerFilter(new BasenameFilter());
+        jinjava.getGlobalContext().registerFilter(new DirnameFilter());
+        jinjava.getGlobalContext().registerFilter(new SplitextFilter());
+        jinjava.getGlobalContext().registerFilter(new RealpathFilter());
+        jinjava.getGlobalContext().registerFilter(new TernaryFilter());
+        jinjava.getGlobalContext().registerFilter(new FlattenFilter());
     }
 
     /**
