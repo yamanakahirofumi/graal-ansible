@@ -73,7 +73,7 @@ Ansible 特有のフィルターは、Jinjava の `Filter` インターフェー
 - `to_yaml`: オブジェクトを YAML 文字列に変換。
 - `regex_replace`: 正規表現による置換。
 - `quote`: シェルクォート処理。
-- `b64encode`: Base64 エンコード。
+- `b64encode`: Base64 エンコード.
 - `b64decode`: Base64 デコード。
 - `mandatory`: 変数が未定義または空の場合にエラーを発生させる。
 - `basename`: パスのベース名を取得。
@@ -99,7 +99,36 @@ Ansible 特有のフィルターは、Jinjava の `Filter` インターフェー
 3.  **動作確認**:
     - Playbook 内で `{{ variable | new_filter }}` のように記述し、期待通りに動作することを確認します。
 
-## 5. マジック変数 (Magic Variables)
+## 5. Lookup と Query プラグイン (Lookup and Query Plugins)
+
+Ansible において、外部ソース（ファイル、環境変数、コマンド実行結果等）からデータを取得するための `lookup` および `query` 関数をサポートしています。
+
+### 5.1 サポートされている Lookup
+
+- `file`: ファイルの内容を読み込みます。
+- `env`: 環境変数の値を取得します。
+- `template`: 指定されたファイルを Jinja2 テンプレートとしてレンダリングした結果を取得します。
+- `pipe`: シェルコマンドを実行し、その標準出力を取得します。
+- `dict`: 辞書（Map）をキーと値のペアを持つリストに変換します。
+
+### 5.2 使用例
+
+```yaml
+- name: lookup examples
+  debug:
+    msg:
+      - "File content: {{ lookup('file', '/path/to/file.txt') }}"
+      - "Env var: {{ lookup('env', 'HOME') }}"
+      - "Command output: {{ lookup('pipe', 'date') }}"
+```
+
+### 5.3 実装詳細
+
+- `org.example.ansible.engine.lookup.Lookup` インターフェースを実装することで、新しい Lookup プラグインを追加できます。
+- プラグインは `VariableResolver` において登録され、Jinjava のカスタム関数 `lookup` および `query` を介して呼び出されます。
+- `lookup` は結果をカンマ区切りの文字列として返し、`query` は常にリスト形式で返します（Ansible 互換）。
+
+## 6. マジック変数 (Magic Variables)
 
 Ansible において自動的に定義される特殊な変数（マジック変数）について、現在 `graal-ansible` では以下の変数をサポートしています。
 
@@ -116,7 +145,7 @@ Ansible において自動的に定義される特殊な変数（マジック変
 
 これらの変数は、`VariableManager` によって自動的に各ホストの変数セットに注入され、テンプレート内で参照可能です。
 
-## 6. Native Image への対応
+## 7. Native Image への対応
 
 - Jinjava が内部で使用するリフレクション情報を `reflect-config.json` に定義する必要があります。
 - 動的なクラスロードが発生する箇所を特定し、ビルド時に静的に解決されるよう設定します。

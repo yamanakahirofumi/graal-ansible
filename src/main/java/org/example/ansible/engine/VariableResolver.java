@@ -2,6 +2,7 @@ package org.example.ansible.engine;
 
 import com.hubspot.jinjava.Jinjava;
 import com.hubspot.jinjava.interpret.JinjavaInterpreter;
+import com.hubspot.jinjava.lib.fn.ELFunctionDefinition;
 import org.example.ansible.connection.BecomeContext;
 import org.example.ansible.engine.filter.B64DecodeFilter;
 import org.example.ansible.engine.filter.B64EncodeFilter;
@@ -23,9 +24,16 @@ import org.example.ansible.engine.filter.TernaryFilter;
 import org.example.ansible.engine.filter.ToJsonFilter;
 import org.example.ansible.engine.filter.ToYamlFilter;
 import org.example.ansible.engine.filter.UniqueFilter;
+import org.example.ansible.engine.lookup.DictLookup;
+import org.example.ansible.engine.lookup.EnvLookup;
+import org.example.ansible.engine.lookup.FileLookup;
+import org.example.ansible.engine.lookup.Lookup;
+import org.example.ansible.engine.lookup.PipeLookup;
+import org.example.ansible.engine.lookup.TemplateLookup;
 import org.example.ansible.util.Truthiness;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,10 +45,79 @@ import java.util.stream.Collectors;
  */
 public class VariableResolver {
     private final Jinjava jinjava;
+    private final Map<String, Lookup> lookupPlugins = new HashMap<>();
 
     public VariableResolver() {
         this.jinjava = new Jinjava();
         registerFilters();
+        registerLookups();
+    }
+
+    private void registerLookups() {
+        registerLookup(new FileLookup());
+        registerLookup(new EnvLookup());
+        registerLookup(new TemplateLookup(jinjava));
+        registerLookup(new PipeLookup());
+        registerLookup(new DictLookup());
+
+        try {
+            jinjava.getGlobalContext().registerFunction(new ELFunctionDefinition("", "lookup",
+                    VariableResolver.class.getDeclaredMethod("lookup", String.class, Object[].class)));
+            jinjava.getGlobalContext().registerFunction(new ELFunctionDefinition("", "query",
+                    VariableResolver.class.getDeclaredMethod("query", String.class, Object[].class)));
+        } catch (NoSuchMethodException e) {
+            throw new RuntimeException("Failed to register lookup functions", e);
+        }
+    }
+
+    private void registerLookup(Lookup lookup) {
+        lookupPlugins.put(lookup.getName(), lookup);
+    }
+
+    /**
+     * Entry point for lookup() function in Jinja2.
+     */
+    public static Object lookup(String name, Object... args) {
+        List<Object> results = query(name, args);
+        return results.stream()
+                .map(Object::toString)
+                .collect(Collectors.joining(","));
+    }
+
+    /**
+     * Entry point for query() function in Jinja2.
+     */
+    @SuppressWarnings("unchecked")
+    public static List<Object> query(String name, Object... args) {
+        JinjavaInterpreter interpreter = JinjavaInterpreter.getCurrent();
+        Map<String, Object> variables = interpreter.getContext();
+
+        // The 'this' instance is not directly available in static methods called from Jinjava.
+        // We need a way to get the lookup plugins. For now, we can use a thread-local or
+        // re-instantiate, but re-instantiating is bad.
+        // Better: register lookup plugins as a global object in Jinjava context.
+        VariableResolver resolver = (VariableResolver) variables.get("__ansible_resolver");
+        if (resolver == null) {
+            return List.of();
+        }
+
+        Lookup plugin = resolver.lookupPlugins.get(name);
+        if (plugin == null) {
+            throw new RuntimeException("Lookup plugin not found: " + name);
+        }
+
+        List<String> terms = new ArrayList<>();
+        Map<String, Object> kwargs = new HashMap<>();
+
+        for (Object arg : args) {
+            if (arg instanceof Map) {
+                kwargs.putAll((Map<String, Object>) arg);
+            } else if (arg != null) {
+                terms.add(arg.toString());
+            }
+        }
+
+        return plugin.run(terms, variables, kwargs);
     }
 
     private void registerFilters() {
@@ -109,8 +186,14 @@ public class VariableResolver {
             return input;
         }
 
-        JinjavaInterpreter interpreter = jinjava.newInterpreter();
-        interpreter.getContext().putAll(variables);
+        Map<String, Object> context = new HashMap<>(variables);
+        context.put("__ansible_resolver", this);
+
+        // We need to use an interpreter that knows about our context
+        JinjavaInterpreter interpreter = new JinjavaInterpreter(jinjava, jinjava.getGlobalContext(), jinjava.getGlobalConfig());
+        JinjavaInterpreter.pushCurrent(interpreter);
+        try {
+            interpreter.getContext().putAll(context);
 
         // If the entire string is just a single {{ expr }}, we try to return the raw object
         String trimmed = input.trim();
@@ -122,6 +205,8 @@ public class VariableResolver {
                     // This handles filters and complex expressions correctly
                     String tempVarName = "__ansible_temp_var_" + System.nanoTime();
                     String renderScript = "{% set " + tempVarName + " = " + expr + " %}";
+
+                    // We must use the SAME interpreter that has the resolver context
                     interpreter.render(renderScript);
                     Object resolved = interpreter.getContext().get(tempVarName);
                     // Check if it's explicitly set to something (even null)
@@ -134,12 +219,24 @@ public class VariableResolver {
             }
         }
 
-        Object rendered = jinjava.render(input, variables);
+        Object rendered = interpreter.render(input);
+        if (!interpreter.getErrors().isEmpty()) {
+            com.hubspot.jinjava.interpret.TemplateError error = interpreter.getErrors().get(0);
+            if (error.getException() instanceof RuntimeException re) {
+                throw re;
+            }
+            throw new RuntimeException(error.getMessage(), error.getException());
+        }
+
         if (rendered instanceof String s) {
             if ("true".equals(s)) return true;
             if ("false".equals(s)) return false;
         }
+
         return rendered;
+        } finally {
+            JinjavaInterpreter.popCurrent();
+        }
     }
 
     /**
