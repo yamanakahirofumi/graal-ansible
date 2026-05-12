@@ -139,6 +139,11 @@ void testIdempotency() {
 | `subversion` | `subversion` |
 | `git` | `git` |
 | `iptables` | `iptables` |
+| `unarchive` | `tar`, `unzip` |
+| `pip` | `python3-pip` |
+| `apt_repository` | `software-properties-common` |
+| `cron` | `cron` |
+| `debconf` | `debconf-utils` |
 
 ## 8. トラブルシューティング (Troubleshooting)
 
