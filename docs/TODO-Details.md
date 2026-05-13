@@ -11,6 +11,13 @@
     - Build Cache の有効活用。
     - Windows/macOS 環境でのビルドエラーの監視と修正。
 
+### 1.2 [ ] Lookup プラグインの実装
+- **概要**: 外部ソースからデータを取得するための `lookup` および `query` 関数の実装。
+- **検討内容**:
+    - `Jinjava` へのカスタム関数登録。
+    - 主要なプラグイン (`file`, `env`, `template`, `pipe`, `dict`) の優先実装。
+    - 詳細は [Variables-Templating.md](implementation/Variables-Templating.md) を参照。
+
 ## 2. 実装時の詳細事項
 
 ### 2.1 [ ] Ansible 本体の完全ロードと基本動作の実現 (フェーズ1)
@@ -97,51 +104,56 @@
 - **解決策**: `mandatory`, `basename`, `dirname`, `splitext`, `realpath`, `ternary`, `flatten` を実装し `VariableResolver` に登録。
 
 
-### 3.10 [✓] GraalPy と Java のシームレスな統合
+### 3.11 [✓] GraalPy と Java のシームレスな統合
 - **完了日**: 2026-03-04
 - **概要**: Java コードから既存の Ansible Python モジュールを効率的に呼び出すためのブリッジ設計。
 - **解決策**: `PythonModule` クラスにて Polyglot API を使用し、`complex_args` を介した引数受け渡しと標準出力キャプチャによる結果取得を実装済み。
 
-### 3.11 [✓] SnakeYAML 2.x による Playbook 解析の実装
+### 3.12 [✓] SnakeYAML 2.x による Playbook 解析の実装
 - **完了日**: 2026-03-04
 - **概要**: YAML 形式の Playbook を Java オブジェクト（Record）へマッピング。
 - **解決策**: `YamlParser` にて予約語（`when`, `loop` 等）とモジュール引数の分離、および `block/rescue/always` の再帰的パースを実装済み。
 
-### 3.12 [✓] インベントリ管理の基本機能
+### 3.13 [✓] インベントリ管理の基本機能
 - **完了日**: 2026-02-22
 - **概要**: ターゲットホストの静的ファイル（INI/YAML）からの読み込みと優先順位解決。
 - **解決策**:
     - INI/YAML 形式のインベントリサポート済み。
     - [インベントリシステム実装](implementation/Inventory-System.md) に基づき、`Inventory` クラスにて階層化されたグループ変数の優先順位解決（all < parent < child < host）を実装済み。
 
-### 3.13 [✓] 実行エンジンの基本設計
+### 3.14 [✓] 実行エンジンの基本設計
 - **完了日**: 2026-02-22
 - **概要**: 複数タスクの順次実行とエラーハンドリングの基本方針。
 - **解決策**: [タスク実行エンジン](implementation/Task-Executor.md) にて、`linear` 戦略の採用を策定・実装済み。
 
-### 3.14 [✓] Jinjava による変数テンプレートの実装
+### 3.15 [✓] Jinjava による変数テンプレートの実装
 - **完了日**: 2026-03-04
 - **概要**: Playbook や変数ファイル内の Jinja2 テンプレートを展開する仕組み。
 - **解決策**:
     - `VariableResolver` にて Jinjava を統合し、動的な変数展開を実装済み。
     - 主要なフィルター（`bool`, `combine`, `default`, `dict2items`, `ipaddr`, `to_json`, `to_yaml`）を Java で実装し登録済み。
 
-### 3.15 [✓] タスク制御機能（when, register, loop, handlers, block, retry, check_mode 等）の実装
+### 3.16 [✓] タスク制御機能（when, register, loop, handlers, block, retry, check_mode 等）の実装
 - **完了日**: 2026-03-05
 - **概要**: 実行の動的制御や変数の再利用、繰り返し処理、エラーハンドリング、およびドライランのサポート。
 - **解決策**:
     - [タスク制御の実装詳細](implementation/Task-Control.md) に基づき、`PlaybookExecutor` および `TaskExecutor` へ全機能を組み込み済み。
     - `when`, `loop` (`with_items`), `register`, `handlers` (`notify`), `block/rescue/always`, `until/retries/delay`, `failed_when/changed_when`, `delegate_to`, `run_once`, `ignore_errors`, `check_mode` をサポート。
 
-### 3.16 [✓] タスク制御キーワードの拡充 (environment)
+### 3.17 [✓] タスク制御キーワードの拡充 (environment)
 - **完了日**: 2026-03-05
 - **概要**: [タスク制御の実装詳細](implementation/Task-Control.md) に基づき、`environment` のサポートを追加。
 - **解決策**:
     - `environment` 変数のテンプレート展開と、`LocalConnection` / `SshConnection` への伝播を実装済み。
     - Play, Block, Task の各レベルでのマージと、タスク実行直前の遅延評価をサポート。
 
-### 3.17 [✓] Ansible 互換性の維持レベル
+### 3.18 [✓] Ansible 互換性の維持レベル
 - **決定事項**: **Ansible 13** で動くコレクションが動作することを目標とする。
+
+### 3.19 [✓] 変数の優先順位（22段階）の完全な実装とテスト
+- **完了日**: 2026-07-27
+- **概要**: [Variables-Templating.md](implementation/Variables-Templating.md) に基づき、Ansible 互換の 22 段階の変数優先順位を実装。
+- **解決策**: `VariableManager` において全 22 レベルの優先順位解決ロジックを実装し、テストスイートによりその正当性を検証済み。
 
 ## 4. 整理・調整済み (Refactored/Adjusted)
 
@@ -202,6 +214,5 @@
 ### 5.1 [ ] PlaybookExecutor および実行エンジンのさらなる整理
 - **概要**: `PlaybookExecutor` および `TaskQueueManager`, `TaskExecutor` 内に存在する課題の継続的な改善。
 - **検討内容**:
-    - 変数の優先順位（22 段階）の完全な実装とテスト（詳細は [Variables-Templating.md](implementation/Variables-Templating.md) を参照）。
     - 動的インベントリの完全なサポート。
 
