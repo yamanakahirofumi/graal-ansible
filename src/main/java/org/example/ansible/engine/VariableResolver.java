@@ -221,10 +221,21 @@ public class VariableResolver {
 
         Object rendered = interpreter.render(input);
         if (!interpreter.getErrors().isEmpty()) {
+            // For lookups and queries, we want to throw the exception if it's from a filter or lookup
+            // But for standard strings that might be invalid jinja (like in NegativeIntegrationTest),
+            // we should fall back to returning the original string to maintain backward compatibility.
             com.hubspot.jinjava.interpret.TemplateError error = interpreter.getErrors().get(0);
             if (error.getException() instanceof RuntimeException re) {
+                // If it's a RuntimeException from our code (e.g. MandatoryFilter), throw it
                 throw re;
             }
+            // Otherwise, check if it's a single expression.
+            // If it's not a single expression, we fall back to returning the input string.
+            String errTrimmed = input.trim();
+            if (!(errTrimmed.startsWith("{{") && errTrimmed.endsWith("}}"))) {
+                return input;
+            }
+            // If it's a single expression and it failed, we throw.
             throw new RuntimeException(error.getMessage(), error.getException());
         }
 

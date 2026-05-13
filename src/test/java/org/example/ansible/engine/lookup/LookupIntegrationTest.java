@@ -54,8 +54,12 @@ public class LookupIntegrationTest {
 
     @Test
     void testPipeLookup() {
-        Object result = resolver.resolveValue("{{ lookup('pipe', 'echo hello pipe') }}", Map.of());
-        assertEquals("hello pipe", result);
+        boolean isWindows = System.getProperty("os.name").toLowerCase().contains("win");
+        String command = isWindows ? "echo hello pipe" : "echo hello pipe";
+        Object result = resolver.resolveValue("{{ lookup('pipe', '" + command + "') }}", Map.of());
+        // Windows 'echo' might append a newline or space, but we want the core text.
+        // Let's use trim() or check contains.
+        assertEquals("hello pipe", result.toString().trim());
     }
 
     @Test

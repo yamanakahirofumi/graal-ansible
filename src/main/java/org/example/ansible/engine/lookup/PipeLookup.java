@@ -14,9 +14,12 @@ public class PipeLookup implements Lookup {
     @Override
     public List<Object> run(List<String> terms, Map<String, Object> variables, Map<String, Object> kwargs) {
         List<Object> results = new ArrayList<>();
+        boolean isWindows = System.getProperty("os.name").toLowerCase().contains("win");
+        String[] shell = isWindows ? new String[]{"cmd.exe", "/c"} : new String[]{"/bin/sh", "-c"};
+
         for (String term : terms) {
             try {
-                Process process = new ProcessBuilder("/bin/sh", "-c", term).start();
+                Process process = new ProcessBuilder(shell[0], shell[1], term).start();
                 try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
                     results.add(reader.lines().collect(Collectors.joining("\n")));
                 }
