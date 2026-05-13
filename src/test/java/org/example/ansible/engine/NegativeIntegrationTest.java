@@ -99,13 +99,12 @@ class NegativeIntegrationTest {
 
     @Test
     void testInvalidJinjaTemplate() {
-        // Jinja syntax error. Currently VariableResolver returns the string as is if it cannot render.
+        // Jinja syntax error. VariableResolver now throws RuntimeException.
         Task task = new Task("Invalid jinja", "debug", Map.of(
                 "msg", "hello {{ name"
         ));
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
-
-        assertTrue(result.success());
-        assertEquals("hello {{ name", result.data().get("msg"));
+        assertThrows(RuntimeException.class, () ->
+                taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null)
+        );
     }
 }

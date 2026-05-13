@@ -29,7 +29,9 @@ class LookupIntegrationTest {
         Files.writeString(tempFile, "Hello World Lookup");
         try {
             Map<String, Object> variables = new HashMap<>();
-            String template = "{{ lookup('file', '" + tempFile.toAbsolutePath() + "') }}";
+            // Use forward slashes for Jinja2 template to avoid lexical errors on Windows
+            String path = tempFile.toAbsolutePath().toString().replace("\\", "/");
+            String template = "{{ lookup('file', '" + path + "') }}";
             Object result = resolver.resolveValue(template, variables);
             assertEquals("Hello World Lookup", result);
         } finally {
@@ -45,7 +47,10 @@ class LookupIntegrationTest {
         Files.writeString(tempFile2, "Content 2");
         try {
             Map<String, Object> variables = new HashMap<>();
-            String template = "{{ query('file', '" + tempFile1.toAbsolutePath() + "', '" + tempFile2.toAbsolutePath() + "') }}";
+            // Use forward slashes for Jinja2 template to avoid lexical errors on Windows
+            String path1 = tempFile1.toAbsolutePath().toString().replace("\\", "/");
+            String path2 = tempFile2.toAbsolutePath().toString().replace("\\", "/");
+            String template = "{{ query('file', '" + path1 + "', '" + path2 + "') }}";
             Object result = resolver.resolveValue(template, variables);
             assertTrue(result instanceof List);
             List<?> list = (List<?>) result;
