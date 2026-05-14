@@ -28,9 +28,7 @@ public class PipeLookup implements Lookup {
                 String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
                 int exitCode = process.waitFor();
                 if (exitCode != 0) {
-                     // In Ansible, pipe lookup fails if exit code is non-zero (default behavior)
-                     // but we might want to check how it exactly behaves.
-                     // For now, let's just add the output.
+                    throw new RuntimeException("Pipe lookup command failed with exit code " + exitCode + ": " + command);
                 }
                 results.add(output);
             } catch (Exception e) {

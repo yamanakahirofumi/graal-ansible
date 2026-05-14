@@ -89,7 +89,8 @@ class LookupIntegrationTest {
     @Test
     void testPipeLookup() {
         Map<String, Object> variables = new HashMap<>();
-        String template = "{{ lookup('pipe', 'echo -n HelloPipe') }}";
+        // Use a simple echo that works across platforms (Windows 'echo' includes arguments as-is)
+        String template = "{{ lookup('pipe', 'echo HelloPipe') }}";
         Object result = resolver.resolveValue(template, variables);
         assertEquals("HelloPipe", result);
     }
