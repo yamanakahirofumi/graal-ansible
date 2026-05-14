@@ -1,7 +1,9 @@
 package org.example.ansible.engine;
 
 import com.hubspot.jinjava.Jinjava;
+import com.hubspot.jinjava.lib.fn.ELFunctionDefinition;
 import com.hubspot.jinjava.interpret.JinjavaInterpreter;
+import com.hubspot.jinjava.interpret.TemplateError;
 import org.example.ansible.connection.BecomeContext;
 import org.example.ansible.engine.filter.B64DecodeFilter;
 import org.example.ansible.engine.filter.B64EncodeFilter;
@@ -23,6 +25,9 @@ import org.example.ansible.engine.filter.TernaryFilter;
 import org.example.ansible.engine.filter.ToJsonFilter;
 import org.example.ansible.engine.filter.ToYamlFilter;
 import org.example.ansible.engine.filter.UniqueFilter;
+import org.example.ansible.engine.lookup.EnvLookup;
+import org.example.ansible.engine.lookup.FileLookup;
+import org.example.ansible.engine.lookup.Lookup;
 import org.example.ansible.util.Truthiness;
 
 import java.util.ArrayList;
@@ -37,10 +42,29 @@ import java.util.stream.Collectors;
  */
 public class VariableResolver {
     private final Jinjava jinjava;
+    private final Map<String, Lookup> lookups = new HashMap<>();
 
     public VariableResolver() {
         this.jinjava = new Jinjava();
         registerFilters();
+        registerLookups();
+        registerFunctions();
+    }
+
+    private void registerLookups() {
+        registerLookup(new EnvLookup());
+        registerLookup(new FileLookup());
+    }
+
+    private void registerLookup(Lookup lookup) {
+        lookups.put(lookup.getName(), lookup);
+    }
+
+    private void registerFunctions() {
+        jinjava.getGlobalContext().registerFunction(new ELFunctionDefinition("", "lookup",
+                VariableResolver.class, "lookupFunc", String.class, Object[].class));
+        jinjava.getGlobalContext().registerFunction(new ELFunctionDefinition("", "query",
+                VariableResolver.class, "queryFunc", String.class, Object[].class));
     }
 
     private void registerFilters() {
@@ -64,6 +88,51 @@ public class VariableResolver {
         jinjava.getGlobalContext().registerFilter(new FlattenFilter());
         jinjava.getGlobalContext().registerFilter(new Items2DictFilter());
         jinjava.getGlobalContext().registerFilter(new UniqueFilter());
+    }
+
+    /**
+     * Internal function for 'lookup'.
+     */
+    public static Object lookupFunc(String name, Object... args) {
+        List<Object> results = queryFunc(name, args);
+        return results.stream()
+                .map(Object::toString)
+                .collect(Collectors.joining(","));
+    }
+
+    /**
+     * Internal function for 'query'.
+     */
+    @SuppressWarnings("unchecked")
+    public static List<Object> queryFunc(String name, Object... args) {
+        JinjavaInterpreter interpreter = JinjavaInterpreter.getCurrent();
+        if (interpreter == null) {
+            throw new IllegalStateException("JinjavaInterpreter not found in current thread");
+        }
+
+        VariableResolver resolver = (VariableResolver) interpreter.getContext().get("__ansible_resolver");
+        if (resolver == null) {
+            // If not found, try to find lookups from global context or fallback
+            throw new IllegalStateException("VariableResolver not found in Jinjava context");
+        }
+
+        Lookup lookup = resolver.lookups.get(name);
+        if (lookup == null) {
+            throw new RuntimeException("Lookup plugin not found: " + name);
+        }
+
+        List<String> terms = new ArrayList<>();
+        for (Object arg : args) {
+            if (arg instanceof List<?> list) {
+                for (Object item : list) {
+                    terms.add(item.toString());
+                }
+            } else {
+                terms.add(arg.toString());
+            }
+        }
+
+        return lookup.execute(terms, (Map<String, Object>) interpreter.getContext());
     }
 
     /**
@@ -111,7 +180,17 @@ public class VariableResolver {
 
         JinjavaInterpreter interpreter = jinjava.newInterpreter();
         interpreter.getContext().putAll(variables);
+        interpreter.getContext().put("__ansible_resolver", this);
 
+        try {
+            JinjavaInterpreter.pushCurrent(interpreter);
+            return doResolveString(input, interpreter, variables);
+        } finally {
+            JinjavaInterpreter.popCurrent();
+        }
+    }
+
+    private Object doResolveString(String input, JinjavaInterpreter interpreter, Map<String, Object> variables) {
         // If the entire string is just a single {{ expr }}, we try to return the raw object
         String trimmed = input.trim();
         if (trimmed.startsWith("{{") && trimmed.endsWith("}}")) {
@@ -134,11 +213,13 @@ public class VariableResolver {
             }
         }
 
-        Object rendered = jinjava.render(input, variables);
-        if (rendered instanceof String s) {
-            if ("true".equals(s)) return true;
-            if ("false".equals(s)) return false;
+        String rendered = interpreter.render(input);
+        if (interpreter.getErrors().size() > 0) {
+            throw new RuntimeException("Template error: " + interpreter.getErrors().get(0).getMessage());
         }
+
+        if ("true".equals(rendered)) return true;
+        if ("false".equals(rendered)) return false;
         return rendered;
     }
 
