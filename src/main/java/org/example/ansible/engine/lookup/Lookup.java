@@ -14,7 +14,7 @@ public interface Lookup {
      * @param variables The current variable context.
      * @return A list of result items.
      */
-    List<Object> execute(List<String> terms, Map<String, Object> variables);
+    List<Object> execute(List<Object> terms, Map<String, Object> variables);
 
     /**
      * Returns the name of the lookup plugin.

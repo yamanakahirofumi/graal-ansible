@@ -9,9 +9,10 @@ import java.util.Map;
  */
 public class EnvLookup implements Lookup {
     @Override
-    public List<Object> execute(List<String> terms, Map<String, Object> variables) {
+    public List<Object> execute(List<Object> terms, Map<String, Object> variables) {
         List<Object> results = new ArrayList<>();
-        for (String term : terms) {
+        for (Object termObj : terms) {
+            String term = termObj != null ? termObj.toString() : "";
             String val = System.getenv(term);
             if (val != null) {
                 results.add(val);

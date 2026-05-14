@@ -62,4 +62,51 @@ class LookupIntegrationTest {
             Files.deleteIfExists(tempFile2);
         }
     }
+
+    @Test
+    void testDictLookup() {
+        Map<String, Object> variables = new HashMap<>();
+        Map<String, Object> myDict = new HashMap<>();
+        myDict.put("a", 1);
+        myDict.put("b", 2);
+        variables.put("my_dict", myDict);
+
+        String template = "{{ query('dict', my_dict) }}";
+        Object result = resolver.resolveValue(template, variables);
+
+        assertTrue(result instanceof List);
+        List<?> list = (List<?>) result;
+        assertEquals(2, list.size());
+
+        // Items are Map with 'key' and 'value'
+        Map<?, ?> item1 = (Map<?, ?>) list.get(0);
+        Map<?, ?> item2 = (Map<?, ?>) list.get(1);
+
+        assertTrue(item1.containsKey("key"));
+        assertTrue(item1.containsKey("value"));
+    }
+
+    @Test
+    void testPipeLookup() {
+        Map<String, Object> variables = new HashMap<>();
+        String template = "{{ lookup('pipe', 'echo -n HelloPipe') }}";
+        Object result = resolver.resolveValue(template, variables);
+        assertEquals("HelloPipe", result);
+    }
+
+    @Test
+    void testTemplateLookup() throws IOException {
+        Path tempFile = Files.createTempFile("ansible_tpl", ".j2");
+        Files.writeString(tempFile, "Hello {{ name }}");
+        try {
+            Map<String, Object> variables = new HashMap<>();
+            variables.put("name", "World");
+            String path = tempFile.toAbsolutePath().toString().replace("\\", "/");
+            String template = "{{ lookup('template', '" + path + "') }}";
+            Object result = resolver.resolveValue(template, variables);
+            assertEquals("Hello World", result);
+        } finally {
+            Files.deleteIfExists(tempFile);
+        }
+    }
 }

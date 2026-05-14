@@ -25,9 +25,12 @@ import org.example.ansible.engine.filter.TernaryFilter;
 import org.example.ansible.engine.filter.ToJsonFilter;
 import org.example.ansible.engine.filter.ToYamlFilter;
 import org.example.ansible.engine.filter.UniqueFilter;
+import org.example.ansible.engine.lookup.DictLookup;
 import org.example.ansible.engine.lookup.EnvLookup;
 import org.example.ansible.engine.lookup.FileLookup;
 import org.example.ansible.engine.lookup.Lookup;
+import org.example.ansible.engine.lookup.PipeLookup;
+import org.example.ansible.engine.lookup.TemplateLookup;
 import org.example.ansible.util.Truthiness;
 
 import java.util.ArrayList;
@@ -54,6 +57,9 @@ public class VariableResolver {
     private void registerLookups() {
         registerLookup(new EnvLookup());
         registerLookup(new FileLookup());
+        registerLookup(new DictLookup());
+        registerLookup(new PipeLookup());
+        registerLookup(new TemplateLookup());
     }
 
     private void registerLookup(Lookup lookup) {
@@ -121,14 +127,12 @@ public class VariableResolver {
             throw new RuntimeException("Lookup plugin not found: " + name);
         }
 
-        List<String> terms = new ArrayList<>();
+        List<Object> terms = new ArrayList<>();
         for (Object arg : args) {
             if (arg instanceof List<?> list) {
-                for (Object item : list) {
-                    terms.add(item.toString());
-                }
+                terms.addAll(list);
             } else {
-                terms.add(arg.toString());
+                terms.add(arg);
             }
         }
 
