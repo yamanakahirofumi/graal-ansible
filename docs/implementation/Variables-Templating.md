@@ -141,3 +141,36 @@ Lookup プラグインは、外部ソース（ファイル、環境変数、コ�
 ### 7.3 lookup と query の違い
 - `lookup`: デフォルトではカンマ区切りの文字列を返します。
 - `query` (または `wantlist=True` 指定時の `lookup`): 常にリストを返します。
+
+### 7.4 独自Lookupプラグインの追加手順
+
+新しい Lookup プラグインを Java で実装してエンジンに追加する手順は以下の通りです。
+
+1.  **Lookup インターフェースの実装**:
+    - `org.example.ansible.engine.lookup.Lookup` インターフェースを実装するクラスを作成します。
+    - `execute(JinjavaInterpreter interpreter, List<Object> args, Map<String, Object> kwargs)` メソッドを実装し、データの取得ロジックを記述します。
+
+    ```java
+    public interface Lookup {
+        /**
+         * Lookup プラグインを実行します。
+         * @param interpreter 現在の JinjavaInterpreter
+         * @param args 位置引数 (例: lookup('file', 'path1', 'path2') の 'path1', 'path2')
+         * @param kwargs 名前付き引数 (例: lookup(..., errors='ignore'))
+         * @return 取得されたデータのリスト
+         */
+        List<Object> execute(JinjavaInterpreter interpreter, List<Object> args, Map<String, Object> kwargs);
+
+        /**
+         * プラグイン名を返します。
+         */
+        String getName();
+    }
+    ```
+
+2.  **エンジンのレジストリへの登録**:
+    - `org.example.ansible.engine.VariableResolver.java` において、`lookup` および `query` カスタム関数から呼び出し可能な形式でプラグインを登録します。
+    - 内部的には、指定されたプラグイン名（例: `file`）に対応する `Lookup` 実装を解決するマップ等で管理します。
+
+3.  **動作確認**:
+    - Playbook 内で `{{ lookup('my_lookup', 'arg1') }}` や `{{ query('my_lookup', 'arg1') }}` のように記述し、期待通りに動作することを確認します。

@@ -16,7 +16,7 @@
 - **検討内容**:
     - `Jinjava` へのカスタム関数登録。
     - 主要なプラグイン (`file`, `env`, `template`, `pipe`, `dict`) の優先実装。
-    - 詳細は [Variables-Templating.md](implementation/Variables-Templating.md) を参照。
+    - 詳細は [Variables-Templating.md](implementation/Variables-Templating.md) (特に Section 7) を参照。
 
 ## 2. 実装時の詳細事項
 
