@@ -296,9 +296,9 @@ public class TaskExecutor implements ITaskExecutor {
             }
         }
 
-        Task resolvedTask = new Task(task.name(), task.action(), resolvedArgs, task.vars(), task.when(), task.register(), task.loop(), task.notifications(), task.failedWhen(), task.changedWhen(), task.ignoreErrors(),
+        Task resolvedTask = new Task(task.name(), task.action(), resolvedArgs, task.vars(), task.when(), task.register(), task.loop(), task.loopControl(), task.notifications(), task.failedWhen(), task.changedWhen(), task.ignoreErrors(),
                 task.until(), task.retries(), task.delay(), resolvedDelegateTo, task.delegateFacts(), task.runOnce(), task.ignoreUnreachable(), task.block(), task.rescue(), task.always(),
-                task.become(), task.becomeMethod(), task.becomeUser(), task.becomeFlags(), task.checkMode(), task.environment());
+                task.become(), task.becomeMethod(), task.becomeUser(), task.becomeFlags(), task.checkMode(), task.environment(), task.tags());
 
         try {
             if ("meta".equals(resolvedTask.action())) {
@@ -387,24 +387,50 @@ public class TaskExecutor implements ITaskExecutor {
         boolean anyChanged = false;
         boolean allSkipped = true;
 
-        for (Object item : items) {
-            TaskResult result = executeLoopIteration(play, host, task, item, allVars, variableManager, inheritedCheckMode, inheritedEnvironments, blockVars, activeRoles, includeParams, connection, connectionFactory);
+        String indexVar = (String) task.loopControl().get("index_var");
+        Object pauseObj = task.loopControl().get("pause");
+        int pauseSeconds = 0;
+        if (pauseObj instanceof Number n) {
+            pauseSeconds = n.intValue();
+        } else if (pauseObj instanceof String s) {
+            try {
+                pauseSeconds = Integer.parseInt(s);
+            } catch (NumberFormatException ignored) {}
+        }
 
-            Map<String, Object> resultData = buildIterationResultData(result, item);
+        int index = 0;
+        for (Object item : items) {
+            if (index > 0 && pauseSeconds > 0) {
+                try {
+                    Thread.sleep(pauseSeconds * 1000L);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+
+            Map<String, Object> iterationVars = new HashMap<>(allVars);
+            if (indexVar != null) {
+                iterationVars.put(indexVar, index);
+            }
+            String loopVar = (String) task.loopControl().getOrDefault("loop_var", "item");
+            iterationVars.put(loopVar, item);
+
+            TaskResult result = executeLoopIteration(play, host, task, item, iterationVars, variableManager, inheritedCheckMode, inheritedEnvironments, blockVars, activeRoles, includeParams, connection, connectionFactory);
+
+            Map<String, Object> resultData = buildIterationResultData(result, item, iterationVars, task.loopControl());
             loopResults.add(resultData);
 
             if (!result.success() && !result.isSkipped()) anyFailed = true;
             if (result.changed()) anyChanged = true;
             if (!result.isSkipped()) allSkipped = false;
+            index++;
         }
 
         return buildFinalLoopResult(loopResults, anyFailed, anyChanged, allSkipped);
     }
 
-    private TaskResult executeLoopIteration(Play play, Host host, Task task, Object item, Map<String, Object> allVars, VariableManager variableManager, boolean inheritedCheckMode, List<Object> inheritedEnvironments, Map<String, Object> blockVars, List<Role> activeRoles, Map<String, Object> includeParams, Connection connection, ConnectionFactory connectionFactory) {
-        Map<String, Object> iterationVars = new HashMap<>(allVars);
-        iterationVars.put("item", item);
-
+    private TaskResult executeLoopIteration(Play play, Host host, Task task, Object item, Map<String, Object> iterationVars, VariableManager variableManager, boolean inheritedCheckMode, List<Object> inheritedEnvironments, Map<String, Object> blockVars, List<Role> activeRoles, Map<String, Object> includeParams, Connection connection, ConnectionFactory connectionFactory) {
         TaskResult result = executeSingleTask(play, host, task, iterationVars, variableManager, inheritedCheckMode, inheritedEnvironments, blockVars, activeRoles, includeParams, connection, connectionFactory);
         if (result != null && task.until() == null && !result.isSkipped()) {
             result = evaluateResultCustomization(task, result, iterationVars);
@@ -412,7 +438,7 @@ public class TaskExecutor implements ITaskExecutor {
         return result;
     }
 
-    private Map<String, Object> buildIterationResultData(TaskResult result, Object item) {
+    private Map<String, Object> buildIterationResultData(TaskResult result, Object item, Map<String, Object> iterationVars, Map<String, Object> loopControl) {
         Map<String, Object> resultData = new HashMap<>(result.data());
         resultData.put("item", item);
         resultData.put("changed", result.changed());
@@ -420,6 +446,22 @@ public class TaskExecutor implements ITaskExecutor {
         if (result.isSkipped()) {
             resultData.put("skipped", true);
         }
+
+        String loopVar = (String) loopControl.get("loop_var");
+        if (loopVar != null) {
+            resultData.put(loopVar, item);
+        }
+        String indexVar = (String) loopControl.get("index_var");
+        if (indexVar != null) {
+            resultData.put(indexVar, iterationVars.get(indexVar));
+        }
+
+        String label = (String) loopControl.get("label");
+        if (label != null) {
+            Object resolvedLabel = variableResolver.resolveValue(variableResolver.wrapInJinja(label), iterationVars);
+            resultData.put("_ansible_item_label", resolvedLabel);
+        }
+
         return resultData;
     }
 
@@ -600,9 +642,9 @@ public class TaskExecutor implements ITaskExecutor {
                     "execute_from_python",
                     moduleName,
                     moduleArgs,
-                    null, null, null, null, null, null, null, false,
+                    null, null, null, null, Map.of(), null, null, null, false,
                     null, 0, 0, null, false, false, false, null, null, null,
-                    null, null, null, null, null, null
+                    null, null, null, null, null, null, List.of()
             );
 
             // Execute as a normal module, using the current connection and environment

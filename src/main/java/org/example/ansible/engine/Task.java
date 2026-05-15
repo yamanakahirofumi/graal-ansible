@@ -13,6 +13,7 @@ import java.util.List;
  * @param when              Conditional execution expression (String or List of Strings).
  * @param register          Variable name to register the result.
  * @param loop              Loop items or expression.
+ * @param loopControl       Loop control parameters (index_var, loop_var, label, pause).
  * @param notifications     List of handler names to notify on change.
  * @param failedWhen        Custom condition for failure.
  * @param changedWhen       Custom condition for change.
@@ -43,6 +44,7 @@ public record Task(
         Object when,
         String register,
         Object loop,
+        Map<String, Object> loopControl,
         List<String> notifications,
         Object failedWhen,
         Object changedWhen,
@@ -66,13 +68,13 @@ public record Task(
         List<String> tags
 ) {
     public Task(String name, String action, Map<String, Object> args) {
-        this(name, action, args, Map.of(), null, null, null, List.of(), null, null, false,
+        this(name, action, args, Map.of(), null, null, null, Map.of(), List.of(), null, null, false,
                 null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
                 null, null, null, null, null, null, List.of());
     }
 
     public Task(String name, String action, Map<String, Object> args, Map<String, Object> vars) {
-        this(name, action, args, vars, null, null, null, List.of(), null, null, false,
+        this(name, action, args, vars, null, null, null, Map.of(), List.of(), null, null, false,
                 null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
                 null, null, null, null, null, null, List.of());
     }
@@ -106,7 +108,7 @@ public record Task(
             Object checkMode,
             Object environment
     ) {
-        this(name, action, args, vars, when, register, loop, notifications, failedWhen, changedWhen, ignoreErrors,
+        this(name, action, args, vars, when, register, loop, Map.of(), notifications, failedWhen, changedWhen, ignoreErrors,
                 until, retries, delay, delegateTo, delegateFacts, runOnce, ignoreUnreachable, block, rescue, always,
                 become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, List.of());
     }
