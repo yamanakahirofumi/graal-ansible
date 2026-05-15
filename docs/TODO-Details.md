@@ -11,12 +11,6 @@
     - Build Cache の有効活用。
     - Windows/macOS 環境でのビルドエラーの監視と修正。
 
-### 1.2 [ ] Lookup プラグインの実装
-- **概要**: 外部ソースからデータを取得するための `lookup` および `query` 関数の実装。
-- **検討内容**:
-    - `Jinjava` へのカスタム関数登録。
-    - 主要なプラグイン (`file`, `env`, `template`, `pipe`, `dict`) の優先実装。
-    - 詳細は [Variables-Templating.md](implementation/Variables-Templating.md) (特に Section 7) を参照。
 
 ## 2. 実装時の詳細事項
 
@@ -152,8 +146,16 @@
 
 ### 3.19 [✓] 変数の優先順位（22段階）の完全な実装とテスト
 - **完了日**: 2026-07-27
-- **概要**: [Variables-Templating.md](implementation/Variables-Templating.md) に基づき、Ansible 互換の 22 段階の変数優先順位を実装。
+- **概要**: [Variables-Templating.md](implementation/Variables-Templating.md) に基づき、Ansible 互換の 22 段階の変数優先順位を実装.
 - **解決策**: `VariableManager` において全 22 レベルの優先順位解決ロジックを実装し、テストスイートによりその正当性を検証済み。
+
+### 3.20 [✓] Lookup プラグインの実装
+- **完了日**: 2026-05-14
+- **概要**: 外部ソースからデータを取得するための `lookup` および `query` 関数の実装。
+- **解決策**:
+    - `Jinjava` へのカスタム関数登録を行い、`lookup` と `query` をサポート。
+    - 主要なプラグイン (`file`, `env`, `template`, `pipe`, `dict`) を実装済み。
+    - `Lookup` インターフェースを `List<Object>` 対応に改善し、型安全なデータ受け渡しを実現。
 
 ## 4. 整理・調整済み (Refactored/Adjusted)
 

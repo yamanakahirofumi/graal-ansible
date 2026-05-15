@@ -13,11 +13,12 @@ import java.util.Map;
  */
 public class FileLookup implements Lookup {
     @Override
-    public List<Object> execute(List<String> terms, Map<String, Object> variables) {
+    public List<Object> execute(List<Object> terms, Map<String, Object> variables) {
         List<Object> results = new ArrayList<>();
         String playbookDir = (String) variables.get("playbook_dir");
 
-        for (String term : terms) {
+        for (Object termObj : terms) {
+            String term = termObj != null ? termObj.toString() : "";
             Path path = Paths.get(term);
             if (!path.isAbsolute() && playbookDir != null) {
                 path = Paths.get(playbookDir, term);
