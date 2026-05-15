@@ -24,7 +24,7 @@ graal-ansible [options] playbook.yml
 | `--become-method` | - | 権限昇格に使用するメソッドを指定 (sudo, su等) | ◎ |
 | `--become-user` | - | 昇格後のユーザーを指定 (デフォルト: root) | ◎ |
 | `--become-flags` | - | 権限昇格に使用するフラグを指定 | ◎ |
-| `--ask-become-pass` | `-K` | 権限昇格パスワードをプロンプトで問い合せる | ○ |
+| `--ask-become-pass` | `-K` | 権限昇格パスワードをプロンプトで問い合せる | ◎ |
 | `--version` | - | バージョン情報を表示 | ◎ |
 | `--collections-path` | - | コレクションの探索パスを指定 | ○ |
 | `--help` | `-h` | ヘルプメッセージを表示 | ◎ |
