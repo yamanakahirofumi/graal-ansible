@@ -11,6 +11,10 @@
     - Build Cache の有効活用。
     - Windows/macOS 環境でのビルドエラーの監視と修正。
 
+### 1.2 [ ] Lookup プラグインの実装
+- **概要**: 外部ソースからデータを取得するための `lookup` および `query` 関数の実装。
+- **詳細は [Variables-Templating.md](implementation/Variables-Templating.md) の Section 7 を参照。**
+
 
 ## 2. 実装時の詳細事項
 
