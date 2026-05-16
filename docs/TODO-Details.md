@@ -39,7 +39,7 @@
 ### 3.2 [✓] Truthiness 判定ルールの明文化
 - **完了日**: 2026-04-16
 - **概要**: `org.example.ansible.util.Truthiness` に実装されている判定ルールをドキュメント化。
-- **解決策**: `docs/implementation/Task-Control.md` に「14. 真偽判定 (Truthiness)」セクションを追加。
+- **解決策**: `docs/implementation/Task-Control.md` に「15. 真偽判定 (Truthiness)」セクションを追加。
 
 ### 3.3 [✓] モジュールサポート状態の同期
 - **完了日**: 2026-07-26
