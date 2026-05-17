@@ -1,23 +1,25 @@
 package org.example.ansible.engine.lookup;
 
+import com.hubspot.jinjava.interpret.JinjavaInterpreter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 /**
- * env lookup plugin: retrieves environment variables.
+ * env lookup plugin: returns the value of environment variables.
  */
 public class EnvLookup implements Lookup {
     @Override
-    public List<Object> execute(List<Object> terms, Map<String, Object> variables) {
+    public List<Object> execute(JinjavaInterpreter interpreter, List<Object> terms, Map<String, Object> kwargs) {
         List<Object> results = new ArrayList<>();
-        for (Object termObj : terms) {
-            String term = termObj != null ? termObj.toString() : "";
-            String val = System.getenv(term);
-            if (val != null) {
-                results.add(val);
-            } else {
-                results.add("");
+        Object defaultValue = kwargs.get("default");
+
+        for (Object term : terms) {
+            String value = System.getenv(term.toString());
+            if (value != null) {
+                results.add(value);
+            } else if (defaultValue != null) {
+                results.add(defaultValue);
             }
         }
         return results;

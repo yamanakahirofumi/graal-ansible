@@ -1,5 +1,6 @@
 package org.example.ansible.engine.lookup;
 
+import com.hubspot.jinjava.interpret.JinjavaInterpreter;
 import java.util.List;
 import java.util.Map;
 
@@ -10,11 +11,12 @@ public interface Lookup {
     /**
      * Executes the lookup.
      *
-     * @param terms     The terms passed to the lookup.
-     * @param variables The current variable context.
+     * @param interpreter The current Jinjava interpreter.
+     * @param terms       The terms passed to the lookup.
+     * @param kwargs      The keyword arguments passed to the lookup.
      * @return A list of result items.
      */
-    List<Object> execute(List<Object> terms, Map<String, Object> variables);
+    List<Object> execute(JinjavaInterpreter interpreter, List<Object> terms, Map<String, Object> kwargs);
 
     /**
      * Returns the name of the lookup plugin.

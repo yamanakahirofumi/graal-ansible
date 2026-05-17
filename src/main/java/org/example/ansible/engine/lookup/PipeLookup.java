@@ -1,5 +1,6 @@
 package org.example.ansible.engine.lookup;
 
+import com.hubspot.jinjava.interpret.JinjavaInterpreter;
 import org.example.ansible.util.OSHandler;
 import org.example.ansible.util.OSHandlerFactory;
 
@@ -13,7 +14,7 @@ import java.util.Map;
  */
 public class PipeLookup implements Lookup {
     @Override
-    public List<Object> execute(List<Object> terms, Map<String, Object> variables) {
+    public List<Object> execute(JinjavaInterpreter interpreter, List<Object> terms, Map<String, Object> kwargs) {
         List<Object> results = new ArrayList<>();
         OSHandler osHandler = OSHandlerFactory.getHandler();
         List<String> shell = osHandler.getShellExecutable();

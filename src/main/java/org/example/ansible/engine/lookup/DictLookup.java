@@ -1,5 +1,6 @@
 package org.example.ansible.engine.lookup;
 
+import com.hubspot.jinjava.interpret.JinjavaInterpreter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -10,7 +11,7 @@ import java.util.Map;
  */
 public class DictLookup implements Lookup {
     @Override
-    public List<Object> execute(List<Object> terms, Map<String, Object> variables) {
+    public List<Object> execute(JinjavaInterpreter interpreter, List<Object> terms, Map<String, Object> kwargs) {
         List<Object> results = new ArrayList<>();
         for (Object term : terms) {
             if (term instanceof Map<?, ?> map) {

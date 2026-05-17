@@ -24,6 +24,14 @@ class LookupIntegrationTest {
     }
 
     @Test
+    void testEnvLookupWithDefault() {
+        Map<String, Object> variables = new HashMap<>();
+        String template = "{{ lookup('env', 'NON_EXISTENT_VAR_XYZ_123', default='fallback_value') }}";
+        Object result = resolver.resolveValue(template, variables);
+        assertEquals("fallback_value", result);
+    }
+
+    @Test
     void testFileLookup() throws IOException {
         Path tempFile = Files.createTempFile("ansible_test", ".txt");
         Files.writeString(tempFile, "Hello World Lookup");
