@@ -785,6 +785,7 @@ def apply_mocks() -> None:
         'AnsibleModule': AnsibleModule,
         '_load_params': mock_load_params,
         '_ANSIBLE_PROFILE': 'modern',
+        '_PARSED_MODULE_ARGS': _current_task_context['complex_args'],
         'FILE_COMMON_ARGUMENTS': FILE_COMMON_ARGUMENTS,
         'missing_required_lib': lambda *a, **kw: None,
         'sanitize_keys': lambda x, *a, **kw: x,
