@@ -124,6 +124,9 @@ def bind_task(complex_args: Any, connection_java: Any, become_context_java: Any,
         'environment_java': environment_java
     })
 
+    if 'ansible.module_utils.basic' in sys.modules:
+        sys.modules['ansible.module_utils.basic']._PARSED_MODULE_ARGS = converted_args
+
 def setup_sys_path(site_packages: Optional[List[str]]) -> None:
     if site_packages:
         for p in site_packages:
@@ -682,7 +685,9 @@ def apply_mocks() -> None:
     })
     create_mock('ansible._internal._locking')
     create_mock('ansible._internal._errors')
-    create_mock('ansible._internal._powershell', {'_script': types.SimpleNamespace()})
+    create_mock('ansible._internal._powershell')
+    create_mock('ansible._internal._powershell._script')
+    create_mock('ansible._internal._powershell._clixml')
     create_mock('ansible._internal._errors._error_utils', {
         'result_dict_from_captured_errors': lambda *a, **kw: {}
     })
