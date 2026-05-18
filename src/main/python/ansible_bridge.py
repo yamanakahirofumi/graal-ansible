@@ -327,6 +327,8 @@ class ActionBase:
         return rp
     def _fixup_perms2(self, *args: Any, **kwargs: Any) -> None: pass
     def register_host_variables(self, host_vars, variable_layer=None): pass
+    def add_host(self, host_name: str, parent_group_names: List[str] = None, host_vars: Dict[str, Any] = None) -> bool: return True
+    def add_group(self, group_name: str, parent_group_names: List[str] = None) -> bool: return True
 
     def _low_level_execute_command(self, cmd: str, sudoable: bool = True, in_data: Any = None, executable: str = None, encoding_errors: str = 'surrogate_then_replace', chdir: str = None) -> Dict[str, Any]:
         if chdir:
@@ -622,6 +624,7 @@ def apply_mocks() -> None:
         CACHEABLE_FACT = 'cacheable_fact'
         EPHEMERAL_FACT = 'ephemeral_fact'
         INCLUDE_VARS = 'include_vars'
+        REGISTER_VARS = 'register_vars'
     create_mock('ansible.plugins.action', {'ActionBase': ActionBase, 'VariableLayer': VariableLayer})
 
     action_loader_obj = types.SimpleNamespace()
