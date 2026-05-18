@@ -323,6 +323,7 @@ class ActionBase:
             conn.putFile(Paths.get(str(lp)), str(rp))
         return rp
     def _fixup_perms2(self, *args: Any, **kwargs: Any) -> None: pass
+    def register_host_variables(self, host_vars, variable_layer=None): pass
 
     def _low_level_execute_command(self, cmd: str, sudoable: bool = True, in_data: Any = None, executable: str = None, encoding_errors: str = 'surrogate_then_replace', chdir: str = None) -> Dict[str, Any]:
         if chdir:
@@ -612,7 +613,13 @@ def apply_mocks() -> None:
 
     # 5. Plugins & Loader
     create_mock('ansible.plugins', {'AnsiblePlugin': type('AnsiblePlugin', (), {})})
-    create_mock('ansible.plugins.action', {'ActionBase': ActionBase})
+    class VariableLayer:
+        FACTS = 'facts'
+        VARS = 'vars'
+        CACHEABLE_FACT = 'cacheable_fact'
+        EPHEMERAL_FACT = 'ephemeral_fact'
+        INCLUDE_VARS = 'include_vars'
+    create_mock('ansible.plugins.action', {'ActionBase': ActionBase, 'VariableLayer': VariableLayer})
 
     action_loader_obj = types.SimpleNamespace()
     action_loader_obj.action_loader = action_loader_obj
@@ -675,6 +682,7 @@ def apply_mocks() -> None:
     })
     create_mock('ansible._internal._locking')
     create_mock('ansible._internal._errors')
+    create_mock('ansible._internal._powershell', {'_script': types.SimpleNamespace()})
     create_mock('ansible._internal._errors._error_utils', {
         'result_dict_from_captured_errors': lambda *a, **kw: {}
     })
