@@ -24,6 +24,40 @@ class LookupIntegrationTest {
     }
 
     @Test
+    void testEnvLookupMultipleTerms() {
+        Map<String, Object> variables = new HashMap<>();
+        String template = "{{ query('env', 'PATH', 'HOME') }}";
+        Object result = resolver.resolveValue(template, variables);
+        assertTrue(result instanceof List);
+        List<?> list = (List<?>) result;
+        assertTrue(list.size() >= 2);
+    }
+
+    @Test
+    void testPipeLookupLineSplitting() {
+        Map<String, Object> variables = new HashMap<>();
+        // In Linux, printf works well for newlines
+        String template = "{{ query('pipe', 'printf \"line1\\nline2\"') }}";
+        Object result = resolver.resolveValue(template, variables);
+        assertTrue(result instanceof List);
+        List<?> list = (List<?>) result;
+        assertEquals(2, list.size());
+        assertEquals("line1", list.get(0));
+        assertEquals("line2", list.get(1));
+    }
+
+    @Test
+    void testPipeLookupWantListFalse() {
+        Map<String, Object> variables = new HashMap<>();
+        String template = "{{ lookup('pipe', 'printf \"line1\\nline2\"', wantlist=false) }}";
+        Object result = resolver.resolveValue(template, variables);
+        // lookup with wantlist=false returns a string (joined by comma by VariableResolver.lookupFunc)
+        // Wait, VariableResolver.lookupFunc joins results with comma.
+        // If results has 1 item "line1\nline2", then it's "line1\nline2".
+        assertEquals("line1\nline2", result);
+    }
+
+    @Test
     void testEnvLookupWithDefault() {
         Map<String, Object> variables = new HashMap<>();
         String template = "{{ lookup('env', 'NON_EXISTENT_VAR_XYZ_123', default='fallback_value') }}";

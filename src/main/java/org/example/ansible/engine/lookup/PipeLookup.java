@@ -3,6 +3,7 @@ package org.example.ansible.engine.lookup;
 import com.hubspot.jinjava.interpret.JinjavaInterpreter;
 import org.example.ansible.util.OSHandler;
 import org.example.ansible.util.OSHandlerFactory;
+import org.example.ansible.util.Truthiness;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -19,6 +20,12 @@ public class PipeLookup implements Lookup {
         OSHandler osHandler = OSHandlerFactory.getHandler();
         List<String> shell = osHandler.getShellExecutable();
 
+        boolean wantList = true;
+        Object wantListObj = kwargs.get("wantlist");
+        if (wantListObj != null) {
+            wantList = Truthiness.isTrue(wantListObj);
+        }
+
         for (Object termObj : terms) {
             String command = termObj != null ? termObj.toString() : "";
             List<String> fullCommand = new ArrayList<>(shell);
@@ -31,7 +38,16 @@ public class PipeLookup implements Lookup {
                 if (exitCode != 0) {
                     throw new RuntimeException("Pipe lookup command failed with exit code " + exitCode + ": " + command);
                 }
-                results.add(output);
+
+                if (wantList) {
+                    if (!output.isEmpty()) {
+                        for (String line : output.split("\\r?\\n")) {
+                            results.add(line);
+                        }
+                    }
+                } else {
+                    results.add(output);
+                }
             } catch (Exception e) {
                 throw new RuntimeException("Pipe lookup failed for command: " + command, e);
             }
