@@ -243,6 +243,12 @@ class ActionBase:
         self._discovered_interpreter_key = None
     def run(self, tmp: Optional[str] = None, task_vars: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         return {'changed': False, 'failed': False}
+    def register_host_variables(self, vars, layer=None):
+        pass
+    def add_host(self, host_name, group_names=None, port=None, variables=None):
+        pass
+    def add_group(self, group_name):
+        pass
     def validate_argument_spec(self, argument_spec: Dict[str, Any], *args: Any, **kwargs: Any) -> Tuple[Any, Dict[str, Any]]:
         res = {}
         input_args = self._task.args or {}
@@ -612,7 +618,31 @@ def apply_mocks() -> None:
 
     # 5. Plugins & Loader
     create_mock('ansible.plugins', {'AnsiblePlugin': type('AnsiblePlugin', (), {})})
-    create_mock('ansible.plugins.action', {'ActionBase': ActionBase})
+
+    # VariableLayer constants for Ansible 2.17+
+    class VariableLayer:
+        FACTS = 'facts'
+        VARS = 'vars'
+        CACHEABLE_FACT = 'cacheable_fact'
+        EPHEMERAL_FACT = 'ephemeral_fact'
+        INCLUDE_VARS = 'include_vars'
+        REGISTER_VARS = 'register_vars'
+
+    create_mock('ansible.plugins.action', {
+        'ActionBase': ActionBase,
+        'VariableLayer': VariableLayer,
+        'FACTS': VariableLayer.FACTS,
+        'VARS': VariableLayer.VARS,
+        'CACHEABLE_FACT': VariableLayer.CACHEABLE_FACT,
+        'EPHEMERAL_FACT': VariableLayer.EPHEMERAL_FACT,
+        'INCLUDE_VARS': VariableLayer.INCLUDE_VARS,
+        'REGISTER_VARS': VariableLayer.REGISTER_VARS
+    })
+
+    # Mock powershell for script module compatibility
+    create_mock('ansible._internal._powershell')
+    create_mock('ansible._internal._powershell._script')
+    create_mock('ansible._internal._powershell._clixml')
 
     action_loader_obj = types.SimpleNamespace()
     action_loader_obj.action_loader = action_loader_obj
@@ -922,6 +952,11 @@ def execute_module(module_name: str, complex_args: Dict[str, Any], module_code: 
     import __main__
     setattr(__main__, '_module_fqn', f"ansible.builtin.{module_name}")
     setattr(__main__, 'complex_args', complex_args)
+
+    # Initialize _PARSED_MODULE_ARGS to avoid AttributeError in basic.py
+    if 'ansible.module_utils.basic' in sys.modules:
+        sys.modules['ansible.module_utils.basic']._PARSED_MODULE_ARGS = complex_args
+
     old_stdout, sys.stdout = sys.stdout, StringIO()
     try:
         if module_code:
