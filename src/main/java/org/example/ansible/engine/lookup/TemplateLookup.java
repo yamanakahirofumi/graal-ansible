@@ -1,8 +1,8 @@
 package org.example.ansible.engine.lookup;
 
 import org.example.ansible.engine.VariableResolver;
-
 import com.hubspot.jinjava.interpret.JinjavaInterpreter;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -16,14 +16,9 @@ import java.util.Map;
  */
 public class TemplateLookup implements Lookup {
     @Override
-    public List<Object> execute(List<Object> terms, Map<String, Object> variables) {
+    public List<Object> execute(JinjavaInterpreter interpreter, List<Object> terms, Map<String, Object> kwargs) {
         List<Object> results = new ArrayList<>();
-        String playbookDir = (String) variables.get("playbook_dir");
-
-        JinjavaInterpreter interpreter = JinjavaInterpreter.getCurrent();
-        if (interpreter == null) {
-            throw new IllegalStateException("JinjavaInterpreter not found");
-        }
+        String playbookDir = (String) interpreter.getContext().get("playbook_dir");
 
         VariableResolver resolver = (VariableResolver) interpreter.getContext().get("__ansible_resolver");
         if (resolver == null) {
@@ -40,7 +35,7 @@ public class TemplateLookup implements Lookup {
             try {
                 String templateContent = Files.readString(path);
                 // We use resolveValue which handles templating
-                Object rendered = resolver.resolveValue(templateContent, variables);
+                Object rendered = resolver.resolveValue(templateContent, interpreter.getContext());
                 results.add(rendered != null ? rendered.toString() : "");
             } catch (IOException e) {
                 throw new RuntimeException("Template lookup failed for file: " + path + ". " + e.getMessage(), e);

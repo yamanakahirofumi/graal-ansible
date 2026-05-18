@@ -159,11 +159,11 @@ Lookup プラグインは、外部ソース（ファイル、環境変数、コ�
         /**
          * Lookup プラグインを実行します。
          * @param interpreter 現在の JinjavaInterpreter
-         * @param args 位置引数 (例: lookup('file', 'path1', 'path2') の 'path1', 'path2')
+         * @param terms 位置引数 (例: lookup('file', 'path1', 'path2') の 'path1', 'path2')
          * @param kwargs 名前付き引数 (例: lookup(..., errors='ignore'))
          * @return 取得されたデータのリスト
          */
-        List<Object> execute(JinjavaInterpreter interpreter, List<Object> args, Map<String, Object> kwargs);
+        List<Object> execute(JinjavaInterpreter interpreter, List<Object> terms, Map<String, Object> kwargs);
 
         /**
          * プラグイン名を返します。

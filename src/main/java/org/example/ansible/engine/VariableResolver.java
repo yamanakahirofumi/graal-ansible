@@ -1,6 +1,7 @@
 package org.example.ansible.engine;
 
 import com.hubspot.jinjava.Jinjava;
+import com.hubspot.jinjava.el.ext.NamedParameter;
 import com.hubspot.jinjava.lib.fn.ELFunctionDefinition;
 import com.hubspot.jinjava.interpret.JinjavaInterpreter;
 import com.hubspot.jinjava.interpret.TemplateError;
@@ -128,15 +129,19 @@ public class VariableResolver {
         }
 
         List<Object> terms = new ArrayList<>();
+        Map<String, Object> kwargs = new HashMap<>();
+
         for (Object arg : args) {
-            if (arg instanceof List<?> list) {
+            if (arg instanceof NamedParameter np) {
+                kwargs.put(np.getName(), np.getValue());
+            } else if (arg instanceof List<?> list) {
                 terms.addAll(list);
             } else {
                 terms.add(arg);
             }
         }
 
-        return lookup.execute(terms, (Map<String, Object>) interpreter.getContext());
+        return lookup.execute(interpreter, terms, kwargs);
     }
 
     /**
