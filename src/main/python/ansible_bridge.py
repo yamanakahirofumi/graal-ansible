@@ -2,6 +2,7 @@ import json
 import sys
 import shlex
 import os
+import enum
 import shutil
 import types
 import re
@@ -620,7 +621,7 @@ def apply_mocks() -> None:
     create_mock('ansible.plugins', {'AnsiblePlugin': type('AnsiblePlugin', (), {})})
 
     # VariableLayer constants for Ansible 2.17+
-    class VariableLayer:
+    class VariableLayer(enum.Enum):
         FACTS = 'facts'
         VARS = 'vars'
         CACHEABLE_FACT = 'cacheable_fact'
@@ -738,7 +739,7 @@ def apply_mocks() -> None:
             m.RoutingMarkerBehavior = type('RoMB', (), {'__init__': lambda *a, **kw: None})
 
     # 8. Module Utils
-    for mname in ['ansible', 'ansible.module_utils', 'ansible.module_utils.common', 'ansible.module_utils.compat', 'ansible.module_utils._internal', 'ansible.module_utils.parsing', 'ansible.module_utils.facts', 'ansible.plugins', 'ansible.plugins.action']:
+    for mname in ['ansible', 'ansible.module_utils', 'ansible.module_utils.common', 'ansible.module_utils.compat', 'ansible.module_utils._internal', 'ansible.module_utils.parsing', 'ansible.module_utils.facts']:
         attrs = {}
         if mname == 'ansible.module_utils._internal':
             attrs['get_controller_serialize_map'] = lambda: {}
