@@ -805,6 +805,7 @@ def apply_mocks() -> None:
 
     create_mock('ansible.module_utils.basic', {
         'AnsibleModule': AnsibleModule,
+        '_PARSED_MODULE_ARGS': {},
         '_load_params': mock_load_params,
         '_ANSIBLE_PROFILE': 'modern',
         'FILE_COMMON_ARGUMENTS': FILE_COMMON_ARGUMENTS,
