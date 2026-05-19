@@ -243,6 +243,9 @@ class ActionBase:
         self._discovered_interpreter_key = None
     def run(self, tmp: Optional[str] = None, task_vars: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         return {'changed': False, 'failed': False}
+    def register_host_variables(self, *args, **kwargs): pass
+    def add_host(self, *args, **kwargs): pass
+    def add_group(self, *args, **kwargs): pass
     def validate_argument_spec(self, argument_spec: Dict[str, Any], *args: Any, **kwargs: Any) -> Tuple[Any, Dict[str, Any]]:
         res = {}
         input_args = self._task.args or {}
@@ -611,8 +614,20 @@ def apply_mocks() -> None:
     })
 
     # 5. Plugins & Loader
+    class VariableLayer:
+        FACTS = 'facts'
+        VARS = 'vars'
+        CACHEABLE_FACT = 'cacheable_fact'
+        EPHEMERAL_FACT = 'ephemeral_fact'
+        INCLUDE_VARS = 'include_vars'
+        REGISTER_VARS = 'register_vars'
+
     create_mock('ansible.plugins', {'AnsiblePlugin': type('AnsiblePlugin', (), {})})
-    create_mock('ansible.plugins.action', {'ActionBase': ActionBase})
+    create_mock('ansible.plugins.action', {'ActionBase': ActionBase, 'VariableLayer': VariableLayer})
+
+    create_mock('ansible._internal._powershell')
+    create_mock('ansible._internal._powershell._script')
+    create_mock('ansible._internal._powershell._clixml')
 
     action_loader_obj = types.SimpleNamespace()
     action_loader_obj.action_loader = action_loader_obj
