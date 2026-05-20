@@ -600,4 +600,51 @@ class TaskControlTest {
         assertEquals("handled", host1Results.get(2).data().get("msg"));
         assertEquals("after", host1Results.get(3).data().get("msg"));
     }
+
+    @Test
+    void testHandlersListen() {
+        String inventoryIni = "host1";
+        Inventory inventory = new IniInventoryParser().parse(new ByteArrayInputStream(inventoryIni.getBytes(StandardCharsets.UTF_8)));
+
+        String playbookYaml = """
+                - name: test handlers listen
+                  hosts: all
+                  tasks:
+                    - name: trigger topic
+                      debug:
+                        msg: "trigger"
+                      changed_when: true
+                      notify: my topic
+                    - name: trigger both
+                      debug:
+                        msg: "trigger both"
+                      changed_when: true
+                      notify:
+                        - my topic
+                        - handler2
+                  handlers:
+                    - name: handler1
+                      debug:
+                        msg: "handled 1"
+                      listen: my topic
+                    - name: handler2
+                      debug:
+                        msg: "handled 2"
+                      listen: my topic
+                """;
+        Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
+
+        Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
+
+        List<TaskResult> host1Results = results.get("host1");
+        // Expected results:
+        // 0: trigger topic
+        // 1: trigger both
+        // 2: handler1 (triggered by 'my topic')
+        // 3: handler2 (triggered by 'my topic' or 'handler2')
+
+        assertEquals(4, host1Results.size(), "Should have 4 results: 2 tasks and 2 handlers");
+        assertEquals("handled 1", host1Results.get(2).data().get("msg"));
+        assertEquals("handled 2", host1Results.get(3).data().get("msg"));
+    }
 }

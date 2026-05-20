@@ -298,7 +298,7 @@ public class TaskExecutor implements ITaskExecutor {
 
         Task resolvedTask = new Task(task.name(), task.action(), resolvedArgs, task.vars(), task.when(), task.register(), task.loop(), task.loopControl(), task.notifications(), task.failedWhen(), task.changedWhen(), task.ignoreErrors(),
                 task.until(), task.retries(), task.delay(), resolvedDelegateTo, task.delegateFacts(), task.runOnce(), task.ignoreUnreachable(), task.block(), task.rescue(), task.always(),
-                task.become(), task.becomeMethod(), task.becomeUser(), task.becomeFlags(), task.checkMode(), task.environment(), task.tags());
+                task.become(), task.becomeMethod(), task.becomeUser(), task.becomeFlags(), task.checkMode(), task.environment(), task.tags(), task.listen());
 
         try {
             if ("meta".equals(resolvedTask.action())) {
@@ -642,9 +642,9 @@ public class TaskExecutor implements ITaskExecutor {
                     "execute_from_python",
                     moduleName,
                     moduleArgs,
-                    null, null, null, null, Map.of(), null, null, null, false,
-                    null, 0, 0, null, false, false, false, null, null, null,
-                    null, null, null, null, null, null, List.of()
+                    null, null, null, null, Map.of(), List.of(), null, null, false,
+                    null, 0, 0, null, false, false, false, List.of(), List.of(), List.of(),
+                    null, null, null, null, null, null, List.of(), List.of()
             );
 
             // Execute as a normal module, using the current connection and environment

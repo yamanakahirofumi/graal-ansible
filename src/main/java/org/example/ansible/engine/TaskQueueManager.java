@@ -165,23 +165,26 @@ public class TaskQueueManager {
     }
 
     private void flushHandlersForHost(Play play, Host host, Inventory inventory, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode, Connection connection, List<String> runTags, List<String> skipTags) {
-        Set<String> allNotifiedHandlers = new HashSet<>();
+        Set<Task> allExecutedHandlers = new HashSet<>();
         boolean anyNewNotified;
         do {
             anyNewNotified = false;
             Set<String> notifiedInThisCycle = hostNotifications.remove(host.name());
             if (notifiedInThisCycle != null && !notifiedInThisCycle.isEmpty()) {
-                for (String handlerName : notifiedInThisCycle) {
-                    if (allNotifiedHandlers.add(handlerName)) {
-                        for (Task handler : play.handlers()) {
-                            if (handlerName.equals(handler.name())) {
-                                if (failedHosts.contains(host.name())) continue;
-                                if (!isTaskToBeExecuted(handler, runTags, skipTags)) continue;
-                                executeTaskOnHost(play, host, handler, inventory, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, new ArrayList<>(), null, null, null, connection, runTags, skipTags);
-                                anyNewNotified = true;
-                                break;
-                            }
+                for (Task handler : play.handlers()) {
+                    boolean isNotified = false;
+                    for (String notification : notifiedInThisCycle) {
+                        if (notification.equals(handler.name()) || (handler.listen() != null && handler.listen().contains(notification))) {
+                            isNotified = true;
+                            break;
                         }
+                    }
+
+                    if (isNotified && allExecutedHandlers.add(handler)) {
+                        if (failedHosts.contains(host.name())) continue;
+                        if (!isTaskToBeExecuted(handler, runTags, skipTags)) continue;
+                        executeTaskOnHost(play, host, handler, inventory, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, new ArrayList<>(), null, null, null, connection, runTags, skipTags);
+                        anyNewNotified = true;
                     }
                 }
             }

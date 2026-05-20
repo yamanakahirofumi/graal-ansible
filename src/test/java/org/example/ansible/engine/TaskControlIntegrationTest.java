@@ -46,14 +46,14 @@ class TaskControlIntegrationTest {
         return new Task(name, action, args, Map.of(), null, null, null, Map.of(), List.of(),
                 failedWhen, changedWhen, ignoreErrors,
                 null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
-                null, null, null, null, null, null, List.of());
+                null, null, null, null, null, null, List.of(), List.of());
     }
 
     private Task createUntilTask(String name, String action, Map<String, Object> args, String register, Object until, int retries, int delay) {
         return new Task(name, action, args, Map.of(), null, register, null, Map.of(), List.of(),
                 null, null, false,
                 until, retries, delay, null, false, false, false, List.of(), List.of(), List.of(),
-                null, null, null, null, null, null, List.of());
+                null, null, null, null, null, null, List.of(), List.of());
     }
 
     @Test
