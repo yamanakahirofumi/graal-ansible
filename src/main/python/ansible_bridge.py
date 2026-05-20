@@ -124,6 +124,9 @@ def bind_task(complex_args: Any, connection_java: Any, become_context_java: Any,
         'environment_java': environment_java
     })
 
+    if 'ansible.module_utils.basic' in sys.modules:
+        sys.modules['ansible.module_utils.basic']._PARSED_MODULE_ARGS = converted_args
+
 def setup_sys_path(site_packages: Optional[List[str]]) -> None:
     if site_packages:
         for p in site_packages:
@@ -323,6 +326,9 @@ class ActionBase:
             conn.putFile(Paths.get(str(lp)), str(rp))
         return rp
     def _fixup_perms2(self, *args: Any, **kwargs: Any) -> None: pass
+    def register_host_variables(self, host_vars, variable_layer=None): pass
+    def add_host(self, host_name: str, parent_group_names: List[str] = None, host_vars: Dict[str, Any] = None) -> bool: return True
+    def add_group(self, group_name: str, parent_group_names: List[str] = None) -> bool: return True
 
     def _low_level_execute_command(self, cmd: str, sudoable: bool = True, in_data: Any = None, executable: str = None, encoding_errors: str = 'surrogate_then_replace', chdir: str = None) -> Dict[str, Any]:
         if chdir:
@@ -612,7 +618,14 @@ def apply_mocks() -> None:
 
     # 5. Plugins & Loader
     create_mock('ansible.plugins', {'AnsiblePlugin': type('AnsiblePlugin', (), {})})
-    create_mock('ansible.plugins.action', {'ActionBase': ActionBase})
+    class VariableLayer:
+        FACTS = 'facts'
+        VARS = 'vars'
+        CACHEABLE_FACT = 'cacheable_fact'
+        EPHEMERAL_FACT = 'ephemeral_fact'
+        INCLUDE_VARS = 'include_vars'
+        REGISTER_VARS = 'register_vars'
+    create_mock('ansible.plugins.action', {'ActionBase': ActionBase, 'VariableLayer': VariableLayer})
 
     action_loader_obj = types.SimpleNamespace()
     action_loader_obj.action_loader = action_loader_obj
@@ -675,6 +688,9 @@ def apply_mocks() -> None:
     })
     create_mock('ansible._internal._locking')
     create_mock('ansible._internal._errors')
+    create_mock('ansible._internal._powershell')
+    create_mock('ansible._internal._powershell._script')
+    create_mock('ansible._internal._powershell._clixml')
     create_mock('ansible._internal._errors._error_utils', {
         'result_dict_from_captured_errors': lambda *a, **kw: {}
     })
@@ -777,6 +793,7 @@ def apply_mocks() -> None:
         'AnsibleModule': AnsibleModule,
         '_load_params': mock_load_params,
         '_ANSIBLE_PROFILE': 'modern',
+        '_PARSED_MODULE_ARGS': _current_task_context['complex_args'],
         'FILE_COMMON_ARGUMENTS': FILE_COMMON_ARGUMENTS,
         'missing_required_lib': lambda *a, **kw: None,
         'sanitize_keys': lambda x, *a, **kw: x,

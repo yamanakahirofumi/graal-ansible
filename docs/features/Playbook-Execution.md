@@ -25,8 +25,11 @@
 - **方針**: 現在、Ansible 互換の全 22 段階の変数優先順位が完全に実装され、検証済みです。具体的な優先順位の定義については、[変数とテンプレートの実装詳細](../implementation/Variables-Templating.md#2-変数優先順位-variable-precedence) を参照してください。
 
 ### 2.2 Jinja2 テンプレートの互換性
-- **懸念点**: `Jinjava` または `Handlebars` を使用しますが、Ansible 特有の Jinja2 フィルター（`ipaddr`, `dict2items` 等）の完全な再現は困難です。
-- **方針**: 標準的な Jinja2 構文を優先し、Ansible 特有のフィルターは必要に応じて個別に Java で実装します。未実装のフィルターに遭遇した場合の挙動（エラーにするか、そのまま文字列として残すか）を定義する必要があります。
+- **状況**: `Jinjava` を採用し、Ansible 互換のフィルターおよびルックアッププラグインを Java で実装しています。
+- **実装済み**:
+    - **フィルター (20種類)**: `bool`, `combine`, `default`, `dict2items`, `ipaddr`, `to_json`, `to_yaml`, `regex_replace`, `quote`, `b64encode`, `b64decode`, `mandatory`, `basename`, `dirname`, `splitext`, `realpath`, `ternary`, `flatten`, `items2dict`, `unique` をサポート。
+    - **ルックアッププラグイン (5種類)**: `file`, `env`, `template`, `pipe`, `dict` をサポート。
+- **方針**: 未実装のフィルターやルックアップ、あるいはテンプレートのレンダリングエラー（未定義変数の参照等）が発生した場合は、原則として `RuntimeException` をスローし、該当ホストのタスクを失敗（failed）として処理します。
 
 ### 2.3 ループ (`loop`, `with_items`) の処理
 - **懸念点**: `loop` と `with_X` 系では挙動が異なり、特に複雑なデータ構造に対するループ処理のパースがブレやすいです。

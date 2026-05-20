@@ -228,6 +228,7 @@ public class PythonModule implements Module {
         sb.append("    import ansible.module_utils.basic\n");
         sb.append("    ansible.module_utils.basic._load_params = lambda: (complex_args, 'main')\n");
         sb.append("    ansible.module_utils.basic._ANSIBLE_PROFILE = 'modern'\n");
+        sb.append("    ansible.module_utils.basic._PARSED_MODULE_ARGS = complex_args\n");
         sb.append("    def mocked_load_params(self): self.params = complex_args\n");
         sb.append("    ansible.module_utils.basic.AnsibleModule._load_params = mocked_load_params\n");
         sb.append("except Exception: pass\n");
