@@ -2,6 +2,8 @@
 
 本ドキュメントは、Ansible の Action Plugin やモジュールを GraalPy 上で動作させるため、および Windows 実行環境や Java との相互運用のために導入されている主要なモックとパッチの技術リファレンスです。
 
+どのモジュールがどのモックに依存しているかなどの機能的な対応関係については、[モジュールとモックの対応リファレンス (Module & Mock Reference)](../features/Module-Mock-Reference.md) を参照してください。
+
 ## 1. パス正規化と OS 抽象化 (Path Normalization & OS Abstraction)
 
 Java から渡されるパスや Windows 環境特有の挙動を吸収するための実装です。
