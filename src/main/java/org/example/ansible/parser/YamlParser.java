@@ -24,7 +24,7 @@ public class YamlParser {
     private static final Set<String> RESERVED_TASK_KEYS = Set.of(
             "name", "register", "when", "loop", "loop_control", "until", "retries", "delay",
             "ignore_errors", "ignore_unreachable", "tags", "become", "become_user", "become_method", "become_flags",
-            "vars", "notify", "with_items", "with_list", "with_dict",
+            "vars", "notify", "listen", "with_items", "with_list", "with_dict",
             "failed_when", "changed_when", "delegate_to", "delegate_facts", "run_once",
             "block", "rescue", "always", "check_mode", "environment"
     );
@@ -325,9 +325,19 @@ public class YamlParser {
             notify.add(s);
         }
 
+        List<String> listen = new ArrayList<>();
+        Object listenObj = map.get("listen");
+        if (listenObj instanceof List<?> list) {
+            for (Object item : list) {
+                if (item instanceof String s) listen.add(s);
+            }
+        } else if (listenObj instanceof String s) {
+            listen.add(s);
+        }
+
         return new Task(name, action, args, vars, when, register, loop, loopControl, notify, failedWhen, changedWhen, ignoreErrors,
                 until, retries, delay, delegateTo, delegateFacts, runOnce, ignoreUnreachable, block, rescue, always,
-                become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, taskTags);
+                become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, taskTags, listen);
     }
 
     @SuppressWarnings("unchecked")
