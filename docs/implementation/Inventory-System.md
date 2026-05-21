@@ -60,3 +60,42 @@
 
 1.  優先度 3-7: `getGroupVariablesForHost` で取得されたインベントリ/プレイブックのグループ変数を順次マージ。
 2.  優先度 8-10: `getHostVariables` で取得されたインベントリホスト変数、および `host_vars/*` をマージ。
+
+## 5. 外部インベントリの統合設計 (External Inventory Integration Design)
+
+Ansible 互換の外部インベントリ（スクリプトまたはプラグイン）を統合するための設計方針です。
+
+### 5.1 スクリプト方式 (Inventory Scripts)
+実行可能なプログラムから JSON 形式でインベントリ情報を取得します。
+
+- **実行メカニズム**:
+    - `ProcessBuilder` を使用して、指定されたスクリプトを `--list` 引数付きで実行します。
+    - スクリプトの標準出力をキャプチャし、JSON 解析を行います。
+- **データマッピング**:
+    - JSON の `_meta.hostvars` セクションからホスト個別の変数を取得します。
+    - 各グループ配下の `hosts`, `children`, `vars` を再帰的に解析し、内部の `Inventory` オブジェクトへマージします。
+
+### 5.2 プラグイン方式 (Inventory Plugins)
+YAML 設定ファイルに基づき、特定のソース（AWS, GCP, NetBox 等）から動的にホストを取得します。
+
+- **実装方針**:
+    - GraalPy 上でオリジナルの Ansible Inventory Plugin を実行する「Python-first」アプローチを検討します。
+    - [Action Plugin 実装仕様](Action-Plugins.md) と同様のブリッジメカニズム（`ansible_bridge.py`）を利用し、プラグインを実行して得られた結果（Python 辞書）を Java 側で `Inventory` レコードに変換します。
+
+### 5.3 インベントリ・プロバイダー (InventoryProvider)
+インベントリのソース（静的ファイル、スクリプト、プラグイン）を抽象化するため、`InventoryProvider` インターフェースを導入します。
+
+```java
+public interface InventoryProvider {
+    /**
+     * ソースからインベントリを読み込み、Inventory オブジェクトを構築または更新します。
+     * @param source ソースのパスまたは識別子
+     * @param currentInventory 現在のインベントリ（マージ用）
+     */
+    void load(String source, Inventory currentInventory);
+}
+```
+
+### 5.4 実行時の考慮事項
+- **キャッシュ**: 動的インベントリの取得はコストが高いため、同一実行セッション内でのキャッシュ機構を設けます。
+- **環境変数**: スクリプト実行時、管理ノードの環境変数を継承させつつ、必要に応じて `ANSIBLE_` 等の変数を追加注入します。
