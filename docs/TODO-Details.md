@@ -215,5 +215,5 @@
 ### 5.1 [ ] PlaybookExecutor および実行エンジンのさらなる整理
 - **概要**: `PlaybookExecutor` および `TaskQueueManager`, `TaskExecutor` 内に存在する課題の継続的な改善。
 - **検討内容**:
-    - 動的インベントリ（スクリプト/プラグイン）の統合設計。 (**設計策定中**: 詳細は `implementation/Inventory-System.md` 参照)
+    - 動的インベントリ（スクリプト/プラグイン）の統合実装。
 
