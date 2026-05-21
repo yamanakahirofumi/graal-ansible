@@ -2,6 +2,8 @@ package org.example.ansible.inventory;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.ansible.util.OSHandler;
+import org.example.ansible.util.OSHandlerFactory;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -22,13 +24,31 @@ public class ScriptInventoryProvider implements InventoryProvider {
     @Override
     public boolean supports(String source) {
         File file = new File(source);
-        return file.exists() && file.isFile() && file.canExecute();
+        if (!file.exists() || !file.isFile()) {
+            return false;
+        }
+
+        boolean isWindows = System.getProperty("os.name").toLowerCase().contains("win");
+        if (isWindows) {
+            // On Windows, we consider .py, .bat, .ps1, .exe as potential scripts
+            return source.endsWith(".py") || source.endsWith(".bat") || source.endsWith(".ps1") || source.endsWith(".exe");
+        }
+
+        return file.canExecute();
     }
 
     @Override
     public void load(String source, Inventory inventory) {
         try {
-            ProcessBuilder pb = new ProcessBuilder(source, "--list");
+            OSHandler osHandler = OSHandlerFactory.getHandler();
+            List<String> command = new ArrayList<>();
+            if ("Windows".equals(osHandler.getOSFamily()) && source.endsWith(".py")) {
+                command.add("python");
+            }
+            command.add(source);
+            command.add("--list");
+
+            ProcessBuilder pb = new ProcessBuilder(command);
             pb.redirectError(ProcessBuilder.Redirect.INHERIT);
             Process process = pb.start();
 

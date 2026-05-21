@@ -13,7 +13,18 @@ public class FileInventoryProvider implements InventoryProvider {
     @Override
     public boolean supports(String source) {
         File file = new File(source);
-        return file.exists() && file.isFile() && !file.canExecute();
+        if (!file.exists() || !file.isFile()) {
+            return false;
+        }
+
+        // On Windows, canExecute() is often true even for non-executable files.
+        // We rely more on file extensions for static files if on Windows.
+        boolean isWindows = System.getProperty("os.name").toLowerCase().contains("win");
+        if (isWindows) {
+            return source.endsWith(".ini") || source.endsWith(".yml") || source.endsWith(".yaml") || source.endsWith(".txt");
+        }
+
+        return !file.canExecute();
     }
 
     @Override
