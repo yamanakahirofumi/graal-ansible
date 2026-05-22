@@ -156,6 +156,14 @@
     - 主要なプラグイン (`file`, `env`, `template`, `pipe`, `dict`) を実装済み。
     - `Lookup` インターフェースを `List<Object>` 対応に改善し、型安全なデータ受け渡しを実現。
 
+### 3.21 [✓] 動的インベントリ（スクリプト/プラグイン）の統合実装
+- **完了日**: 2026-07-27
+- **概要**: 外部プログラムから JSON 形式でインベントリ情報を取得する機能の実装。
+- **解決策**:
+    - `InventoryManager` による複数ソースの統合管理を実装。
+    - `ScriptInventoryProvider` を実装し、`--list` 引数付きのスクリプト実行と JSON 解析をサポート。
+    - `_meta.hostvars` によるホスト変数の効率的な読み込みに対応。
+
 ## 4. 整理・調整済み (Refactored/Adjusted)
 
 ### 4.1 [✓] GitHub Actions CI ワークフローの構築
@@ -215,5 +223,4 @@
 ### 5.1 [ ] PlaybookExecutor および実行エンジンのさらなる整理
 - **概要**: `PlaybookExecutor` および `TaskQueueManager`, `TaskExecutor` 内に存在する課題の継続的な改善。
 - **検討内容**:
-    - 動的インベントリ（スクリプト/プラグイン）の統合実装。
 

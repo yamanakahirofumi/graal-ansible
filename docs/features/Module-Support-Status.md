@@ -16,7 +16,7 @@
 
 | コレクション / モジュール | Target: Linux | Target: macOS | Target: Windows | 備考 |
 | :--- | :---: | :---: | :---: | :--- |
-| **ansible.builtin** | △ | ？ | ？ | Linux で全 72 モジュールを一覧化。うち 65 モジュールの動作確認済 。 |
+| **ansible.builtin** | △ | ？ | ？ | Linux で全 72 モジュールを一覧化。うち 65 モジュール (90%) の動作確認済。 |
 | - `debug` | ◎ | ○ | ○ | オリジナル Python ソースコードにより検証済。 |
 | - `ping` | ◎ | ○ | - | オリジナル Python ソースコードにより検証済。 |
 | - `copy` | ◎ | ○ | - | オリジナル Python ソースコードにより検証済。 |
@@ -101,7 +101,7 @@
 - **Windows**: `LocalConnection` および `debug` モジュールの動作を確認中。
 
 ### 2.2 テストカテゴリ
-- **Module Load Test**: `ansible.builtin` の各モジュールがインポートエラーなく読み込めるかを確認（Linux では約 50% のロードを確認済。依存関係を順次解決中）。
+- **Module Load Test**: `ansible.builtin` の各モジュールがインポートエラーなく読み込めるかを確認（Linux では 100% のロード、および 90% の動作確認済み。依存関係を順次解決中）。
 - **Integration Test**: 実際の Playbook を使用して、ターゲットノードの状態が正しく変更されるかを検証。必要に応じて **Testcontainers** を**ターゲットノード**として用いる。
 
 ## 3. 実装フェーズと進捗状況 (Implementation Phases)
