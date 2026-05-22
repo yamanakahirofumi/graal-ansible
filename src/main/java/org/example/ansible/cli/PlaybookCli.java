@@ -16,10 +16,10 @@ import org.example.ansible.engine.PlaybookExecutor;
 import org.example.ansible.engine.TaskExecutor;
 import org.example.ansible.engine.TaskResult;
 import org.example.ansible.engine.VariableManager;
-import org.example.ansible.inventory.IniInventoryParser;
+import org.example.ansible.inventory.FileInventoryProvider;
 import org.example.ansible.inventory.Inventory;
-import org.example.ansible.inventory.InventoryParser;
-import org.example.ansible.inventory.YamlInventoryParser;
+import org.example.ansible.inventory.InventoryManager;
+import org.example.ansible.inventory.ScriptInventoryProvider;
 import org.example.ansible.parser.YamlParser;
 import org.graalvm.polyglot.Context;
 import org.yaml.snakeyaml.Yaml;
@@ -98,19 +98,14 @@ public class PlaybookCli implements Callable<Integer> {
             YamlParser yamlParser = new YamlParser();
             Playbook playbook = yamlParser.parse(playbookFile);
 
-            // Load Inventory
+            // Load Inventory using InventoryManager
             Inventory inventory;
             if (inventoryPath != null) {
-                InventoryParser inventoryParser;
-                if (inventoryPath.endsWith(".yml") || inventoryPath.endsWith(".yaml")) {
-                    inventoryParser = new YamlInventoryParser();
-                } else {
-                    inventoryParser = new IniInventoryParser();
-                }
+                InventoryManager inventoryManager = new InventoryManager();
+                inventoryManager.addProvider(new ScriptInventoryProvider());
+                inventoryManager.addProvider(new FileInventoryProvider());
 
-                try (InputStream is = new FileInputStream(inventoryPath)) {
-                    inventory = inventoryParser.parse(is);
-                }
+                inventory = inventoryManager.loadInventory(List.of(inventoryPath));
             } else {
                 // Default or empty inventory if not provided
                 System.err.println("No inventory provided. Execution might skip hosts.");
