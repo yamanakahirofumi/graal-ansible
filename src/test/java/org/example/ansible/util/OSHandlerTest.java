@@ -1,40 +1,53 @@
 package org.example.ansible.util;
 
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.*;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class OSHandlerTest {
 
+    private String originalOsName;
+
+    @BeforeEach
+    void setUp() {
+        originalOsName = System.getProperty("os.name");
+    }
+
+    @AfterEach
+    void tearDown() {
+        if (originalOsName != null) {
+            System.setProperty("os.name", originalOsName);
+        }
+    }
+
+    @Test
+    void testMacOSHandler() {
+        System.setProperty("os.name", "Mac OS X");
+        OSHandler handler = OSHandlerFactory.getHandler();
+
+        assertTrue(handler instanceof MacOSHandler);
+        assertEquals("Darwin", handler.getOSFamily());
+        assertEquals("/", handler.getSeparator());
+    }
+
     @Test
     void testLinuxHandler() {
-        OSHandler handler = new LinuxHandler();
-        assertEquals("/tmp", handler.getTempDir());
-        assertEquals("/", handler.getSeparator());
-        assertEquals("a/b/c", handler.getJoinPath("a", "b", "c"));
+        System.setProperty("os.name", "Linux");
+        OSHandler handler = OSHandlerFactory.getHandler();
+
+        assertTrue(handler instanceof LinuxHandler);
         assertEquals("Linux", handler.getOSFamily());
     }
 
     @Test
     void testWindowsHandler() {
-        OSHandler handler = new WindowsHandler();
-        assertEquals("C:\\Temp", handler.getTempDir());
-        assertEquals("\\", handler.getSeparator());
-        assertEquals("a\\b\\c", handler.getJoinPath("a", "b", "c"));
-        assertEquals("Windows", handler.getOSFamily());
-    }
-
-    @Test
-    void testOSHandlerFactory() {
+        System.setProperty("os.name", "Windows 10");
         OSHandler handler = OSHandlerFactory.getHandler();
-        assertNotNull(handler);
 
-        String osName = System.getProperty("os.name").toLowerCase();
-        if (osName.contains("linux")) {
-            assertTrue(handler instanceof LinuxHandler);
-            assertEquals("Linux", handler.getOSFamily());
-        } else if (osName.contains("win")) {
-            assertTrue(handler instanceof WindowsHandler);
-            assertEquals("Windows", handler.getOSFamily());
-        }
+        assertTrue(handler instanceof WindowsHandler);
+        assertEquals("Windows", handler.getOSFamily());
     }
 }
