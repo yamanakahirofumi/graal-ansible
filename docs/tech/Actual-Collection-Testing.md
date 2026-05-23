@@ -148,7 +148,7 @@ void testIdempotency() {
 ## 8. トラブルシューティング (Troubleshooting)
 
 ### 8.1 制限のある環境での実行
-サンドボックス環境や制限された CI 環境では、`ActualModuleIntegrationTest` の実行中に Docker イメージのプルや抽出に失敗（例: Ryuk や SSHD イメージでの "operation not permitted"）することがあります。
+サンドボックス環境や制限された CI 環境では、`ActualModuleIntegrationTest` の実行中に Docker イメージのプルや抽出に失敗（例: Ryuk や SSHD イメージでの "operation not permitted"）することがあります。特に Testcontainers の内部管理用コンテナである Ryuk (image `testcontainers/ryuk:0.13.0`) の起動失敗が CI 環境で報告されるケースがあります。
 
 このような場合、統合テスト全体をパスさせるのが困難であれば、`YamlParserTest` や `VariableManagerTest` などのスタンドアロンなユニットテストを実行することで、コアエンジンのロジックが正常であることを確認してください。
 

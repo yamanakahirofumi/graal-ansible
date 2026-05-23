@@ -156,6 +156,14 @@
     - 主要なプラグイン (`file`, `env`, `template`, `pipe`, `dict`) を実装済み。
     - `Lookup` インターフェースを `List<Object>` 対応に改善し、型安全なデータ受け渡しを実現。
 
+### 3.21 [✓] ダイナミックインベントリ（スクリプト方式）の統合
+- **完了日**: 2026-07-27
+- **概要**: Ansible 互換の動的インベントリスクリプト（JSON出力）のサポート。
+- **解決策**:
+    - `InventoryProvider` 抽象化を導入し、`ScriptInventoryProvider` を実装。
+    - Jackson を用いた JSON 解析と、`_meta.hostvars` を含むインベントリ構造の内部マッピングを実現。
+    - `InventoryManager` による複数ソースの統合管理をサポート。
+
 ## 4. 整理・調整済み (Refactored/Adjusted)
 
 ### 4.1 [✓] GitHub Actions CI ワークフローの構築
@@ -215,5 +223,5 @@
 ### 5.1 [ ] PlaybookExecutor および実行エンジンのさらなる整理
 - **概要**: `PlaybookExecutor` および `TaskQueueManager`, `TaskExecutor` 内に存在する課題の継続的な改善。
 - **検討内容**:
-    - 動的インベントリ（スクリプト/プラグイン）の統合実装。
+    - インベントリプラグイン（Python-first）の統合。
 
