@@ -24,7 +24,7 @@ Ansible モジュールやタスクが、実行対象 OS の違いを意識せ�
 
 - **LinuxHandler**: 標準的な Linux ディストリビューション向けのハンドラ。
 - **WindowsHandler**: Windows 向けのハンドラ。
-- **MacOSHandler**: macOS 向けのハンドラ。内部的には `LinuxHandler` を継承または流用しつつ、OS Family として `Darwin` を返すなどの調整を行います（現状、`OSHandlerFactory` 内の匿名クラスとして実装されています）。
+- **MacOSHandler**: macOS 向けのハンドラ。内部的には `LinuxHandler` を継承または流用しつつ、OS Family として `Darwin` を返すなどの調整を行います。
 
 ### 3.1 インターフェースのメソッド例
 

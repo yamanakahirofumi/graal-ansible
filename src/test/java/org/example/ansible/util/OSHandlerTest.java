@@ -15,6 +15,14 @@ class OSHandlerTest {
     }
 
     @Test
+    void testMacOSHandler() {
+        OSHandler handler = new MacOSHandler();
+        assertEquals("/tmp", handler.getTempDir());
+        assertEquals("/", handler.getSeparator());
+        assertEquals("Darwin", handler.getOSFamily());
+    }
+
+    @Test
     void testWindowsHandler() {
         OSHandler handler = new WindowsHandler();
         assertEquals("C:\\Temp", handler.getTempDir());
@@ -35,6 +43,9 @@ class OSHandlerTest {
         } else if (osName.contains("win")) {
             assertTrue(handler instanceof WindowsHandler);
             assertEquals("Windows", handler.getOSFamily());
+        } else if (osName.contains("mac")) {
+            assertTrue(handler instanceof MacOSHandler);
+            assertEquals("Darwin", handler.getOSFamily());
         }
     }
 }

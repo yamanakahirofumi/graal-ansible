@@ -26,6 +26,7 @@ import org.example.ansible.engine.filter.TernaryFilter;
 import org.example.ansible.engine.filter.ToJsonFilter;
 import org.example.ansible.engine.filter.ToYamlFilter;
 import org.example.ansible.engine.filter.UniqueFilter;
+import org.example.ansible.engine.filter.UrlencodeFilter;
 import org.example.ansible.engine.lookup.DictLookup;
 import org.example.ansible.engine.lookup.EnvLookup;
 import org.example.ansible.engine.lookup.FileLookup;
@@ -95,6 +96,7 @@ public class VariableResolver {
         jinjava.getGlobalContext().registerFilter(new FlattenFilter());
         jinjava.getGlobalContext().registerFilter(new Items2DictFilter());
         jinjava.getGlobalContext().registerFilter(new UniqueFilter());
+        jinjava.getGlobalContext().registerFilter(new UrlencodeFilter());
     }
 
     /**
