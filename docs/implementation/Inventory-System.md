@@ -63,7 +63,7 @@
 
 ## 5. 外部インベントリの統合 (External Inventory Integration)
 
-Ansible 互換の外部インベントリ（スクリプトまたはプラグイン）を統合するための実装方針です。
+Ansible 互換の外部インベントリ（スクリプトまたはプラグイン）を統合するための実装詳細です。
 
 ### 5.1 スクリプト方式 (Inventory Scripts)
 実行可能なプログラムから JSON 形式でインベントリ情報を取得します。
@@ -72,18 +72,18 @@ Ansible 互換の外部インベントリ（スクリプトまたはプラグイ
     - `ProcessBuilder` を使用して、指定されたスクリプトを `--list` 引数付きで実行します。
     - スクリプトの標準出力をキャプチャし、Jackson を用いて JSON 解析を行います。
 - **データマッピング**:
-    - JSON の `_meta.hostvars` セクションからホスト個別の変数を取得します。
+    - JSON の `_meta.hostvars` セクションからホスト個別の変数を取得し、`VariableManager` で利用可能な形式に変換します。
     - 各グループ配下の `hosts`, `children`, `vars` を再帰的に解析し、内部の `Inventory` オブジェクトへマージします。
 
 ### 5.2 プラグイン方式 (Inventory Plugins)
 YAML 設定ファイルに基づき、特定のソース（AWS, GCP, NetBox 等）から動的にホストを取得します。
 
-- **実装方針**:
-    - **将来的な課題**: GraalPy 上でオリジナルの Ansible Inventory Plugin を実行する「Python-first」アプローチを検討します。
-    - [Action Plugin 実装仕様](Action-Plugins.md) と同様のブリッジメカニズム（`ansible_bridge.py`）を利用し、プラグインを実行して得られた結果（Python 辞書）を Java 側で `Inventory` レコードに変換することを計画しています。
+- **実装方針 (将来的な課題)**:
+    - GraalPy 上でオリジナルの Ansible Inventory Plugin を実行する「Python-first」アプローチを検討します。
+    - [Action Plugin 実装仕様](Action-Plugins.md) と同様のブリッジメカニズム（`ansible_bridge.py`）を利用し、プラグインを実行して得られた結果（Python 辞書）を Java 側で `Inventory` オブジェクトに変換することを計画しています。
 
 ### 5.3 インベントリ・プロバイダー (InventoryProvider)
-インベントリのソース（静的ファイル、スクリプト、プラグイン）を抽象化するため、`InventoryProvider` インターフェースを導入します。
+インベントリのソース（静的ファイル、スクリプト、プラグイン）を抽象化するため、`InventoryProvider` インターフェースを導入し、`FileInventoryProvider` および `ScriptInventoryProvider` を実装済みです。
 
 ```java
 public interface InventoryProvider {

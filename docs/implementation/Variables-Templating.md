@@ -71,6 +71,7 @@ Ansible 特有のフィルターは、Jinjava の `Filter` インターフェー
 - `ipaddr`: IP アドレスの検証・操作。
 - `to_json`: オブジェクトを JSON 文字列に変換。
 - `to_yaml`: オブジェクトを YAML 文字列に変換。
+- `urlencode`: 文字列またはMapをURLエンコードされた形式に変換。
 - `regex_replace`: 正規表現による置換。
 - `quote`: シェルクォート処理。
 - `b64encode`: Base64 エンコード。
