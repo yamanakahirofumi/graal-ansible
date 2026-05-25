@@ -63,10 +63,10 @@
 
 ## 5. 外部インベントリの統合 (External Inventory Integration)
 
-Ansible 互換の外部インベントリ（スクリプトまたはプラグイン）を統合するための実装方針です。
+Ansible 互換の外部インベントリ（スクリプトまたはプラグイン）を統合しています。
 
 ### 5.1 スクリプト方式 (Inventory Scripts)
-実行可能なプログラムから JSON 形式でインベントリ情報を取得します。
+実行可能なプログラムから JSON 形式でインベントリ情報を取得します。`ScriptInventoryProvider` によって実装されています。
 
 - **実行メカニズム**:
     - `ProcessBuilder` を使用して、指定されたスクリプトを `--list` 引数付きで実行します。
@@ -83,7 +83,7 @@ YAML 設定ファイルに基づき、特定のソース（AWS, GCP, NetBox 等�
     - [Action Plugin 実装仕様](Action-Plugins.md) と同様のブリッジメカニズム（`ansible_bridge.py`）を利用し、プラグインを実行して得られた結果（Python 辞書）を Java 側で `Inventory` レコードに変換することを計画しています。
 
 ### 5.3 インベントリ・プロバイダー (InventoryProvider)
-インベントリのソース（静的ファイル、スクリプト、プラグイン）を抽象化するため、`InventoryProvider` インターフェースを導入します。
+インベントリのソース（静的ファイル、スクリプト、プラグイン）を抽象化するため、`InventoryProvider` インターフェースを導入しています。
 
 ```java
 public interface InventoryProvider {
@@ -102,7 +102,7 @@ public interface InventoryProvider {
 ```
 
 ### 5.4 インベントリ・マネージャー (InventoryManager)
-複数の `InventoryProvider` を管理し、複数のインベントリソースを一つの `Inventory` オブジェクトに統合（マージ）します。
+複数の `InventoryProvider` を管理し、複数のインベントリソースを一つの `Inventory` オブジェクトに統合（マージ）します。`FileInventoryProvider` や `ScriptInventoryProvider` を順次呼び出し、インベントリ情報を構築します。
 
 ### 5.5 実行時の考慮事項
 - **キャッシュ**: 動的インベントリの取得はコストが高いため、同一実行セッション内でのキャッシュ機構を設けます。
