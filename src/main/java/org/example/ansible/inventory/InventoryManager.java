@@ -1,6 +1,9 @@
 package org.example.ansible.inventory;
 
+import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -28,19 +31,43 @@ public class InventoryManager {
         Inventory inventory = new Inventory(new Group("all"));
 
         for (String source : sources) {
-            boolean handled = false;
-            for (InventoryProvider provider : providers) {
-                if (provider.supports(source)) {
-                    provider.load(source, inventory);
-                    handled = true;
-                    break;
-                }
-            }
-            if (!handled) {
-                throw new RuntimeException("No inventory provider found for source: " + source);
-            }
+            loadSource(source, inventory);
         }
 
         return inventory;
+    }
+
+    private void loadSource(String source, Inventory inventory) {
+        File file = new File(source);
+        if (file.isDirectory()) {
+            File[] files = file.listFiles();
+            if (files != null) {
+                // Sort files to ensure deterministic loading order
+                Arrays.sort(files, Comparator.comparing(File::getName));
+                for (File child : files) {
+                    if (child.isFile()) {
+                        loadSingleFile(child.getPath(), inventory, false);
+                    } else if (child.isDirectory()) {
+                        loadSource(child.getPath(), inventory);
+                    }
+                }
+            }
+        } else {
+            loadSingleFile(source, inventory, true);
+        }
+    }
+
+    private void loadSingleFile(String source, Inventory inventory, boolean throwOnNotFound) {
+        boolean handled = false;
+        for (InventoryProvider provider : providers) {
+            if (provider.supports(source)) {
+                provider.load(source, inventory);
+                handled = true;
+                break;
+            }
+        }
+        if (!handled && throwOnNotFound) {
+            throw new RuntimeException("No inventory provider found for source: " + source);
+        }
     }
 }
