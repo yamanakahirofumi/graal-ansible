@@ -152,9 +152,16 @@
 - **完了日**: 2026-05-14
 - **概要**: 外部ソースからデータを取得するための `lookup` および `query` 関数の実装。
 - **解決策**:
-    - `Jinjava` へのカスタム関数登録を行い、`lookup` と `query` をサポート。
+    - `Jinjava` へのカスタム関数登録を行い、`lookup` と `query` をサポート.
     - 主要なプラグイン (`file`, `env`, `template`, `pipe`, `dict`) を実装済み。
     - `Lookup` インターフェースを `List<Object>` 対応に改善し、型安全なデータ受け渡しを実現。
+
+### 3.21 [✓] スクリプト方式の動的インベントリの実装
+- **完了日**: 2026-07-28
+- **概要**: 外部スクリプト（`--list` 出力）による動的インベントリの取得と統合。
+- **解決策**:
+    - `InventoryProvider` および `ScriptInventoryProvider` を実装し、JSON 形式の出力を解析して `Inventory` オブジェクトへマージする仕組みを構築。
+    - `InventoryManager` を導入し、静的ファイルと動的スクリプトの複数ソースを統合管理可能とした。
 
 ## 4. 整理・調整済み (Refactored/Adjusted)
 
@@ -215,5 +222,5 @@
 ### 5.1 [ ] PlaybookExecutor および実行エンジンのさらなる整理
 - **概要**: `PlaybookExecutor` および `TaskQueueManager`, `TaskExecutor` 内に存在する課題の継続的な改善。
 - **検討内容**:
-    - 動的インベントリ（スクリプト/プラグイン）の統合実装。
+    - プラグイン方式の動的インベントリの統合実装。
 
