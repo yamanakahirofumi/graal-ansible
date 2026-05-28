@@ -152,7 +152,7 @@ Lookup プラグインは、外部ソース（ファイル、環境変数、コ�
 
 1.  **Lookup インターフェースの実装**:
     - `org.example.ansible.engine.lookup.Lookup` インターフェースを実装するクラスを作成します。
-    - `execute(JinjavaInterpreter interpreter, List<Object> args, Map<String, Object> kwargs)` メソッドを実装し、データの取得ロジックを記述します。
+    - `execute(JinjavaInterpreter interpreter, List<Object> terms, Map<String, Object> kwargs)` メソッドを実装し、データの取得ロジックを記述します。
 
     ```java
     public interface Lookup {
