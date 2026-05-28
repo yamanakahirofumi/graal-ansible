@@ -13,7 +13,11 @@
 - **group_by モジュール**: ファクトに基づいて実行時にグループを動的に作成する機能をサポート済み。
 
 ### 1.3 外部インベントリ (Dynamic Inventory)
-- **インベントリ・プラグイン/スクリプト**: JSON 形式等を出力する外部プログラムとの連携をサポートします。詳細は [インベントリシステムの実装詳細](../implementation/Inventory-System.md#5-外部インベントリの統合設計-external-inventory-integration-design) を参照してください。
+- **インベントリ・プラグイン/スクリプト**: JSON 形式等を出力する外部プログラムとの連携をサポートします。詳細は [インベントリシステムの実装詳細](../implementation/Inventory-System.md#5-外部インベントリの統合-external-inventory-integration) を参照してください。
+
+### 1.4 インベントリディレクトリ
+- **ディレクトリ指定**: インベントリソースとしてディレクトリを指定した場合、その配下のファイルを再帰的に読み込み、結果をマージします。
+- **フィルタリング**: バックアップファイルや一時ファイルを自動的に除外します。詳細は [インベントリシステムの実装詳細](../implementation/Inventory-System.md#6-インベントリディレクトリのサポート-inventory-directory-support) を参照してください。
 
 ## 2. 実装上の留意点 (Implementation Considerations)
 

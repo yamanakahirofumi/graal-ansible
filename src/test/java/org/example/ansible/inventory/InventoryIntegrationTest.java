@@ -104,4 +104,51 @@ class InventoryIntegrationTest {
         assertTrue(inventory.getHost("web1").isPresent());
         assertTrue(inventory.getHost("db1").isPresent());
     }
+
+    @Test
+    void testInventoryManager_RecursiveDirectory() throws IOException {
+        Path invDir = tempDir.resolve("inventory");
+        Files.createDirectories(invDir);
+
+        // 1. Static INI in root
+        Files.writeString(invDir.resolve("hosts.ini"), "[web]\nweb1");
+
+        // 2. Static YAML in subdir
+        Path subDir = invDir.resolve("subdir");
+        Files.createDirectories(subDir);
+        Files.writeString(subDir.resolve("hosts.yml"), "db:\n  hosts:\n    db1:");
+
+        // 3. Dynamic script in subdir
+        Path scriptFile = subDir.resolve("dynamic.py");
+        String scriptContent = "#!/usr/bin/env python3\n" +
+                "import json\n" +
+                "import sys\n" +
+                "if '--list' in sys.argv:\n" +
+                "    print(json.dumps({\n" +
+                "      'app': {'hosts': ['app1']}\n" +
+                "    }))";
+        Files.writeString(scriptFile, scriptContent);
+        scriptFile.toFile().setExecutable(true);
+
+        // 4. Files to ignore
+        Files.writeString(invDir.resolve(".hidden"), "should ignore");
+        Files.writeString(invDir.resolve("hosts.bak"), "should ignore");
+        Files.createDirectories(invDir.resolve("group_vars"));
+
+        InventoryManager manager = new InventoryManager();
+        manager.addProvider(new ScriptInventoryProvider());
+        manager.addProvider(new FileInventoryProvider());
+
+        Inventory inventory = manager.loadInventory(List.of(invDir.toString()));
+
+        // Check if all hosts from different files/scripts are present
+        assertTrue(inventory.getHost("web1").isPresent(), "web1 from INI should be present");
+        assertTrue(inventory.getHost("db1").isPresent(), "db1 from YAML should be present");
+        assertTrue(inventory.getHost("app1").isPresent(), "app1 from script should be present");
+
+        // Check groups
+        assertTrue(inventory.getGroup("web").isPresent());
+        assertTrue(inventory.getGroup("db").isPresent());
+        assertTrue(inventory.getGroup("app").isPresent());
+    }
 }

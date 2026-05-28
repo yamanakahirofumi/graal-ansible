@@ -28,6 +28,36 @@ public class InventoryManager {
         Inventory inventory = new Inventory(new Group("all"));
 
         for (String source : sources) {
+            loadSourceRecursive(source, inventory, true);
+        }
+
+        return inventory;
+    }
+
+    private void loadSourceRecursive(String source, Inventory inventory, boolean isExplicit) {
+        java.io.File file = new java.io.File(source);
+        if (!file.exists()) {
+            throw new RuntimeException("Inventory source not found: " + source);
+        }
+
+        if (file.isDirectory()) {
+            String name = file.getName();
+            if (name.equals("vars") || name.equals("group_vars") || name.equals("host_vars")) {
+                return;
+            }
+
+            java.io.File[] children = file.listFiles();
+            if (children != null) {
+                java.util.Arrays.sort(children);
+                for (java.io.File child : children) {
+                    loadSourceRecursive(child.getAbsolutePath(), inventory, false);
+                }
+            }
+        } else {
+            if (!isExplicit && shouldIgnoreFile(file)) {
+                return;
+            }
+
             boolean handled = false;
             for (InventoryProvider provider : providers) {
                 if (provider.supports(source)) {
@@ -36,11 +66,27 @@ public class InventoryManager {
                     break;
                 }
             }
-            if (!handled) {
+            if (!handled && isExplicit) {
                 throw new RuntimeException("No inventory provider found for source: " + source);
             }
         }
+    }
 
-        return inventory;
+    private boolean shouldIgnoreFile(java.io.File file) {
+        String name = file.getName();
+        if (name.startsWith(".")) {
+            return true;
+        }
+        if (name.endsWith("~") ||
+            name.endsWith(".bak") ||
+            name.endsWith(".old") ||
+            name.endsWith(".orig") ||
+            name.endsWith(".retry") ||
+            name.endsWith(".rpmnew") ||
+            name.endsWith(".rpmsave") ||
+            name.endsWith(".tmp")) {
+            return true;
+        }
+        return false;
     }
 }
