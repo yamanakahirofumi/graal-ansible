@@ -15,6 +15,9 @@
 ### 1.3 外部インベントリ (Dynamic Inventory)
 - **インベントリ・プラグイン/スクリプト**: JSON 形式等を出力する外部プログラムとの連携をサポートします。詳細は [インベントリシステムの実装詳細](../implementation/Inventory-System.md#5-外部インベントリの統合設計-external-inventory-integration-design) を参照してください。
 
+### 1.4 ディレクトリサポート (Inventory Directory)
+- **ディレクトリ指定**: インベントリソースとしてディレクトリを指定可能です。配下のファイルが再帰的に探索され、アルファベット順にマージされます。詳細は [インベントリシステムの実装詳細](../implementation/Inventory-System.md#6-インベントリのディレクトリサポート-inventory-directory-support) を参照してください。
+
 ## 2. 実装上の留意点 (Implementation Considerations)
 
 ### 2.1 グループ変数の階層構造

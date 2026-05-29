@@ -156,6 +156,16 @@
     - 主要なプラグイン (`file`, `env`, `template`, `pipe`, `dict`) を実装済み。
     - `Lookup` インターフェースを `List<Object>` 対応に改善し、型安全なデータ受け渡しを実現。
 
+### 3.21 [✓] 動的インベントリ - スクリプト方式の実装
+- **完了日**: 2026-07-26
+- **概要**: 外部スクリプトの実行と JSON 出力の解析によるインベントリ構築。
+- **解決策**: [インベントリシステムの実装詳細](implementation/Inventory-System.md) に基づき、`ScriptInventoryProvider` を実装済み。`_meta.hostvars` を含む Ansible 標準の JSON フォーマットをサポート。
+
+### 3.22 [✓] インベントリディレクトリのサポート
+- **完了日**: 2026-07-27
+- **概要**: インベントリソースとしてのディレクトリ指定と、配下のソースの再帰的・アルファベット順マッピング。
+- **解決策**: [インベントリシステムの実装詳細](implementation/Inventory-System.md) に詳細仕様を規定。`InventoryManager` におけるディレクトリ走査と除外パターンの適用を規定済み。
+
 ## 4. 整理・調整済み (Refactored/Adjusted)
 
 ### 4.1 [✓] GitHub Actions CI ワークフローの構築
@@ -215,5 +225,5 @@
 ### 5.1 [ ] PlaybookExecutor および実行エンジンのさらなる整理
 - **概要**: `PlaybookExecutor` および `TaskQueueManager`, `TaskExecutor` 内に存在する課題の継続的な改善。
 - **検討内容**:
-    - 動的インベントリ（スクリプト/プラグイン）の統合実装。
+    - インベントリ・プラグイン方式 (Inventory Plugins) の統合実装。
 
