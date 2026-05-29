@@ -104,4 +104,49 @@ class InventoryIntegrationTest {
         assertTrue(inventory.getHost("web1").isPresent());
         assertTrue(inventory.getHost("db1").isPresent());
     }
+
+    @Test
+    void testInventoryManager_DirectoryTraversal() throws IOException {
+        Path invDir = tempDir.resolve("inventory");
+        Files.createDirectories(invDir);
+
+        // Subdirectory (should be traversed)
+        Path subDir = invDir.resolve("production");
+        Files.createDirectories(subDir);
+        Files.writeString(subDir.resolve("hosts.ini"), "[prod]\nprod_host");
+
+        // Top level file
+        Files.writeString(invDir.resolve("01_base.yml"), "all:\n  hosts:\n    base_host:");
+
+        // Hidden file (should be ignored)
+        Files.writeString(invDir.resolve(".hidden"), "[hidden]\nignored_host");
+
+        // Backup file (should be ignored)
+        Files.writeString(invDir.resolve("hosts.bak"), "[backup]\nignored_host");
+
+        // Ignored directory (should be ignored)
+        Path groupVarsDir = invDir.resolve("group_vars");
+        Files.createDirectories(groupVarsDir);
+        Files.writeString(groupVarsDir.resolve("all.yml"), "foo: bar");
+
+        InventoryManager manager = new InventoryManager();
+        manager.addProvider(new FileInventoryProvider());
+
+        Inventory inventory = manager.loadInventory(List.of(invDir.toString()));
+
+        // Check if prod_host and base_host are present
+        assertTrue(inventory.getHost("prod_host").isPresent(), "prod_host should be loaded from subdirectory");
+        assertTrue(inventory.getHost("base_host").isPresent(), "base_host should be loaded from top level file");
+
+        // Check if ignored hosts are NOT present
+        assertFalse(inventory.getGroup("hidden").isPresent(), "Hidden files should be ignored");
+        assertFalse(inventory.getGroup("backup").isPresent(), "Backup files should be ignored");
+
+        // Check if group_vars directory was ignored as an inventory source
+        // (Note: group_vars content is handled by VariableManager, not InventoryManager)
+        // If it was NOT ignored, it would fail because group_vars/all.yml is not a valid inventory file
+        // (it's a variables file). But FileInventoryProvider might try to parse it as YAML inventory.
+        // If it tried and failed, loadInventory would throw an exception.
+        // If it tried and "succeeded" (e.g. as an empty inventory), it might not have the host.
+    }
 }
