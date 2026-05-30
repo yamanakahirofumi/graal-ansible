@@ -104,4 +104,53 @@ class InventoryIntegrationTest {
         assertTrue(inventory.getHost("web1").isPresent());
         assertTrue(inventory.getHost("db1").isPresent());
     }
+
+    @Test
+    void testInventoryManager_Directory() throws IOException {
+        Path inventoryDir = tempDir.resolve("inventory");
+        Files.createDirectories(inventoryDir);
+
+        // Subdirectory 1
+        Path subDir1 = inventoryDir.resolve("group1");
+        Files.createDirectories(subDir1);
+        Files.writeString(subDir1.resolve("hosts.ini"), "[web]\nweb1");
+
+        // Subdirectory 2
+        Path subDir2 = inventoryDir.resolve("group2");
+        Files.createDirectories(subDir2);
+        Files.writeString(subDir2.resolve("hosts.yml"), "db:\n  hosts:\n    db1:");
+
+        // Script in root
+        Path scriptFile = inventoryDir.resolve("inventory_script.py");
+        String scriptContent = "#!/usr/bin/env python3\n" +
+                "import json\n" +
+                "import sys\n" +
+                "if '--list' in sys.argv:\n" +
+                "    print(json.dumps({\n" +
+                "      'app': {'hosts': ['app1']}\n" +
+                "    }))";
+        Files.writeString(scriptFile, scriptContent);
+        scriptFile.toFile().setExecutable(true);
+
+        // File to ignore
+        Files.writeString(inventoryDir.resolve("hosts.bak"), "[ignored]\nhost_ignored");
+        Files.writeString(inventoryDir.resolve(".hidden_hosts"), "[hidden]\nhost_hidden");
+        Files.createDirectories(inventoryDir.resolve("group_vars"));
+
+        InventoryManager manager = new InventoryManager();
+        manager.addProvider(new ScriptInventoryProvider());
+        manager.addProvider(new FileInventoryProvider());
+
+        Inventory inventory = manager.loadInventory(List.of(inventoryDir.toString()));
+
+        assertTrue(inventory.getGroup("web").isPresent());
+        assertTrue(inventory.getGroup("db").isPresent());
+        assertTrue(inventory.getGroup("app").isPresent());
+        assertFalse(inventory.getGroup("ignored").isPresent());
+        assertFalse(inventory.getGroup("hidden").isPresent());
+
+        assertTrue(inventory.getHost("web1").isPresent());
+        assertTrue(inventory.getHost("db1").isPresent());
+        assertTrue(inventory.getHost("app1").isPresent());
+    }
 }
