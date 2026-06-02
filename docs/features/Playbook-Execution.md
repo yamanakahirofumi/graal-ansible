@@ -27,8 +27,8 @@
 ### 2.2 Jinja2 テンプレートの互換性
 - **状況**: `Jinjava` を採用し、Ansible 互換のフィルターおよびルックアッププラグインを Java で実装しています。
 - **実装済み**:
-    - **フィルター (21種類)**: `bool`, `combine`, `default`, `dict2items`, `ipaddr`, `to_json`, `to_yaml`, `urlencode`, `regex_replace`, `quote`, `b64encode`, `b64decode`, `mandatory`, `basename`, `dirname`, `splitext`, `realpath`, `ternary`, `flatten`, `items2dict`, `unique` をサポート。
-    - **ルックアッププラグイン (5種類)**: `file`, `env`, `template`, `pipe`, `dict` をサポート。
+    - **フィルター (21種類)**: `b64decode`, `b64encode`, `basename`, `bool`, `combine`, `default`, `dict2items`, `dirname`, `flatten`, `ipaddr`, `items2dict`, `mandatory`, `quote`, `realpath`, `regex_replace`, `splitext`, `ternary`, `to_json`, `to_yaml`, `unique`, `urlencode` をサポート。
+    - **ルックアッププラグイン (5種類)**: `dict`, `env`, `file`, `pipe`, `template` をサポート。
 - **方針**: 未実装のフィルターやルックアップ、あるいはテンプレートのレンダリングエラー（未定義変数の参照等）が発生した場合は、原則として `RuntimeException` をスローし、該当ホストのタスクを失敗（failed）として処理します。
 
 ### 2.3 ループ (`loop`, `with_items`) の処理

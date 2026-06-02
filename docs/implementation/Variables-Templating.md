@@ -64,26 +64,27 @@ Ansible と同様に、変数は定義時ではなく、実際に使用される
 
 Ansible 特有のフィルターは、Jinjava の `Filter` インターフェースを実装して追加されています。現在、以下のフィルターが実装済みです。
 
+- `b64decode`: Base64 デコード。
+- `b64encode`: Base64 エンコード。
+- `basename`: パスのベース名を取得。
 - `bool`: 値を真偽値に変換。
 - `combine`: 辞書（Map）をマージ。
 - `default`: 未定義値に対するデフォルト値を設定。
 - `dict2items`: 辞書をリスト形式に変換。
+- `dirname`: パスのディレクトリ名を取得。
+- `flatten`: ネストされたリストを平坦化。
 - `ipaddr`: IP アドレスの検証・操作。
+- `items2dict`: リスト形式の辞書を一つの辞書に変換。
+- `mandatory`: 変数が未定義または空の場合にエラーを発生させる。
+- `quote`: シェルクォート処理。
+- `realpath`: 絶対パスを取得。
+- `regex_replace`: 正規表現による置換。
+- `splitext`: パスを名前と拡張子に分割。
+- `ternary`: 条件に応じて値を切り替える。
 - `to_json`: オブジェクトを JSON 文字列に変換。
 - `to_yaml`: オブジェクトを YAML 文字列に変換。
-- `regex_replace`: 正規表現による置換。
-- `quote`: シェルクォート処理。
-- `b64encode`: Base64 エンコード。
-- `b64decode`: Base64 デコード。
-- `mandatory`: 変数が未定義または空の場合にエラーを発生させる。
-- `basename`: パスのベース名を取得。
-- `dirname`: パスのディレクトリ名を取得。
-- `splitext`: パスを名前と拡張子に分割。
-- `realpath`: 絶対パスを取得。
-- `ternary`: 条件に応じて値を切り替える。
-- `flatten`: ネストされたリストを平坦化。
-- `items2dict`: リスト形式の辞書を一つの辞書に変換。
 - `unique`: リストから重複する要素を排除。
+- `urlencode`: URLエンコード処理。
 
 ### 4.1 独自フィルターの追加手順
 
@@ -113,10 +114,6 @@ Ansible において自動的に定義される特殊な変数（マジック変
 - `ansible_verbosity`: 実行時の詳細度（`-v` オプションの数）。
 - `ansible_run_tags`: 実行時に `--tags` で指定されたタグのリスト。
 - `ansible_skip_tags`: 実行時に `--skip-tags` で指定されたタグのリスト。
-- `ansible_become`: 特権昇格の有効無効。
-- `ansible_become_method`: 特権昇格に使用するメソッド。
-- `ansible_become_user`: 昇格後のユーザー。
-- `ansible_become_password`: 特権昇格に使用するパスワード。
 
 これらの変数は、`VariableManager` によって自動的に各ホストの変数セットに注入され、テンプレート内で参照可能です。
 
