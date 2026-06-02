@@ -31,10 +31,10 @@
     - **Unicode 対応**: パス名やファイル内容、変数における Unicode 文字（日本語等）の適切な取り扱い（実装済み）。
 
 ### 2.4 エンジン・制御機能の統合検証 (Engine & Control Flow)
-- **現状**: 基本的な `when`, `loop` 等は実装済みだが、組み合わせによる複雑なケースの網羅性が低い。
+- **現状**: `when`, `loop` の基本機能に加え、`TaskControlAdvancedTest.java` により、`block`/`rescue`/`always` の入れ子構造、`register` 変数を利用した動的なループや条件分岐、ネストされた変数へのアクセス、および `ignore_errors` と `failed_when` の組み合わせ等の複雑な制御フローが検証済み。
 - **拡充計画**:
-    - **動的変数の解決**: `register` した変数が次ステップの `when` や `loop` で正しく参照されるかの再帰的検証。
-    - **エラーハンドリング**: `block`/`rescue`/`always` の深いネストや、`ignore_errors` と `failed_when` の組み合わせによる制御フロー。
+    - **動的変数の解決**: さらなる複雑なデータ構造（Jinja2 フィルターを介した変形等）における再帰的な解決の検証。
+    - **エラーハンドリング**: 特権昇格（become）失敗時や接続エラー（unreachable）がブロック構造に与える影響の網羅的テスト。
     - **Become (権限昇格)**: sudo/su の実行パスと、パスワード入力を必要としない構成（NOPASSWD）での確実な動作。
 
 ### 2.5 実行環境コンテキストの固定 (Execution Context Consistency)

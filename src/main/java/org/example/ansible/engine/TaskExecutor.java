@@ -317,7 +317,16 @@ public class TaskExecutor implements ITaskExecutor {
             setCurrentVariableManager(variableManager);
             try {
                 // Action Plugin detection
-                if (isActionPlugin(resolvedTask.action())) {
+                String actionName = resolvedTask.action();
+                if (actionName != null) {
+                    if (actionName.startsWith("ansible.builtin.")) {
+                        actionName = actionName.substring("ansible.builtin.".length());
+                    } else if (actionName.startsWith("ansible.legacy.")) {
+                        actionName = actionName.substring("ansible.legacy.".length());
+                    }
+                }
+
+                if (actionName != null && isActionPlugin(resolvedTask.action()) && !modules.containsKey(actionName)) {
                     TaskResult actionResult = executeActionPlugin(resolvedTask, becomeContext, effectiveConnection, resolvedEnvironment, variables);
                     if (resolvedDelegateTo != null) {
                         Map<String, Object> dataWithDelegate = new HashMap<>(actionResult.data());
