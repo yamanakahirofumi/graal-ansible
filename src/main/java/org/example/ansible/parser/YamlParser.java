@@ -292,7 +292,19 @@ public class YamlParser {
         String register = (String) map.get("register");
         Object loop = map.get("loop");
         if (loop == null) {
-            loop = map.get("with_items");
+            Object withItems = map.get("with_items");
+            if (withItems != null) {
+                loop = wrapWithFilter(withItems, "flatten(levels=1)");
+            }
+        }
+        if (loop == null) {
+            Object withDict = map.get("with_dict");
+            if (withDict != null) {
+                loop = wrapWithFilter(withDict, "dict2items");
+            }
+        }
+        if (loop == null) {
+            loop = map.get("with_list");
         }
         Map<String, Object> loopControl = (Map<String, Object>) map.getOrDefault("loop_control", Map.of());
 
@@ -351,6 +363,22 @@ public class YamlParser {
             }
         }
         return tasks;
+    }
+
+    private Object wrapWithFilter(Object value, String filter) {
+        if (value instanceof String s) {
+            String trimmed = s.trim();
+            if (trimmed.startsWith("{{") && trimmed.endsWith("}}")) {
+                return trimmed.substring(0, trimmed.length() - 2) + " | " + filter + " }}";
+            } else {
+                return "{{ " + trimmed + " | " + filter + " }}";
+            }
+        } else {
+            Map<String, Object> wrapped = new HashMap<>();
+            wrapped.put("__ansible_loop_source", value);
+            wrapped.put("__ansible_loop_filter", filter);
+            return wrapped;
+        }
     }
 
     private List<String> parseTags(Object obj) {

@@ -266,6 +266,10 @@ public class TaskExecutor implements ITaskExecutor {
         }
 
         Map<String, Object> resolvedArgs = new HashMap<>(variableResolver.resolve(task.args(), variables));
+
+        // Handle 'omit'
+        resolvedArgs.entrySet().removeIf(entry -> entry.getValue() == VariableManager.OMIT);
+
         boolean effectiveCheckMode = variableResolver.resolveCheckMode(task.checkMode(), variables, inheritedCheckMode);
 
         if (effectiveCheckMode) {
