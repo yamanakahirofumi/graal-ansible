@@ -115,4 +115,17 @@ class AdditionalFiltersTest {
         assertEquals("alice", ((Map<?, ?>) list.get(0)).get("name"));
         assertEquals("bob", ((Map<?, ?>) list.get(1)).get("name"));
     }
+
+    @Test
+    void testUrlencode() {
+        assertEquals("foo%20bar", resolver.resolveValue("{{ 'foo bar' | urlencode }}", Map.of()));
+        assertEquals("a%3Db%26c", resolver.resolveValue("{{ 'a=b&c' | urlencode }}", Map.of()));
+
+        Map<String, Object> map = Map.of("a", 1, "b", "c d");
+        Object result = resolver.resolveValue("{{ map | urlencode }}", Map.of("map", map));
+        assertTrue(result instanceof String);
+        String str = (String) result;
+        // Map order is not guaranteed, check both possibilities
+        assertTrue(str.equals("a=1&b=c%20d") || str.equals("b=c%20d&a=1"));
+    }
 }
