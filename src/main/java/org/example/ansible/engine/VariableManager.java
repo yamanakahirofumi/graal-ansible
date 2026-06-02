@@ -20,6 +20,16 @@ import java.util.Map;
  * Manages variable resolution and priority on the Control Node (管理ノード).
  */
 public class VariableManager {
+    /**
+     * Special object used to represent the 'omit' variable.
+     */
+    public static final Object OMIT = new Object() {
+        @Override
+        public String toString() {
+            return "__ansible_omit__";
+        }
+    };
+
     private final Inventory inventory;
     private final Map<String, Object> cliVars;
     private final Map<String, Object> extraVars;
@@ -206,6 +216,9 @@ public class VariableManager {
 
         // Level 1: CLI variables
         variables.putAll(cliVars);
+
+        // Inject 'omit' variable
+        variables.put("omit", OMIT);
 
         List<Role> allRoles = new ArrayList<>();
         if (play != null) {

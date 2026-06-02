@@ -33,6 +33,7 @@ import org.example.ansible.engine.lookup.FileLookup;
 import org.example.ansible.engine.lookup.Lookup;
 import org.example.ansible.engine.lookup.PipeLookup;
 import org.example.ansible.engine.lookup.TemplateLookup;
+import org.example.ansible.engine.lookup.VarsLookup;
 import org.example.ansible.util.Truthiness;
 
 import java.util.ArrayList;
@@ -62,6 +63,7 @@ public class VariableResolver {
         registerLookup(new DictLookup());
         registerLookup(new PipeLookup());
         registerLookup(new TemplateLookup());
+        registerLookup(new VarsLookup());
     }
 
     private void registerLookup(Lookup lookup) {
@@ -183,8 +185,17 @@ public class VariableResolver {
         return value;
     }
 
+    private static final int MAX_RECURSION_DEPTH = 20;
+
     private Object resolveString(String input, Map<String, Object> variables) {
+        return resolveString(input, variables, 0);
+    }
+
+    private Object resolveString(String input, Map<String, Object> variables, int depth) {
         if (input == null) return null;
+        if (depth > MAX_RECURSION_DEPTH) {
+            throw new RuntimeException("Max variable recursion depth exceeded (" + MAX_RECURSION_DEPTH + ")");
+        }
         if (!input.contains("{{") && !input.contains("{%") && !input.contains("{#")) {
             return input;
         }
@@ -195,7 +206,12 @@ public class VariableResolver {
 
         try {
             JinjavaInterpreter.pushCurrent(interpreter);
-            return doResolveString(input, interpreter, variables);
+            Object resolved = doResolveString(input, interpreter, variables);
+            // Ansible resolves variables recursively.
+            if (resolved instanceof String str && str.contains("{{") && !str.equals(input)) {
+                return resolveString(str, variables, depth + 1);
+            }
+            return resolved;
         } finally {
             JinjavaInterpreter.popCurrent();
         }
@@ -367,6 +383,16 @@ public class VariableResolver {
         Object resolved = loop;
         if (loop instanceof String str) {
             resolved = resolveValue(wrapInJinja(str), variables);
+        } else if (loop instanceof Map<?, ?> map && map.containsKey("__ansible_loop_source")) {
+            Object source = map.get("__ansible_loop_source");
+            String filter = (String) map.get("__ansible_loop_filter");
+
+            // Register the source in a temporary variable to apply filter on it
+            String tempVarName = "__ansible_loop_temp_" + System.nanoTime();
+            Map<String, Object> evalVars = new HashMap<>(variables);
+            evalVars.put(tempVarName, source);
+
+            resolved = resolveValue("{{ " + tempVarName + " | " + filter + " }}", evalVars);
         }
 
         if (resolved instanceof List<?> items) {
