@@ -229,4 +229,6 @@
 - **概要**: `PlaybookExecutor` および `TaskQueueManager`, `TaskExecutor` 内に存在する課題の継続的な改善。
 - **検討内容**:
     - 動的インベントリ（プラグイン）の統合実装。
+    - **実行制御の拡充**: `any_errors_fatal`, `max_fail_percentage`, `serial`, `force_handlers` の各ディレクティブの設計と TQM/Worker への組み込み。
+    - **モジュール引数の管理**: `module_defaults` による共通引数のスコープ管理とマージロジックの実装。
 
