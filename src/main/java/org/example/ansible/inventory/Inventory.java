@@ -13,6 +13,10 @@ import java.util.Optional;
  */
 public record Inventory(Group all) {
 
+    public Inventory() {
+        this(new Group("all"));
+    }
+
     /**
      * Resolves all variables for a given host by name.
      * Follows the priority: all group < parent groups < child groups < host variables.

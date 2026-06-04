@@ -89,6 +89,9 @@ public class TaskQueueManager {
         try {
             for (Role role : play.roles()) {
                 executeRole(play, role, targetHosts, inventory, variableManager, results, failedHosts, hostNotifications, globalCheckMode, runTags, skipTags);
+                if (checkAnyErrorsFatal(play, null, targetHosts, failedHosts, variableManager)) {
+                    return;
+                }
             }
 
             for (Task task : play.tasks()) {
@@ -123,6 +126,10 @@ public class TaskQueueManager {
                         }
                     }
                     executedOnce = true;
+                }
+
+                if (checkAnyErrorsFatal(play, task, targetHosts, failedHosts, variableManager)) {
+                    return;
                 }
             }
 
@@ -643,6 +650,10 @@ public class TaskQueueManager {
                 }
                 executedOnce = true;
             }
+
+            if (checkAnyErrorsFatal(play, task, targetHosts, failedHosts, variableManager)) {
+                return;
+            }
         }
     }
 
@@ -689,6 +700,33 @@ public class TaskQueueManager {
             // Ignore loading errors
         }
         return Collections.emptyMap();
+    }
+
+    private boolean checkAnyErrorsFatal(Play play, Task task, List<Host> targetHosts, Set<String> failedHosts, VariableManager variableManager) {
+        if (failedHosts.isEmpty()) {
+            return false;
+        }
+
+        // any_errors_fatal can be defined at Task level (highest priority) or Play level
+        Object anyErrorsFatalObj = null;
+        if (task != null && task.anyErrorsFatal() != null) {
+            anyErrorsFatalObj = task.anyErrorsFatal();
+        } else if (play.anyErrorsFatal() != null) {
+            anyErrorsFatalObj = play.anyErrorsFatal();
+        }
+
+        if (anyErrorsFatalObj == null) {
+            return false;
+        }
+
+        // Evaluate any_errors_fatal. We use the first host's variables to resolve it.
+        Map<String, Object> vars = variableManager.getAllVariables(play, targetHosts.get(0), task, null, (List<Role>) null, null);
+        if (Truthiness.isTrue(variableResolver.resolveValue(variableResolver.wrapInJinja(anyErrorsFatalObj), vars))) {
+            // In Ansible, any_errors_fatal stops execution for all hosts in the current play
+            return true;
+        }
+
+        return false;
     }
 
     private Group findGroup(Group root, String name) {

@@ -272,7 +272,20 @@ Playbook の実行対象を動的に制御する仕組みの実装について�
     - 単一のホスト名またはグループ名。
     - カンマ区切りのリスト (`host1,host2,group1`)。
 
-## 15. 真偽判定 (Truthiness)
+## 15. 致命的エラー制御 (`any_errors_fatal`)
+
+エラー発生時に Playbook の実行を全ホストで停止するかどうかを制御します。
+
+- **実装方針**:
+    - `any_errors_fatal` は Play レベルまたは Task レベルで定義可能です。
+    - いずれかのホストでタスクが失敗（failed）した際、`any_errors_fatal` が有効（`true`）であれば、その Play 内の残りのホストおよびタスクの実行をすべて中断します。
+    - `VariableResolver` を用いてテンプレート展開されるため、条件によって動的に致命的エラーとするかどうかを切り替えることが可能です。
+- **データ構造**:
+    - `Play` および `Task` レコードに `Object anyErrorsFatal` フィールドを保持します。
+- **実行エンジンへの統合**:
+    - `TaskQueueManager` において、各タスク（またはロール）の実行直後に失敗ホストの有無と `any_errors_fatal` 設定をチェックし、条件を満たす場合は直ちに `executePlay` メソッドから復帰（return）します。
+
+## 16. 真偽判定 (Truthiness)
 
 Jinja2 テンプレートや `when` 句、`failed_when` 等の評価において、Ansible 互換の真偽判定（Truthiness）を採用しています。
 
