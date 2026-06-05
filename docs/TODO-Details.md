@@ -28,6 +28,14 @@
 - **概要**: `ansible-core` 全体のロードを排除し、最適化と安定化を図る。
 - **詳細は [Module-Support-Status.md](features/Module-Support-Status.md) を参照。**
 
+### 2.4 [ ] any_errors_fatal の実装
+- **概要**: Playbook 実行中にいずれかのホストでエラーが発生した際、全ホストで実行を停止する機能の実装。
+- **検討内容**:
+    - `Play` および `Task` レコードへのフィールド追加。
+    - `YamlParser` での解析対応。
+    - `TaskQueueManager` における実行ループの遮断ロジック。
+    - `block/rescue/always` との組み合わせにおける挙動の整合性確保。
+
 ## 3. 完了済みの項目 (Completed)
 
 ### 3.1 [✓] インベントリシステムの動的更新に関する記述の修正

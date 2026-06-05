@@ -285,3 +285,15 @@ Jinja2 テンプレートや `when` 句、`failed_when` 等の評価において
         - `List` / `Map`: 要素が空の場合。
     - **True と判定されるケース**:
         - 上記以外のすべての値（非空の文字列、非ゼロの数値、要素を持つリスト/マップ等）。
+
+## 16. エラー発生時の即時停止 (`any_errors_fatal`)
+
+Play 内のいずれかのホストでタスクが失敗した場合に、その Play の実行を全ホストで即座に停止するかどうかを制御します。
+
+- **実装方針**:
+    - `any_errors_fatal` は Play レベルおよび Task レベルで定義可能です。
+    - いずれかのホストでタスクが失敗（failed）し、かつそのコンテキストで `any_errors_fatal: true` が有効な場合、`TaskQueueManager` は現在の Play の実行を中断し、以降のタスクおよび残りのホストでの処理をスキップします。
+- **データ構造**:
+    - `Play` レコードおよび `Task` レコードに `boolean any_errors_fatal` フィールドを保持し、`YamlParser` で解析可能とします。
+- **実行エンジンへの統合**:
+    - `TaskQueueManager.executePlay` において、各タスクの実行結果を監視し、失敗が発生した際に `any_errors_fatal` の設定を確認してループをブレイクするロジックを実装します。
