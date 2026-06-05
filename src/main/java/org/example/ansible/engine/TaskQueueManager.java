@@ -35,6 +35,7 @@ public class TaskQueueManager {
     private final ConnectionFactory connectionFactory;
     private PromptProvider promptProvider = new ConsolePromptProvider();
     private final Map<String, Connection> connectionCache = new HashMap<>();
+    private boolean playFatalError = false;
 
     public TaskQueueManager(ITaskExecutor taskExecutor) {
         this(taskExecutor, new DefaultConnectionFactory());
@@ -83,15 +84,18 @@ public class TaskQueueManager {
         // Resolve vars_prompt (Level 13)
         resolveVarsPrompt(play, variableManager);
 
+        this.playFatalError = false;
         Set<String> failedHosts = new HashSet<>();
         Map<String, Set<String>> hostNotifications = new HashMap<>();
 
         try {
             for (Role role : play.roles()) {
+                if (this.playFatalError) break;
                 executeRole(play, role, targetHosts, inventory, variableManager, results, failedHosts, hostNotifications, globalCheckMode, runTags, skipTags);
             }
 
             for (Task task : play.tasks()) {
+                if (this.playFatalError) break;
                 if (!isTaskToBeExecuted(task, runTags, skipTags)) {
                     for (Host host : targetHosts) {
                         results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(TaskResult.skipped("Skipped due to tags"));
@@ -120,6 +124,7 @@ public class TaskQueueManager {
                             results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(unreachableResult);
                         } else {
                             failedHosts.add(host.name());
+                            checkAnyErrorsFatal(play, host, task, null, null, null, variableManager);
                         }
                     }
                     executedOnce = true;
@@ -127,17 +132,19 @@ public class TaskQueueManager {
             }
 
             // Execute handlers at the end of the play
-            for (Host host : targetHosts) {
-                if (failedHosts.contains(host.name())) {
-                    continue;
-                }
-                Map<String, Object> vars = variableManager.getAllVariables(play, host, null, null, (List<Role>) null, null);
-                boolean playCheckMode = variableResolver.resolveCheckMode(play.checkMode(), vars, globalCheckMode);
-                try {
-                    Connection connection = getOrCreateConnection(host, vars);
-                    flushHandlersForHost(play, host, inventory, variableManager, results, failedHosts, hostNotifications, playCheckMode, connection, runTags, skipTags);
-                } catch (UnreachableException e) {
-                    failedHosts.add(host.name());
+            if (!this.playFatalError) {
+                for (Host host : targetHosts) {
+                    if (failedHosts.contains(host.name())) {
+                        continue;
+                    }
+                    Map<String, Object> vars = variableManager.getAllVariables(play, host, null, null, (List<Role>) null, null);
+                    boolean playCheckMode = variableResolver.resolveCheckMode(play.checkMode(), vars, globalCheckMode);
+                    try {
+                        Connection connection = getOrCreateConnection(host, vars);
+                        flushHandlersForHost(play, host, inventory, variableManager, results, failedHosts, hostNotifications, playCheckMode, connection, runTags, skipTags);
+                    } catch (UnreachableException e) {
+                        failedHosts.add(host.name());
+                    }
                 }
             }
         } finally {
@@ -172,6 +179,7 @@ public class TaskQueueManager {
             Set<String> notifiedInThisCycle = hostNotifications.remove(host.name());
             if (notifiedInThisCycle != null && !notifiedInThisCycle.isEmpty()) {
                 for (Task handler : play.handlers()) {
+                    if (this.playFatalError) break;
                     boolean isNotified = false;
                     for (String notification : notifiedInThisCycle) {
                         if (notification.equals(handler.name()) || (handler.listen() != null && handler.listen().contains(notification))) {
@@ -216,6 +224,7 @@ public class TaskQueueManager {
                 result = TaskResult.unreachable(e.getMessage());
             } else {
                 failedHosts.add(host.name());
+                checkAnyErrorsFatal(play, host, task, blockVars, activeRoles, includeParams, variableManager);
                 return;
             }
         }
@@ -280,10 +289,21 @@ public class TaskQueueManager {
             if (!result.success()) {
                 if (result.isUnreachable()) {
                     failedHosts.add(host.name());
+                    checkAnyErrorsFatal(play, host, task, blockVars, activeRoles, includeParams, variableManager);
                 } else if (!result.isSkipped() && !task.ignoreErrors()) {
                     failedHosts.add(host.name());
+                    checkAnyErrorsFatal(play, host, task, blockVars, activeRoles, includeParams, variableManager);
                 }
             }
+        }
+    }
+
+    private void checkAnyErrorsFatal(Play play, Host host, Task task, Map<String, Object> blockVars, List<Role> activeRoles, Map<String, Object> includeParams, VariableManager variableManager) {
+        Map<String, Object> vars = variableManager.getAllVariables(play, host, task, blockVars, activeRoles, includeParams);
+        boolean isFatal = variableResolver.resolveAnyErrorsFatal(task.anyErrorsFatal(), vars,
+                variableResolver.resolveAnyErrorsFatal(play.anyErrorsFatal(), vars, false));
+        if (isFatal) {
+            this.playFatalError = true;
         }
     }
 
@@ -310,6 +330,7 @@ public class TaskQueueManager {
         combinedBlockVars.putAll(blockTask.vars());
 
         for (Task task : blockTask.block()) {
+            if (this.playFatalError) break;
             if (blockFailedHosts.contains(host.name())) {
                 blockFailed = true;
                 break;
@@ -327,11 +348,13 @@ public class TaskQueueManager {
 
         if (blockFailed) {
             for (Task task : blockTask.rescue()) {
+                if (this.playFatalError) break;
                 executeTaskOnHost(play, host, task, inventory, variableManager, results, failedHosts, hostNotifications, blockCheckMode, effectiveBlockEnvs, combinedBlockVars, activeRoles, includeParams, connection, runTags, skipTags);
             }
         }
 
         for (Task task : blockTask.always()) {
+            if (this.playFatalError) break;
             executeTaskOnHost(play, host, task, inventory, variableManager, results, failedHosts, hostNotifications, blockCheckMode, effectiveBlockEnvs, combinedBlockVars, activeRoles, includeParams, connection, runTags, skipTags);
         }
 
@@ -536,6 +559,7 @@ public class TaskQueueManager {
             }
 
             for (Task includedTask : includedTasks) {
+                if (this.playFatalError) break;
                 if (failedHosts.contains(host.name())) break;
                 executeTaskOnHost(play, host, includedTask, inventory, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, inheritedEnvironments, combinedBlockVars, activeRoles, includeParams, connection, runTags, skipTags);
             }
@@ -621,6 +645,7 @@ public class TaskQueueManager {
 
     private void executeRoleTasks(Play play, List<Role> activeRoles, List<Task> roleTasks, List<Host> targetHosts, Inventory inventory, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean globalCheckMode, List<String> runTags, List<String> skipTags) {
         for (Task task : roleTasks) {
+            if (this.playFatalError) break;
             if (!isTaskToBeExecuted(task, runTags, skipTags)) continue;
 
             boolean executedOnce = false;
@@ -639,6 +664,7 @@ public class TaskQueueManager {
                         results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(TaskResult.unreachable(e.getMessage()));
                     } else {
                         failedHosts.add(host.name());
+                        checkAnyErrorsFatal(play, host, task, null, activeRoles, null, variableManager);
                     }
                 }
                 executedOnce = true;
