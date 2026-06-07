@@ -302,7 +302,7 @@ public class TaskExecutor implements ITaskExecutor {
 
         Task resolvedTask = new Task(task.name(), task.action(), resolvedArgs, task.vars(), task.when(), task.register(), task.loop(), task.loopControl(), task.notifications(), task.failedWhen(), task.changedWhen(), task.ignoreErrors(),
                 task.until(), task.retries(), task.delay(), resolvedDelegateTo, task.delegateFacts(), task.runOnce(), task.ignoreUnreachable(), task.block(), task.rescue(), task.always(),
-                task.become(), task.becomeMethod(), task.becomeUser(), task.becomeFlags(), task.checkMode(), task.environment(), task.tags(), task.listen());
+                task.become(), task.becomeMethod(), task.becomeUser(), task.becomeFlags(), task.checkMode(), task.environment(), task.tags(), task.listen(), task.anyErrorsFatal());
 
         try {
             if ("meta".equals(resolvedTask.action())) {
@@ -657,7 +657,7 @@ public class TaskExecutor implements ITaskExecutor {
                     moduleArgs,
                     null, null, null, null, Map.of(), List.of(), null, null, false,
                     null, 0, 0, null, false, false, false, List.of(), List.of(), List.of(),
-                    null, null, null, null, null, null, List.of(), List.of()
+                    null, null, null, null, null, null, List.of(), List.of(), null
             );
 
             // Execute as a normal module, using the current connection and environment

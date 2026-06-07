@@ -297,6 +297,22 @@ public class VariableResolver {
     }
 
     /**
+     * Resolves any_errors_fatal status.
+     *
+     * @param anyErrorsFatal The any_errors_fatal setting.
+     * @param variables      The variable map.
+     * @param inheritedValue The value inherited from parent context.
+     * @return Resolved any_errors_fatal status.
+     */
+    public boolean resolveAnyErrorsFatal(Object anyErrorsFatal, Map<String, Object> variables, boolean inheritedValue) {
+        if (anyErrorsFatal == null) {
+            return inheritedValue;
+        }
+        Object resolved = resolveValue(anyErrorsFatal, variables);
+        return Truthiness.isTrue(resolved);
+    }
+
+    /**
      * Resolves the become context for a task.
      *
      * @param play      The play context.

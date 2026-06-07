@@ -62,7 +62,7 @@ class VariablePrecedenceComprehensiveTest {
         vm.addRoleDefaults("role1", Map.of("v", "level2_role_default"));
         vm.addRoleVars("role1", Map.of("v", "level15_role_var"));
 
-        Play play = new Play("play", "all", List.of(), Map.of("v", "level12_play_var"), List.of(), List.of(), List.of(role), List.of(), null, null, null, null, null, null, List.of());
+        Play play = new Play("play", "all", List.of(), Map.of("v", "level12_play_var"), List.of(), List.of(), List.of(role), List.of(), null, null, null, null, null, null, List.of(), null);
         Task task = new Task("task", "debug", Map.of(), Map.of("v", "level17_task_var"));
 
         // Act
@@ -81,7 +81,7 @@ class VariablePrecedenceComprehensiveTest {
 
         // Verify without Level 20
         role = new Role("role1", Map.of());
-        play = new Play("play", "all", List.of(), Map.of("v", "level12_play_var"), List.of(), List.of(), List.of(role), List.of(), null, null, null, null, null, null, List.of());
+        play = new Play("play", "all", List.of(), Map.of("v", "level12_play_var"), List.of(), List.of(), List.of(role), List.of(), null, null, null, null, null, null, List.of(), null);
         vars = vm.getAllVariables(play, host, task, null, List.of(role), null);
         assertEquals("level17_task_var", vars.get("v"), "Task vars (Level 17) should win over Level 15");
 
@@ -97,7 +97,7 @@ class VariablePrecedenceComprehensiveTest {
         assertEquals("level12_play_var", vars.get("v"), "Play vars (Level 12) should win over Level 8");
 
         // Verify without Level 12
-        play = new Play("play", "all", List.of(), Map.of(), List.of(), List.of(), List.of(role), List.of(), null, null, null, null, null, null, List.of());
+        play = new Play("play", "all", List.of(), Map.of(), List.of(), List.of(), List.of(role), List.of(), null, null, null, null, null, null, List.of(), null);
         vars = vm.getAllVariables(play, host, task, null, List.of(role), null);
         assertEquals("level8_inv_host", vars.get("v"), "Inventory host vars (Level 8) should win over Level 5");
 
