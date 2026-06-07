@@ -84,6 +84,12 @@ public class TaskQueueManager {
         // Resolve vars_prompt (Level 13)
         resolveVarsPrompt(play, variableManager);
 
+        // Set initial magic host lists
+        List<String> targetHostNames = targetHosts.stream().map(Host::name).toList();
+        variableManager.setAnsiblePlayHostsAll(targetHostNames);
+        variableManager.setAnsiblePlayHosts(targetHostNames);
+        variableManager.setAnsiblePlayBatch(targetHostNames);
+
         this.playFatalError = false;
         Set<String> failedHosts = new HashSet<>();
         Map<String, Set<String>> hostNotifications = new HashMap<>();
@@ -118,12 +124,16 @@ public class TaskQueueManager {
                     try {
                         Connection connection = getOrCreateConnection(host, vars);
                         executeTaskOnHost(play, host, task, inventory, variableManager, results, failedHosts, hostNotifications, playCheckMode, new ArrayList<>(), null, null, null, connection, runTags, skipTags);
+                        if (failedHosts.contains(host.name())) {
+                            updateMagicHostLists(variableManager, targetHosts, failedHosts);
+                        }
                     } catch (UnreachableException e) {
                         if (task.ignoreUnreachable()) {
                             TaskResult unreachableResult = TaskResult.unreachable(e.getMessage());
                             results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(unreachableResult);
                         } else {
                             failedHosts.add(host.name());
+                            updateMagicHostLists(variableManager, targetHosts, failedHosts);
                             checkAnyErrorsFatal(play, host, task, null, null, null, variableManager);
                         }
                     }
@@ -659,11 +669,15 @@ public class TaskQueueManager {
                 try {
                     Connection connection = getOrCreateConnection(host, vars);
                     executeTaskOnHost(play, host, task, inventory, variableManager, results, failedHosts, hostNotifications, playCheckMode, new ArrayList<>(), null, activeRoles, null, connection, runTags, skipTags);
+                    if (failedHosts.contains(host.name())) {
+                        updateMagicHostLists(variableManager, targetHosts, failedHosts);
+                    }
                 } catch (UnreachableException e) {
                     if (task.ignoreUnreachable()) {
                         results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(TaskResult.unreachable(e.getMessage()));
                     } else {
                         failedHosts.add(host.name());
+                        updateMagicHostLists(variableManager, targetHosts, failedHosts);
                         checkAnyErrorsFatal(play, host, task, null, activeRoles, null, variableManager);
                     }
                 }
@@ -790,6 +804,15 @@ public class TaskQueueManager {
         if (groupName == null) return;
 
         inventory.addHostToGroup(currentHostName, groupName);
+    }
+
+    private void updateMagicHostLists(VariableManager variableManager, List<Host> targetHosts, Set<String> failedHosts) {
+        List<String> activeHosts = targetHosts.stream()
+                .map(Host::name)
+                .filter(name -> !failedHosts.contains(name))
+                .toList();
+        variableManager.setAnsiblePlayHosts(activeHosts);
+        variableManager.setAnsiblePlayBatch(activeHosts);
     }
 
     private void resolveVarsPrompt(Play play, VariableManager variableManager) {

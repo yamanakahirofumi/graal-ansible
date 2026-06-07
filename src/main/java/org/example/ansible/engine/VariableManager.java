@@ -15,6 +15,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Manages variable resolution and priority on the Control Node (管理ノード).
@@ -29,6 +30,17 @@ public class VariableManager {
             return "__ansible_omit__";
         }
     };
+
+    /**
+     * Magic variable for Ansible version.
+     */
+    public static final Map<String, Object> ANSIBLE_VERSION = Map.of(
+            "full", "2.21.0",
+            "major", 2,
+            "minor", 21,
+            "revision", 0,
+            "string", "2.21.0"
+    );
 
     private final Inventory inventory;
     private final Map<String, Object> cliVars;
@@ -46,6 +58,10 @@ public class VariableManager {
     private final Path inventoryDir;
     private final Yaml yaml = new Yaml();
 
+    private List<String> ansiblePlayHosts = Collections.emptyList();
+    private List<String> ansiblePlayBatch = Collections.emptyList();
+    private List<String> ansiblePlayHostsAll = Collections.emptyList();
+
     public VariableManager(Inventory inventory, Map<String, Object> extraVars) {
         this(inventory, Map.of(), extraVars, null, null);
     }
@@ -56,6 +72,18 @@ public class VariableManager {
 
     public VariableManager(Inventory inventory, Map<String, Object> extraVars, Path baseDir, Path inventoryDir) {
         this(inventory, Map.of(), extraVars, baseDir, inventoryDir);
+    }
+
+    public void setAnsiblePlayHosts(List<String> ansiblePlayHosts) {
+        this.ansiblePlayHosts = new ArrayList<>(ansiblePlayHosts);
+    }
+
+    public void setAnsiblePlayBatch(List<String> ansiblePlayBatch) {
+        this.ansiblePlayBatch = new ArrayList<>(ansiblePlayBatch);
+    }
+
+    public void setAnsiblePlayHostsAll(List<String> ansiblePlayHostsAll) {
+        this.ansiblePlayHostsAll = new ArrayList<>(ansiblePlayHostsAll);
     }
 
     public VariableManager(Inventory inventory, Map<String, Object> cliVars, Map<String, Object> extraVars, Path baseDir, Path inventoryDir) {
@@ -219,6 +247,20 @@ public class VariableManager {
 
         // Inject 'omit' variable
         variables.put("omit", OMIT);
+
+        // Inject 'ansible_version'
+        variables.put("ansible_version", ANSIBLE_VERSION);
+
+        // Inject 'ansible_diff_mode'
+        variables.put("ansible_diff_mode", cliVars.getOrDefault("ansible_diff_mode", false));
+
+        // Inject 'hostvars'
+        variables.put("hostvars", new HostvarsMap(play));
+
+        // Inject play-scoped host lists
+        variables.put("ansible_play_hosts", ansiblePlayHosts);
+        variables.put("ansible_play_batch", ansiblePlayBatch);
+        variables.put("ansible_play_hosts_all", ansiblePlayHostsAll);
 
         List<Role> allRoles = new ArrayList<>();
         if (play != null) {
@@ -482,5 +524,35 @@ public class VariableManager {
         }
         directoryVarsCache.put(cacheKey, vars);
         return vars;
+    }
+
+    /**
+     * Lazy-loading map for 'hostvars' magic variable.
+     */
+    private class HostvarsMap extends java.util.AbstractMap<String, Object> {
+        private final Play play;
+
+        HostvarsMap(Play play) {
+            this.play = play;
+        }
+
+        @Override
+        public Object get(Object key) {
+            if (!(key instanceof String hostName)) return null;
+            return getVariablesForHost(hostName, play);
+        }
+
+        @Override
+        public boolean containsKey(Object key) {
+            if (!(key instanceof String hostName)) return false;
+            return inventory != null && inventory.getHost(hostName).isPresent();
+        }
+
+        @Override
+        public Set<Entry<String, Object>> entrySet() {
+            // Expensive to build, only return if absolutely necessary.
+            // For now, we return an empty set to comply with the interface.
+            return Collections.emptySet();
+        }
     }
 }
