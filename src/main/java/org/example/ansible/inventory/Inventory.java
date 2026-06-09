@@ -2,9 +2,11 @@ package org.example.ansible.inventory;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Represents the entire inventory.
@@ -174,5 +176,24 @@ public record Inventory(Group all) {
             if (found != null) return found;
         }
         return null;
+    }
+
+    /**
+     * Gets names of all hosts in the inventory.
+     * @return A list of all host names.
+     */
+    public List<String> getAllHostNames() {
+        Set<String> names = new HashSet<>();
+        collectHostNames(all, names);
+        return names.stream().sorted().toList();
+    }
+
+    private void collectHostNames(Group group, Set<String> names) {
+        for (Host host : group.hosts()) {
+            names.add(host.name());
+        }
+        for (Group child : group.children()) {
+            collectHostNames(child, names);
+        }
     }
 }

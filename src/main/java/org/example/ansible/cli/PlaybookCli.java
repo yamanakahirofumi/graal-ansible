@@ -64,6 +64,9 @@ public class PlaybookCli implements Callable<Integer> {
     @Option(names = {"-C", "--check"}, description = "Don't make any changes; instead, try to predict some of the changes that may occur.")
     private boolean check;
 
+    @Option(names = {"-D", "--diff"}, description = "When changing (small) files and templates, show the differences in those files; works great with --check.")
+    private boolean diff;
+
     @Option(names = {"-b", "--become"}, description = "Run operations with become (does not imply password prompting).")
     private boolean become;
 
@@ -122,8 +125,23 @@ public class PlaybookCli implements Callable<Integer> {
                 // Execute Playbook
                 PlaybookExecutor executor = new PlaybookExecutor(taskExecutor);
                 java.nio.file.Path baseDir = playbookFile.getAbsoluteFile().getParentFile().toPath();
+
+                java.nio.file.Path inventoryDirPath = null;
+                if (inventoryPath != null) {
+                    File invFile = new File(inventoryPath);
+                    if (invFile.isDirectory()) {
+                        inventoryDirPath = invFile.getAbsoluteFile().toPath();
+                    } else {
+                        File parent = invFile.getAbsoluteFile().getParentFile();
+                        if (parent != null) {
+                            inventoryDirPath = parent.toPath();
+                        }
+                    }
+                }
+
                 Map<String, Object> cliVars = new HashMap<>();
                 cliVars.put("ansible_check_mode", check);
+                cliVars.put("ansible_diff_mode", diff);
                 cliVars.put("ansible_become", become);
                 cliVars.put("ansible_become_method", becomeMethod);
                 cliVars.put("ansible_become_user", becomeUser);
@@ -146,7 +164,7 @@ public class PlaybookCli implements Callable<Integer> {
                 cliVars.put("ansible_run_tags", tags);
                 cliVars.put("ansible_skip_tags", skipTags);
 
-                VariableManager variableManager = new VariableManager(inventory, cliVars, parsedExtraVars, baseDir, null);
+                VariableManager variableManager = new VariableManager(inventory, cliVars, parsedExtraVars, baseDir, inventoryDirPath);
                 Map<String, List<TaskResult>> results = executor.execute(playbook, inventory, variableManager, check, tags, skipTags, limit);
 
                 // Print Results

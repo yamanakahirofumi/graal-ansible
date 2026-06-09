@@ -148,20 +148,25 @@ class VariablePrecedenceIntegrationTest {
         // Note: Task Var (17) should override Fact (11).
         // If 'my_var' was set via set_fact (19), it would override Task Var (17).
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory, vm, false);
-        // Task 1: set_fact (executed during play)
-        // Task 2: check var with task-level vars: my_var=task_val
-        // In this test, vm.addFacts was called BEFORE execution.
-        // During execution, Task 1 "set fact" runs and sets my_var: fact_val at Level 19.
-        // Level 19 (set_fact) > Level 17 (task vars)
-        assertEquals("fact_val", results.get("host1").get(1).data().get("msg"));
+        List<TaskResult> hostResults = results.get("host1");
+        if (hostResults == null || hostResults.size() < 2) {
+            System.err.println("Results for host1: " + hostResults);
+            if (hostResults != null && !hostResults.isEmpty()) {
+                System.err.println("First task result: " + hostResults.get(0));
+            }
+        }
+        assertTrue(hostResults != null && hostResults.size() >= 2, "Expected at least 2 results for host1, got: " + (hostResults == null ? "null" : hostResults.size()));
+        assertEquals("fact_val", hostResults.get(1).data().get("msg"));
 
         // Scenario 2: Registered Var (19) > Task Var (17)
         // We'll simulate this by adding a registered variable manually to the VM
         vm.registerVariable("host1", "reg_result", Map.of("stdout", "reg_val"));
         results = playbookExecutor.execute(playbook, inventory, vm, false);
+        hostResults = results.get("host1");
         // The 4th task has a task-level var "reg_result" with "stdout: task_val"
         // But the registered var "reg_result" (reg_val) should win.
-        assertEquals("reg_val", results.get("host1").get(3).data().get("msg").toString().trim());
+        assertTrue(hostResults.size() >= 4, "Expected at least 4 results for host1");
+        assertEquals("reg_val", hostResults.get(3).data().get("msg").toString().trim());
     }
 
     @Test
