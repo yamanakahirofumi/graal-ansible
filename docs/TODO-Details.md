@@ -94,7 +94,7 @@
 ### 3.10 [✓] 独自 Jinja2 フィルターの拡充 (Ansible 互換)
 - **完了日**: 2026-05-11
 - **概要**: Playbook で頻繁に使用される Ansible 特有の Jinja2 フィルターを Java で実装。
-- **解決策**: `mandatory`, `basename`, `dirname`, `splitext`, `realpath`, `ternary`, `flatten` を実装し `VariableResolver` に登録。
+- **解決策**: `mandatory`, `basename`, `dirname`, `splitext`, `realpath`, `ternary`, `flatten` を含む、計 21 種類のフィルターを実装し `VariableResolver` に登録済み。
 
 
 ### 3.11 [✓] GraalPy と Java のシームレスな統合
@@ -124,7 +124,7 @@
 - **概要**: Playbook や変数ファイル内の Jinja2 テンプレートを展開する仕組み。
 - **解決策**:
     - `VariableResolver` にて Jinjava を統合し、動的な変数展開を実装済み。
-    - 主要なフィルター（`bool`, `combine`, `default`, `dict2items`, `ipaddr`, `to_json`, `to_yaml`）を Java で実装し登録済み。
+    - 計 21 種類の Ansible 互換フィルター（`bool`, `combine`, `default`, `dict2items`, `ipaddr`, `to_json`, `to_yaml` 等）を Java で実装し登録済み。
 
 ### 3.16 [✓] タスク制御機能（when, register, loop, handlers, block, retry, check_mode 等）の実装
 - **完了日**: 2026-03-05
