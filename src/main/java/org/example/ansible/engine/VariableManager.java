@@ -10,11 +10,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Manages variable resolution and priority on the Control Node (管理ノード).
@@ -29,6 +33,14 @@ public class VariableManager {
             return "__ansible_omit__";
         }
     };
+
+    private static final Map<String, Object> ANSIBLE_VERSION = Map.of(
+            "full", "2.21.0",
+            "major", 2,
+            "minor", 21,
+            "revision", 0,
+            "string", "2.21.0"
+    );
 
     private final Inventory inventory;
     private final Map<String, Object> cliVars;
@@ -45,6 +57,9 @@ public class VariableManager {
     private final Path baseDir;
     private final Path inventoryDir;
     private final Yaml yaml = new Yaml();
+
+    private List<String> playHostNames = new ArrayList<>();
+    private Set<String> failedHostNames = new HashSet<>();
 
     public VariableManager(Inventory inventory, Map<String, Object> extraVars) {
         this(inventory, Map.of(), extraVars, null, null);
@@ -139,6 +154,16 @@ public class VariableManager {
         promptVars.putAll(vars);
     }
 
+    /**
+     * Sets the current play context for magic variables.
+     * @param playHostNames List of all hosts in the current play.
+     * @param failedHostNames Set of hosts that have failed in the current play.
+     */
+    public void setPlayContext(List<String> playHostNames, Set<String> failedHostNames) {
+        this.playHostNames = playHostNames != null ? new ArrayList<>(playHostNames) : new ArrayList<>();
+        this.failedHostNames = failedHostNames != null ? failedHostNames : new HashSet<>();
+    }
+
     public void clearPromptVars() {
         promptVars.clear();
     }
@@ -203,14 +228,18 @@ public class VariableManager {
      * @return A merged map of all variables.
      */
     public Map<String, Object> getAllVariables(Play play, Host host, Task task, Map<String, Object> blockVars) {
-        return getAllVariables(play, host, task, blockVars, null, null, true);
+        return getAllVariables(play, host, task, blockVars, null, null, true, true);
     }
 
     public Map<String, Object> getAllVariables(Play play, Host host, Task task, Map<String, Object> blockVars, List<Role> activeRoles, Map<String, Object> includeParams) {
-        return getAllVariables(play, host, task, blockVars, activeRoles, includeParams, true);
+        return getAllVariables(play, host, task, blockVars, activeRoles, includeParams, true, true);
     }
 
     public Map<String, Object> getAllVariables(Play play, Host host, Task task, Map<String, Object> blockVars, List<Role> activeRoles, Map<String, Object> includeParams, boolean includePromptVars) {
+        return getAllVariables(play, host, task, blockVars, activeRoles, includeParams, includePromptVars, true);
+    }
+
+    public Map<String, Object> getAllVariables(Play play, Host host, Task task, Map<String, Object> blockVars, List<Role> activeRoles, Map<String, Object> includeParams, boolean includePromptVars, boolean includeHostVars) {
         Map<String, Object> variables = new HashMap<>();
         String hostName = host != null ? host.name() : null;
 
@@ -237,6 +266,7 @@ public class VariableManager {
         }
 
         // Magic Variables
+        variables.put("ansible_version", ANSIBLE_VERSION);
         if (hostName != null) {
             variables.put("inventory_hostname", hostName);
             if (baseDir != null) {
@@ -254,11 +284,25 @@ public class VariableManager {
             if (inventory != null) {
                 variables.put("groups", inventory.getGroupsMap());
                 variables.put("group_names", getHostGroups(hostName));
+                if (includeHostVars) {
+                    variables.put("hostvars", new HostVarsMap(play));
+                }
             }
+
+            // Play context magic variables
+            variables.put("ansible_play_hosts_all", Collections.unmodifiableList(playHostNames));
+            List<String> activePlayHosts = playHostNames.stream()
+                    .filter(name -> !failedHostNames.contains(name))
+                    .collect(Collectors.toList());
+            variables.put("ansible_play_hosts", Collections.unmodifiableList(activePlayHosts));
+            variables.put("ansible_play_batch", Collections.unmodifiableList(activePlayHosts));
 
             // Propagate CLI settings as magic variables
             if (cliVars.containsKey("ansible_check_mode")) {
                 variables.put("ansible_check_mode", cliVars.get("ansible_check_mode"));
+            }
+            if (cliVars.containsKey("ansible_diff_mode")) {
+                variables.put("ansible_diff_mode", cliVars.get("ansible_diff_mode"));
             }
             if (cliVars.containsKey("ansible_verbosity")) {
                 variables.put("ansible_verbosity", cliVars.get("ansible_verbosity"));
@@ -482,5 +526,44 @@ public class VariableManager {
         }
         directoryVarsCache.put(cacheKey, vars);
         return vars;
+    }
+
+    /**
+     * Lazy map for hostvars magic variable.
+     */
+    private class HostVarsMap extends AbstractMap<String, Object> {
+        private final Play play;
+        private final Map<String, Map<String, Object>> cache = new HashMap<>();
+
+        public HostVarsMap(Play play) {
+            this.play = play;
+        }
+
+        @Override
+        public Set<Entry<String, Object>> entrySet() {
+            if (inventory == null) return Collections.emptySet();
+            return inventory.getAllHostNames().stream()
+                    .map(name -> new SimpleImmutableEntry<>(name, get(name)))
+                    .collect(Collectors.toSet());
+        }
+
+        @Override
+        public Object get(Object key) {
+            if (!(key instanceof String hostName)) return null;
+            if (cache.containsKey(hostName)) return cache.get(hostName);
+
+            if (inventory != null && inventory.getHost(hostName).isPresent()) {
+                // To avoid infinite recursion, we don't include prompt vars or other hostvars when resolving via hostvars
+                Map<String, Object> vars = getAllVariables(play, inventory.getHost(hostName).get(), null, null, null, null, false, false);
+                cache.put(hostName, vars);
+                return vars;
+            }
+            return null;
+        }
+
+        @Override
+        public boolean containsKey(Object key) {
+            return inventory != null && key instanceof String hostName && inventory.getHost(hostName).isPresent();
+        }
     }
 }

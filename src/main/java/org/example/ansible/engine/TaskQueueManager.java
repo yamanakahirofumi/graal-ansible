@@ -86,6 +86,7 @@ public class TaskQueueManager {
 
         this.playFatalError = false;
         Set<String> failedHosts = new HashSet<>();
+        variableManager.setPlayContext(targetHosts.stream().map(Host::name).toList(), failedHosts);
         Map<String, Set<String>> hostNotifications = new HashMap<>();
 
         try {
