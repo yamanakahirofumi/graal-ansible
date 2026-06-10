@@ -28,12 +28,14 @@
 - **状況**: `Jinjava` を採用し、Ansible 互換のフィルターおよびルックアッププラグインを Java で実装しています。
 - **実装済み**:
     - **フィルター (21種類)**: `b64decode`, `b64encode`, `basename`, `bool`, `combine`, `default`, `dict2items`, `dirname`, `flatten`, `ipaddr`, `items2dict`, `mandatory`, `quote`, `realpath`, `regex_replace`, `splitext`, `ternary`, `to_json`, `to_yaml`, `unique`, `urlencode` をサポート。
-    - **ルックアッププラグイン (5種類)**: `dict`, `env`, `file`, `pipe`, `template` をサポート。
+    - **ルックアッププラグイン (6種類)**: `dict`, `env`, `file`, `pipe`, `template`, `vars` をサポート。
 - **方針**: 未実装のフィルターやルックアップ、あるいはテンプレートのレンダリングエラー（未定義変数の参照等）が発生した場合は、原則として `RuntimeException` をスローし、該当ホストのタスクを失敗（failed）として処理します。
 
 ### 2.3 ループ (`loop`, `with_items`) の処理
 - **懸念点**: `loop` と `with_X` 系では挙動が異なり、特に複雑なデータ構造に対するループ処理のパースがブレやすいです。
-- **方針**: まずは `loop` を基本とし、`with_items` などのレガシーな構文は内部で `loop` に変換する処理を検討します。
+- **方針**: `loop` を基本とし、`with_items` などのレガシーな構文は内部で `loop` に変換して処理します（実装済み）。
+    - **with_items**: `loop: "{{ list | flatten(levels=1) }}"` に変換。
+    - **with_dict**: `loop: "{{ dict | dict2items }}"` に変換。
 
 ### 2.4 タスクの並列実行 (Strategy)
 - **懸念点**: `linear`（デフォルト）と `free` の実行戦略があります。
