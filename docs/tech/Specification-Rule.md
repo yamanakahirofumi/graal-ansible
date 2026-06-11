@@ -45,6 +45,7 @@
 | `Inventory-System.md`        | 静的インベントリの解析と管理の実装詳細。                                                                        |
 | `Task-Executor.md`           | マルチスレッドによるタスク実行エンジン、実行戦略（linear等）の実装方法。                                        |
 | `Task-Control.md`            | when, loop, register, block, retry等の制御ロジックの実装詳細。                                                  |
+| `Callback-Plugins.md`        | コールバックプラグインのインターフェース定義とイベント通知の実装詳細。                                          |
 | `Action-Plugins.md`          | 制御ノード側で動作するプラグインの実行メカニズム (Python-first)。                                               |
 | `Ansible-Module-Initialization.md` | AnsibleModule のインスタンス構成、引数の受け渡し、モンキーパッチの詳細。                                   |
 | `Connection-Plugins.md`      | Local, SSH (Apache MINA SSHD) 等の接続プラグインの実装詳細。                                                    |

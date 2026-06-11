@@ -64,6 +64,7 @@
 - [Action Plugin 実装調査報告](implementation/Action-Plugins-Investigation.md)：GraalPy 上での実行における技術的課題と解決策
 - [Action Plugin / Module Mock 実装リファレンス](implementation/Mock-Implementation-Reference.md)：Dependency Emulation Strategy のためのモック実装詳細
 - [タスク制御の実装詳細](implementation/Task-Control.md)：when, loop, register, block, retry等の制御ロジック
+- [コールバックプラグインの設計仕様](implementation/Callback-Plugins.md)：実行イベントの通知と出力形式の制御
 - [Ansible モジュールの初期化と設定](implementation/Ansible-Module-Initialization.md)：AnsibleModule のインスタンス構成、引数の受け渡し、モンキーパッチの詳細
 - [接続プラグイン実装](implementation/Connection-Plugins.md)：Local, SSH(JSch/Apache MINA SSHD)の実装
 - [リモートノードでのモジュール実行仕様](implementation/Remote-Module-Execution.md)：ターゲットノードへモジュールを転送して実行する仕組み（モジュール転送型）
