@@ -5,6 +5,7 @@ import org.example.ansible.connection.DefaultConnectionFactory;
 import org.example.ansible.inventory.Inventory;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,6 +20,7 @@ public class PlaybookExecutor {
     private final ITaskExecutor taskExecutor;
     private final ConnectionFactory connectionFactory;
     private PromptProvider promptProvider = new ConsolePromptProvider();
+    private final List<Callback> callbacks = new ArrayList<>(List.of(new DefaultCallback()));
 
     public PlaybookExecutor(ITaskExecutor taskExecutor) {
         this(taskExecutor, new DefaultConnectionFactory());
@@ -31,6 +33,14 @@ public class PlaybookExecutor {
 
     public void setPromptProvider(PromptProvider promptProvider) {
         this.promptProvider = promptProvider;
+    }
+
+    public void addCallback(Callback callback) {
+        this.callbacks.add(callback);
+    }
+
+    public void clearCallbacks() {
+        this.callbacks.clear();
     }
 
     /**
@@ -129,13 +139,53 @@ public class PlaybookExecutor {
     public Map<String, List<TaskResult>> execute(Playbook playbook, Inventory inventory, VariableManager variableManager, boolean globalCheckMode, List<String> runTags, List<String> skipTags, String limit) {
         Map<String, List<TaskResult>> results = new HashMap<>();
 
+        callbacks.forEach(c -> c.v2_playbook_on_start(playbook));
+
         TaskQueueManager tqm = new TaskQueueManager(taskExecutor, connectionFactory);
         tqm.setPromptProvider(promptProvider);
+        callbacks.forEach(tqm::addCallback);
 
         for (Play play : playbook.plays()) {
             tqm.executePlay(play, inventory, variableManager, results, globalCheckMode, runTags, skipTags, limit);
         }
 
+        callbacks.forEach(c -> c.v2_playbook_on_stats(calculateStats(results)));
+
         return results;
+    }
+
+    private Map<String, Map<String, Integer>> calculateStats(Map<String, List<TaskResult>> results) {
+        Map<String, Map<String, Integer>> stats = new HashMap<>();
+        for (Map.Entry<String, List<TaskResult>> entry : results.entrySet()) {
+            String host = entry.getKey();
+            Map<String, Integer> hostStats = new HashMap<>();
+            int ok = 0;
+            int changed = 0;
+            int unreachable = 0;
+            int failed = 0;
+            int skipped = 0;
+
+            for (TaskResult res : entry.getValue()) {
+                if (res.isUnreachable()) {
+                    unreachable++;
+                } else if (res.isSkipped()) {
+                    skipped++;
+                } else if (res.success()) {
+                    ok++;
+                    if (res.changed()) {
+                        changed++;
+                    }
+                } else {
+                    failed++;
+                }
+            }
+            hostStats.put("ok", ok);
+            hostStats.put("changed", changed);
+            hostStats.put("unreachable", unreachable);
+            hostStats.put("failed", failed);
+            hostStats.put("skipped", skipped);
+            stats.put(host, hostStats);
+        }
+        return stats;
     }
 }
