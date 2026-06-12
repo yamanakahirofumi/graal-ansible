@@ -124,6 +124,16 @@ public class PlaybookCli implements Callable<Integer> {
 
                 // Execute Playbook
                 PlaybookExecutor executor = new PlaybookExecutor(taskExecutor);
+
+                // Select Callback Plugin
+                String callbackName = System.getenv("ANSIBLE_STDOUT_CALLBACK");
+                if ("json".equalsIgnoreCase(callbackName)) {
+                    executor.clearCallbacks();
+                    executor.addCallback(new org.example.ansible.engine.JsonCallback());
+                } else if (callbackName != null && !"default".equalsIgnoreCase(callbackName)) {
+                    System.err.println("Warning: Unknown callback plugin '" + callbackName + "'. Using 'default'.");
+                }
+
                 java.nio.file.Path baseDir = playbookFile.getAbsoluteFile().getParentFile().toPath();
 
                 java.nio.file.Path inventoryDirPath = null;
@@ -165,10 +175,7 @@ public class PlaybookCli implements Callable<Integer> {
                 cliVars.put("ansible_skip_tags", skipTags);
 
                 VariableManager variableManager = new VariableManager(inventory, cliVars, parsedExtraVars, baseDir, inventoryDirPath);
-                Map<String, List<TaskResult>> results = executor.execute(playbook, inventory, variableManager, check, tags, skipTags, limit);
-
-                // Print Results
-                printSummary(results);
+                executor.execute(playbook, inventory, variableManager, check, tags, skipTags, limit);
 
                 return 0;
             }
@@ -231,19 +238,6 @@ public class PlaybookCli implements Callable<Integer> {
 
         executor.registerModule("file", new PythonModule("ansible.builtin.file"));
         executor.registerModule("copy", new PythonModule("ansible.builtin.copy"));
-    }
-
-    private void printSummary(Map<String, List<TaskResult>> results) {
-        System.out.println("\nPLAY RECAP *********************************************************************");
-        for (Map.Entry<String, List<TaskResult>> entry : results.entrySet()) {
-            String host = entry.getKey();
-            List<TaskResult> hostResults = entry.getValue();
-            long ok = hostResults.stream().filter(r -> r.success() && !r.changed()).count();
-            long changed = hostResults.stream().filter(r -> r.success() && r.changed()).count();
-            long failed = hostResults.stream().filter(r -> !r.success()).count();
-
-            System.out.printf("%-20s : ok=%-4d changed=%-4d failed=%-4d%n", host, ok, changed, failed);
-        }
     }
 
     // Getters for testing
