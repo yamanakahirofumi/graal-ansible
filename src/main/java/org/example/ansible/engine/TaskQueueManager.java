@@ -36,6 +36,7 @@ public class TaskQueueManager {
     private PromptProvider promptProvider = new ConsolePromptProvider();
     private final Map<String, Connection> connectionCache = new HashMap<>();
     private boolean playFatalError = false;
+    private final List<Callback> callbacks = new ArrayList<>();
 
     public TaskQueueManager(ITaskExecutor taskExecutor) {
         this(taskExecutor, new DefaultConnectionFactory());
@@ -48,6 +49,14 @@ public class TaskQueueManager {
 
     public void setPromptProvider(PromptProvider promptProvider) {
         this.promptProvider = promptProvider;
+    }
+
+    public void addCallback(Callback callback) {
+        this.callbacks.add(callback);
+    }
+
+    public void clearCallbacks() {
+        this.callbacks.clear();
     }
 
     /**
@@ -84,6 +93,8 @@ public class TaskQueueManager {
         // Resolve vars_prompt (Level 13)
         resolveVarsPrompt(play, variableManager);
 
+        callbacks.forEach(c -> c.v2_playbook_on_play_start(play));
+
         this.playFatalError = false;
         Set<String> failedHosts = new HashSet<>();
         variableManager.setPlayContext(targetHosts.stream().map(Host::name).toList(), failedHosts);
@@ -103,6 +114,9 @@ public class TaskQueueManager {
                     }
                     continue;
                 }
+
+                callbacks.forEach(c -> c.v2_playbook_on_task_start(task, task.when() != null));
+
                 boolean executedOnce = false;
                 for (Host host : targetHosts) {
                     if (failedHosts.contains(host.name())) {
@@ -192,6 +206,7 @@ public class TaskQueueManager {
                     if (isNotified && allExecutedHandlers.add(handler)) {
                         if (failedHosts.contains(host.name())) continue;
                         if (!isTaskToBeExecuted(handler, runTags, skipTags)) continue;
+                        callbacks.forEach(c -> c.v2_playbook_on_handler_stats(handler.name()));
                         executeTaskOnHost(play, host, handler, inventory, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, new ArrayList<>(), null, null, null, connection, runTags, skipTags);
                         anyNewNotified = true;
                     }
@@ -225,15 +240,28 @@ public class TaskQueueManager {
                 result = TaskResult.unreachable(e.getMessage());
             } else {
                 failedHosts.add(host.name());
+                TaskResult unreachableResult = TaskResult.unreachable(e.getMessage());
+                callbacks.forEach(c -> c.v2_runner_on_unreachable(host.name(), unreachableResult));
                 checkAnyErrorsFatal(play, host, task, blockVars, activeRoles, includeParams, variableManager);
                 return;
             }
         }
 
-        if (result != null) {
-            results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(result);
+        final TaskResult finalResult = result;
+        if (finalResult != null) {
+            results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(finalResult);
 
-            if (result.success() && !result.isSkipped() && "meta".equals(task.action()) && "flush_handlers".equals(task.args().get("_raw_params"))) {
+            if (finalResult.isUnreachable()) {
+                callbacks.forEach(c -> c.v2_runner_on_unreachable(host.name(), finalResult));
+            } else if (finalResult.isSkipped()) {
+                callbacks.forEach(c -> c.v2_runner_on_skipped(host.name(), finalResult));
+            } else if (finalResult.success()) {
+                callbacks.forEach(c -> c.v2_runner_on_ok(host.name(), finalResult));
+            } else {
+                callbacks.forEach(c -> c.v2_runner_on_failed(host.name(), finalResult, task.ignoreErrors()));
+            }
+
+            if (finalResult.success() && !finalResult.isSkipped() && "meta".equals(task.action()) && "flush_handlers".equals(task.args().get("_raw_params"))) {
                 flushHandlersForHost(play, host, inventory, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, connection, runTags, skipTags);
             }
 
@@ -562,6 +590,7 @@ public class TaskQueueManager {
             for (Task includedTask : includedTasks) {
                 if (this.playFatalError) break;
                 if (failedHosts.contains(host.name())) break;
+                callbacks.forEach(c -> c.v2_playbook_on_task_start(includedTask, includedTask.when() != null));
                 executeTaskOnHost(play, host, includedTask, inventory, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, inheritedEnvironments, combinedBlockVars, activeRoles, includeParams, connection, runTags, skipTags);
             }
         } catch (Exception e) {
@@ -648,6 +677,8 @@ public class TaskQueueManager {
         for (Task task : roleTasks) {
             if (this.playFatalError) break;
             if (!isTaskToBeExecuted(task, runTags, skipTags)) continue;
+
+            callbacks.forEach(c -> c.v2_playbook_on_task_start(task, task.when() != null));
 
             boolean executedOnce = false;
             for (Host host : targetHosts) {
