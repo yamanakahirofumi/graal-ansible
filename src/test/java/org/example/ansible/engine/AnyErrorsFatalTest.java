@@ -146,4 +146,64 @@ class AnyErrorsFatalTest {
         assertNotNull(host2Results);
         assertEquals(1, host2Results.size());
     }
+
+    @Test
+    void testAnyErrorsFatalThreeHosts() {
+        Inventory threeHostInventory = new Inventory(new Group("all", List.of(
+                new Host("host1"), new Host("host2"), new Host("host3")
+        ), List.of(), Map.of()));
+
+        String playbookYaml = """
+                - name: test any_errors_fatal with 3 hosts
+                  hosts: all
+                  any_errors_fatal: true
+                  tasks:
+                    - name: fail on host2
+                      fail:
+                        msg: "host2 fails"
+                      when: inventory_hostname == 'host2'
+                    - name: should not run anywhere else
+                      debug:
+                        msg: "this should not appear"
+                """;
+        Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
+
+        Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, threeHostInventory);
+
+        assertEquals(1, results.get("host1").size(), "host1 should stop after host2 failure");
+        assertEquals(1, results.get("host2").size(), "host2 failed");
+        assertEquals(1, results.get("host3").size(), "host3 should stop after host2 failure");
+
+        assertFalse(results.get("host2").get(0).success());
+        assertTrue(results.get("host1").get(0).isSkipped());
+        assertTrue(results.get("host3").get(0).isSkipped());
+    }
+
+    @Test
+    void testAnyErrorsFatalWithIgnoreErrors() {
+        String playbookYaml = """
+                - name: test any_errors_fatal interaction with ignore_errors
+                  hosts: all
+                  any_errors_fatal: true
+                  tasks:
+                    - name: fail on localhost but ignore
+                      fail:
+                        msg: "forced failure"
+                      when: inventory_hostname == 'localhost'
+                      ignore_errors: true
+                    - name: should run on 127.0.0.1
+                      debug:
+                        msg: "this should appear"
+                """;
+        Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
+
+        Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
+
+        // Even though it failed, ignore_errors: true means it's not a "fatal" error that triggers any_errors_fatal
+        assertEquals(2, results.get("localhost").size());
+        assertEquals(2, results.get("127.0.0.1").size());
+
+        assertFalse(results.get("localhost").get(0).success());
+        assertTrue(results.get("127.0.0.1").get(1).success());
+    }
 }

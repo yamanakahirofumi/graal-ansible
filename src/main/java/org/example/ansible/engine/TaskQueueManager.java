@@ -831,24 +831,33 @@ public class TaskQueueManager {
 
         Map<String, Object> promptedValues = new HashMap<>();
         for (Map<String, Object> promptDef : play.varsPrompt()) {
-            String name = (String) promptDef.get("name");
-            if (name == null) continue;
+            String varName = (String) promptDef.get("name");
+            if (varName == null) continue;
 
-            // Check if variable is already defined in higher precedence levels (e.g. extra vars)
-            // Ansible skips prompting if the variable is already defined in extra_vars or other high-level sources.
-            // Importantly, we pass 'null' for play to EXCLUDE Play Level 12 variables from this check,
-            // as vars_prompt (Level 13) should override Play variables (Level 12).
-            Map<String, Object> higherPrecedenceVars = variableManager.getAllVariables(null, null, null, null, null, null, false);
-            if (higherPrecedenceVars.containsKey(name)) {
+            // Ansible skips prompting if the variable is already defined in higher precedence levels
+            // (e.g. extra vars, or included variables).
+            // We pass null for Play, Task and Host to check only global/high-level variables.
+            // Level 13 (vars_prompt) SHOULD override Level 12 (Play vars), so we exclude Level 12 from this check.
+            boolean isAlreadyDefined = isVariableDefinedInHigherPrecedence(varName, variableManager);
+            if (isAlreadyDefined) {
                 continue;
             }
 
             String value = promptProvider.prompt(promptDef);
-            promptedValues.put(name, value);
+            promptedValues.put(varName, value);
         }
 
         if (!promptedValues.isEmpty()) {
             variableManager.addPromptVars(promptedValues);
         }
+    }
+
+    private boolean isVariableDefinedInHigherPrecedence(String varName, VariableManager variableManager) {
+        // Levels higher than 13 include: Level 14 (vars_files) to Level 22 (extra vars).
+        // Since we are at the start of the play, we only need to check Level 22 (extra vars)
+        // and other global-level variables that might be present in VariableManager.
+        // Importantly, we pass includePromptVars=false to avoid self-reference.
+        Map<String, Object> globalVars = variableManager.getAllVariables(null, null, null, null, null, null, false);
+        return globalVars.containsKey(varName);
     }
 }
