@@ -43,8 +43,8 @@
 | - `apt_key` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
 | - `apt_repository` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
 | - `assemble` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `async_status` | △ | ？ | ？ | ロード確認済。 |
-| - `async_wrapper` | △ | ？ | ？ | ロード確認済。 |
+| - `async_status` | ○ | ？ | ？ | Java エンジン (AsyncJobManager) によるステータス管理と連携。 |
+| - `async_wrapper` | ○ | ？ | ？ | Java エンジンによる非同期実行基盤と連携。 |
 | - `blockinfile` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
 | - `cron` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
 | - `deb822_repository` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
