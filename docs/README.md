@@ -60,6 +60,7 @@
 - [YAML解析エンジン](implementation/YAML-Parser.md)：SnakeYAML等を用いたPlaybook解析の実装
 - [インベントリシステム実装](implementation/Inventory-System.md)：静的インベントリの解析と管理
 - [タスク実行エンジン](implementation/Task-Executor.md)：マルチスレッド実行と順序制御
+- [ストラテジ・プラグインの実装仕様](implementation/Strategy-Plugins.md)：実行戦略（linear, free等）による実行制御
 - [Action Plugin 実装仕様](implementation/Action-Plugins.md)：制御ノード側で動作するプラグインの実行メカニズム (Python-first)
 - [Action Plugin 実装調査報告](implementation/Action-Plugins-Investigation.md)：GraalPy 上での実行における技術的課題と解決策
 - [Action Plugin / Module Mock 実装リファレンス](implementation/Mock-Implementation-Reference.md)：Dependency Emulation Strategy のためのモック実装詳細
