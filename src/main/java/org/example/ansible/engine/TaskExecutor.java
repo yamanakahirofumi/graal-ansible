@@ -101,6 +101,7 @@ public class TaskExecutor implements ITaskExecutor {
     private final VariableResolver variableResolver = new VariableResolver();
     private final ConnectionFactory connectionFactory;
     private final PythonOSMock pythonOSMock;
+    private final AsyncJobManager asyncJobManager = new DefaultAsyncJobManager();
 
     public TaskExecutor() {
         this(OSHandlerFactory.getHandler());
@@ -114,6 +115,8 @@ public class TaskExecutor implements ITaskExecutor {
         this.osHandler = osHandler;
         this.connectionFactory = connectionFactory;
         this.pythonOSMock = new PythonOSMock(osHandler);
+
+        registerModule("async_status", new AsyncStatusModule(asyncJobManager));
 
         Context.Builder builder = Context.newBuilder("python")
                 .allowAllAccess(true);
@@ -302,7 +305,50 @@ public class TaskExecutor implements ITaskExecutor {
 
         Task resolvedTask = new Task(task.name(), task.action(), resolvedArgs, task.vars(), task.when(), task.register(), task.loop(), task.loopControl(), task.notifications(), task.failedWhen(), task.changedWhen(), task.ignoreErrors(),
                 task.until(), task.retries(), task.delay(), resolvedDelegateTo, task.delegateFacts(), task.runOnce(), task.ignoreUnreachable(), task.block(), task.rescue(), task.always(),
-                task.become(), task.becomeMethod(), task.becomeUser(), task.becomeFlags(), task.checkMode(), task.environment(), task.tags(), task.listen(), task.anyErrorsFatal());
+                task.become(), task.becomeMethod(), task.becomeUser(), task.becomeFlags(), task.checkMode(), task.environment(), task.tags(), task.listen(), task.anyErrorsFatal(),
+                task.asyncVal(), task.poll());
+
+        if (resolvedTask.asyncVal() > 0) {
+            String jid = java.util.UUID.randomUUID().toString();
+            final Connection finalConnection = effectiveConnection;
+            final Map<String, String> finalEnv = variableResolver.resolveEnvironment(play, task, variables, inheritedEnvironments);
+            final BecomeContext finalBecome = variableResolver.resolveBecomeContext(play, resolvedTask, variables);
+
+            AsyncJob job = asyncJobManager.submit(jid, resolvedTask.asyncVal(), () -> {
+                return executeWithContext(resolvedTask, finalBecome, finalConnection, finalEnv);
+            });
+
+            if (resolvedTask.poll() > 0) {
+                // Polling logic
+                long end = System.currentTimeMillis() + resolvedTask.asyncVal() * 1000L;
+                while (System.currentTimeMillis() < end) {
+                    if (asyncJobManager.isCompleted(jid)) {
+                        AsyncJob completedJob = asyncJobManager.getJob(jid);
+                        return new TaskResult(
+                                !Boolean.TRUE.equals(completedJob.result().get("failed")),
+                                Boolean.TRUE.equals(completedJob.result().get("changed")),
+                                (String) completedJob.result().get("msg"),
+                                completedJob.result()
+                        );
+                    }
+                    try {
+                        Thread.sleep(resolvedTask.poll() * 1000L);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
+                return TaskResult.failure("Async task timed out during polling");
+            } else {
+                // Fire and forget
+                return TaskResult.success(false, Map.of(
+                        "ansible_job_id", jid,
+                        "started", job.started(),
+                        "finished", 0,
+                        "results_file", job.resultsFile()
+                ));
+            }
+        }
 
         try {
             if ("meta".equals(resolvedTask.action())) {
@@ -582,6 +628,10 @@ public class TaskExecutor implements ITaskExecutor {
 
     @Override
     public TaskResult execute(Task task, BecomeContext becomeContext, Connection connection, Map<String, String> environment) {
+        return executeWithContext(task, becomeContext, connection, environment);
+    }
+
+    private TaskResult executeWithContext(Task task, BecomeContext becomeContext, Connection connection, Map<String, String> environment) {
         setCurrentConnection(connection);
         setCurrentEnvironment(environment);
         setCurrentBecomeContext(becomeContext);
@@ -657,7 +707,7 @@ public class TaskExecutor implements ITaskExecutor {
                     moduleArgs,
                     null, null, null, null, Map.of(), List.of(), null, null, false,
                     null, 0, 0, null, false, false, false, List.of(), List.of(), List.of(),
-                    null, null, null, null, null, null, List.of(), List.of(), null
+                    null, null, null, null, null, null, List.of(), List.of(), null, 0, 10
             );
 
             // Execute as a normal module, using the current connection and environment
@@ -695,6 +745,7 @@ public class TaskExecutor implements ITaskExecutor {
 
     @Override
     public void close() {
+        asyncJobManager.shutdown();
         if (context != null) {
             context.close();
         }

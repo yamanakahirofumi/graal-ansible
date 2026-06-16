@@ -26,7 +26,8 @@ public class YamlParser {
             "ignore_errors", "ignore_unreachable", "tags", "become", "become_user", "become_method", "become_flags",
             "vars", "notify", "listen", "with_items", "with_list", "with_dict",
             "failed_when", "changed_when", "delegate_to", "delegate_facts", "run_once",
-            "block", "rescue", "always", "check_mode", "environment", "any_errors_fatal"
+            "block", "rescue", "always", "check_mode", "environment", "any_errors_fatal",
+            "async", "poll"
     );
 
     private final Yaml yaml;
@@ -329,6 +330,8 @@ public class YamlParser {
         Object checkMode = map.get("check_mode");
         Object environment = map.get("environment");
         Object anyErrorsFatal = map.get("any_errors_fatal");
+        Integer asyncVal = (Integer) map.getOrDefault("async", 0);
+        Integer poll = (Integer) map.getOrDefault("poll", 10);
 
         List<String> notify = new ArrayList<>();
         Object notifyObj = map.get("notify");
@@ -352,7 +355,8 @@ public class YamlParser {
 
         return new Task(name, action, args, vars, when, register, loop, loopControl, notify, failedWhen, changedWhen, ignoreErrors,
                 until, retries, delay, delegateTo, delegateFacts, runOnce, ignoreUnreachable, block, rescue, always,
-                become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, taskTags, listen, anyErrorsFatal);
+                become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, taskTags, listen, anyErrorsFatal,
+                asyncVal, poll);
     }
 
     @SuppressWarnings("unchecked")
