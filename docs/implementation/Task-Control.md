@@ -242,9 +242,10 @@
 - **実装方針**:
     - `TaskQueueManager` において Java によるエミュレーション実装を行っています。
     - ロール名に基づき、標準的なディレクトリ構造（`roles/<role_name>/`）を検索し、`tasks/main.yml`（または `tasks_from` で指定されたファイル）を読み込みます。
-- **変数優先順位 (Level 20)**:
-    - ロール呼び出し時に渡されたパラメータ、およびロール内の `vars/main.yml` で定義された変数は、Level 20 (Role variables) として `VariableManager` に登録されます。
-    - これにより、ロール外の変数（Level 15 等）を適切に上書きしつつ、`extra_vars`（Level 22）による上書きを許容する Ansible 互換の優先順位を実現しています。
+- **変数優先順位 (Level 15 および Level 20)**:
+    - ロール内の `vars/main.yml` で定義された変数は、**Level 15 (Role variables)** として登録されます。
+    - ロール呼び出し時に渡されたパラメータ（例: `vars:` 句）は、**Level 20 (Role parameters)** として登録されます。
+    - これにより、プレイ変数（Level 12）などを適切に上書きしつつ、`extra_vars`（Level 22）による上書きを許容する Ansible 互換の優先順位を実現しています。
 - **コンテキストの分離**:
     - ロール実行中は、そのロール固有の変数が優先的に解決されるよう、`activeRoles` コンテキストをスタック状に管理して実行エンジンに伝播させます。
 
