@@ -234,6 +234,18 @@ public class PlaybookCli implements Callable<Integer> {
             return TaskResult.success(false, Map.of("msg", msg));
         });
 
+        executor.registerModule("async_status", (args, becomeContext, context) -> {
+            String jid = (String) args.get("jid");
+            if (jid == null) {
+                return TaskResult.failure("async_status requires a 'jid' argument");
+            }
+            Map<String, Object> status = org.example.ansible.engine.AsyncJobManager.getInstance().getJobStatus(jid);
+            if (status == null) {
+                return TaskResult.failure("Job ID " + jid + " not found");
+            }
+            return TaskResult.success(status);
+        });
+
         // command, shell, and setup are now registered by default in TaskExecutor constructor.
 
         executor.registerModule("file", new PythonModule("ansible.builtin.file"));

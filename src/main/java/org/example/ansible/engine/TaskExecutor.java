@@ -302,8 +302,83 @@ public class TaskExecutor implements ITaskExecutor {
 
         Task resolvedTask = new Task(task.name(), task.action(), resolvedArgs, task.vars(), task.when(), task.register(), task.loop(), task.loopControl(), task.notifications(), task.failedWhen(), task.changedWhen(), task.ignoreErrors(),
                 task.until(), task.retries(), task.delay(), resolvedDelegateTo, task.delegateFacts(), task.runOnce(), task.ignoreUnreachable(), task.block(), task.rescue(), task.always(),
-                task.become(), task.becomeMethod(), task.becomeUser(), task.becomeFlags(), task.checkMode(), task.environment(), task.tags(), task.listen(), task.anyErrorsFatal());
+                task.become(), task.becomeMethod(), task.becomeUser(), task.becomeFlags(), task.checkMode(), task.environment(), task.tags(), task.listen(), task.anyErrorsFatal(), task.asyncVal(), task.poll());
 
+        if (resolvedTask.asyncVal() > 0) {
+            final String finalResolvedDelegateTo = resolvedDelegateTo;
+            String jid = AsyncJobManager.getInstance().submit(() -> {
+                // Ensure same context during background execution and use separate connection
+                TaskExecutor backgroundExecutor = new TaskExecutor(this.osHandler, this.connectionFactory);
+                Connection bgConnection = null;
+                boolean closeBgConnection = false;
+                try {
+                    if (finalResolvedDelegateTo != null) {
+                        Map<String, Object> delegatedVars = variableManager != null ? variableManager.getVariablesForHost(finalResolvedDelegateTo, play) : variables;
+                        bgConnection = connectionFactory.createConnection(new Host(finalResolvedDelegateTo), delegatedVars);
+                        bgConnection.connect();
+                        closeBgConnection = true;
+                    } else {
+                        bgConnection = connectionFactory.createConnection(host, variables);
+                        bgConnection.connect();
+                        closeBgConnection = true;
+                    }
+
+                    return backgroundExecutor.executeSingleTaskInternal(play, host, resolvedTask, variables, variableManager, effectiveCheckMode, inheritedEnvironments, blockVars, activeRoles, includeParams, bgConnection, connectionFactory, finalResolvedDelegateTo, closeBgConnection, bgConnection);
+                } finally {
+                    if (closeBgConnection && bgConnection != null) {
+                        try { bgConnection.close(); } catch (Exception ignored) {}
+                    }
+                    backgroundExecutor.close();
+                }
+            }, resolvedTask.asyncVal());
+
+            Map<String, Object> asyncResultData = new HashMap<>();
+            asyncResultData.put("ansible_job_id", jid);
+            asyncResultData.put("started", 1);
+            asyncResultData.put("finished", 0);
+            asyncResultData.put("results_file", System.getProperty("user.home") + "/.ansible_async/" + jid);
+
+            Integer pollInterval = resolvedTask.poll();
+            if (pollInterval == null) pollInterval = 10; // Default poll
+
+            if (pollInterval > 0) {
+                // Polling logic
+                long startTime = System.currentTimeMillis();
+                long timeoutMillis = resolvedTask.asyncVal() * 1000L;
+                while (true) {
+                    try {
+                        Thread.sleep(pollInterval * 1000L);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        return TaskResult.failure("Async polling interrupted");
+                    }
+
+                    Map<String, Object> status = AsyncJobManager.getInstance().getJobStatus(jid);
+                    if (status != null && Integer.valueOf(1).equals(status.get("finished"))) {
+                        Map<String, Object> resultWrap = new HashMap<>(status);
+                        resultWrap.put("ansible_job_id", jid);
+                        return new TaskResult(
+                                !Boolean.TRUE.equals(resultWrap.get("failed")),
+                                Boolean.TRUE.equals(resultWrap.get("changed")),
+                                (String) resultWrap.get("msg"),
+                                resultWrap
+                        );
+                    }
+
+                    if (System.currentTimeMillis() - startTime > timeoutMillis) {
+                         return TaskResult.failure("Async task timed out during polling");
+                    }
+                }
+            } else {
+                // poll: 0, return immediately
+                return TaskResult.success(false, asyncResultData);
+            }
+        }
+
+        return executeSingleTaskInternal(play, host, resolvedTask, variables, variableManager, effectiveCheckMode, inheritedEnvironments, blockVars, activeRoles, includeParams, connection, connectionFactory, resolvedDelegateTo, closeDelegatedConnection, effectiveConnection);
+    }
+
+    private TaskResult executeSingleTaskInternal(Play play, Host host, Task resolvedTask, Map<String, Object> variables, VariableManager variableManager, boolean effectiveCheckMode, List<Object> inheritedEnvironments, Map<String, Object> blockVars, List<Role> activeRoles, Map<String, Object> includeParams, Connection connection, ConnectionFactory connectionFactory, String resolvedDelegateTo, boolean closeDelegatedConnection, Connection effectiveConnection) {
         try {
             if ("meta".equals(resolvedTask.action())) {
                 TaskResult metaResult = TaskResult.success(false, Map.of("meta", resolvedTask.args().getOrDefault("_raw_params", ""), "changed", false));
@@ -316,7 +391,7 @@ public class TaskExecutor implements ITaskExecutor {
             }
 
             BecomeContext becomeContext = variableResolver.resolveBecomeContext(play, resolvedTask, variables);
-            Map<String, String> resolvedEnvironment = variableResolver.resolveEnvironment(play, task, variables, inheritedEnvironments);
+            Map<String, String> resolvedEnvironment = variableResolver.resolveEnvironment(play, resolvedTask, variables, inheritedEnvironments);
 
             setCurrentVariableManager(variableManager);
             try {
@@ -657,7 +732,7 @@ public class TaskExecutor implements ITaskExecutor {
                     moduleArgs,
                     null, null, null, null, Map.of(), List.of(), null, null, false,
                     null, 0, 0, null, false, false, false, List.of(), List.of(), List.of(),
-                    null, null, null, null, null, null, List.of(), List.of(), null
+                    null, null, null, null, null, null, List.of(), List.of(), null, 0, null
             );
 
             // Execute as a normal module, using the current connection and environment
