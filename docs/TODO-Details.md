@@ -189,6 +189,15 @@
     - `InventoryManager` を導入し、`FileInventoryProvider` と `ScriptInventoryProvider` をオーケストレートする構成に刷新。
     - 単一のソース指定に対して、その形式（静的/動的/ディレクトリ）を自動判別し、適切にマージされた `Inventory` オブジェクトを生成するロジックを実装。
 
+### 3.26 [✓] ストラテジ・プラグイン（Strategy Plugins）の実装
+- **完了日**: 2026-07-28
+- **概要**: Playbook 内の実行戦略（linear, free）を切り替え可能にする基盤の実装。
+- **解決策**:
+    - `Strategy` インターフェースを定義し、`LinearStrategy` および `FreeStrategy` を実装。
+    - `StrategyFactory` による動的な戦略選択をサポート。
+    - `FreeStrategy` において、`ThreadPoolExecutor` を用いたホストごとの並列タスク実行を実現。
+    - `TaskQueueManager.executePlay` の実行ループ制御を `Strategy` へ委譲するリファクタリングを完了。
+
 ## 4. 整理・調整済み (Refactored/Adjusted)
 
 ### 4.1 [✓] GitHub Actions CI ワークフローの構築
@@ -248,6 +257,5 @@
 ### 5.1 [ ] PlaybookExecutor および実行エンジンのさらなる整理
 - **概要**: `PlaybookExecutor` および `TaskQueueManager`, `TaskExecutor` 内に存在する課題の継続的な改善。
 - **検討内容**:
-    - ストラテジ・プラグイン（free 戦略等）の導入に向けた構造の見直し。
     - 実行結果レポートのさらなる詳細化とフィルタリング機能。
 
