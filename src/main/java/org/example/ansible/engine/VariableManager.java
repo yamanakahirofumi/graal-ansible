@@ -25,6 +25,26 @@ import java.util.stream.Collectors;
  */
 public class VariableManager {
     /**
+     * Variable merging behavior.
+     */
+    public enum HashBehaviour {
+        REPLACE,
+        MERGE;
+
+        /**
+         * Resolves the behavior from the ANSIBLE_HASH_BEHAVIOUR environment variable.
+         * @return The resolved HashBehaviour.
+         */
+        public static HashBehaviour fromEnvironment() {
+            String val = System.getenv("ANSIBLE_HASH_BEHAVIOUR");
+            if ("merge".equalsIgnoreCase(val)) {
+                return MERGE;
+            }
+            return REPLACE;
+        }
+    }
+
+    /**
      * Special object used to represent the 'omit' variable.
      */
     public static final Object OMIT = new Object() {
@@ -56,6 +76,7 @@ public class VariableManager {
     private final Map<String, Map<String, Object>> directoryVarsCache = new HashMap<>();
     private final Path baseDir;
     private final Path inventoryDir;
+    private final HashBehaviour hashBehaviour;
     private final Yaml yaml = new Yaml();
 
     private List<String> playHostNames = new ArrayList<>();
@@ -74,11 +95,16 @@ public class VariableManager {
     }
 
     public VariableManager(Inventory inventory, Map<String, Object> cliVars, Map<String, Object> extraVars, Path baseDir, Path inventoryDir) {
+        this(inventory, cliVars, extraVars, baseDir, inventoryDir, HashBehaviour.fromEnvironment());
+    }
+
+    public VariableManager(Inventory inventory, Map<String, Object> cliVars, Map<String, Object> extraVars, Path baseDir, Path inventoryDir, HashBehaviour hashBehaviour) {
         this.inventory = inventory;
         this.cliVars = cliVars != null ? new HashMap<>(cliVars) : new HashMap<>();
         this.extraVars = extraVars != null ? new HashMap<>(extraVars) : new HashMap<>();
         this.baseDir = baseDir;
         this.inventoryDir = inventoryDir;
+        this.hashBehaviour = hashBehaviour != null ? hashBehaviour : HashBehaviour.REPLACE;
     }
 
     /**
@@ -244,7 +270,7 @@ public class VariableManager {
         String hostName = host != null ? host.name() : null;
 
         // Level 1: CLI variables
-        variables.putAll(cliVars);
+        mergeVariables(variables, cliVars);
 
         // Inject 'omit' variable
         variables.put("omit", OMIT);
@@ -261,7 +287,7 @@ public class VariableManager {
         for (Role role : allRoles) {
             Map<String, Object> defaults = roleDefaults.get(role.name());
             if (defaults != null) {
-                variables.putAll(defaults);
+                mergeVariables(variables, defaults);
             }
         }
 
@@ -319,14 +345,14 @@ public class VariableManager {
         if (hostName != null) {
             // Level 3: Inventory group variables
             if (inventory != null) {
-                variables.putAll(inventory.getGroupVariablesForHost(hostName));
+                mergeVariables(variables, inventory.getGroupVariablesForHost(hostName));
             }
 
             // Level 4: Inventory group_vars/all
-            variables.putAll(loadDirectoryVars(inventoryDir, "group_vars", "all"));
+            mergeVariables(variables, loadDirectoryVars(inventoryDir, "group_vars", "all"));
 
             // Level 5: Playbook group_vars/all
-            variables.putAll(loadDirectoryVars(baseDir, "group_vars", "all"));
+            mergeVariables(variables, loadDirectoryVars(baseDir, "group_vars", "all"));
 
             // Get groups for Levels 6 and 7
             List<String> groups = getHostGroups(hostName);
@@ -334,48 +360,48 @@ public class VariableManager {
             // Level 6: Inventory group_vars/*
             for (String group : groups) {
                 if (!"all".equals(group)) {
-                    variables.putAll(loadDirectoryVars(inventoryDir, "group_vars", group));
+                    mergeVariables(variables, loadDirectoryVars(inventoryDir, "group_vars", group));
                 }
             }
 
             // Level 7: Playbook group_vars/*
             for (String group : groups) {
                 if (!"all".equals(group)) {
-                    variables.putAll(loadDirectoryVars(baseDir, "group_vars", group));
+                    mergeVariables(variables, loadDirectoryVars(baseDir, "group_vars", group));
                 }
             }
 
             // Level 8: Inventory host variables
             if (inventory != null) {
-                variables.putAll(inventory.getHostVariables(hostName));
+                mergeVariables(variables, inventory.getHostVariables(hostName));
             }
 
             // Level 9: Inventory host_vars/*
-            variables.putAll(loadDirectoryVars(inventoryDir, "host_vars", hostName));
+            mergeVariables(variables, loadDirectoryVars(inventoryDir, "host_vars", hostName));
 
             // Level 10: Playbook host_vars/*
-            variables.putAll(loadDirectoryVars(baseDir, "host_vars", hostName));
+            mergeVariables(variables, loadDirectoryVars(baseDir, "host_vars", hostName));
         }
 
         // Level 11: Host facts
         if (hostName != null && hostFacts.containsKey(hostName)) {
-            variables.putAll(hostFacts.get(hostName));
+            mergeVariables(variables, hostFacts.get(hostName));
         }
 
         // Level 12: Play variables
         if (play != null) {
-            variables.putAll(play.vars());
+            mergeVariables(variables, play.vars());
         }
 
         // Level 13: Play vars_prompt
         if (includePromptVars) {
-            variables.putAll(promptVars);
+            mergeVariables(variables, promptVars);
         }
 
         // Level 14: Play vars_files
         if (play != null && !play.varsFiles().isEmpty()) {
             for (String varsFile : play.varsFiles()) {
-                variables.putAll(loadVarsFile(varsFile));
+                mergeVariables(variables, loadVarsFile(varsFile));
             }
         }
 
@@ -383,49 +409,74 @@ public class VariableManager {
         for (Role role : allRoles) {
             Map<String, Object> vars = roleVars.get(role.name());
             if (vars != null) {
-                variables.putAll(vars);
+                mergeVariables(variables, vars);
             }
         }
 
         // Level 16: Block variables
         if (blockVars != null) {
-            variables.putAll(blockVars);
+            mergeVariables(variables, blockVars);
         }
 
         // Level 17: Task variables
         if (task != null) {
-            variables.putAll(task.vars());
+            mergeVariables(variables, task.vars());
         }
 
         // Level 18: included_vars
         if (hostName != null && includedVars.containsKey(hostName)) {
-            variables.putAll(includedVars.get(hostName));
+            mergeVariables(variables, includedVars.get(hostName));
         }
 
         // Level 19: Registered variables / set_fact
         if (hostName != null) {
             if (setFactVars.containsKey(hostName)) {
-                variables.putAll(setFactVars.get(hostName));
+                mergeVariables(variables, setFactVars.get(hostName));
             }
             if (registeredVars.containsKey(hostName)) {
-                variables.putAll(registeredVars.get(hostName));
+                mergeVariables(variables, registeredVars.get(hostName));
             }
         }
 
         // Level 20: Role parameters
         for (Role role : allRoles) {
-            variables.putAll(role.vars());
+            mergeVariables(variables, role.vars());
         }
 
         // Level 21: Include parameters
         if (includeParams != null) {
-            variables.putAll(includeParams);
+            mergeVariables(variables, includeParams);
         }
 
         // Level 22: Extra variables
-        variables.putAll(extraVars);
+        mergeVariables(variables, extraVars);
 
         return Collections.unmodifiableMap(variables);
+    }
+
+    private void mergeVariables(Map<String, Object> target, Map<String, Object> source) {
+        if (source == null || source.isEmpty()) return;
+        if (hashBehaviour == HashBehaviour.MERGE) {
+            mergeRecursive(target, source);
+        } else {
+            target.putAll(source);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void mergeRecursive(Map<String, Object> target, Map<String, Object> source) {
+        for (Map.Entry<String, Object> entry : source.entrySet()) {
+            String key = entry.getKey();
+            Object value = entry.getValue();
+
+            if (value instanceof Map && target.get(key) instanceof Map) {
+                Map<String, Object> targetSubMap = new HashMap<>((Map<String, Object>) target.get(key));
+                mergeRecursive(targetSubMap, (Map<String, Object>) value);
+                target.put(key, targetSubMap);
+            } else {
+                target.put(key, value);
+            }
+        }
     }
 
     private List<String> getHostGroups(String hostName) {
