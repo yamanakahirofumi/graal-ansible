@@ -22,6 +22,7 @@ import java.util.Map;
  * @param environment     Environment variables for this play.
  * @param tags            The tags defined for this play.
  * @param anyErrorsFatal  Whether to halt play execution on any host failure.
+ * @param strategy        The execution strategy (e.g., linear, free).
  */
 public record Play(
         String name,
@@ -39,14 +40,15 @@ public record Play(
         Object checkMode,
         Object environment,
         List<String> tags,
-        Object anyErrorsFatal
+        Object anyErrorsFatal,
+        String strategy
 ) {
     public Play(String name, String hosts, List<Task> tasks) {
-        this(name, hosts, tasks, Map.of(), List.of(), List.of(), List.of(), List.of(), null, null, null, null, null, null, List.of(), null);
+        this(name, hosts, tasks, Map.of(), List.of(), List.of(), List.of(), List.of(), null, null, null, null, null, null, List.of(), null, "linear");
     }
 
     public Play(String name, String hosts, List<Task> tasks, Map<String, Object> vars) {
-        this(name, hosts, tasks, vars, List.of(), List.of(), List.of(), List.of(), null, null, null, null, null, null, List.of(), null);
+        this(name, hosts, tasks, vars, List.of(), List.of(), List.of(), List.of(), null, null, null, null, null, null, List.of(), null, "linear");
     }
 
     public Play(
@@ -63,7 +65,7 @@ public record Play(
             Object checkMode,
             Object environment
     ) {
-        this(name, hosts, tasks, vars, varsFiles, List.of(), List.of(), handlers, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, List.of(), null);
+        this(name, hosts, tasks, vars, varsFiles, List.of(), List.of(), handlers, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, List.of(), null, "linear");
     }
 
     public Play(
@@ -81,7 +83,7 @@ public record Play(
             Object environment,
             List<String> tags
     ) {
-        this(name, hosts, tasks, vars, varsFiles, List.of(), List.of(), handlers, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, null);
+        this(name, hosts, tasks, vars, varsFiles, List.of(), List.of(), handlers, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, null, "linear");
     }
 
     public Play(
@@ -100,7 +102,7 @@ public record Play(
             Object environment,
             List<String> tags
     ) {
-        this(name, hosts, tasks, vars, varsFiles, List.of(), roles, handlers, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, null);
+        this(name, hosts, tasks, vars, varsFiles, List.of(), roles, handlers, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, null, "linear");
     }
 
     public Play(
@@ -120,6 +122,27 @@ public record Play(
             Object environment,
             List<String> tags
     ) {
-        this(name, hosts, tasks, vars, varsFiles, varsPrompt, roles, handlers, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, null);
+        this(name, hosts, tasks, vars, varsFiles, varsPrompt, roles, handlers, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, null, "linear");
+    }
+
+    public Play(
+            String name,
+            String hosts,
+            List<Task> tasks,
+            Map<String, Object> vars,
+            List<String> varsFiles,
+            List<Map<String, Object>> varsPrompt,
+            List<Role> roles,
+            List<Task> handlers,
+            Object become,
+            String becomeMethod,
+            String becomeUser,
+            String becomeFlags,
+            Object checkMode,
+            Object environment,
+            List<String> tags,
+            Object anyErrorsFatal
+    ) {
+        this(name, hosts, tasks, vars, varsFiles, varsPrompt, roles, handlers, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, anyErrorsFatal, "linear");
     }
 }

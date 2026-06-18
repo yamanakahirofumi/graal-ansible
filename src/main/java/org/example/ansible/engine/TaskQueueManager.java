@@ -8,7 +8,6 @@ import org.example.ansible.inventory.Group;
 import org.example.ansible.inventory.Host;
 import org.example.ansible.inventory.Inventory;
 import org.example.ansible.parser.YamlParser;
-import org.example.ansible.util.Truthiness;
 
 import java.io.FileInputStream;
 import java.io.InputStream;
@@ -22,6 +21,7 @@ import java.util.Optional;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
@@ -34,9 +34,12 @@ public class TaskQueueManager {
     private final VariableResolver variableResolver = new VariableResolver();
     private final ConnectionFactory connectionFactory;
     private PromptProvider promptProvider = new ConsolePromptProvider();
-    private final Map<String, Connection> connectionCache = new HashMap<>();
-    private boolean playFatalError = false;
+    private final Map<String, Connection> connectionCache = new ConcurrentHashMap<>();
+    private volatile boolean playFatalError = false;
     private final List<Callback> callbacks = new ArrayList<>();
+    private Inventory inventory;
+    private Map<String, Set<String>> hostNotifications = new ConcurrentHashMap<>();
+    private Set<String> failedHosts = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     public TaskQueueManager(ITaskExecutor taskExecutor) {
         this(taskExecutor, new DefaultConnectionFactory());
@@ -57,6 +60,38 @@ public class TaskQueueManager {
 
     public void clearCallbacks() {
         this.callbacks.clear();
+    }
+
+    public void setInventory(Inventory inventory) {
+        this.inventory = inventory;
+    }
+
+    public Inventory getInventory() {
+        return inventory;
+    }
+
+    public void setFailedHosts(Set<String> failedHosts) {
+        this.failedHosts = failedHosts;
+    }
+
+    public Set<String> getFailedHosts() {
+        return failedHosts;
+    }
+
+    public Map<String, Set<String>> getHostNotifications() {
+        return hostNotifications;
+    }
+
+    public boolean isPlayFatalError() {
+        return playFatalError;
+    }
+
+    public List<Callback> getCallbacks() {
+        return callbacks;
+    }
+
+    public VariableResolver getVariableResolver() {
+        return variableResolver;
     }
 
     /**
@@ -85,6 +120,7 @@ public class TaskQueueManager {
      * @param limit            The host limit pattern.
      */
     public void executePlay(Play play, Inventory inventory, VariableManager variableManager, Map<String, List<TaskResult>> results, boolean globalCheckMode, List<String> runTags, List<String> skipTags, String limit) {
+        this.inventory = inventory;
         List<Host> targetHosts = getTargetHosts(play.hosts(), inventory, limit);
         if (targetHosts.isEmpty()) {
             return;
@@ -96,78 +132,19 @@ public class TaskQueueManager {
         callbacks.forEach(c -> c.v2_playbook_on_play_start(play));
 
         this.playFatalError = false;
-        Set<String> failedHosts = new HashSet<>();
+        this.failedHosts = Collections.newSetFromMap(new ConcurrentHashMap<>());
         variableManager.setPlayContext(targetHosts.stream().map(Host::name).toList(), failedHosts);
-        Map<String, Set<String>> hostNotifications = new HashMap<>();
+        this.hostNotifications = new ConcurrentHashMap<>();
 
         try {
-            for (Role role : play.roles()) {
-                if (this.playFatalError) break;
-                executeRole(play, role, targetHosts, inventory, variableManager, results, failedHosts, hostNotifications, globalCheckMode, runTags, skipTags);
-            }
-
-            for (Task task : play.tasks()) {
-                if (this.playFatalError) break;
-                if (!isTaskToBeExecuted(task, runTags, skipTags)) {
-                    for (Host host : targetHosts) {
-                        results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(TaskResult.skipped("Skipped due to tags"));
-                    }
-                    continue;
-                }
-
-                callbacks.forEach(c -> c.v2_playbook_on_task_start(task, task.when() != null));
-
-                boolean executedOnce = false;
-                for (Host host : targetHosts) {
-                    if (failedHosts.contains(host.name())) {
-                        continue;
-                    }
-                    if (task.runOnce() && executedOnce) {
-                        continue;
-                    }
-
-                    // Initial inherited check mode from Play level
-                    Map<String, Object> vars = variableManager.getAllVariables(play, host, task, null, (List<Role>) null, null);
-                    boolean playCheckMode = variableResolver.resolveCheckMode(play.checkMode(), vars, globalCheckMode);
-
-                    try {
-                        Connection connection = getOrCreateConnection(host, vars);
-                        executeTaskOnHost(play, host, task, inventory, variableManager, results, failedHosts, hostNotifications, playCheckMode, new ArrayList<>(), null, null, null, connection, runTags, skipTags);
-                    } catch (UnreachableException e) {
-                        if (task.ignoreUnreachable()) {
-                            TaskResult unreachableResult = TaskResult.unreachable(e.getMessage());
-                            results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(unreachableResult);
-                        } else {
-                            failedHosts.add(host.name());
-                            checkAnyErrorsFatal(play, host, task, null, null, null, variableManager);
-                        }
-                    }
-                    executedOnce = true;
-                }
-            }
-
-            // Execute handlers at the end of the play
-            if (!this.playFatalError) {
-                for (Host host : targetHosts) {
-                    if (failedHosts.contains(host.name())) {
-                        continue;
-                    }
-                    Map<String, Object> vars = variableManager.getAllVariables(play, host, null, null, (List<Role>) null, null);
-                    boolean playCheckMode = variableResolver.resolveCheckMode(play.checkMode(), vars, globalCheckMode);
-                    try {
-                        Connection connection = getOrCreateConnection(host, vars);
-                        flushHandlersForHost(play, host, inventory, variableManager, results, failedHosts, hostNotifications, playCheckMode, connection, runTags, skipTags);
-                    } catch (UnreachableException e) {
-                        failedHosts.add(host.name());
-                    }
-                }
-            }
+            Strategy strategy = StrategyFactory.getStrategy(play.strategy());
+            strategy.run(play, targetHosts, this, variableManager, results, globalCheckMode, runTags, skipTags);
         } finally {
             closeAllConnections();
         }
     }
 
-    private Connection getOrCreateConnection(Host host, Map<String, Object> variables) {
+    Connection getOrCreateConnection(Host host, Map<String, Object> variables) {
         return connectionCache.computeIfAbsent(host.name(), k -> {
             Connection conn = connectionFactory.createConnection(host, variables);
             conn.connect();
@@ -186,7 +163,7 @@ public class TaskQueueManager {
         connectionCache.clear();
     }
 
-    private void flushHandlersForHost(Play play, Host host, Inventory inventory, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode, Connection connection, List<String> runTags, List<String> skipTags) {
+    void flushHandlersForHost(Play play, Host host, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode, Connection connection, List<String> runTags, List<String> skipTags) {
         Set<Task> allExecutedHandlers = new HashSet<>();
         boolean anyNewNotified;
         do {
@@ -207,7 +184,7 @@ public class TaskQueueManager {
                         if (failedHosts.contains(host.name())) continue;
                         if (!isTaskToBeExecuted(handler, runTags, skipTags)) continue;
                         callbacks.forEach(c -> c.v2_playbook_on_handler_stats(handler.name()));
-                        executeTaskOnHost(play, host, handler, inventory, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, new ArrayList<>(), null, null, null, connection, runTags, skipTags);
+                        executeTaskOnHost(play, host, handler, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, new ArrayList<>(), null, null, null, connection, runTags, skipTags);
                         anyNewNotified = true;
                     }
                 }
@@ -215,20 +192,20 @@ public class TaskQueueManager {
         } while (anyNewNotified);
     }
 
-    private void executeTaskOnHost(Play play, Host host, Task task, Inventory inventory, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode, List<Object> inheritedEnvironments, Map<String, Object> blockVars, List<Role> activeRoles, Map<String, Object> includeParams, Connection connection, List<String> runTags, List<String> skipTags) {
+    void executeTaskOnHost(Play play, Host host, Task task, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode, List<Object> inheritedEnvironments, Map<String, Object> blockVars, List<Role> activeRoles, Map<String, Object> includeParams, Connection connection, List<String> runTags, List<String> skipTags) {
         if (!task.block().isEmpty()) {
-            executeBlock(play, host, task, inventory, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, inheritedEnvironments, blockVars, activeRoles, includeParams, connection, runTags, skipTags);
+            executeBlock(play, host, task, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, inheritedEnvironments, blockVars, activeRoles, includeParams, connection, runTags, skipTags);
             return;
         }
 
         String action = task.action();
         if ("include_tasks".equals(action) || "import_tasks".equals(action)) {
-            executeIncludeTasks(play, host, task, inventory, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, inheritedEnvironments, blockVars, activeRoles, includeParams, connection, runTags, skipTags);
+            executeIncludeTasks(play, host, task, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, inheritedEnvironments, blockVars, activeRoles, includeParams, connection, runTags, skipTags);
             return;
         }
 
         if ("include_role".equals(action) || "import_role".equals(action)) {
-            executeIncludeRole(play, host, task, inventory, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, inheritedEnvironments, blockVars, activeRoles, includeParams, connection, runTags, skipTags);
+            executeIncludeRole(play, host, task, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, inheritedEnvironments, blockVars, activeRoles, includeParams, connection, runTags, skipTags);
             return;
         }
 
@@ -262,7 +239,7 @@ public class TaskQueueManager {
             }
 
             if (finalResult.success() && !finalResult.isSkipped() && "meta".equals(task.action()) && "flush_handlers".equals(task.args().get("_raw_params"))) {
-                flushHandlersForHost(play, host, inventory, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, connection, runTags, skipTags);
+                flushHandlersForHost(play, host, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, connection, runTags, skipTags);
             }
 
             if (task.register() != null) {
@@ -327,7 +304,7 @@ public class TaskQueueManager {
         }
     }
 
-    private void checkAnyErrorsFatal(Play play, Host host, Task task, Map<String, Object> blockVars, List<Role> activeRoles, Map<String, Object> includeParams, VariableManager variableManager) {
+    void checkAnyErrorsFatal(Play play, Host host, Task task, Map<String, Object> blockVars, List<Role> activeRoles, Map<String, Object> includeParams, VariableManager variableManager) {
         Map<String, Object> vars = variableManager.getAllVariables(play, host, task, blockVars, activeRoles, includeParams);
         boolean isFatal = variableResolver.resolveAnyErrorsFatal(task.anyErrorsFatal(), vars,
                 variableResolver.resolveAnyErrorsFatal(play.anyErrorsFatal(), vars, false));
@@ -336,7 +313,7 @@ public class TaskQueueManager {
         }
     }
 
-    private void executeBlock(Play play, Host host, Task blockTask, Inventory inventory, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode, List<Object> inheritedEnvironments, Map<String, Object> inheritedBlockVars, List<Role> activeRoles, Map<String, Object> includeParams, Connection connection, List<String> runTags, List<String> skipTags) {
+    private void executeBlock(Play play, Host host, Task blockTask, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode, List<Object> inheritedEnvironments, Map<String, Object> inheritedBlockVars, List<Role> activeRoles, Map<String, Object> includeParams, Connection connection, List<String> runTags, List<String> skipTags) {
         Map<String, Object> blockVars = variableManager.getAllVariables(play, host, blockTask, inheritedBlockVars, activeRoles, includeParams);
         boolean blockCheckMode = variableResolver.resolveCheckMode(blockTask.checkMode(), blockVars, inheritedCheckMode);
 
@@ -368,7 +345,7 @@ public class TaskQueueManager {
                 results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(TaskResult.skipped("Skipped due to tags"));
                 continue;
             }
-            executeTaskOnHost(play, host, task, inventory, variableManager, results, blockFailedHosts, hostNotifications, blockCheckMode, effectiveBlockEnvs, combinedBlockVars, activeRoles, includeParams, connection, runTags, skipTags);
+            executeTaskOnHost(play, host, task, variableManager, results, blockFailedHosts, hostNotifications, blockCheckMode, effectiveBlockEnvs, combinedBlockVars, activeRoles, includeParams, connection, runTags, skipTags);
         }
 
         if (blockFailedHosts.contains(host.name())) {
@@ -378,13 +355,13 @@ public class TaskQueueManager {
         if (blockFailed) {
             for (Task task : blockTask.rescue()) {
                 if (this.playFatalError) break;
-                executeTaskOnHost(play, host, task, inventory, variableManager, results, failedHosts, hostNotifications, blockCheckMode, effectiveBlockEnvs, combinedBlockVars, activeRoles, includeParams, connection, runTags, skipTags);
+                executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications, blockCheckMode, effectiveBlockEnvs, combinedBlockVars, activeRoles, includeParams, connection, runTags, skipTags);
             }
         }
 
         for (Task task : blockTask.always()) {
             if (this.playFatalError) break;
-            executeTaskOnHost(play, host, task, inventory, variableManager, results, failedHosts, hostNotifications, blockCheckMode, effectiveBlockEnvs, combinedBlockVars, activeRoles, includeParams, connection, runTags, skipTags);
+            executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications, blockCheckMode, effectiveBlockEnvs, combinedBlockVars, activeRoles, includeParams, connection, runTags, skipTags);
         }
 
         if (blockFailed && blockTask.rescue().isEmpty()) {
@@ -472,7 +449,7 @@ public class TaskQueueManager {
         }
     }
 
-    private boolean isTaskToBeExecuted(Task task, List<String> runTags, List<String> skipTags) {
+    boolean isTaskToBeExecuted(Task task, List<String> runTags, List<String> skipTags) {
         List<String> taskTags = task.tags();
 
         // 1. Handle skip_tags
@@ -519,7 +496,7 @@ public class TaskQueueManager {
         return new ArrayList<>(distinctHosts.values());
     }
 
-    private void executeIncludeTasks(Play play, Host host, Task task, Inventory inventory, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode, List<Object> inheritedEnvironments, Map<String, Object> blockVars, List<Role> activeRoles, Map<String, Object> includeParams, Connection connection, List<String> runTags, List<String> skipTags) {
+    private void executeIncludeTasks(Play play, Host host, Task task, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode, List<Object> inheritedEnvironments, Map<String, Object> blockVars, List<Role> activeRoles, Map<String, Object> includeParams, Connection connection, List<String> runTags, List<String> skipTags) {
         Map<String, Object> allVars = variableManager.getAllVariables(play, host, task, blockVars, activeRoles, includeParams);
 
         // Resolve loop if present
@@ -530,21 +507,21 @@ public class TaskQueueManager {
                 Map<String, Object> iterationVars = new HashMap<>(allVars);
                 iterationVars.put("item", item);
                 if (variableResolver.isWhenConditionMet(task.when(), iterationVars)) {
-                    executeIncludeTasksIteration(play, host, task, iterationVars, inventory, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, inheritedEnvironments, blockVars, activeRoles, includeParams, connection, runTags, skipTags);
+                    executeIncludeTasksIteration(play, host, task, iterationVars, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, inheritedEnvironments, blockVars, activeRoles, includeParams, connection, runTags, skipTags);
                 } else {
                     results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(TaskResult.skipped("Included tasks skipped due to when condition"));
                 }
             }
         } else {
             if (variableResolver.isWhenConditionMet(task.when(), allVars)) {
-                executeIncludeTasksIteration(play, host, task, allVars, inventory, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, inheritedEnvironments, blockVars, activeRoles, includeParams, connection, runTags, skipTags);
+                executeIncludeTasksIteration(play, host, task, allVars, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, inheritedEnvironments, blockVars, activeRoles, includeParams, connection, runTags, skipTags);
             } else {
                 results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(TaskResult.skipped("Included tasks skipped due to when condition"));
             }
         }
     }
 
-    private void executeIncludeTasksIteration(Play play, Host host, Task task, Map<String, Object> variables, Inventory inventory, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode, List<Object> inheritedEnvironments, Map<String, Object> blockVars, List<Role> activeRoles, Map<String, Object> inheritedIncludeParams, Connection connection, List<String> runTags, List<String> skipTags) {
+    private void executeIncludeTasksIteration(Play play, Host host, Task task, Map<String, Object> variables, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode, List<Object> inheritedEnvironments, Map<String, Object> blockVars, List<Role> activeRoles, Map<String, Object> inheritedIncludeParams, Connection connection, List<String> runTags, List<String> skipTags) {
         Map<String, Object> resolvedArgs = variableResolver.resolve(task.args(), variables);
         String file = (String) resolvedArgs.get("file");
         if (file == null) {
@@ -591,14 +568,14 @@ public class TaskQueueManager {
                 if (this.playFatalError) break;
                 if (failedHosts.contains(host.name())) break;
                 callbacks.forEach(c -> c.v2_playbook_on_task_start(includedTask, includedTask.when() != null));
-                executeTaskOnHost(play, host, includedTask, inventory, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, inheritedEnvironments, combinedBlockVars, activeRoles, includeParams, connection, runTags, skipTags);
+                executeTaskOnHost(play, host, includedTask, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, inheritedEnvironments, combinedBlockVars, activeRoles, includeParams, connection, runTags, skipTags);
             }
         } catch (Exception e) {
             results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(TaskResult.failure("Failed to load included tasks: " + e.getMessage()));
         }
     }
 
-    private void executeRole(Play play, Role role, List<Host> targetHosts, Inventory inventory, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean globalCheckMode, List<String> runTags, List<String> skipTags) {
+    void executeRole(Play play, Role role, List<Host> targetHosts, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean globalCheckMode, List<String> runTags, List<String> skipTags) {
         Path roleDir = findRoleDir(role.name(), variableManager);
         if (roleDir == null) return;
 
@@ -614,14 +591,14 @@ public class TaskQueueManager {
             try (InputStream is = new FileInputStream(tasksFile.toFile())) {
                 YamlParser parser = new YamlParser();
                 List<Task> roleTasks = parser.parseTasks(is, play.tags());
-                executeRoleTasks(play, List.of(role), roleTasks, targetHosts, inventory, variableManager, results, failedHosts, hostNotifications, globalCheckMode, runTags, skipTags);
+                executeRoleTasks(play, List.of(role), roleTasks, targetHosts, variableManager, results, failedHosts, hostNotifications, globalCheckMode, runTags, skipTags);
             } catch (Exception e) {
                 // Log or handle task loading error
             }
         }
     }
 
-    private void executeIncludeRole(Play play, Host host, Task task, Inventory inventory, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode, List<Object> inheritedEnvironments, Map<String, Object> blockVars, List<Role> activeRoles, Map<String, Object> includeParams, Connection connection, List<String> runTags, List<String> skipTags) {
+    private void executeIncludeRole(Play play, Host host, Task task, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode, List<Object> inheritedEnvironments, Map<String, Object> blockVars, List<Role> activeRoles, Map<String, Object> includeParams, Connection connection, List<String> runTags, List<String> skipTags) {
         Map<String, Object> allVars = variableManager.getAllVariables(play, host, task, blockVars, activeRoles, includeParams);
         Map<String, Object> resolvedArgs = variableResolver.resolve(task.args(), allVars);
 
@@ -664,7 +641,7 @@ public class TaskQueueManager {
                 if (activeRoles != null) newActiveRoles.addAll(activeRoles);
                 newActiveRoles.add(role);
 
-                executeRoleTasks(play, newActiveRoles, roleTasks, List.of(host), inventory, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, runTags, skipTags);
+                executeRoleTasks(play, newActiveRoles, roleTasks, List.of(host), variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, runTags, skipTags);
             } catch (Exception e) {
                 results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(TaskResult.failure("Failed to load role tasks: " + e.getMessage()));
             }
@@ -673,7 +650,7 @@ public class TaskQueueManager {
         }
     }
 
-    private void executeRoleTasks(Play play, List<Role> activeRoles, List<Task> roleTasks, List<Host> targetHosts, Inventory inventory, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean globalCheckMode, List<String> runTags, List<String> skipTags) {
+    private void executeRoleTasks(Play play, List<Role> activeRoles, List<Task> roleTasks, List<Host> targetHosts, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean globalCheckMode, List<String> runTags, List<String> skipTags) {
         for (Task task : roleTasks) {
             if (this.playFatalError) break;
             if (!isTaskToBeExecuted(task, runTags, skipTags)) continue;
@@ -690,7 +667,7 @@ public class TaskQueueManager {
 
                 try {
                     Connection connection = getOrCreateConnection(host, vars);
-                    executeTaskOnHost(play, host, task, inventory, variableManager, results, failedHosts, hostNotifications, playCheckMode, new ArrayList<>(), null, activeRoles, null, connection, runTags, skipTags);
+                    executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications, playCheckMode, new ArrayList<>(), null, activeRoles, null, connection, runTags, skipTags);
                 } catch (UnreachableException e) {
                     if (task.ignoreUnreachable()) {
                         results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(TaskResult.unreachable(e.getMessage()));

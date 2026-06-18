@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * PlaybookExecutor (PE) manages the overall execution of a playbook.
@@ -137,7 +138,7 @@ public class PlaybookExecutor {
      * @return A map of host names to their execution results for each task.
      */
     public Map<String, List<TaskResult>> execute(Playbook playbook, Inventory inventory, VariableManager variableManager, boolean globalCheckMode, List<String> runTags, List<String> skipTags, String limit) {
-        Map<String, List<TaskResult>> results = new HashMap<>();
+        Map<String, List<TaskResult>> results = new ConcurrentHashMap<>();
 
         callbacks.forEach(c -> c.v2_playbook_on_start(playbook));
 
