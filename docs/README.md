@@ -5,7 +5,7 @@
 ## 1. プロジェクトの現在のステータス
 `graal-ansible` は、Java 21 と GraalPy を基盤とした Ansible 実行エンジンの再実装プロジェクトです。現在、以下の主要機能が実装され、動作検証が行われています。
 
-- **コアエンジン (管理ノード)**: linear 戦略による Playbook の順次実行、マルチホスト対応、PlaybookExecutor による実行管理。
+- **コアエンジン (管理ノード)**: linear/free 戦略によるタスク実行、マルチホスト対応、PlaybookExecutor による実行管理。
 - **YAML 解析**: SnakeYAML 2.x による Playbook (Record) へのマッピング、`block/rescue/always` 対応。
 - **変数解決**: Jinjava による Jinja2 互換テンプレート、22段階の変数優先順位（all, group, host, play, extra-vars等）。
 - **タスク制御 (Worker)**: `when`, `loop`, `register`, `notify/handlers`, `until/retries`, `delegate_to`, `ignore_unreachable`, `delegate_facts` 等のサポート。

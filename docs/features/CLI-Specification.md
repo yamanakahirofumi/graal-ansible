@@ -26,6 +26,7 @@ graal-ansible [options] playbook.yml
 | `--become-flags` | - | 権限昇格に使用するフラグを指定 | ◎ |
 | `--ask-become-pass` | `-K` | 権限昇格パスワードをプロンプトで問い合せる | ◎ |
 | `--version` | - | バージョン情報を表示 | ◎ |
+| `--forks` | `-f` | 並列実行するホストの数を指定 (デフォルト: 5) | ○ |
 | `--collections-path` | - | コレクションの探索パスを指定 | ○ |
 | `--help` | `-h` | ヘルプメッセージを表示 | ◎ |
 
