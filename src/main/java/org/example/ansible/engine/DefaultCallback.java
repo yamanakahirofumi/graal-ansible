@@ -31,27 +31,78 @@ public class DefaultCallback implements Callback {
 
     @Override
     public void v2_runner_on_ok(String host, TaskResult result) {
-        if (result.changed()) {
-            System.out.println("changed: [" + host + "]");
+        if (isLoop(result)) {
+            printLoopResults("ok", host, result);
         } else {
-            System.out.println("ok: [" + host + "]");
+            if (result.changed()) {
+                System.out.println("changed: [" + host + "]");
+            } else {
+                System.out.println("ok: [" + host + "]");
+            }
         }
     }
 
     @Override
     public void v2_runner_on_failed(String host, TaskResult result, boolean ignoreErrors) {
-        String msg = ignoreErrors ? "...ignoring" : "fatal: [" + host + "]: FAILED! => " + result.data();
-        System.out.println(msg);
+        if (isLoop(result)) {
+            printLoopResults("failed", host, result);
+            if (ignoreErrors) {
+                System.out.println("...ignoring");
+            }
+        } else {
+            String msg = ignoreErrors ? "...ignoring" : "fatal: [" + host + "]: FAILED! => " + result.data();
+            System.out.println(msg);
+        }
     }
 
     @Override
     public void v2_runner_on_skipped(String host, TaskResult result) {
-        System.out.println("skipping: [" + host + "]");
+        if (isLoop(result)) {
+            printLoopResults("skipping", host, result);
+        } else {
+            System.out.println("skipping: [" + host + "]");
+        }
     }
 
     @Override
     public void v2_runner_on_unreachable(String host, TaskResult result) {
-        System.out.println("fatal: [" + host + "]: UNREACHABLE! => " + result.data());
+        if (isLoop(result)) {
+            printLoopResults("unreachable", host, result);
+        } else {
+            System.out.println("fatal: [" + host + "]: UNREACHABLE! => " + result.data());
+        }
+    }
+
+    private boolean isLoop(TaskResult result) {
+        return result.data() != null && result.data().get("results") instanceof java.util.List;
+    }
+
+    @SuppressWarnings("unchecked")
+    private void printLoopResults(String status, String host, TaskResult result) {
+        java.util.List<java.util.Map<String, Object>> results = (java.util.List<java.util.Map<String, Object>>) result.data().get("results");
+        for (java.util.Map<String, Object> iteration : results) {
+            Object label = iteration.get("_ansible_item_label");
+            if (label == null) {
+                label = iteration.get("item");
+            }
+
+            String prefix = status;
+            if ("ok".equals(status) && Boolean.TRUE.equals(iteration.get("changed"))) {
+                prefix = "changed";
+            } else if ("failed".equals(status)) {
+                prefix = "fatal";
+            }
+
+            if ("fatal".equals(prefix)) {
+                System.out.println(prefix + ": [" + host + "]: FAILED! => (item=" + label + ") => " + iteration);
+            } else if ("unreachable".equals(prefix)) {
+                System.out.println("fatal: [" + host + "]: UNREACHABLE! => (item=" + label + ") => " + iteration);
+            } else if ("skipping".equals(prefix)) {
+                System.out.println("skipping: [" + host + "] => (item=" + label + ")");
+            } else {
+                System.out.println(prefix + ": [" + host + "] => (item=" + label + ")");
+            }
+        }
     }
 
     @Override
