@@ -73,9 +73,7 @@ Ansible 標準の出力形式を提供します。
 
 ## 6. 今後の拡張性
 
-### 6.1 Python ベースのコールバック
-- 将来的には、GraalPy を利用して Ansible 本家の Python 製コールバックプラグインをそのまま実行する仕組みを検討します。
-- [Action Plugin 実装仕様](Action-Plugins.md) と同様のブリッジメカニズムを利用する計画です。
+今後の設計・拡張事項については、[検討事項・TODOリスト](../TODO-Details.md#6-今後の設計拡張事項-future-design-and-extensions) を参照してください。
 
 ## 7. ロギング方針との関係
 - `Logging-Policy.md` で定義される `java.util.logging` は、主に内部デバッグやシステムエラー用です。
