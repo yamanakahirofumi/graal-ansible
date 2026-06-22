@@ -21,6 +21,7 @@ public class PlaybookExecutor {
     private final ITaskExecutor taskExecutor;
     private final ConnectionFactory connectionFactory;
     private PromptProvider promptProvider = new ConsolePromptProvider();
+    private int forks = 5;
     private final List<Callback> callbacks = new ArrayList<>(List.of(new DefaultCallback()));
 
     public PlaybookExecutor(ITaskExecutor taskExecutor) {
@@ -34,6 +35,10 @@ public class PlaybookExecutor {
 
     public void setPromptProvider(PromptProvider promptProvider) {
         this.promptProvider = promptProvider;
+    }
+
+    public void setForks(int forks) {
+        this.forks = forks;
     }
 
     public void addCallback(Callback callback) {
@@ -144,6 +149,7 @@ public class PlaybookExecutor {
 
         TaskQueueManager tqm = new TaskQueueManager(taskExecutor, connectionFactory);
         tqm.setPromptProvider(promptProvider);
+        tqm.setForks(forks);
         callbacks.forEach(tqm::addCallback);
 
         for (Play play : playbook.plays()) {

@@ -46,6 +46,9 @@ public class PlaybookCli implements Callable<Integer> {
     @Option(names = {"-i", "--inventory"}, description = "Specify inventory host path.")
     private String inventoryPath;
 
+    @Option(names = {"-f", "--forks"}, description = "Specify number of parallel processes to use (default=%s)", defaultValue = "5")
+    private int forks;
+
     @Option(names = {"-e", "--extra-vars"}, description = "Set additional variables as key=value or YAML/JSON.")
     private List<String> extraVars = new ArrayList<>();
 
@@ -124,6 +127,7 @@ public class PlaybookCli implements Callable<Integer> {
 
                 // Execute Playbook
                 PlaybookExecutor executor = new PlaybookExecutor(taskExecutor);
+                executor.setForks(forks);
 
                 // Select Callback Plugin
                 String callbackName = System.getenv("ANSIBLE_STDOUT_CALLBACK");
@@ -243,6 +247,7 @@ public class PlaybookCli implements Callable<Integer> {
     // Getters for testing
     public File getPlaybook() { return playbookFile; }
     public String getInventory() { return inventoryPath; }
+    public int getForks() { return forks; }
     public List<String> getExtraVars() { return extraVars; }
     public int getVerbose() { return verbose == null ? 0 : verbose.length; }
     public String getLimit() { return limit; }
