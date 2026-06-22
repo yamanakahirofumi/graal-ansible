@@ -26,6 +26,7 @@ graal-ansible [options] playbook.yml
 | `--become-flags` | - | 権限昇格に使用するフラグを指定 | ◎ |
 | `--ask-become-pass` | `-K` | 権限昇格パスワードをプロンプトで問い合せる | ◎ |
 | `--version` | - | バージョン情報を表示 | ◎ |
+| `--forks` | `-f` | 並列実行するホストの数を指定 | ○ |
 | `--collections-path` | - | コレクションの探索パスを指定 | ○ |
 | `--help` | `-h` | ヘルプメッセージを表示 | ◎ |
 
@@ -51,7 +52,17 @@ graal-ansible [options] playbook.yml
 - `@file.yml`, `@file.yaml`, `@file.json`: ファイルからの変数の読み込み。
 - インライン JSON/YAML: `{"key": "value"}` 形式の直接指定。
 
-## 5. 実装方針
+## 5. 環境変数 (Environment Variables)
+
+`graal-ansible` は、以下の環境変数をサポート、またはサポートを計画しています。
+
+| 環境変数 | 説明 | 実装状況 |
+| :--- | :--- | :---: |
+| `ANSIBLE_STDOUT_CALLBACK` | 使用するコールバックプラグインを指定（例: `default`, `json`） | ◎ |
+| `ANSIBLE_COLLECTIONS_PATH` | コレクションの探索パスをコロン区切りで指定 | ○ |
+| `ANSIBLE_HASH_BEHAVIOUR` | 辞書型変数のマージ戦略を指定 (`replace` または `merge`) | ○ |
+
+## 6. 実装方針
 
 - **解析ライブラリ**: [picocli](https://picocli.info/) を採用。
 - **Native Image 対応**: GraalVM Native Image での実行時にリフレクション設定が必要になるため、picocli のアノテーションプロセッサを活用する。
