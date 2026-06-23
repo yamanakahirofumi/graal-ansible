@@ -59,6 +59,7 @@ Ansible 本家のデフォルト出力に近い形式を Java で実装します
 - **PLAY [name]**: Play の開始。
 - **TASK [name]**: タスクの開始。
 - **ok: [host]**, **changed: [host]**, **fatal: [host]**: 各ホストの実行結果。
+- **ループ (loop) の出力**: `loop` 実行時は、各イテレーションの結果が出力されます。`TaskExecutor` によって解決された `_ansible_item_label` (または `item`) がラベルとして使用されます。
 - **PLAY RECAP**: 最終的な成功・変更・失敗数の統計。
 
 ## 5. 実装済みのプラグイン

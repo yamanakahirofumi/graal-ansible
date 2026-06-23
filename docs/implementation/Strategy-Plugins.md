@@ -49,8 +49,11 @@ Ansible のデフォルト戦略であり、`graal-ansible` における標準�
 - **実装方針**:
     - `ThreadPoolExecutor` を使用し、ホストごとに `TaskExecutor` による実行を並列化しています。
     - 並列数はデフォルトで `5` (forks) です。
-    - `TaskQueueManager` は、失敗ホストのリストやハンドラー通知などの共通コンテキストを、スレッドセーフなコレクション（`ConcurrentHashMap`, `Collections.synchronizedSet` 等）を使用して管理します。
-    - `run_once` タスクについては、スレッドセーフなセットを用いて重複実行を防止しています。
+    - **スレッド安全性**: `TaskQueueManager` および `FreeStrategy` では、複数スレッドからの同時アクセスに対応するため、以下のスレッドセーフなコレクションを使用して共通コンテキストを管理しています。
+        - `failedHosts` (失敗ホストの管理): `Collections.newSetFromMap(new ConcurrentHashMap<>())`
+        - `hostNotifications` (ハンドラー通知の管理): `ConcurrentHashMap`
+        - `connectionCache` (接続のキャッシュ): `ConcurrentHashMap`
+        - `runOnceExecuted` (run_once タスクの実行済み管理): `Collections.newSetFromMap(new ConcurrentHashMap<>())`
 - **用途**: ホスト間の同期が不要で、全体のスループットを向上させたい場合に適しています。
 
 ## 4. 実行エンジンへの統合
