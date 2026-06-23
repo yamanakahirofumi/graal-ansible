@@ -25,8 +25,7 @@ public class FreeStrategy implements Strategy {
     private static final int DEFAULT_FORKS = 5;
 
     @Override
-    public void run(Play play, List<Host> targetHosts, TaskQueueManager tqm, VariableManager variableManager, Map<String, List<TaskResult>> results, boolean globalCheckMode, List<String> runTags, List<String> skipTags) {
-        int forks = DEFAULT_FORKS; // In the future, this could be configurable via Play or Global settings
+    public void run(Play play, List<Host> targetHosts, TaskQueueManager tqm, VariableManager variableManager, Map<String, List<TaskResult>> results, boolean globalCheckMode, List<String> runTags, List<String> skipTags, int forks) {
         ExecutorService executor = Executors.newFixedThreadPool(Math.min(targetHosts.size(), forks));
         Set<String> failedHosts = tqm.getFailedHosts();
         Map<String, Set<String>> hostNotifications = tqm.getHostNotifications();

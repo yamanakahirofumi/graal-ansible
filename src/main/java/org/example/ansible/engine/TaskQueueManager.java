@@ -22,6 +22,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 /**
@@ -35,6 +39,7 @@ public class TaskQueueManager {
     private final ConnectionFactory connectionFactory;
     private PromptProvider promptProvider = new ConsolePromptProvider();
     private final Map<String, Connection> connectionCache = new ConcurrentHashMap<>();
+    private int forks = 5;
     private volatile boolean playFatalError = false;
     private final List<Callback> callbacks = new ArrayList<>();
     private Inventory inventory;
@@ -68,6 +73,10 @@ public class TaskQueueManager {
 
     public Inventory getInventory() {
         return inventory;
+    }
+
+    public void setForks(int forks) {
+        this.forks = forks;
     }
 
     public void setFailedHosts(Set<String> failedHosts) {
@@ -138,7 +147,7 @@ public class TaskQueueManager {
 
         try {
             Strategy strategy = StrategyFactory.getStrategy(play.strategy());
-            strategy.run(play, targetHosts, this, variableManager, results, globalCheckMode, runTags, skipTags);
+            strategy.run(play, targetHosts, this, variableManager, results, globalCheckMode, runTags, skipTags, this.forks);
         } finally {
             closeAllConnections();
         }
@@ -657,26 +666,39 @@ public class TaskQueueManager {
 
             callbacks.forEach(c -> c.v2_playbook_on_task_start(task, task.when() != null));
 
-            boolean executedOnce = false;
-            for (Host host : targetHosts) {
-                if (failedHosts.contains(host.name())) continue;
-                if (task.runOnce() && executedOnce) continue;
+            ExecutorService executor = Executors.newFixedThreadPool(Math.min(targetHosts.size(), forks));
+            AtomicBoolean executedOnce = new AtomicBoolean(false);
 
-                Map<String, Object> vars = variableManager.getAllVariables(play, host, task, null, activeRoles, null);
-                boolean playCheckMode = variableResolver.resolveCheckMode(play.checkMode(), vars, globalCheckMode);
+            try {
+                for (Host host : targetHosts) {
+                    executor.submit(() -> {
+                        if (this.playFatalError) return;
+                        if (failedHosts.contains(host.name())) return;
+                        if (task.runOnce() && !executedOnce.compareAndSet(false, true)) return;
 
-                try {
-                    Connection connection = getOrCreateConnection(host, vars);
-                    executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications, playCheckMode, new ArrayList<>(), null, activeRoles, null, connection, runTags, skipTags);
-                } catch (UnreachableException e) {
-                    if (task.ignoreUnreachable()) {
-                        results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(TaskResult.unreachable(e.getMessage()));
-                    } else {
-                        failedHosts.add(host.name());
-                        checkAnyErrorsFatal(play, host, task, null, activeRoles, null, variableManager);
-                    }
+                        Map<String, Object> vars = variableManager.getAllVariables(play, host, task, null, activeRoles, null);
+                        boolean playCheckMode = variableResolver.resolveCheckMode(play.checkMode(), vars, globalCheckMode);
+
+                        try {
+                            Connection connection = getOrCreateConnection(host, vars);
+                            executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications, playCheckMode, new ArrayList<>(), null, activeRoles, null, connection, runTags, skipTags);
+                        } catch (UnreachableException e) {
+                            if (task.ignoreUnreachable()) {
+                                results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(TaskResult.unreachable(e.getMessage()));
+                            } else {
+                                failedHosts.add(host.name());
+                                checkAnyErrorsFatal(play, host, task, null, activeRoles, null, variableManager);
+                            }
+                        }
+                    });
                 }
-                executedOnce = true;
+            } finally {
+                executor.shutdown();
+                try {
+                    executor.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
             }
         }
     }

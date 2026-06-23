@@ -8,13 +8,17 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Linear strategy: executes tasks one by one for all hosts.
  */
 public class LinearStrategy implements Strategy {
     @Override
-    public void run(Play play, List<Host> targetHosts, TaskQueueManager tqm, VariableManager variableManager, Map<String, List<TaskResult>> results, boolean globalCheckMode, List<String> runTags, List<String> skipTags) {
+    public void run(Play play, List<Host> targetHosts, TaskQueueManager tqm, VariableManager variableManager, Map<String, List<TaskResult>> results, boolean globalCheckMode, List<String> runTags, List<String> skipTags, int forks) {
         Set<String> failedHosts = tqm.getFailedHosts();
         Map<String, Set<String>> hostNotifications = tqm.getHostNotifications();
 
@@ -34,47 +38,66 @@ public class LinearStrategy implements Strategy {
 
             tqm.getCallbacks().forEach(c -> c.v2_playbook_on_task_start(task, task.when() != null));
 
-            boolean executedOnce = false;
-            for (Host host : targetHosts) {
-                if (failedHosts.contains(host.name())) {
-                    continue;
-                }
-                if (task.runOnce() && executedOnce) {
-                    continue;
-                }
+            ExecutorService executor = Executors.newFixedThreadPool(Math.min(targetHosts.size(), forks));
+            AtomicBoolean executedOnce = new AtomicBoolean(false);
 
-                Map<String, Object> vars = variableManager.getAllVariables(play, host, task, null, (List<Role>) null, null);
-                boolean playCheckMode = tqm.getVariableResolver().resolveCheckMode(play.checkMode(), vars, globalCheckMode);
+            try {
+                for (Host host : targetHosts) {
+                    executor.submit(() -> {
+                        if (tqm.isPlayFatalError()) return;
+                        if (failedHosts.contains(host.name())) return;
+                        if (task.runOnce() && !executedOnce.compareAndSet(false, true)) return;
 
+                        Map<String, Object> vars = variableManager.getAllVariables(play, host, task, null, (List<Role>) null, null);
+                        boolean playCheckMode = tqm.getVariableResolver().resolveCheckMode(play.checkMode(), vars, globalCheckMode);
+
+                        try {
+                            Connection connection = tqm.getOrCreateConnection(host, vars);
+                            tqm.executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications, playCheckMode, new ArrayList<>(), null, null, null, connection, runTags, skipTags);
+                        } catch (UnreachableException e) {
+                            if (task.ignoreUnreachable()) {
+                                TaskResult unreachableResult = TaskResult.unreachable(e.getMessage());
+                                results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(unreachableResult);
+                            } else {
+                                failedHosts.add(host.name());
+                                tqm.checkAnyErrorsFatal(play, host, task, null, null, null, variableManager);
+                            }
+                        }
+                    });
+                }
+            } finally {
+                executor.shutdown();
                 try {
-                    Connection connection = tqm.getOrCreateConnection(host, vars);
-                    tqm.executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications, playCheckMode, new ArrayList<>(), null, null, null, connection, runTags, skipTags);
-                } catch (UnreachableException e) {
-                    if (task.ignoreUnreachable()) {
-                        TaskResult unreachableResult = TaskResult.unreachable(e.getMessage());
-                        results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(unreachableResult);
-                    } else {
-                        failedHosts.add(host.name());
-                        tqm.checkAnyErrorsFatal(play, host, task, null, null, null, variableManager);
-                    }
+                    executor.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
                 }
-                executedOnce = true;
             }
         }
 
         // Execute handlers at the end of the play
         if (!tqm.isPlayFatalError()) {
-            for (Host host : targetHosts) {
-                if (failedHosts.contains(host.name())) {
-                    continue;
+            ExecutorService handlerExecutor = Executors.newFixedThreadPool(Math.min(targetHosts.size(), forks));
+            try {
+                for (Host host : targetHosts) {
+                    handlerExecutor.submit(() -> {
+                        if (failedHosts.contains(host.name())) return;
+                        Map<String, Object> vars = variableManager.getAllVariables(play, host, null, null, (List<Role>) null, null);
+                        boolean playCheckMode = tqm.getVariableResolver().resolveCheckMode(play.checkMode(), vars, globalCheckMode);
+                        try {
+                            Connection connection = tqm.getOrCreateConnection(host, vars);
+                            tqm.flushHandlersForHost(play, host, variableManager, results, failedHosts, hostNotifications, playCheckMode, connection, runTags, skipTags);
+                        } catch (UnreachableException e) {
+                            failedHosts.add(host.name());
+                        }
+                    });
                 }
-                Map<String, Object> vars = variableManager.getAllVariables(play, host, null, null, (List<Role>) null, null);
-                boolean playCheckMode = tqm.getVariableResolver().resolveCheckMode(play.checkMode(), vars, globalCheckMode);
+            } finally {
+                handlerExecutor.shutdown();
                 try {
-                    Connection connection = tqm.getOrCreateConnection(host, vars);
-                    tqm.flushHandlersForHost(play, host, variableManager, results, failedHosts, hostNotifications, playCheckMode, connection, runTags, skipTags);
-                } catch (UnreachableException e) {
-                    failedHosts.add(host.name());
+                    handlerExecutor.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
                 }
             }
         }

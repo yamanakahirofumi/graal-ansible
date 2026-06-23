@@ -82,6 +82,9 @@ public class PlaybookCli implements Callable<Integer> {
     @Option(names = {"-K", "--ask-become-pass"}, description = "Ask for privilege escalation password")
     private boolean askBecomePass;
 
+    @Option(names = {"-f", "--forks"}, description = "Specify number of parallel processes to use (default=%s)", defaultValue = "5")
+    private int forks;
+
     @Override
     public Integer call() {
         int verbosity = verbose == null ? 0 : verbose.length;
@@ -175,7 +178,7 @@ public class PlaybookCli implements Callable<Integer> {
                 cliVars.put("ansible_skip_tags", skipTags);
 
                 VariableManager variableManager = new VariableManager(inventory, cliVars, parsedExtraVars, baseDir, inventoryDirPath);
-                executor.execute(playbook, inventory, variableManager, check, tags, skipTags, limit);
+                executor.execute(playbook, inventory, variableManager, check, tags, skipTags, limit, forks);
 
                 return 0;
             }

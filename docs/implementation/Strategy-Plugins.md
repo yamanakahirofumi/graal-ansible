@@ -23,8 +23,9 @@ public interface Strategy {
      * @param globalCheckMode  グローバルチェックモードの有無
      * @param runTags          実行対象タグ
      * @param skipTags         スキップ対象タグ
+     * @param forks            並列実行数
      */
-    void run(Play play, List<Host> targetHosts, TaskQueueManager tqm, VariableManager variableManager, Map<String, List<TaskResult>> results, boolean globalCheckMode, List<String> runTags, List<String> skipTags);
+    void run(Play play, List<Host> targetHosts, TaskQueueManager tqm, VariableManager variableManager, Map<String, List<TaskResult>> results, boolean globalCheckMode, List<String> runTags, List<String> skipTags, int forks);
 
     /**
      * 戦略名を返します（例: "linear", "free"）。
@@ -39,7 +40,7 @@ public interface Strategy {
 Ansible のデフォルト戦略であり、`graal-ansible` における標準的な挙動です。
 
 - **動作**: 1つのタスクが全ターゲットホストで完了（または失敗）してから、次のタスクに進みます。
-- **実装状況**: 実装済み。`TaskQueueManager` からタスク実行ループの制御がこのクラスへ委譲されています。
+- **実装状況**: 実装済み。`TaskQueueManager` からタスク実行ループの制御がこのクラスへ委譲されています。各タスク内でのホスト実行は `forks` 設定に基づき並列化されますが、次のタスクへ進む前に全ホストの完了を待ち合わせることで線形性を維持します。
 - **エラー処理**: `any_errors_fatal` が有効な場合、あるホストでの失敗が即座に全ホストの次タスク実行の中断に繋がります。
 
 ### 3.2 Free 戦略 (Free Strategy)
@@ -48,7 +49,7 @@ Ansible のデフォルト戦略であり、`graal-ansible` における標準�
 - **動作**: 各ホストは、他のホストの進捗を待つことなく、自分に割り当てられたタスクを次々と実行します。
 - **実装方針**:
     - `ThreadPoolExecutor` を使用し、ホストごとに `TaskExecutor` による実行を並列化しています。
-    - 並列数はデフォルトで `5` (forks) です。
+    - 並列数は `forks` 設定に従います（デフォルト: 5）。
     - `TaskQueueManager` は、失敗ホストのリストやハンドラー通知などの共通コンテキストを、スレッドセーフなコレクション（`ConcurrentHashMap`, `Collections.synchronizedSet` 等）を使用して管理します。
     - `run_once` タスクについては、スレッドセーフなセットを用いて重複実行を防止しています。
 - **用途**: ホスト間の同期が不要で、全体のスループットを向上させたい場合に適しています。

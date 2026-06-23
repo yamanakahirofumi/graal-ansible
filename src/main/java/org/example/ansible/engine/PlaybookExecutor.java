@@ -138,12 +138,30 @@ public class PlaybookExecutor {
      * @return A map of host names to their execution results for each task.
      */
     public Map<String, List<TaskResult>> execute(Playbook playbook, Inventory inventory, VariableManager variableManager, boolean globalCheckMode, List<String> runTags, List<String> skipTags, String limit) {
+        return execute(playbook, inventory, variableManager, globalCheckMode, runTags, skipTags, limit, 5);
+    }
+
+    /**
+     * Executes the entire playbook with tags, limit filtering, and parallel forks.
+     *
+     * @param playbook        The playbook to execute.
+     * @param inventory       The inventory.
+     * @param variableManager The variable manager to use.
+     * @param globalCheckMode Whether the execution is in global check mode.
+     * @param runTags          The tags to run.
+     * @param skipTags         The tags to skip.
+     * @param limit            The host limit pattern.
+     * @param forks            Number of parallel processes.
+     * @return A map of host names to their execution results for each task.
+     */
+    public Map<String, List<TaskResult>> execute(Playbook playbook, Inventory inventory, VariableManager variableManager, boolean globalCheckMode, List<String> runTags, List<String> skipTags, String limit, int forks) {
         Map<String, List<TaskResult>> results = new ConcurrentHashMap<>();
 
         callbacks.forEach(c -> c.v2_playbook_on_start(playbook));
 
         TaskQueueManager tqm = new TaskQueueManager(taskExecutor, connectionFactory);
         tqm.setPromptProvider(promptProvider);
+        tqm.setForks(forks);
         callbacks.forEach(tqm::addCallback);
 
         for (Play play : playbook.plays()) {

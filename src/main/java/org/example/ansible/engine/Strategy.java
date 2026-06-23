@@ -19,8 +19,9 @@ public interface Strategy {
      * @param globalCheckMode  Whether in global check mode.
      * @param runTags          Tags to run.
      * @param skipTags         Tags to skip.
+     * @param forks            Number of parallel processes.
      */
-    void run(Play play, List<Host> targetHosts, TaskQueueManager tqm, VariableManager variableManager, Map<String, List<TaskResult>> results, boolean globalCheckMode, List<String> runTags, List<String> skipTags);
+    void run(Play play, List<Host> targetHosts, TaskQueueManager tqm, VariableManager variableManager, Map<String, List<TaskResult>> results, boolean globalCheckMode, List<String> runTags, List<String> skipTags, int forks);
 
     /**
      * Returns the name of the strategy.

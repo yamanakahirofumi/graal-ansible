@@ -261,11 +261,13 @@
 
 ## 6. 今後の設計・拡張事項 (Future Design and Extensions)
 
-### 6.1 [ ] 並列実行数 (forks) の外部設定
+### 6.1 [✓] 並列実行数 (forks) の外部設定
+- **完了日**: 2026-07-28
 - **概要**: 現在固定値（5）となっている並列実行数を、コマンドライン引数や設定ファイルから変更可能にする。
-- **検討内容**:
-    - `PlaybookCli` への `-f` / `--forks` オプションの追加。
-    - `FreeStrategy` への設定値の伝播。
+- **解決策**:
+    - `PlaybookCli` への `-f` / `--forks` オプションを追加。
+    - `PlaybookExecutor` および `TaskQueueManager` を経由して、`LinearStrategy` および `FreeStrategy` へ設定値を伝播。
+    - `LinearStrategy` においても、各タスクの実行においてホスト間の並列実行をサポート。
 
 ### 6.2 [ ] シリアル実行 (serial) のサポート
 - **概要**: `linear` 戦略において、一度に実行するホストの数を制限する（バッチ実行）機能の実装。
