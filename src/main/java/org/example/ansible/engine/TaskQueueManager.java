@@ -501,7 +501,7 @@ public class TaskQueueManager {
             hosts.addAll(getAllHosts(child));
         }
         // Use a set of names to distinct hosts but return actual Host objects
-        Map<String, Host> distinctHosts = new HashMap<>();
+        Map<String, Host> distinctHosts = new java.util.LinkedHashMap<>();
         for (Host h : hosts) {
             distinctHosts.putIfAbsent(h.name(), h);
         }
