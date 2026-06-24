@@ -37,6 +37,7 @@ public class TaskQueueManager {
     private final Map<String, Connection> connectionCache = new ConcurrentHashMap<>();
     private volatile boolean playFatalError = false;
     private final List<Callback> callbacks = new ArrayList<>();
+    private int forks = 5;
     private Inventory inventory;
     private Map<String, Set<String>> hostNotifications = new ConcurrentHashMap<>();
     private Set<String> failedHosts = Collections.newSetFromMap(new ConcurrentHashMap<>());
@@ -68,6 +69,17 @@ public class TaskQueueManager {
 
     public Inventory getInventory() {
         return inventory;
+    }
+
+    public void setForks(int forks) {
+        if (forks < 1) {
+            throw new IllegalArgumentException("forks must be at least 1");
+        }
+        this.forks = forks;
+    }
+
+    public int getForks() {
+        return forks;
     }
 
     public void setFailedHosts(Set<String> failedHosts) {

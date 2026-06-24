@@ -193,10 +193,17 @@
 - **完了日**: 2026-07-28
 - **概要**: Playbook 内の実行戦略（linear, free）を切り替え可能にする基盤の実装。
 - **解決策**:
-    - `Strategy` インターフェースを定義し、`LinearStrategy` および `FreeStrategy` を実装。
-    - `StrategyFactory` による動的な戦略選択をサポート。
-    - `FreeStrategy` において、`ThreadPoolExecutor` を用いたホストごとの並列タスク実行を実現。
-    - `TaskQueueManager.executePlay` の実行ループ制御を `Strategy` へ委譲するリファクタリングを完了。
+    - `Strategy` インターフェースを定義し、`LinearStrategy` および `FreeStrategy` を実装.
+    - `StrategyFactory` による動的な戦略選択をサポート.
+    - `FreeStrategy` において、`ThreadPoolExecutor` を用いたホストごとの並列タスク実行を実現.
+    - `TaskQueueManager.executePlay` の実行ループ制御を `Strategy` へ委譲するリファクタリングを完了.
+
+### 3.27 [✓] 並列実行数 (forks) の外部設定
+- **完了日**: 2026-07-29
+- **概要**: 固定値となっていた並列実行数を、コマンドライン引数や設定ファイルから変更可能にする。
+- **解決策**:
+    - `PlaybookCli` への `-f` / `--forks` オプションを追加。
+    - `PlaybookExecutor` および `TaskQueueManager` に `forks` 設定値を保持するフィールドと setter を追加し、`FreeStrategy` での実行時に参照するように修正。
 
 ## 4. 整理・調整済み (Refactored/Adjusted)
 
@@ -261,13 +268,7 @@
 
 ## 6. 今後の設計・拡張事項 (Future Design and Extensions)
 
-### 6.1 [ ] 並列実行数 (forks) の外部設定
-- **概要**: 現在固定値（5）となっている並列実行数を、コマンドライン引数や設定ファイルから変更可能にする。
-- **検討内容**:
-    - `PlaybookCli` への `-f` / `--forks` オプションの追加。
-    - `FreeStrategy` への設定値の伝播。
-
-### 6.2 [ ] シリアル実行 (serial) のサポート
+### 6.1 [ ] シリアル実行 (serial) のサポート
 - **概要**: `linear` 戦略において、一度に実行するホストの数を制限する（バッチ実行）機能の実装。
 - **検討内容**:
     - `Play` レコードへの `serial` フィールドの追加と解析。
