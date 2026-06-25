@@ -25,9 +25,8 @@ graal-ansible [options] playbook.yml
 | `--become-user` | - | 昇格後のユーザーを指定 (デフォルト: root) | ◎ |
 | `--become-flags` | - | 権限昇格に使用するフラグを指定 | ◎ |
 | `--ask-become-pass` | `-K` | 権限昇格パスワードをプロンプトで問い合せる | ◎ |
-| `--forks` | `-f` | 並列実行数を指定 | ◎ |
+| `--forks` | `-f` | 並列実行するホストの数を指定 | ◎ |
 | `--version` | - | バージョン情報を表示 | ◎ |
-| `--forks` | `-f` | 並列実行するホストの数を指定 | ○ |
 | `--collections-path` | - | コレクションの探索パスを指定 | ○ |
 | `--help` | `-h` | ヘルプメッセージを表示 | ◎ |
 
@@ -61,7 +60,7 @@ graal-ansible [options] playbook.yml
 | :--- | :--- | :---: |
 | `ANSIBLE_STDOUT_CALLBACK` | 使用するコールバックプラグインを指定（例: `default`, `json`） | ◎ |
 | `ANSIBLE_COLLECTIONS_PATH` | コレクションの探索パスをコロン区切りで指定 | ○ |
-| `ANSIBLE_HASH_BEHAVIOUR` | 辞書型変数のマージ戦略を指定 (`replace` または `merge`) | ○ |
+| `ANSIBLE_HASH_BEHAVIOUR` | 辞書型変数のマージ戦略を指定 (`replace` または `merge`) | ◎ |
 
 ## 6. 実装方針
 
