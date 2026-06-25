@@ -103,6 +103,7 @@ public class YamlParser {
                                     play.environment(),
                                     play.tags(),
                                     play.anyErrorsFatal(),
+                                    play.serial(),
                                     play.strategy()
                             );
                         }
@@ -248,9 +249,10 @@ public class YamlParser {
         Object checkMode = map.get("check_mode");
         Object environment = map.get("environment");
         Object anyErrorsFatal = map.get("any_errors_fatal");
+        Object serial = map.get("serial");
         String strategy = (String) map.getOrDefault("strategy", "linear");
 
-        return new Play(name, hosts, tasks, vars, varsFiles, varsPrompt, roles, handlers, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, playTags, anyErrorsFatal, strategy);
+        return new Play(name, hosts, tasks, vars, varsFiles, varsPrompt, roles, handlers, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, playTags, anyErrorsFatal, serial, strategy);
     }
 
     @SuppressWarnings("unchecked")
