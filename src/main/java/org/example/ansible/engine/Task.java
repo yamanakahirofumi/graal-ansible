@@ -1,5 +1,7 @@
 package org.example.ansible.engine;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.List;
 
@@ -76,7 +78,7 @@ public record Task(
         Integer poll
 ) {
     public Task(String name, String action, Map<String, Object> args) {
-        this(name, action, args, Map.of(), null, null, null, Map.of(), List.of(), null, null, false,
+        this(name, action, args, new HashMap<>(), null, null, null, Map.of(), new ArrayList<>(), null, null, false,
                 null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
                 null, null, null, null, null, null, List.of(), List.of(), null, 0, 10);
     }
