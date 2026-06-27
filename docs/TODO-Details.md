@@ -287,8 +287,10 @@
 ### 6.1 [ ] シリアル実行 (serial) のサポート
 - **概要**: `linear` 戦略において、一度に実行するホストの数を制限する（バッチ実行）機能の実装。
 - **検討内容**:
-    - `Play` レコードへの `serial` フィールドの追加と解析。
-    - `LinearStrategy` におけるバッチごとの実行ループ制御の実装。
+    - `Play` レコードへの `serial` フィールド（整数、パーセンテージ、リスト）の追加と解析。
+    - `LinearStrategy` におけるバッチごとの実行ループ制御およびハンドラーフラッシュの実装。
+    - `VariableManager` への `setBatchContext` メソッド追加による `ansible_play_batch` マジック変数の制御。
+    - 詳細は [Strategy-Plugins.md](implementation/Strategy-Plugins.md#5-シリアル実行-serial-の詳細設計) を参照。
 
 ### 6.2 [ ] タスク実行制限 (throttle) のサポート
 - **概要**: 特定のタスクやブロック、プレイにおいて、同時に実行できるホスト数を制限する機能の実装。

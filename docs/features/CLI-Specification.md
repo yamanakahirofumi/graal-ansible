@@ -62,6 +62,12 @@ graal-ansible [options] playbook.yml
 | `ANSIBLE_COLLECTIONS_PATH` | コレクションの探索パスをコロン区切りで指定 | ○ |
 | `ANSIBLE_HASH_BEHAVIOUR` | 辞書型変数のマージ戦略を指定 (`replace` または `merge`) | ◎ |
 
+### 5.1 コレクションパスの解決優先順位
+複数の場所でコレクションパスが指定された場合、以下の優先順位でマージされ、実行エンジンに渡されます。
+1.  CLI オプション `--collections-path` で指定されたパス（最優先）。
+2.  環境変数 `ANSIBLE_COLLECTIONS_PATH` で指定されたパス（コロン区切り）。
+3.  デフォルトパス（例: `~/.ansible/collections`, `/usr/share/ansible/collections`）。
+
 ## 6. 実装方針
 
 - **解析ライブラリ**: [picocli](https://picocli.info/) を採用。
