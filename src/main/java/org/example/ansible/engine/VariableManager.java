@@ -80,6 +80,7 @@ public class VariableManager {
     private final Yaml yaml = new Yaml();
 
     private List<String> playHostNames = new ArrayList<>();
+    private List<String> batchHostNames = null;
     private Set<String> failedHostNames = new HashSet<>();
 
     public VariableManager(Inventory inventory, Map<String, Object> extraVars) {
@@ -188,6 +189,15 @@ public class VariableManager {
     public void setPlayContext(List<String> playHostNames, Set<String> failedHostNames) {
         this.playHostNames = playHostNames != null ? new ArrayList<>(playHostNames) : new ArrayList<>();
         this.failedHostNames = failedHostNames != null ? failedHostNames : new HashSet<>();
+        this.batchHostNames = null;
+    }
+
+    /**
+     * Sets the current batch context for magic variables.
+     * @param batchHostNames List of hosts in the current batch.
+     */
+    public void setBatchContext(List<String> batchHostNames) {
+        this.batchHostNames = batchHostNames != null ? new ArrayList<>(batchHostNames) : null;
     }
 
     public void clearPromptVars() {
@@ -321,7 +331,14 @@ public class VariableManager {
                     .filter(name -> !failedHostNames.contains(name))
                     .collect(Collectors.toList());
             variables.put("ansible_play_hosts", Collections.unmodifiableList(activePlayHosts));
-            variables.put("ansible_play_batch", Collections.unmodifiableList(activePlayHosts));
+            if (batchHostNames != null) {
+                List<String> activeBatchHosts = batchHostNames.stream()
+                        .filter(name -> !failedHostNames.contains(name))
+                        .collect(Collectors.toList());
+                variables.put("ansible_play_batch", Collections.unmodifiableList(activeBatchHosts));
+            } else {
+                variables.put("ansible_play_batch", Collections.unmodifiableList(activePlayHosts));
+            }
 
             // Propagate CLI settings as magic variables
             if (cliVars.containsKey("ansible_check_mode")) {

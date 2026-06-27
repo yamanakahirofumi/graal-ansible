@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.Optional;
 import java.util.List;
 import java.util.Map;
@@ -500,8 +501,9 @@ public class TaskQueueManager {
         for (Group child : group.children()) {
             hosts.addAll(getAllHosts(child));
         }
-        // Use a set of names to distinct hosts but return actual Host objects
-        Map<String, Host> distinctHosts = new HashMap<>();
+        // Use a set of names to distinct hosts but return actual Host objects.
+        // LinkedHashMap is used to preserve the order of first appearance.
+        Map<String, Host> distinctHosts = new LinkedHashMap<>();
         for (Host h : hosts) {
             distinctHosts.putIfAbsent(h.name(), h);
         }
