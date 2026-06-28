@@ -80,6 +80,7 @@ public class VariableManager {
     private final Yaml yaml = new Yaml();
 
     private List<String> playHostNames = new ArrayList<>();
+    private List<String> playBatchHostNames = new ArrayList<>();
     private Set<String> failedHostNames = new HashSet<>();
 
     public VariableManager(Inventory inventory, Map<String, Object> extraVars) {
@@ -187,7 +188,16 @@ public class VariableManager {
      */
     public void setPlayContext(List<String> playHostNames, Set<String> failedHostNames) {
         this.playHostNames = playHostNames != null ? new ArrayList<>(playHostNames) : new ArrayList<>();
+        this.playBatchHostNames = new ArrayList<>(this.playHostNames);
         this.failedHostNames = failedHostNames != null ? failedHostNames : new HashSet<>();
+    }
+
+    /**
+     * Sets the current play batch context for the 'ansible_play_batch' magic variable.
+     * @param batchHostNames List of host names in the current batch.
+     */
+    public void setBatchContext(List<String> batchHostNames) {
+        this.playBatchHostNames = batchHostNames != null ? new ArrayList<>(batchHostNames) : new ArrayList<>();
     }
 
     public void clearPromptVars() {
@@ -321,7 +331,11 @@ public class VariableManager {
                     .filter(name -> !failedHostNames.contains(name))
                     .collect(Collectors.toList());
             variables.put("ansible_play_hosts", Collections.unmodifiableList(activePlayHosts));
-            variables.put("ansible_play_batch", Collections.unmodifiableList(activePlayHosts));
+
+            List<String> activeBatchHosts = playBatchHostNames.stream()
+                    .filter(name -> !failedHostNames.contains(name))
+                    .collect(Collectors.toList());
+            variables.put("ansible_play_batch", Collections.unmodifiableList(activeBatchHosts));
 
             // Propagate CLI settings as magic variables
             if (cliVars.containsKey("ansible_check_mode")) {

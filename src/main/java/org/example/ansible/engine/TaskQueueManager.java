@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.Optional;
 import java.util.List;
 import java.util.Map;
@@ -145,7 +146,7 @@ public class TaskQueueManager {
 
         this.playFatalError = false;
         this.failedHosts = Collections.newSetFromMap(new ConcurrentHashMap<>());
-        variableManager.setPlayContext(targetHosts.stream().map(Host::name).toList(), failedHosts);
+        variableManager.setPlayContext(targetHosts.stream().map(Host::name).collect(Collectors.toList()), failedHosts);
         this.hostNotifications = new ConcurrentHashMap<>();
 
         try {
@@ -501,7 +502,7 @@ public class TaskQueueManager {
             hosts.addAll(getAllHosts(child));
         }
         // Use a set of names to distinct hosts but return actual Host objects
-        Map<String, Host> distinctHosts = new HashMap<>();
+        Map<String, Host> distinctHosts = new LinkedHashMap<>();
         for (Host h : hosts) {
             distinctHosts.putIfAbsent(h.name(), h);
         }
