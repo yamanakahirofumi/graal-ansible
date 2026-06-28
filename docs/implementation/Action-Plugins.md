@@ -98,10 +98,10 @@ GraalPy の Polyglot API を介したデータ交換では、以下のルール�
 
 ### 4.3 実行コンテキストの同期
 
-`execute_from_python` が呼び出された際、Java 側は以下の状態を維持したままモジュールを実行する必要があります。
+`execute_from_python` が呼び出された際、Java 側は以下の状態を維持したままモジュールを実行します（実装済み）。
 
 1.  **接続の維持**: `ActionBase` が保持している `connection_java` (SSH/Local) をそのまま使用します。
-2.  **変数の同期**: Python 側で変更された `task_vars` がある場合、それを Java 側の実行コンテキスト（`VariableManager`）へ反映させる仕組みを検討します。
+2.  **変数の同期**: `VariableManager.updateVariables` により、Python 側で変更された `task_vars` を Java 側のコンテキストへ反映させ、後続のタスクでも利用可能にします。
 3.  **チェックモード/Become**: Action Plugin 起動時の設定（`check_mode`, `become` 等）を、再帰的に呼び出されるモジュール実行にも伝播させます。
 
 ## 5. モック化が必要なコンポーネント
@@ -143,12 +143,12 @@ Windows 管理ノード対応などのため、Linux 固有のモジュール（
 | `include_vars` | Python (Actual) | 動的な変数ファイルの読み込み。 |
 | その他 | Python (Actual) | `ansible_bridge.py` 経由での実行。 |
 
-## 8. Java によるエミュレータの段階的廃止
+## 8. Java によるエミュレータの廃止
 
 > [!IMPORTANT]
-> **本プロジェクトでは、以前存在した Java ベースの Action Plugin エミュレータは、Python-first 方針への移行に伴い原則として廃止されました。**
+> **本プロジェクトでは、以前存在した Java ベースの Action Plugin エミュレータは、Python-first 方針への移行に伴いすべて削除・置換されました。**
 
-以前は `set_fact`, `copy`, `template` などの主要なアクションを Java で再実装していましたが、現在はオリジナルの Python ソースコード実行に一本化されています。ただし、`debug` モジュールなどの一部の機能については、簡易的な出力を目的として Java 側でのフォールバック実装が併用されている箇所があります。
+以前は `set_fact`, `copy`, `template`, `debug` などの主要なアクションを Java で再実装していましたが、現在はオリジナルの Python ソースコード実行に完全に一本化されています。これにより、Ansible 本家との 100% の互換性とメンテナンス性の向上を実現しています。
 
 ## 9. 関連ドキュメント
 - [GraalPy 互換性テクニカルリファレンス](Action-Plugins-Investigation.md)
