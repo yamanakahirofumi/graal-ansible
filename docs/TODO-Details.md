@@ -11,6 +11,7 @@
     - Build Cache の有効活用。
     - Windows/macOS 環境でのビルドエラーの監視と修正。
 
+
 ## 2. 実装時の詳細事項
 
 ### 2.1 [ ] Ansible 本体の完全ロードと基本動作の実現 (フェーズ1)
@@ -219,6 +220,14 @@
 - **解決策**:
     - `PlaybookCli` への `-f` / `--forks` オプションを追加。
     - `PlaybookExecutor` および `TaskQueueManager` に `forks` 設定値を保持するフィールドと setter を追加し、`FreeStrategy` での実行時に参照するように修正。
+
+### 3.29 [✓] 非同期タスク (async, poll) の実装
+- **完了日**: 2026-07-30
+- **概要**: タスクのバックグラウンド実行とポーリング機能。
+- **解決策**:
+    - `AsyncJobManager` および `DefaultAsyncJobManager` を導入。
+    - `TaskExecutor` において `async` キーワードに応じたスレッドプールへの投入と `poll` に基づく待機処理を実装。
+    - `async_status` モジュールを Java で実装。
 
 ## 4. 整理・調整済み (Refactored/Adjusted)
 
