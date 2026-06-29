@@ -54,7 +54,7 @@ graal-ansible [options] playbook.yml
 
 ## 5. 環境変数 (Environment Variables)
 
-`graal-ansible` は、以下の環境変数をサポート、またはサポートを計画しています。
+`graal-ansible` は、以下の環境変数をサポートしています。
 
 | 環境変数 | 説明 | 実装状況 |
 | :--- | :--- | :---: |
@@ -62,7 +62,15 @@ graal-ansible [options] playbook.yml
 | `ANSIBLE_COLLECTIONS_PATH` | コレクションの探索パスをコロン区切りで指定 | ○ |
 | `ANSIBLE_HASH_BEHAVIOUR` | 辞書型変数のマージ戦略を指定 (`replace` または `merge`) | ◎ |
 
-## 6. 実装方針
+## 6. コレクション探索パスの優先順位
+
+複数の方法でコレクションの探索パスが指定された場合、以下の優先順位で解決されます。
+
+1. **CLI オプション (`--collections-path`)**
+2. **環境変数 (`ANSIBLE_COLLECTIONS_PATH`)**
+3. **デフォルトパス** (詳細は [コレクションの管理と取得方法](Collection-Management.md) を参照)
+
+## 7. 実装方針
 
 - **解析ライブラリ**: [picocli](https://picocli.info/) を採用。
 - **Native Image 対応**: GraalVM Native Image での実行時にリフレクション設定が必要になるため、picocli のアノテーションプロセッサを活用する。
