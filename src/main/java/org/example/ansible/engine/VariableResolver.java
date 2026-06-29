@@ -313,6 +313,31 @@ public class VariableResolver {
     }
 
     /**
+     * Resolves throttle value.
+     *
+     * @param throttle       The throttle setting.
+     * @param variables      The variable map.
+     * @param inheritedValue The value inherited from parent context.
+     * @return Resolved throttle value, or null if not set.
+     */
+    public Integer resolveThrottle(Object throttle, Map<String, Object> variables, Integer inheritedValue) {
+        if (throttle == null) {
+            return inheritedValue;
+        }
+        Object resolved = resolveValue(throttle, variables);
+        if (resolved instanceof Integer i) {
+            return i;
+        } else if (resolved instanceof String s) {
+            try {
+                return Integer.parseInt(s);
+            } catch (NumberFormatException e) {
+                return inheritedValue;
+            }
+        }
+        return inheritedValue;
+    }
+
+    /**
      * Resolves the become context for a task.
      *
      * @param play      The play context.

@@ -225,9 +225,17 @@
 - **完了日**: 2026-07-30
 - **概要**: タスクのバックグラウンド実行とポーリング機能。
 - **解決策**:
-    - `AsyncJobManager` および `DefaultAsyncJobManager` を導入。
-    - `TaskExecutor` において `async` キーワードに応じたスレッドプールへの投入と `poll` に基づく待機処理を実装。
-    - `async_status` モジュールを Java で実装。
+    - `AsyncJobManager` および `DefaultAsyncJobManager` を導入.
+    - `TaskExecutor` において `async` キーワードに応じたスレッドプールへの投入と `poll` に基づく待機処理を実装.
+    - `async_status` モジュールを Java で実装.
+
+### 3.30 [✓] タスク実行制限 (throttle) のサポート
+- **完了日**: 2026-06-28
+- **概要**: 特定のタスクやブロック、プレイにおいて、同時に実行できるホスト数を制限する機能の実装。
+- **解決策**:
+    - `Task` / `Play` レコードへ `throttle` キーワードを追加.
+    - `FreeStrategy` において `Semaphore` を用いた同時実行ホスト数の制御を実装.
+    - `VariableResolver` にて `throttle` 値（数値またはテンプレート）の動的評価をサポート.
 
 ## 4. 整理・調整済み (Refactored/Adjusted)
 
@@ -291,12 +299,6 @@
     - 実行結果レポートのさらなる詳細化とフィルタリング機能。
 
 ## 6. 今後の設計・拡張事項 (Future Design and Extensions)
-
-### 6.1 [ ] タスク実行制限 (throttle) のサポート
-- **概要**: 特定のタスクやブロック、プレイにおいて、同時に実行できるホスト数を制限する機能の実装。
-- **検討内容**:
-    - `Task` / `Play` レコードへの `throttle` キーワードの追加。
-    - 戦略プラグイン内での同時実行スレッド数の制御。
 
 ### 6.3 [ ] Python ベースのコールバックのサポート
 - **概要**: GraalPy を利用して Ansible 本家の Python 製コールバックプラグインをそのまま実行する仕組みの導入。
