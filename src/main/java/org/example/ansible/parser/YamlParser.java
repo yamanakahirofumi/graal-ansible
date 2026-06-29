@@ -27,7 +27,7 @@ public class YamlParser {
             "vars", "notify", "listen", "with_items", "with_list", "with_dict",
             "failed_when", "changed_when", "delegate_to", "delegate_facts", "run_once",
             "block", "rescue", "always", "check_mode", "environment", "any_errors_fatal",
-            "async", "poll"
+            "async", "poll", "throttle"
     );
 
     private final Yaml yaml;
@@ -104,7 +104,8 @@ public class YamlParser {
                                     play.tags(),
                                     play.anyErrorsFatal(),
                                     play.strategy(),
-                                    play.serial()
+                                    play.serial(),
+                                    play.throttle()
                             );
                         }
                         plays.add(play);
@@ -251,8 +252,9 @@ public class YamlParser {
         Object anyErrorsFatal = map.get("any_errors_fatal");
         String strategy = (String) map.getOrDefault("strategy", "linear");
         Object serial = map.get("serial");
+        Object throttle = map.get("throttle");
 
-        return new Play(name, hosts, tasks, vars, varsFiles, varsPrompt, roles, handlers, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, playTags, anyErrorsFatal, strategy, serial);
+        return new Play(name, hosts, tasks, vars, varsFiles, varsPrompt, roles, handlers, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, playTags, anyErrorsFatal, strategy, serial, throttle);
     }
 
     @SuppressWarnings("unchecked")
@@ -334,6 +336,7 @@ public class YamlParser {
         Object checkMode = map.get("check_mode");
         Object environment = map.get("environment");
         Object anyErrorsFatal = map.get("any_errors_fatal");
+        Object throttle = map.get("throttle");
         Integer asyncVal = (Integer) map.getOrDefault("async", 0);
         Integer poll = (Integer) map.getOrDefault("poll", 10);
 
@@ -360,7 +363,7 @@ public class YamlParser {
         return new Task(name, action, args, vars, when, register, loop, loopControl, notify, failedWhen, changedWhen, ignoreErrors,
                 until, retries, delay, delegateTo, delegateFacts, runOnce, ignoreUnreachable, block, rescue, always,
                 become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, taskTags, listen, anyErrorsFatal,
-                asyncVal, poll);
+                throttle, asyncVal, poll);
     }
 
     @SuppressWarnings("unchecked")

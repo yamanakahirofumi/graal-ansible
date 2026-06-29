@@ -13,6 +13,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -30,6 +31,7 @@ public class FreeStrategy implements Strategy {
         Set<String> failedHosts = tqm.getFailedHosts();
         Map<String, Set<String>> hostNotifications = tqm.getHostNotifications();
         Set<Task> runOnceExecuted = Collections.newSetFromMap(new ConcurrentHashMap<>());
+        Map<Task, Semaphore> taskSemaphores = new ConcurrentHashMap<>();
 
         for (Host host : targetHosts) {
             executor.submit(() -> {
@@ -60,6 +62,20 @@ public class FreeStrategy implements Strategy {
                         Map<String, Object> vars = variableManager.getAllVariables(play, host, task, null, (List<Role>) null, null);
                         boolean playCheckMode = tqm.getVariableResolver().resolveCheckMode(play.checkMode(), vars, globalCheckMode);
 
+                        Integer throttle = tqm.getVariableResolver().resolveThrottle(task.throttle(), vars,
+                                tqm.getVariableResolver().resolveThrottle(play.throttle(), vars, null));
+
+                        Semaphore semaphore = null;
+                        if (throttle != null && throttle > 0) {
+                            semaphore = taskSemaphores.computeIfAbsent(task, t -> new Semaphore(throttle));
+                            try {
+                                semaphore.acquire();
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                                return;
+                            }
+                        }
+
                         try {
                             Connection connection = tqm.getOrCreateConnection(host, vars);
                             tqm.executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications, playCheckMode, new ArrayList<>(), null, null, null, connection, runTags, skipTags);
@@ -70,6 +86,10 @@ public class FreeStrategy implements Strategy {
                             } else {
                                 failedHosts.add(host.name());
                                 tqm.checkAnyErrorsFatal(play, host, task, null, null, null, variableManager);
+                            }
+                        } finally {
+                            if (semaphore != null) {
+                                semaphore.release();
                             }
                         }
                     }
