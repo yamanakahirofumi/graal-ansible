@@ -54,26 +54,38 @@ my-ansible-project/
 
 ## 3. アプリケーションによるコレクションの認識
 
-`graal-ansible` は、以下の順序でコレクションの探索パスを決定します。
+`graal-ansible` は、以下の優先順位でコレクションの探索パスを決定します。
 
-### 3.1 環境変数 `ANSIBLE_COLLECTIONS_PATH`
+1.  **CLI オプション (`--collections-path`)**: コマンドラインで明示的に指定されたパスが最優先されます。
+2.  **環境変数 (`ANSIBLE_COLLECTIONS_PATH`)**: CLI オプションが指定されていない場合、この環境変数の値が使用されます。
+3.  **デフォルトパス**: 上記がいずれも指定されていない場合、後述するデフォルトの位置を探索します。
 
-最も優先される方法です。複数のパスをコロン（Windows はセミコロン）区切りで指定可能です。
+### 3.1 CLI オプション `--collections-path`
+
+コマンド実行時に直接パスを指定します。
+
+```bash
+graal-ansible --collections-path "./my_collections" playbook.yml
+```
+
+### 3.2 環境変数 `ANSIBLE_COLLECTIONS_PATH`
+
+複数のパスをコロン（Windows はセミコロン）区切りで指定可能です。
 
 ```bash
 export ANSIBLE_COLLECTIONS_PATH="./collections:/usr/share/ansible/collections"
 graal-ansible playbook.yml
 ```
 
-### 3.2 デフォルトパスの探索
+### 3.3 デフォルトパスの探索
 
-環境変数が指定されていない場合、以下のデフォルト位置を自動的に探索します。
+上位の指定がない場合、以下のデフォルト位置を自動的に探索します。
 
 1.  実行ディレクトリ直下の `collections` フォルダ
 2.  `~/.ansible/collections`
 3.  `/usr/share/ansible/collections`
 
-### 3.3 `ansible.builtin` の解決
+### 3.4 `ansible.builtin` の解決
 
 `ansible.builtin` などのコアモジュールについては、以下のパスから解決を試みます。
 
