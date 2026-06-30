@@ -326,6 +326,36 @@ public class TaskQueueManager {
         }
     }
 
+    /**
+     * Checks if the maximum failure percentage has been exceeded for the current batch of hosts.
+     *
+     * @param play             The current play.
+     * @param task             The current task.
+     * @param batchHosts       The list of hosts in the current batch.
+     * @param failedHosts      The set of failed host names.
+     * @param variableManager  The variable manager to resolve templates.
+     */
+    public void checkMaxFailPercentage(Play play, Task task, List<Host> batchHosts, Set<String> failedHosts, VariableManager variableManager) {
+        if (batchHosts.isEmpty()) return;
+
+        // Use any host from the batch to resolve the percentage value (Ansible logic)
+        Host host = batchHosts.get(0);
+        Map<String, Object> vars = variableManager.getAllVariables(play, host, task, null, null, null);
+
+        Object maxFailPercentageObj = task != null && task.maxFailPercentage() != null ? task.maxFailPercentage() : play.maxFailPercentage();
+        if (maxFailPercentageObj == null) return;
+
+        Integer maxFailPercentage = variableResolver.resolveInteger(maxFailPercentageObj, vars, null);
+        if (maxFailPercentage == null || maxFailPercentage >= 100) return;
+
+        long failedCount = batchHosts.stream().filter(h -> failedHosts.contains(h.name())).count();
+        double currentFailPercentage = (failedCount * 100.0) / batchHosts.size();
+
+        if (currentFailPercentage > maxFailPercentage) {
+            this.playFatalError = true;
+        }
+    }
+
     private void executeBlock(Play play, Host host, Task blockTask, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean inheritedCheckMode, List<Object> inheritedEnvironments, Map<String, Object> inheritedBlockVars, List<Role> activeRoles, Map<String, Object> includeParams, Connection connection, List<String> runTags, List<String> skipTags) {
         Map<String, Object> blockVars = variableManager.getAllVariables(play, host, blockTask, inheritedBlockVars, activeRoles, includeParams);
         boolean blockCheckMode = variableResolver.resolveCheckMode(blockTask.checkMode(), blockVars, inheritedCheckMode);

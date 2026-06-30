@@ -321,10 +321,22 @@ public class VariableResolver {
      * @return Resolved throttle value, or null if not set.
      */
     public Integer resolveThrottle(Object throttle, Map<String, Object> variables, Integer inheritedValue) {
-        if (throttle == null) {
+        return resolveInteger(throttle, variables, inheritedValue);
+    }
+
+    /**
+     * Resolves an integer value from a setting (which can be a number or a template).
+     *
+     * @param value          The setting value.
+     * @param variables      The variable map.
+     * @param inheritedValue The value inherited from parent context.
+     * @return Resolved integer value, or null if not set.
+     */
+    public Integer resolveInteger(Object value, Map<String, Object> variables, Integer inheritedValue) {
+        if (value == null) {
             return inheritedValue;
         }
-        Object resolved = resolveValue(throttle, variables);
+        Object resolved = resolveValue(value, variables);
         if (resolved instanceof Integer i) {
             return i;
         } else if (resolved instanceof String s) {
