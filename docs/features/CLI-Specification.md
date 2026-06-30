@@ -27,7 +27,7 @@ graal-ansible [options] playbook.yml
 | `--ask-become-pass` | `-K` | 権限昇格パスワードをプロンプトで問い合せる | ◎ |
 | `--forks` | `-f` | 並列実行するホストの数を指定 | ◎ |
 | `--version` | - | バージョン情報を表示 | ◎ |
-| `--collections-path` | - | コレクションの探索パスを指定 | ○ |
+| `--collections-path` | - | コレクションの探索パスを指定 | ◎ |
 | `--help` | `-h` | ヘルプメッセージを表示 | ◎ |
 
 ※ ◎: 実装済み、○: 計画中、△: 部分的/検討中
@@ -59,7 +59,7 @@ graal-ansible [options] playbook.yml
 | 環境変数 | 説明 | 実装状況 |
 | :--- | :--- | :---: |
 | `ANSIBLE_STDOUT_CALLBACK` | 使用するコールバックプラグインを指定（例: `default`, `json`） | ◎ |
-| `ANSIBLE_COLLECTIONS_PATH` | コレクションの探索パスをコロン区切りで指定 | ○ |
+| `ANSIBLE_COLLECTIONS_PATH` | コレクションの探索パスをコロン区切りで指定 | ◎ |
 | `ANSIBLE_HASH_BEHAVIOUR` | 辞書型変数のマージ戦略を指定 (`replace` または `merge`) | ◎ |
 
 ## 6. 実装方針
