@@ -21,6 +21,7 @@ task_vars: Dict[str, Any] = ansible_bridge._deep_convert(task_vars_java) if 'tas
 module_args: Dict[str, Any] = ansible_bridge._deep_convert(module_args_java) if 'module_args_java' in globals() and module_args_java is not None else {}
 env: Optional[Dict[str, Any]] = environment_java if 'environment_java' in globals() else None
 site_packages: List[str] = [str(s) for s in site_packages_java] if 'site_packages_java' in globals() and site_packages_java is not None else []
+collection_paths: List[str] = [str(s) for s in collection_paths_java] if 'collection_paths_java' in globals() and collection_paths_java is not None else []
 
 def run_action_plugin() -> Dict[str, Any]:
     try:
@@ -29,7 +30,8 @@ def run_action_plugin() -> Dict[str, Any]:
             env_vars=env,
             complex_args=module_args,
             connection_java=connection_java if 'connection_java' in globals() else None,
-            become_context_java=become_context_java if 'become_context_java' in globals() else None
+            become_context_java=become_context_java if 'become_context_java' in globals() else None,
+            collection_paths=collection_paths
         )
 
         from ansible.playbook.task import Task

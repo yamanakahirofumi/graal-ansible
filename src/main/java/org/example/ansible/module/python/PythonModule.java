@@ -80,6 +80,7 @@ public class PythonModule implements Module {
             context.getBindings("python").putMember("complex_args_java", args);
             context.getBindings("python").putMember("module_name", moduleName);
             context.getBindings("python").putMember("site_packages_java", sitePackages);
+            context.getBindings("python").putMember("collection_paths_java", TaskExecutor.getCurrentCollectionPaths());
             context.getBindings("python").putMember("connection_java", connection);
             context.getBindings("python").putMember("become_context_java", becomeContext);
             context.getBindings("python").putMember("environment_java", TaskExecutor.getCurrentEnvironment());
@@ -302,6 +303,27 @@ public class PythonModule implements Module {
             baseName = baseName.substring("ansible.builtin.".length());
         } else if (baseName.startsWith("ansible.legacy.")) {
             baseName = baseName.substring("ansible.legacy.".length());
+        }
+
+        // Check collections
+        if (moduleName.contains(".")) {
+            String[] parts = moduleName.split("\\.");
+            if (parts.length >= 3) {
+                String namespace = parts[0];
+                String collection = parts[1];
+                String module = parts[parts.length - 1];
+                List<String> collectionPaths = TaskExecutor.getCurrentCollectionPaths();
+                if (collectionPaths == null) {
+                    collectionPaths = PythonEnv.getCollectionPaths(null);
+                }
+
+                for (String path : collectionPaths) {
+                    File moduleFile = new File(path, "ansible_collections/" + namespace + "/" + collection + "/plugins/modules/" + module + ".py");
+                    if (moduleFile.exists()) {
+                        return Optional.of(moduleFile);
+                    }
+                }
+            }
         }
 
         List<String> sitePackages = PythonEnv.getSitePackagesFromEnv();

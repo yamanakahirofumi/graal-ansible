@@ -127,7 +127,12 @@ def bind_task(complex_args: Any, connection_java: Any, become_context_java: Any,
     if 'ansible.module_utils.basic' in sys.modules:
         sys.modules['ansible.module_utils.basic']._PARSED_MODULE_ARGS = converted_args
 
-def setup_sys_path(site_packages: Optional[List[str]]) -> None:
+def setup_sys_path(site_packages: Optional[List[str]], collection_paths: Optional[List[str]] = None) -> None:
+    if collection_paths:
+        for p in collection_paths:
+            p_str = _normalize_path(p)
+            if p_str not in sys.path: sys.path.insert(0, p_str)
+
     if site_packages:
         for p in site_packages:
             p_str = _normalize_path(p)
@@ -643,6 +648,17 @@ def apply_mocks() -> None:
             # Also check subdirectories like 'system'
             for sub in ['system', 'utilities', 'files', 'net_tools']:
                 if os.path.exists(os.path.join(p, 'ansible/modules', sub, name + '.py')): return True
+
+        # Check collections
+        if '.' in name:
+            parts = name.split('.')
+            if len(parts) >= 3:
+                ns, coll, mod = parts[0], parts[1], parts[2]
+                coll_pkgs = globals().get('collection_paths_java')
+                if coll_pkgs:
+                    for p in coll_pkgs:
+                        if os.path.exists(os.path.join(_normalize_path(p), 'ansible_collections', ns, coll, 'plugins/modules', mod + '.py')): return True
+
         return name in ['apt', 'service', 'systemd', 'sysvinit', 'command', 'shell', 'setup', 'ping', 'wait_for']
 
     def mock_find_plugin_with_context(*args, **kwargs):
@@ -879,11 +895,24 @@ def _create_action_plugin(action_name: str, task: Any, connection: Any, play_con
     elif base_name.startswith('ansible.legacy.'): base_name = base_name[15:]
 
     path = None
-    site_pkgs = globals().get('site_packages_java')
-    if site_pkgs:
-        for p in site_pkgs:
-            cand = os.path.join(_normalize_path(p), 'ansible/plugins/action', base_name + '.py')
-            if os.path.exists(cand): path = cand; break
+
+    # Check collections
+    if '.' in action_name:
+        parts = action_name.split('.')
+        if len(parts) >= 3:
+            ns, coll, act = parts[0], parts[1], parts[2]
+            coll_pkgs = globals().get('collection_paths_java')
+            if coll_pkgs:
+                for p in coll_pkgs:
+                    cand = os.path.join(_normalize_path(p), 'ansible_collections', ns, coll, 'plugins/action', act + '.py')
+                    if os.path.exists(cand): path = cand; break
+
+    if not path:
+        site_pkgs = globals().get('site_packages_java')
+        if site_pkgs:
+            for p in site_pkgs:
+                cand = os.path.join(_normalize_path(p), 'ansible/plugins/action', base_name + '.py')
+                if os.path.exists(cand): path = cand; break
 
     if not path:
         for p in sys.path:
@@ -948,9 +977,22 @@ def execute_module(module_name: str, complex_args: Dict[str, Any], module_code: 
             if base_name.startswith('ansible.builtin.'): base_name = base_name[16:]
             elif base_name.startswith('ansible.legacy.'): base_name = base_name[15:]
             path = None
-            for p in sys.path:
-                cand = os.path.join(p, 'ansible/modules', base_name + '.py')
-                if os.path.exists(cand): path = cand; break
+
+            # Check collections
+            if '.' in module_name:
+                parts = module_name.split('.')
+                if len(parts) >= 3:
+                    ns, coll, mod = parts[0], parts[1], parts[2]
+                    coll_pkgs = globals().get('collection_paths_java')
+                    if coll_pkgs:
+                        for p in coll_pkgs:
+                            cand = os.path.join(_normalize_path(p), 'ansible_collections', ns, coll, 'plugins/modules', mod + '.py')
+                            if os.path.exists(cand): path = cand; break
+
+            if not path:
+                for p in sys.path:
+                    cand = os.path.join(p, 'ansible/modules', base_name + '.py')
+                    if os.path.exists(cand): path = cand; break
             if not path: return json.dumps({'failed': True, 'msg': f'Module {module_name} not found'})
             with open(path, 'rb') as f:
                 code = compile(f.read(), path, 'exec')
@@ -964,9 +1006,9 @@ def execute_module(module_name: str, complex_args: Dict[str, Any], module_code: 
     finally:
         sys.stdout = old_stdout
 
-def initialize(site_packages: Optional[List[str]] = None, env_vars: Optional[Dict[str, Any]] = None, complex_args: Optional[Dict[str, Any]] = None, connection_java: Any = None, become_context_java: Any = None) -> None:
+def initialize(site_packages: Optional[List[str]] = None, env_vars: Optional[Dict[str, Any]] = None, complex_args: Optional[Dict[str, Any]] = None, connection_java: Any = None, become_context_java: Any = None, collection_paths: Optional[List[str]] = None) -> None:
     apply_mocks()
-    setup_sys_path(site_packages)
+    setup_sys_path(site_packages, collection_paths)
     setup_env(env_vars)
     bind_task(complex_args or {}, connection_java, become_context_java, env_vars)
 

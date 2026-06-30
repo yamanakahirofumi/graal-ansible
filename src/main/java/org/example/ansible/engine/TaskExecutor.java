@@ -38,6 +38,7 @@ public class TaskExecutor implements ITaskExecutor {
     private static final ThreadLocal<Map<String, String>> currentEnvironment = new ThreadLocal<>();
     private static final ThreadLocal<BecomeContext> currentBecomeContext = new ThreadLocal<>();
     private static final ThreadLocal<VariableManager> currentVariableManager = new ThreadLocal<>();
+    private static final ThreadLocal<List<String>> currentCollectionPaths = new ThreadLocal<>();
 
     public static void setCurrentConnection(Connection connection) {
         currentConnection.set(connection);
@@ -87,6 +88,18 @@ public class TaskExecutor implements ITaskExecutor {
         currentVariableManager.remove();
     }
 
+    public static void setCurrentCollectionPaths(List<String> collectionPaths) {
+        currentCollectionPaths.set(collectionPaths);
+    }
+
+    public static List<String> getCurrentCollectionPaths() {
+        return currentCollectionPaths.get();
+    }
+
+    public static void clearCurrentCollectionPaths() {
+        currentCollectionPaths.remove();
+    }
+
     private static final List<String> WELL_KNOWN_ACTION_PLUGINS = List.of(
             "debug", "set_fact", "copy", "template", "assemble", "group_by",
             "include_vars", "fetch", "pause", "wait_for_connection", "gather_facts",
@@ -102,6 +115,7 @@ public class TaskExecutor implements ITaskExecutor {
     private final ConnectionFactory connectionFactory;
     private final PythonOSMock pythonOSMock;
     private final AsyncJobManager asyncJobManager = new DefaultAsyncJobManager();
+    private List<String> collectionPaths = new ArrayList<>();
 
     public TaskExecutor() {
         this(OSHandlerFactory.getHandler());
@@ -134,6 +148,16 @@ public class TaskExecutor implements ITaskExecutor {
         } catch (Exception e) {
             throw new RuntimeException("Failed to pre-load ansible_bridge.py", e);
         }
+    }
+
+    @Override
+    public void setCollectionPaths(List<String> collectionPaths) {
+        this.collectionPaths = collectionPaths != null ? collectionPaths : new ArrayList<>();
+    }
+
+    @Override
+    public List<String> getCollectionPaths() {
+        return collectionPaths;
     }
 
     @Override
@@ -313,9 +337,15 @@ public class TaskExecutor implements ITaskExecutor {
             final Connection finalConnection = effectiveConnection;
             final Map<String, String> finalEnv = variableResolver.resolveEnvironment(play, task, variables, inheritedEnvironments);
             final BecomeContext finalBecome = variableResolver.resolveBecomeContext(play, resolvedTask, variables);
+            final List<String> finalCollPaths = collectionPaths;
 
             AsyncJob job = asyncJobManager.submit(jid, resolvedTask.asyncVal(), () -> {
-                return executeWithContext(resolvedTask, finalBecome, finalConnection, finalEnv);
+                setCurrentCollectionPaths(finalCollPaths);
+                try {
+                    return executeWithContext(resolvedTask, finalBecome, finalConnection, finalEnv);
+                } finally {
+                    clearCurrentCollectionPaths();
+                }
             });
 
             if (resolvedTask.poll() > 0) {
@@ -431,6 +461,23 @@ public class TaskExecutor implements ITaskExecutor {
                     }
                 }
             }
+
+            // Search in collection paths
+            if (finalBaseName.contains(".")) {
+                String[] parts = finalBaseName.split("\\.");
+                if (parts.length >= 3) {
+                    String namespace = parts[0];
+                    String collection = parts[1];
+                    String act = parts[2];
+                    for (String path : collectionPaths) {
+                        File actionFile = new File(path, "ansible_collections/" + namespace + "/" + collection + "/plugins/action/" + act + ".py");
+                        if (actionFile.exists()) {
+                            return true;
+                        }
+                    }
+                }
+            }
+
             return false;
         });
     }
@@ -635,12 +682,14 @@ public class TaskExecutor implements ITaskExecutor {
         setCurrentConnection(connection);
         setCurrentEnvironment(environment);
         setCurrentBecomeContext(becomeContext);
+        setCurrentCollectionPaths(collectionPaths);
         try {
             return execute(task, becomeContext, environment);
         } finally {
             clearCurrentConnection();
             clearCurrentEnvironment();
             clearCurrentBecomeContext();
+            clearCurrentCollectionPaths();
         }
     }
 
@@ -655,6 +704,7 @@ public class TaskExecutor implements ITaskExecutor {
         setCurrentConnection(connection);
         setCurrentEnvironment(environment);
         setCurrentBecomeContext(becomeContext);
+        setCurrentCollectionPaths(collectionPaths);
         try {
             List<String> sitePackages = PythonEnv.getSitePackagesFromEnv();
 
@@ -666,6 +716,7 @@ public class TaskExecutor implements ITaskExecutor {
             context.getBindings("python").putMember("action_name", actionName);
             context.getBindings("python").putMember("module_args_java", task.args());
             context.getBindings("python").putMember("site_packages_java", sitePackages);
+            context.getBindings("python").putMember("collection_paths_java", collectionPaths);
 
             context.eval(loadResource("ansible_action_launcher.py"));
 
@@ -694,6 +745,7 @@ public class TaskExecutor implements ITaskExecutor {
             clearCurrentConnection();
             clearCurrentEnvironment();
             clearCurrentBecomeContext();
+            clearCurrentCollectionPaths();
         }
     }
 

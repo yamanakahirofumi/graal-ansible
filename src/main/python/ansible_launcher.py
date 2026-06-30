@@ -22,7 +22,8 @@ try:
         env_vars=env,
         complex_args=complex_args,
         connection_java=connection_java if 'connection_java' in globals() else None,
-        become_context_java=become_context_java if 'become_context_java' in globals() else None
+        become_context_java=become_context_java if 'become_context_java' in globals() else None,
+        collection_paths=collection_paths_java if 'collection_paths_java' in globals() else None
     )
 
     result = ansible_bridge.execute_module(module_name, complex_args)

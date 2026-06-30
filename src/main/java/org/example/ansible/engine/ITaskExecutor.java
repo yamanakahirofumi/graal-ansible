@@ -94,6 +94,20 @@ public interface ITaskExecutor extends AutoCloseable {
     String resolveLocalPath(String path);
 
     /**
+     * Sets the collection search paths.
+     * @param collectionPaths List of absolute paths.
+     */
+    default void setCollectionPaths(List<String> collectionPaths) {}
+
+    /**
+     * Gets the collection search paths.
+     * @return List of absolute paths.
+     */
+    default List<String> getCollectionPaths() {
+        return java.util.Collections.emptyList();
+    }
+
+    /**
      * Python (Action Plugin) から呼び出され、指定されたモジュールを実行します。
      * @param moduleName モジュール名 (例: "copy", "apt")
      * @param moduleArgs モジュール引数 (Map形式)
