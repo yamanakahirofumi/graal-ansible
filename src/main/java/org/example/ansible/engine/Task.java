@@ -39,6 +39,7 @@ import java.util.List;
  * @param tags              The tags defined for this task.
  * @param listen            List of topics this handler listens to.
  * @param anyErrorsFatal    Whether to halt play execution on any host failure.
+ * @param maxFailPercentage The maximum percentage of host failures allowed before halting.
  * @param throttle          The maximum number of hosts to execute this task on in parallel.
  * @param asyncVal          The timeout for asynchronous execution (seconds).
  * @param poll              The polling interval for asynchronous execution (seconds).
@@ -75,6 +76,7 @@ public record Task(
         List<String> tags,
         List<String> listen,
         Object anyErrorsFatal,
+        Object maxFailPercentage,
         Object throttle,
         Integer asyncVal,
         Integer poll
@@ -82,13 +84,13 @@ public record Task(
     public Task(String name, String action, Map<String, Object> args) {
         this(name, action, args, new HashMap<>(), null, null, null, Map.of(), new ArrayList<>(), null, null, false,
                 null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
-                null, null, null, null, null, null, List.of(), List.of(), null, null, 0, 10);
+                null, null, null, null, null, null, List.of(), List.of(), null, null, null, 0, 10);
     }
 
     public Task(String name, String action, Map<String, Object> args, Map<String, Object> vars) {
         this(name, action, args, vars, null, null, null, Map.of(), List.of(), null, null, false,
                 null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
-                null, null, null, null, null, null, List.of(), List.of(), null, null, 0, 10);
+                null, null, null, null, null, null, List.of(), List.of(), null, null, null, 0, 10);
     }
 
     public Task(
@@ -122,7 +124,7 @@ public record Task(
     ) {
         this(name, action, args, vars, when, register, loop, Map.of(), notifications, failedWhen, changedWhen, ignoreErrors,
                 until, retries, delay, delegateTo, delegateFacts, runOnce, ignoreUnreachable, block, rescue, always,
-                become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, List.of(), List.of(), null, null, 0, 10);
+                become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, List.of(), List.of(), null, null, null, 0, 10);
     }
 
     public Task(
@@ -158,7 +160,7 @@ public record Task(
     ) {
         this(name, action, args, vars, when, register, loop, loopControl, notifications, failedWhen, changedWhen, ignoreErrors,
                 until, retries, delay, delegateTo, delegateFacts, runOnce, ignoreUnreachable, block, rescue, always,
-                become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, List.of(), null, null, 0, 10);
+                become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, List.of(), null, null, null, 0, 10);
     }
 
     public Task(
@@ -195,7 +197,7 @@ public record Task(
     ) {
         this(name, action, args, vars, when, register, loop, loopControl, notifications, failedWhen, changedWhen, ignoreErrors,
                 until, retries, delay, delegateTo, delegateFacts, runOnce, ignoreUnreachable, block, rescue, always,
-                become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, listen, null, null, 0, 10);
+                become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, listen, null, null, null, 0, 10);
     }
 
     public Task(
@@ -233,7 +235,7 @@ public record Task(
     ) {
         this(name, action, args, vars, when, register, loop, loopControl, notifications, failedWhen, changedWhen, ignoreErrors,
                 until, retries, delay, delegateTo, delegateFacts, runOnce, ignoreUnreachable, block, rescue, always,
-                become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, listen, anyErrorsFatal, null, 0, 10);
+                become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, listen, anyErrorsFatal, null, null, 0, 10);
     }
 
     public Task(
@@ -273,6 +275,6 @@ public record Task(
     ) {
         this(name, action, args, vars, when, register, loop, loopControl, notifications, failedWhen, changedWhen, ignoreErrors,
                 until, retries, delay, delegateTo, delegateFacts, runOnce, ignoreUnreachable, block, rescue, always,
-                become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, listen, anyErrorsFatal, null, asyncVal, poll);
+                become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, listen, anyErrorsFatal, null, null, asyncVal, poll);
     }
 }
