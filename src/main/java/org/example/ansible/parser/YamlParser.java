@@ -27,7 +27,7 @@ public class YamlParser {
             "vars", "notify", "listen", "with_items", "with_list", "with_dict",
             "failed_when", "changed_when", "delegate_to", "delegate_facts", "run_once",
             "block", "rescue", "always", "check_mode", "environment", "any_errors_fatal",
-            "async", "poll", "throttle"
+            "async", "poll", "throttle", "max_fail_percentage"
     );
 
     private final Yaml yaml;
@@ -105,7 +105,8 @@ public class YamlParser {
                                     play.anyErrorsFatal(),
                                     play.strategy(),
                                     play.serial(),
-                                    play.throttle()
+                                    play.throttle(),
+                                    play.maxFailPercentage()
                             );
                         }
                         plays.add(play);
@@ -253,8 +254,9 @@ public class YamlParser {
         String strategy = (String) map.getOrDefault("strategy", "linear");
         Object serial = map.get("serial");
         Object throttle = map.get("throttle");
+        Object maxFailPercentage = map.get("max_fail_percentage");
 
-        return new Play(name, hosts, tasks, vars, varsFiles, varsPrompt, roles, handlers, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, playTags, anyErrorsFatal, strategy, serial, throttle);
+        return new Play(name, hosts, tasks, vars, varsFiles, varsPrompt, roles, handlers, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, playTags, anyErrorsFatal, strategy, serial, throttle, maxFailPercentage);
     }
 
     @SuppressWarnings("unchecked")
@@ -336,6 +338,7 @@ public class YamlParser {
         Object checkMode = map.get("check_mode");
         Object environment = map.get("environment");
         Object anyErrorsFatal = map.get("any_errors_fatal");
+        Object maxFailPercentage = map.get("max_fail_percentage");
         Object throttle = map.get("throttle");
         Integer asyncVal = (Integer) map.getOrDefault("async", 0);
         Integer poll = (Integer) map.getOrDefault("poll", 10);
@@ -363,7 +366,7 @@ public class YamlParser {
         return new Task(name, action, args, vars, when, register, loop, loopControl, notify, failedWhen, changedWhen, ignoreErrors,
                 until, retries, delay, delegateTo, delegateFacts, runOnce, ignoreUnreachable, block, rescue, always,
                 become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, taskTags, listen, anyErrorsFatal,
-                throttle, asyncVal, poll);
+                maxFailPercentage, throttle, asyncVal, poll);
     }
 
     @SuppressWarnings("unchecked")

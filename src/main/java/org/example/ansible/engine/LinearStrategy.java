@@ -69,6 +69,7 @@ public class LinearStrategy implements Strategy {
                     }
                     executedOnce = true;
                 }
+                tqm.checkMaxFailPercentage(play, task, batch, failedHosts, variableManager);
             }
 
             // Execute handlers for this batch
