@@ -21,6 +21,7 @@ import org.example.ansible.inventory.Inventory;
 import org.example.ansible.inventory.InventoryManager;
 import org.example.ansible.inventory.ScriptInventoryProvider;
 import org.example.ansible.parser.YamlParser;
+import org.example.ansible.util.YamlUtil;
 import org.graalvm.polyglot.Context;
 import org.yaml.snakeyaml.Yaml;
 
@@ -195,7 +196,7 @@ public class PlaybookCli implements Callable<Integer> {
     @SuppressWarnings("unchecked")
     private Map<String, Object> parseExtraVars(List<String> extraVars) {
         Map<String, Object> result = new HashMap<>();
-        Yaml yaml = new Yaml();
+        Yaml yaml = YamlUtil.createYaml();
         for (String var : extraVars) {
             String trimmedVar = var.trim();
             if (trimmedVar.startsWith("@")) {

@@ -1,5 +1,6 @@
 package org.example.ansible.inventory;
 
+import org.example.ansible.util.YamlUtil;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.InputStream;
@@ -9,7 +10,7 @@ import java.util.*;
  * Parses inventory files in YAML format.
  */
 public class YamlInventoryParser implements InventoryParser {
-    private final Yaml yaml = new Yaml();
+    private final Yaml yaml = YamlUtil.createYaml();
 
     @Override
     public Inventory parse(InputStream inputStream) {
