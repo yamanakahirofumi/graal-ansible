@@ -209,6 +209,14 @@
     - `FreeStrategy` において `Semaphore` を用いた同時実行ホスト数の制御を実装.
     - `VariableResolver` にて `throttle` 値（数値またはテンプレート）の動的評価をサポート.
 
+### 1.32 [✓] 失敗許容率 (max_fail_percentage) の完全サポート
+- **完了日**: 2026-08-02
+- **概要**: `linear` 戦略に加えて、`free` 戦略および `Role` 実行時においても `max_fail_percentage` を有効化。
+- **解決策**:
+    - `TaskQueueManager` においてロール実行ループ後に `checkMaxFailPercentage` を呼び出すよう修正。
+    - `FreeStrategy` において各ホストのタスク実行直後に `checkMaxFailPercentage` を呼び出し、並列実行中も閾値を超えた時点で新規タスクの開始を抑止する仕組みを導入。
+    - 判定ロジックがロール変数を正しく参照できるよう、`checkMaxFailPercentage` の引数に `activeRoles` を追加。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築

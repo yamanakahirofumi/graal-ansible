@@ -8,15 +8,22 @@ import org.example.ansible.parser.YamlParser;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class MaxFailPercentageTest {
+
+    @TempDir
+    Path tempDir;
 
     private TaskExecutor taskExecutor;
     private PlaybookExecutor playbookExecutor;
@@ -47,12 +54,10 @@ class MaxFailPercentageTest {
                   max_fail_percentage: 25
                   tasks:
                     - name: fail on host1 and host2
-                      fail:
-                        msg: "forced failure"
+                      shell: exit 1
                       when: inventory_hostname == 'host1' or inventory_hostname == 'host2'
                     - name: should not run anywhere
-                      debug:
-                        msg: "this should not appear"
+                      command: echo "should not run"
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
 
@@ -81,12 +86,10 @@ class MaxFailPercentageTest {
                   max_fail_percentage: 50
                   tasks:
                     - name: fail on host1 and host2
-                      fail:
-                        msg: "forced failure"
+                      shell: exit 1
                       when: inventory_hostname == 'host1' or inventory_hostname == 'host2'
                     - name: should run on host3 and host4
-                      debug:
-                        msg: "this should appear"
+                      command: echo "should run"
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
 
@@ -109,12 +112,10 @@ class MaxFailPercentageTest {
                   max_fail_percentage: 49
                   tasks:
                     - name: fail on host1
-                      fail:
-                        msg: "forced failure"
+                      shell: exit 1
                       when: inventory_hostname == 'host1'
                     - name: should not run on host2
-                      debug:
-                        msg: "this should not appear"
+                      command: echo "should not run"
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
 
@@ -133,5 +134,81 @@ class MaxFailPercentageTest {
         // Batch 2 should NOT run at all
         assertNull(results.get("host3"));
         assertNull(results.get("host4"));
+    }
+
+    @Test
+    void testMaxFailPercentageWithFreeStrategy() {
+        // 4 hosts, free strategy
+        // max_fail_percentage: 49 -> 2 failures (50%) > 49% -> fatal.
+        // To avoid race conditions in this test, we fail one host and make another host sleep a bit.
+        String playbookYaml = """
+                - name: test max_fail_percentage with free strategy
+                  hosts: all
+                  strategy: free
+                  max_fail_percentage: 49
+                  tasks:
+                    - name: fail on host1 and host2, sleep on others
+                      shell: |
+                        if [ "{{ inventory_hostname }}" = "host1" ] || [ "{{ inventory_hostname }}" = "host2" ]; then
+                          exit 1
+                        else
+                          sleep 1
+                          exit 0
+                        fi
+                    - name: should not run anywhere
+                      command: echo "should not run"
+                """;
+        Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
+
+        Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
+
+        // Second task should NOT run because failure rate (2/4 = 50%) > 49%
+        // Host1 and Host2 failed the first task.
+        // Host3 and Host4 should see playFatalError before they start the second task because of the sleep 1.
+
+        assertEquals(1, results.get("host1").size(), "Host1 should only have 1 task result");
+        assertEquals(1, results.get("host2").size(), "Host2 should only have 1 task result");
+        assertEquals(1, results.get("host3").size(), "Host3 should only have 1 task result");
+        assertEquals(1, results.get("host4").size(), "Host4 should only have 1 task result");
+    }
+
+    @Test
+    void testMaxFailPercentageInRole() throws IOException {
+        // Setup role
+        Path rolesDir = tempDir.resolve("roles");
+        Path testRoleDir = rolesDir.resolve("fail_role");
+        Files.createDirectories(testRoleDir.resolve("tasks"));
+        Files.writeString(testRoleDir.resolve("tasks").resolve("main.yml"), """
+                - name: fail role task
+                  shell: exit 1
+                  when: inventory_hostname == 'host1' or inventory_hostname == 'host2'
+                - name: should not run
+                  command: echo "should not run"
+                """);
+
+        // Use PlaybookExecutor with baseDir to find roles
+        PlaybookExecutor pe = new PlaybookExecutor(taskExecutor, (host, vars) -> new org.example.ansible.connection.LocalConnection());
+        VariableManager vm = new VariableManager(inventory, Map.of(), tempDir);
+
+        String playbookYaml = """
+                - name: test max_fail_percentage in role
+                  hosts: all
+                  max_fail_percentage: 49
+                  roles:
+                    - fail_role
+                """;
+        Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
+
+        Map<String, List<TaskResult>> results = pe.execute(playbook, inventory, vm, false);
+
+        // Role Task 1 runs on all hosts (fails on 2)
+        assertFalse(results.get("host1").get(0).success());
+        assertFalse(results.get("host2").get(0).success());
+
+        // Role Task 2 should NOT run because failure rate (2/4 = 50%) > 49%
+        assertEquals(1, results.get("host1").size(), "Host1 should only have 1 role task result");
+        assertEquals(1, results.get("host2").size(), "Host2 should only have 1 role task result");
+        assertEquals(1, results.get("host3").size(), "Host3 should only have 1 role task result");
+        assertEquals(1, results.get("host4").size(), "Host4 should only have 1 role task result");
     }
 }

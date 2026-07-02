@@ -92,6 +92,7 @@ public class FreeStrategy implements Strategy {
                                 semaphore.release();
                             }
                         }
+                        tqm.checkMaxFailPercentage(play, task, targetHosts, failedHosts, variableManager);
                     }
 
                     // Handlers

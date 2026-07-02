@@ -336,11 +336,15 @@ public class TaskQueueManager {
      * @param variableManager  The variable manager to resolve templates.
      */
     public void checkMaxFailPercentage(Play play, Task task, List<Host> batchHosts, Set<String> failedHosts, VariableManager variableManager) {
+        checkMaxFailPercentage(play, task, batchHosts, failedHosts, variableManager, null);
+    }
+
+    public void checkMaxFailPercentage(Play play, Task task, List<Host> batchHosts, Set<String> failedHosts, VariableManager variableManager, List<Role> activeRoles) {
         if (batchHosts.isEmpty()) return;
 
         // Use any host from the batch to resolve the percentage value (Ansible logic)
         Host host = batchHosts.get(0);
-        Map<String, Object> vars = variableManager.getAllVariables(play, host, task, null, null, null);
+        Map<String, Object> vars = variableManager.getAllVariables(play, host, task, null, activeRoles, null);
 
         Object maxFailPercentageObj = task != null && task.maxFailPercentage() != null ? task.maxFailPercentage() : play.maxFailPercentage();
         if (maxFailPercentageObj == null) return;
@@ -721,6 +725,7 @@ public class TaskQueueManager {
                 }
                 executedOnce = true;
             }
+            checkMaxFailPercentage(play, task, targetHosts, failedHosts, variableManager, activeRoles);
         }
     }
 
