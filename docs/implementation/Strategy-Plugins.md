@@ -67,4 +67,4 @@ Ansible のデフォルト戦略であり、`graal-ansible` における標準�
 ## 5. 今後の課題
 
 ### 5.1 その他
-その他の設計・拡張事項については、[検討事項・TODOリスト](../TODO-Details.md#6-今後の設計拡張事項-future-design-and-extensions) を参照してください。
+その他の設計・拡張事項については、[検討事項・TODOリスト](../TODO-Details.md#5-今後の設計・拡張事項-future-design-and-extensions) を参照してください。
