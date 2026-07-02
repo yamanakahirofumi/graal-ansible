@@ -73,7 +73,7 @@ Ansible 標準の出力形式を提供します。
 
 ## 6. 今後の拡張性
 
-今後の設計・拡張事項については、[検討事項・TODOリスト](../TODO-Details.md#6-今後の設計拡張事項-future-design-and-extensions) を参照してください。
+今後の設計・拡張事項については、[検討事項・TODOリスト](../TODO-Details.md#5-今後の設計・拡張事項-future-design-and-extensions) を参照してください。
 
 ## 7. ロギング方針との関係
 - `Logging-Policy.md` で定義される `java.util.logging` は、主に内部デバッグやシステムエラー用です。
