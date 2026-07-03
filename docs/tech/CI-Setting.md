@@ -42,7 +42,7 @@ jobs:
       uses: graalvm/setup-graalvm@v1
       with:
         java-version: '21'
-        distribution: 'graalvm'
+        distribution: 'oracle-graalvm'
         version: '25.0.2'
         components: 'python'
         github-token: ${{ secrets.GITHUB_TOKEN }}
