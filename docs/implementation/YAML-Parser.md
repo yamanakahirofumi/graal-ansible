@@ -9,15 +9,22 @@
 
 ## 2. 実装のポイント
 
-### 2.1 不変オブジェクトへのマッピング (Java Record)
+### 2.1 統一的な解析基盤 (YamlUtil)
+
+- `org.example.ansible.util.YamlUtil` を通じて `Yaml` インスタンスの生成を一本化しています。
+- Playbook だけでなく、インベントリや変数ファイルの解析においても `YamlUtil.createYaml()` を使用することで、プロジェクト全体で一貫した解析ルールを適用しています。
+
+### 2.2 不変オブジェクトへのマッピング (Java Record)
 
 - `SnakeYAML` の `Constructor` をカスタマイズし、解析結果を Java 14 以降の `record` クラスに直接マッピングします。
-- これにより、Playbook データが読み込み後に変更されることを防ぎ、並行実行時の安全性を確保します。
+- **可変性の確保**: `record` 自体は不変ですが、`add_host` や `group_by` モジュールによる実行時の動的な更新をサポートするため、Record が保持するリストやマップは、解析時に `ArrayList` や `HashMap` などの可変（Mutable）なコレクションとしてインスタンス化されます。
 
-### 2.2 Ansible 特有の構造への対応
+### 2.3 Ansible 特有の構造への対応
 
 - **リストとディクショナリの混在**: `tasks:` セクション内での複雑なリスト構造を、型安全に解析します。
-- **YAML タグの処理**: Ansible 本家がサポートする `!vault`, `!unsafe` 等のタグに対して、独自の `Representer` / `Constructor` を登録し、適切にオブジェクト化します。
+- **YAML タグの処理とフォールバック**:
+    - `AnsibleYamlConstructor` (SafeConstructor を継承) を実装し、Ansible 特有のタグを処理します。
+    - `!vault`, `!unsafe`, `!unknown_seq` などの未知または未対応のカスタムタグに遭遇した場合、解析エラーで停止させるのではなく、対応するベースの YAML 型（String, List, Map 等）として透過的にフォールバックして処理を継続します。
 
 ## 3. Native Image への対応
 
