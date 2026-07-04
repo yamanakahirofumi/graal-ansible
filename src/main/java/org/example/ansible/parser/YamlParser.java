@@ -4,6 +4,7 @@ import org.example.ansible.engine.Play;
 import org.example.ansible.engine.Playbook;
 import org.example.ansible.engine.Role;
 import org.example.ansible.engine.Task;
+import org.example.ansible.util.YamlUtil;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.File;
@@ -33,7 +34,7 @@ public class YamlParser {
     private final Yaml yaml;
 
     public YamlParser() {
-        this.yaml = new Yaml();
+        this.yaml = YamlUtil.createYaml();
     }
 
     /**

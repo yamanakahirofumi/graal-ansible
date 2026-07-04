@@ -3,6 +3,7 @@ package org.example.ansible.engine;
 import org.example.ansible.inventory.Host;
 import org.example.ansible.inventory.Inventory;
 import org.example.ansible.inventory.Group;
+import org.example.ansible.util.YamlUtil;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.FileInputStream;
@@ -77,7 +78,7 @@ public class VariableManager {
     private final Path baseDir;
     private final Path inventoryDir;
     private final HashBehaviour hashBehaviour;
-    private final Yaml yaml = new Yaml();
+    private final Yaml yaml = YamlUtil.createYaml();
 
     private List<String> playHostNames = new ArrayList<>();
     private List<String> playBatchHostNames = new ArrayList<>();
