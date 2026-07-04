@@ -53,3 +53,4 @@
 - **概要**: `free` 戦略などにおいて、ホストごとに進捗が異なる場合の出力形式のさらなる最適化。
 - **検討内容**:
     - ホストごとの並列実行状況をより分かりやすく表示するための `DefaultCallback` の拡張。
+    - タスクヘッダーの重複排除（Deduplication）およびスレッドセーフな出力の設計（詳細は [Callback-Plugins.md](implementation/Callback-Plugins.md#7-並列実行における出力の最適化-future-design) を参照）。
