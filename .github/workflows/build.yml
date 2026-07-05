@@ -27,7 +27,6 @@ jobs:
         with:
           java-version: '21'
           distribution: 'graalvm'
-          components: 'python'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           native-image-job-reports: 'true'
       - name: Build and Test
