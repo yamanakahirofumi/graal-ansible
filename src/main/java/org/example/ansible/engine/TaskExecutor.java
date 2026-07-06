@@ -137,7 +137,9 @@ public class TaskExecutor implements ITaskExecutor {
 
         // Using IsolateNativeModules=true for stability on Linux as specified in GraalPy-Integration.md
         builder.option("python.IsolateNativeModules", "true");
-        builder.option("python.PosixModuleBackend", "native");
+        if ("Linux".equals(osHandler.getOSFamily())) {
+            builder.option("python.PosixModuleBackend", "native");
+        }
 
         this.context = builder.build();
 
