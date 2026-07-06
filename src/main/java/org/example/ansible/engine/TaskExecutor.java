@@ -135,8 +135,9 @@ public class TaskExecutor implements ITaskExecutor {
         Context.Builder builder = Context.newBuilder("python")
                 .allowAllAccess(true);
 
-        // Using IsolateNativeModules=false for stability with ansible-core
-        builder.option("python.IsolateNativeModules", "false");
+        // Using IsolateNativeModules=true for stability on Linux as specified in GraalPy-Integration.md
+        builder.option("python.IsolateNativeModules", "true");
+        builder.option("python.PosixModuleBackend", "native");
 
         this.context = builder.build();
 

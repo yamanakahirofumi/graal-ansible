@@ -43,8 +43,12 @@ Worker Process (`TaskExecutor`) は、タスクの `action` 名に基づき、�
 
 ### 3.2 Python 側 (ansible_action_launcher.py)
 1.  **Ansible コアクラスのモック**: Action Plugin が依存する `Task`, `Connection`, `PlayContext`, `DataLoader`, `Templar` 等のコアクラスを、Java ブリッジを利用するようにモック化します。
-2.  **プラグインのロード**: 指定された Action Plugin モジュールをインポートし、プラグインクラス（例: `ActionModule`）を生成します。
-3.  **実行**: プラグインの `run(task_vars)` メソッドを実行します。
+2.  **引数の平坦化 (Argument Flattening)**:
+    - モジュール引数のうち、`dest`, `path`, `src`, `name` の 4 つのキーについて、値が要素数 1 のリスト形式である場合、自動的に文字列（最初の要素）に変換します。
+    - これは Java 側の変数解決によって予期せずリスト型となった引数を、Python 側の Action Plugin が期待する型に適合させるための処理です。
+    - 要素数が 2 以上のリストはそのまま維持され、Python 側でのバリデーション（型エラー等）を適切に発生させます。
+3.  **プラグインのロード**: 指定された Action Plugin モジュールをインポートし、プラグインクラス（例: `ActionModule`）を生成します。
+4.  **実行**: プラグインの `run(task_vars)` メソッドを実行します。
 
 ### 3.3 Python ランチャー (実行ブリッジ) の詳細仕様
 Action Plugin を実行するための `ansible_action_launcher.py` は、以下のバインディングとインターフェースを期待します。

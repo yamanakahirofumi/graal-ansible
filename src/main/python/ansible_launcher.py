@@ -26,6 +26,8 @@ try:
         collection_paths=collection_paths_java if 'collection_paths_java' in globals() else None
     )
 
+    ansible_bridge.flatten_args(complex_args)
+
     result = ansible_bridge.execute_module(module_name, complex_args)
 except Exception as e:
     import traceback

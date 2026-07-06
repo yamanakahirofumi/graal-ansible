@@ -157,6 +157,16 @@ def setup_env(env_vars: Optional[Dict[str, Any]]) -> None:
     if env_vars:
         for k, v in dict(env_vars).items(): os.environ[str(k)] = str(v)
 
+def flatten_args(args: Dict[str, Any]) -> None:
+    """
+    Flatten common arguments if they are single-element lists.
+    This is necessary because Java's variable resolution may return lists for simple string arguments.
+    """
+    if not args: return
+    for key in ['dest', 'path', 'src', 'name']:
+        if key in args and isinstance(args[key], list) and len(args[key]) == 1:
+            args[key] = args[key][0]
+
 # --- Mock Classes ---
 
 class MockLoader:
