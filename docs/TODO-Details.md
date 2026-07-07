@@ -45,12 +45,8 @@
 
 ### 5.1 [ ] Python ベースのコールバックのサポート
 - **概要**: GraalPy を利用して Ansible 本家の Python 製コールバックプラグインをそのまま実行する仕組みの導入。
-- **検討内容**:
-    - `ActionPlugin` と同様のブリッジメカニズム（`ansible_bridge.py`）の適用.
-    - Python 側のイベントフックを Java 側の `Callback` インターフェースへマッピングする方法。
+- **詳細は [Callback-Plugins.md](implementation/Callback-Plugins.md#9-python-ベースのコールバックのサポート-future-design) を参照。**
 
 ### 5.2 [ ] ストラテジ固有のコールバック最適化
 - **概要**: `free` 戦略などにおいて、ホストごとに進捗が異なる場合の出力形式のさらなる最適化。
-- **検討内容**:
-    - ホストごとの並列実行状況をより分かりやすく表示するための `DefaultCallback` の拡張。
-    - タスクヘッダーの重複排除（Deduplication）およびスレッドセーフな出力の設計（詳細は [Callback-Plugins.md](implementation/Callback-Plugins.md#7-並列実行における出力の最適化-future-design) を参照）。
+- **詳細は [Callback-Plugins.md](implementation/Callback-Plugins.md#7-並列実行における出力の最適化-future-design) を参照。**

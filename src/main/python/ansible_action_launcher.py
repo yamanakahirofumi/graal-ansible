@@ -38,11 +38,6 @@ def run_action_plugin() -> Dict[str, Any]:
         from ansible.playbook.play_context import PlayContext
         from ansible.template import Templar
 
-        # Flatten common arguments if they are single-element lists
-        for key in ['dest', 'path', 'src', 'name']:
-            if key in module_args and isinstance(module_args[key], list) and len(module_args[key]) == 1:
-                module_args[key] = module_args[key][0]
-
         mock_task = Task()
         mock_task.action, mock_task.args = action_name, module_args
         # Initialize internal fields required by some Action Plugins (like copy)

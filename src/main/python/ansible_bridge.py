@@ -124,6 +124,12 @@ def bind_task(complex_args: Any, connection_java: Any, become_context_java: Any,
         'environment_java': environment_java
     })
 
+    # Flatten common arguments if they are single-element lists
+    if isinstance(converted_args, dict):
+        for key in ['dest', 'path', 'src', 'name']:
+            if key in converted_args and isinstance(converted_args[key], list) and len(converted_args[key]) == 1:
+                converted_args[key] = converted_args[key][0]
+
     if 'ansible.module_utils.basic' in sys.modules:
         sys.modules['ansible.module_utils.basic']._PARSED_MODULE_ARGS = converted_args
 
