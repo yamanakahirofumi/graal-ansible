@@ -1012,11 +1012,12 @@ def execute_module(module_name: str, complex_args: Dict[str, Any], module_code: 
     finally:
         sys.stdout = old_stdout
 
-def initialize(site_packages: Optional[List[str]] = None, env_vars: Optional[Dict[str, Any]] = None, complex_args: Optional[Dict[str, Any]] = None, connection_java: Any = None, become_context_java: Any = None, collection_paths: Optional[List[str]] = None) -> None:
+def initialize(site_packages: Optional[List[str]] = None, env_vars: Optional[Dict[str, Any]] = None, complex_args: Optional[Dict[str, Any]] = None, connection_java: Any = None, become_context_java: Any = None, collection_paths: Optional[List[str]] = None) -> Dict[str, Any]:
     apply_mocks()
     setup_sys_path(site_packages, collection_paths)
     setup_env(env_vars)
     bind_task(complex_args or {}, connection_java, become_context_java, env_vars)
+    return _current_task_context['complex_args']
 
 # Early initialization
 apply_mocks()

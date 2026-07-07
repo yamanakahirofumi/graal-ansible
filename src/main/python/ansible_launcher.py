@@ -17,7 +17,7 @@ complex_args: Dict[str, Any] = ansible_bridge._deep_convert(complex_args_java) i
 env: Optional[Dict[str, Any]] = environment_java if 'environment_java' in globals() else None
 
 try:
-    ansible_bridge.initialize(
+    processed_args = ansible_bridge.initialize(
         site_packages=site_packages_java if 'site_packages_java' in globals() else None,
         env_vars=env,
         complex_args=complex_args,
@@ -26,7 +26,7 @@ try:
         collection_paths=collection_paths_java if 'collection_paths_java' in globals() else None
     )
 
-    result = ansible_bridge.execute_module(module_name, complex_args)
+    result = ansible_bridge.execute_module(module_name, processed_args)
 except Exception as e:
     import traceback
     result = json.dumps({'failed': True, 'msg': f'Launcher error: {str(e)}', 'traceback': traceback.format_exc()})

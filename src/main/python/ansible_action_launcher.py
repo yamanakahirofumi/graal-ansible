@@ -25,7 +25,7 @@ collection_paths: List[str] = [str(s) for s in collection_paths_java] if 'collec
 
 def run_action_plugin() -> Dict[str, Any]:
     try:
-        ansible_bridge.initialize(
+        processed_args = ansible_bridge.initialize(
             site_packages=site_packages,
             env_vars=env,
             complex_args=module_args,
@@ -39,9 +39,9 @@ def run_action_plugin() -> Dict[str, Any]:
         from ansible.template import Templar
 
         mock_task = Task()
-        mock_task.action, mock_task.args = action_name, module_args
+        mock_task.action, mock_task.args = action_name, processed_args
         # Initialize internal fields required by some Action Plugins (like copy)
-        src_val = module_args.get('src', '')
+        src_val = processed_args.get('src', '')
         if isinstance(src_val, list) and len(src_val) > 0: src_val = src_val[0]
         mock_task._original_basename = os.path.basename(str(src_val))
 
