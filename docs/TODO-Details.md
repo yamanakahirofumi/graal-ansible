@@ -49,8 +49,9 @@
     - `ActionPlugin` と同様のブリッジメカニズム（`ansible_bridge.py`）の適用.
     - Python 側のイベントフックを Java 側の `Callback` インターフェースへマッピングする方法。
 
-### 5.2 [ ] ストラテジ固有のコールバック最適化
+### 5.2 [✓] ストラテジ固有のコールバック最適化
+- **完了日**: 2026-07-07
 - **概要**: `free` 戦略などにおいて、ホストごとに進捗が異なる場合の出力形式のさらなる最適化。
-- **検討内容**:
-    - ホストごとの並列実行状況をより分かりやすく表示するための `DefaultCallback` の拡張。
-    - タスクヘッダーの重複排除（Deduplication）およびスレッドセーフな出力の設計（詳細は [Callback-Plugins.md](implementation/Callback-Plugins.md#7-並列実行における出力の最適化-future-design) を参照）。
+- **解決策**:
+    - `DefaultCallback` において、タスクおよびハンドラーのヘッダー出力を 1 回のみに制限する重複排除ロジック（Deduplication）を実装。
+    - 全てのコールバックメソッドに `synchronized` を付与し、並列実行時（`free` 戦略等）の出力の混在を防止。
