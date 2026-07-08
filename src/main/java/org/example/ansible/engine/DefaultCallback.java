@@ -1,7 +1,9 @@
 package org.example.ansible.engine;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Default implementation of Callback that prints execution progress to standard output.
@@ -9,28 +11,32 @@ import java.util.TreeMap;
 public class DefaultCallback implements Callback {
 
     private static final int LINE_WIDTH = 80;
+    private final Set<Object> printedTasks = ConcurrentHashMap.newKeySet();
 
     @Override
-    public void v2_playbook_on_start(Playbook playbook) {
+    public synchronized void v2_playbook_on_start(Playbook playbook) {
         // Usually Ansible doesn't print anything here unless it's a header.
     }
 
     @Override
-    public void v2_playbook_on_play_start(Play play) {
+    public synchronized void v2_playbook_on_play_start(Play play) {
+        printedTasks.clear();
         System.out.println();
         String title = "PLAY [" + (play.name() != null ? play.name() : play.hosts()) + "]";
         printHeader(title);
     }
 
     @Override
-    public void v2_playbook_on_task_start(Task task, boolean isConditional) {
-        System.out.println();
-        String title = "TASK [" + (task.name() != null ? task.name() : task.action()) + "]";
-        printHeader(title);
+    public synchronized void v2_playbook_on_task_start(Task task, boolean isConditional) {
+        if (printedTasks.add(task)) {
+            System.out.println();
+            String title = "TASK [" + (task.name() != null ? task.name() : task.action()) + "]";
+            printHeader(title);
+        }
     }
 
     @Override
-    public void v2_runner_on_ok(String host, TaskResult result) {
+    public synchronized void v2_runner_on_ok(String host, TaskResult result) {
         if (isLoop(result)) {
             printLoopResults("ok", host, result);
         } else {
@@ -43,7 +49,7 @@ public class DefaultCallback implements Callback {
     }
 
     @Override
-    public void v2_runner_on_failed(String host, TaskResult result, boolean ignoreErrors) {
+    public synchronized void v2_runner_on_failed(String host, TaskResult result, boolean ignoreErrors) {
         if (isLoop(result)) {
             printLoopResults("failed", host, result);
             if (ignoreErrors) {
@@ -56,7 +62,7 @@ public class DefaultCallback implements Callback {
     }
 
     @Override
-    public void v2_runner_on_skipped(String host, TaskResult result) {
+    public synchronized void v2_runner_on_skipped(String host, TaskResult result) {
         if (isLoop(result)) {
             printLoopResults("skipping", host, result);
         } else {
@@ -65,7 +71,7 @@ public class DefaultCallback implements Callback {
     }
 
     @Override
-    public void v2_runner_on_unreachable(String host, TaskResult result) {
+    public synchronized void v2_runner_on_unreachable(String host, TaskResult result) {
         if (isLoop(result)) {
             printLoopResults("unreachable", host, result);
         } else {
@@ -106,14 +112,16 @@ public class DefaultCallback implements Callback {
     }
 
     @Override
-    public void v2_playbook_on_handler_stats(String handlerName) {
-        System.out.println();
-        String title = "RUNNING HANDLER [" + handlerName + "]";
-        printHeader(title);
+    public synchronized void v2_playbook_on_handler_stats(String handlerName) {
+        if (printedTasks.add("handler:" + handlerName)) {
+            System.out.println();
+            String title = "RUNNING HANDLER [" + handlerName + "]";
+            printHeader(title);
+        }
     }
 
     @Override
-    public void v2_playbook_on_stats(Map<String, Map<String, Integer>> stats) {
+    public synchronized void v2_playbook_on_stats(Map<String, Map<String, Integer>> stats) {
         System.out.println();
         printHeader("PLAY RECAP");
 
