@@ -97,3 +97,25 @@ Ansible 標準の出力形式を提供します。
 ## 8. ロギング方針との関係
 - `Logging-Policy.md` で定義される `java.util.logging` は、主に内部デバッグやシステムエラー用です。
 - ユーザー向けの「実行結果レポート」は、本コールバックシステムが主導します。
+
+## 9. Python ベースのコールバックのサポート (Future Design) {#9-python-ベースのコールバックのサポート-future-design}
+
+GraalPy を活用し、Ansible 本家の Python 製コールバックプラグインをそのまま実行可能にするための設計方針です。
+
+### 9.1 ブリッジメカニズム
+- `ActionPlugin` と同様のブリッジメカニズム（`ansible_bridge.py`）を利用して、Python 側の実行環境を構成します。
+- `ansible.plugins.callback` パッケージから指定されたプラグインを動的にロードします。
+
+### 9.2 イベントのマッピング
+Java 側の `Callback` インターフェースの各メソッド呼び出しを、Python 側のプラグインが持つ対応するメソッド（v2 API）へ転送します。
+
+| Java (Callback interface) | Python (CallbackBase method) |
+| :--- | :--- |
+| `v2_playbook_on_start` | `v2_playbook_on_start` |
+| `v2_playbook_on_play_start` | `v2_playbook_on_play_start` |
+| `v2_runner_on_ok` | `v2_runner_on_ok` |
+| ... | ... |
+
+### 9.3 データ変換と Polyglot 連携
+- Java 側の `TaskResult`, `Play`, `Task` などのオブジェクトを、Python 側が扱いやすい形式（辞書または Polyglot Proxy）に変換して渡します。
+- Python 側での標準出力（`print` 等）は、Java 側の出力ストリームに適切にリダイレクトされます。
