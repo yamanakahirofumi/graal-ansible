@@ -136,7 +136,14 @@ public class PlaybookCli implements Callable<Integer> {
                     executor.clearCallbacks();
                     executor.addCallback(new org.example.ansible.engine.JsonCallback());
                 } else if (callbackName != null && !"default".equalsIgnoreCase(callbackName)) {
-                    System.err.println("Warning: Unknown callback plugin '" + callbackName + "'. Using 'default'.");
+                    try {
+                        executor.clearCallbacks();
+                        executor.addCallback(new org.example.ansible.engine.PythonCallback(callbackName, taskExecutor.getCollectionPaths()));
+                    } catch (Exception e) {
+                        System.err.println("Warning: Failed to load callback plugin '" + callbackName + "': " + e.getMessage());
+                        System.err.println("Falling back to 'default'.");
+                        executor.addCallback(new org.example.ansible.engine.DefaultCallback());
+                    }
                 }
 
                 java.nio.file.Path baseDir = playbookFile.getAbsoluteFile().getParentFile().toPath();
