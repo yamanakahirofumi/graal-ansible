@@ -5,10 +5,10 @@
 ## 1. プロジェクトの現在のステータス
 `graal-ansible` は、Java 21 と GraalPy を基盤とした Ansible 実行エンジンの再実装プロジェクトです。現在、以下の主要機能が実装され、動作検証が行われています。
 
-- **コアエンジン (管理ノード)**: linear（順次）および free（並列）戦略による Playbook 実行、マルチホスト対応、PlaybookExecutor による実行管理。
-- **YAML 解析**: SnakeYAML 2.x による Playbook (Record) へのマッピング、`block/rescue/always` 対応。
+- **コアエンジン (管理ノード)**: linear（順次）および free（並列）戦略による Playbook 実行、マルチホスト対応、バッチ実行 (`serial`)、PlaybookExecutor による実行管理。
+- **YAML 解析**: SnakeYAML 2.x による Playbook (Record) へのマッピング、独自タグの処理、`block/rescue/always` 対応。
 - **変数解決**: Jinjava による Jinja2 互換テンプレート、22段階の変数優先順位（all, group, host, play, extra-vars等）。
-- **タスク制御 (Worker)**: `when`, `loop`, `register`, `notify/handlers`, `until/retries`, `delegate_to`, `ignore_unreachable`, `delegate_facts` 等のサポート。
+- **タスク制御 (Worker)**: `when`, `loop`, `register`, `notify/handlers`, `until/retries`, `delegate_to`, `ignore_unreachable`, `delegate_facts`, `check_mode`, `async/poll`, `throttle`, `max_fail_percentage` 等のサポート。
 - **権限昇格**: `become` (sudo, su) の実装。
 - **コレクション対応**: フェーズ 1 進行中（ansible-core の完全ロードと Linux での 67 モジュールの検証完了：61 ◎, 4 ○, 2 ●）。
 - **接続 (Connection Plugin)**: `local` 接続および `ssh` (Apache MINA SSHD) の基盤。
