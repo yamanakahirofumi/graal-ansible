@@ -623,6 +623,17 @@ def apply_mocks() -> None:
 
     # 5. Plugins & Loader
     create_mock('ansible.plugins', {'AnsiblePlugin': type('AnsiblePlugin', (), {})})
+
+    class CallbackBase:
+        def __init__(self, display=None, options=None):
+            self._display = display or Display()
+            self._options = options
+            self.disabled = False
+        def set_options(self, task_keys=None, var_options=None, direct=None): pass
+        def get_option(self, k): return None
+
+    create_mock('ansible.plugins.callback', {'CallbackBase': CallbackBase})
+
     class VariableLayer:
         FACTS = 'facts'
         VARS = 'vars'
@@ -963,6 +974,54 @@ def _create_action_plugin(action_name: str, task: Any, connection: Any, play_con
         c = Proxy(connection)
 
     return mod.ActionModule(task, c, play_context, l, templar, shared_loader_obj)
+
+def _create_callback_plugin(callback_name: str) -> Any:
+    import importlib.util
+    base_name = callback_name
+    if base_name.startswith('ansible.builtin.'): base_name = base_name[16:]
+    elif base_name.startswith('ansible.legacy.'): base_name = base_name[15:]
+
+    path = None
+
+    # Check collections
+    if '.' in callback_name:
+        parts = callback_name.split('.')
+        if len(parts) >= 3:
+            ns, coll, cb = parts[0], parts[1], parts[2]
+            coll_pkgs = globals().get('collection_paths_java')
+            if coll_pkgs:
+                for p in coll_pkgs:
+                    cand = os.path.join(_normalize_path(p), 'ansible_collections', ns, coll, 'plugins/callback', cb + '.py')
+                    if os.path.exists(cand): path = cand; break
+
+    if not path:
+        site_pkgs = globals().get('site_packages_java')
+        if site_pkgs:
+            for p in site_pkgs:
+                cand = os.path.join(_normalize_path(p), 'ansible/plugins/callback', base_name + '.py')
+                if os.path.exists(cand): path = cand; break
+
+    if not path:
+        for p in sys.path:
+            cand = os.path.join(p, 'ansible/plugins/callback', base_name + '.py')
+            if os.path.exists(cand): path = cand; break
+
+    if not path:
+        raise ImportError(f"Could not find callback plugin {callback_name}")
+
+    fqcn = "ansible.plugins.callback." + base_name
+    if fqcn in sys.modules:
+        mod = sys.modules[fqcn]
+    else:
+        spec = importlib.util.spec_from_file_location(fqcn, path)
+        if spec and spec.loader:
+            mod = importlib.util.module_from_spec(spec)
+            sys.modules[spec.name] = mod
+            spec.loader.exec_module(mod)
+        else:
+            raise ImportError(f"Could not load callback plugin {callback_name}")
+
+    return mod.CallbackModule()
 
 def execute_module(module_name: str, complex_args: Dict[str, Any], module_code: Optional[str] = None) -> str:
     import __main__
