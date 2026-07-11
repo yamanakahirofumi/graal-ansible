@@ -43,17 +43,16 @@ jobs:
       with:
         java-version: '21'
         distribution: 'graalvm'
-        version: '25.0.2'
-        components: 'python'
         github-token: ${{ secrets.GITHUB_TOKEN }}
         native-image-job-reports: 'true'
     - name: Build and Test
       run: mvn -B verify
     - name: Upload test results to Codecov
       if: always() && runner.os == 'Linux'
-      uses: codecov/test-results-action@v1
+      uses: codecov/codecov-action@v5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
+        report_type: test_results
         directory: ./target/surefire-reports/
     - name: Build Native Image
       run: mvn -Pnative native:compile
@@ -64,13 +63,20 @@ jobs:
 
 ### 2.1 測定と転送の仕組み
 1. `mvn verify` 実行時に Maven Surefire Plugin がテストを実行し、`target/surefire-reports/` に XML レポートを生成します。
-2. GitHub Actions 上で、これらの XML レポートを Codecov サービスにアップロードします。
+2. GitHub Actions 上で、`codecov/codecov-action@v5` を使用して、これらの XML レポートを Codecov サービスにアップロードします。
 3. Codecov 上でテストの成功率、失敗数、実行時間などを確認し、品質管理に役立てます。
 
-## 3. CI の目的
+## 3. GraalVM セットアップの留意事項 (Java 21)
+
+Java 21 を使用する場合、`graalvm/setup-graalvm` アクションにおいて以下の設定が推奨されます。
+
+- **`components: 'python'` の省略**: Java 21 環境（特に Windows/Linux ランナー）では、コンポーネントを明示的に指定するとアーティファクトの解決に失敗する場合があるため、指定を省略します。
+- **`version` の省略**: ディストリビューションに合わせた最適なバージョンが自動的に選択されるよう、明示的なバージョン指定を避けます。
+
+## 4. CI の目的
 - **OS非依存性の検証**：マルチプラットフォーム・マトリックスにより、全サポートOSでの動作を毎コミットごとに保証します。
 - **Native Imageの継続的検証**：AOTコンパイル特有の問題を早期に発見します。
 - **自動テスト**：JUnit によるテストを自動実行し、ロジックの正しさを検証します。
 
-## 4. バージョン管理の遵守
+## 5. バージョン管理の遵守
 CI 環境で利用するツール（GraalVM 等）やコンテナイメージのバージョン指定については、[品質方針](Quality-Policy.md#5-バージョン管理方針)に基づき、**バージョンの引き下げ（ダウングレード）を禁止**します。常に安定性とセキュリティを考慮したバージョン選定を行ってください。
