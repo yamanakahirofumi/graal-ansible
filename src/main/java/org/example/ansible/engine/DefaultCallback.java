@@ -36,7 +36,7 @@ public class DefaultCallback implements Callback {
     }
 
     @Override
-    public synchronized void v2_runner_on_ok(String host, TaskResult result) {
+    public synchronized void v2_runner_on_ok(Task task, String host, TaskResult result) {
         if (isLoop(result)) {
             printLoopResults("ok", host, result);
         } else {
@@ -49,7 +49,7 @@ public class DefaultCallback implements Callback {
     }
 
     @Override
-    public synchronized void v2_runner_on_failed(String host, TaskResult result, boolean ignoreErrors) {
+    public synchronized void v2_runner_on_failed(Task task, String host, TaskResult result, boolean ignoreErrors) {
         if (isLoop(result)) {
             printLoopResults("failed", host, result);
             if (ignoreErrors) {
@@ -62,7 +62,7 @@ public class DefaultCallback implements Callback {
     }
 
     @Override
-    public synchronized void v2_runner_on_skipped(String host, TaskResult result) {
+    public synchronized void v2_runner_on_skipped(Task task, String host, TaskResult result) {
         if (isLoop(result)) {
             printLoopResults("skipping", host, result);
         } else {
@@ -71,7 +71,7 @@ public class DefaultCallback implements Callback {
     }
 
     @Override
-    public synchronized void v2_runner_on_unreachable(String host, TaskResult result) {
+    public synchronized void v2_runner_on_unreachable(Task task, String host, TaskResult result) {
         if (isLoop(result)) {
             printLoopResults("unreachable", host, result);
         } else {

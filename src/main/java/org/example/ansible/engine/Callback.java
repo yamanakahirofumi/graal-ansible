@@ -17,16 +17,16 @@ public interface Callback {
     void v2_playbook_on_task_start(Task task, boolean isConditional);
 
     /** Called when a Task execution is successful (ok) */
-    void v2_runner_on_ok(String host, TaskResult result);
+    void v2_runner_on_ok(Task task, String host, TaskResult result);
 
     /** Called when a Task execution fails (failed) */
-    void v2_runner_on_failed(String host, TaskResult result, boolean ignoreErrors);
+    void v2_runner_on_failed(Task task, String host, TaskResult result, boolean ignoreErrors);
 
     /** Called when a Task execution is skipped (skipped) */
-    void v2_runner_on_skipped(String host, TaskResult result);
+    void v2_runner_on_skipped(Task task, String host, TaskResult result);
 
     /** Called when a host is unreachable */
-    void v2_runner_on_unreachable(String host, TaskResult result);
+    void v2_runner_on_unreachable(Task task, String host, TaskResult result);
 
     /** Called when a handler starts */
     void v2_playbook_on_handler_stats(String handlerName);

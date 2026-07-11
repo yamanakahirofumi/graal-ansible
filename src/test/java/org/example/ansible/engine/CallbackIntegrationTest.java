@@ -42,7 +42,7 @@ public class CallbackIntegrationTest {
         verify(mockCallback).v2_playbook_on_start(eq(playbook));
         verify(mockCallback).v2_playbook_on_play_start(eq(play));
         verify(mockCallback).v2_playbook_on_task_start(eq(task), anyBoolean());
-        verify(mockCallback).v2_runner_on_ok(eq("localhost"), eq(successResult));
+        verify(mockCallback).v2_runner_on_ok(eq(task), eq("localhost"), eq(successResult));
 
         ArgumentCaptor<Map<String, Map<String, Integer>>> statsCaptor = ArgumentCaptor.forClass(Map.class);
         verify(mockCallback).v2_playbook_on_stats(statsCaptor.capture());
@@ -74,7 +74,7 @@ public class CallbackIntegrationTest {
 
         executor.execute(playbook, inventory);
 
-        verify(mockCallback).v2_runner_on_failed(eq("localhost"), eq(failResult), eq(false));
+        verify(mockCallback).v2_runner_on_failed(eq(task), eq("localhost"), eq(failResult), eq(false));
 
         ArgumentCaptor<Map<String, Map<String, Integer>>> statsCaptor = ArgumentCaptor.forClass(Map.class);
         verify(mockCallback).v2_playbook_on_stats(statsCaptor.capture());

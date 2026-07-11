@@ -41,8 +41,3 @@
     - 実行結果レポートのさらなる詳細化とフィルタリング機能。
 
 ## 5. 今後の設計・拡張事項 (Future Design and Extensions)
-
-
-### 5.1 [ ] Python ベースのコールバックのサポート
-- **概要**: GraalPy を利用して Ansible 本家の Python 製コールバックプラグインをそのまま実行する仕組みの導入。
-- **詳細は [Callback-Plugins.md](implementation/Callback-Plugins.md#9-python-ベースのコールバックのサポート-future-design) を参照。**

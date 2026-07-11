@@ -277,3 +277,11 @@
 - **完了日**: 2026-04-17
 - **概要**: `docs/tech/Error-Handling-Policy.md` を更新し、`ConnectionResult` による結果返却メカニズムや、`UnreachableException` による接続失敗時の挙動、および `meta: flush_handlers` の実行エンジンレベルでの処理詳細について具体的に記載。
 - **解決策**: 実行エンジンの実装に基づき、接続失敗時の `ignore_unreachable` の挙動、`ConnectionResult` による標準出力・標準エラー・終了コードの返却、および `meta: flush_handlers` によるハンドラーの即時実行仕様を明文化。
+
+### 2.9 [✓] Python ベースのコールバックのサポート
+- **完了日**: 2026-07-11
+- **概要**: GraalPy を利用して Ansible 本家の Python 製コールバックプラグインをそのまま実行する仕組みを導入。
+- **解決策**:
+    - `PythonCallback` を実装し、Java のコールバックイベントを Python 側のプラグインへブリッジ。
+    - `ansible_callback_launcher.py` により、Python 側の `CallbackBase` 互換のオブジェクト（TaskResult, Task, Host等）を生成して渡す仕組みを構築。
+    - 環境変数 `ANSIBLE_STDOUT_CALLBACK` を通じた動的なプラグイン選択をサポート。

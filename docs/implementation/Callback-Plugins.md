@@ -98,9 +98,9 @@ Ansible 標準の出力形式を提供します。
 - `Logging-Policy.md` で定義される `java.util.logging` は、主に内部デバッグやシステムエラー用です。
 - ユーザー向けの「実行結果レポート」は、本コールバックシステムが主導します。
 
-## 9. Python ベースのコールバックのサポート (Future Design) {#9-python-ベースのコールバックのサポート-future-design}
+## 9. Python ベースのコールバックのサポート (Implemented) {#9-python-ベースのコールバックのサポート-future-design}
 
-GraalPy を活用し、Ansible 本家の Python 製コールバックプラグインをそのまま実行可能にするための設計方針です。
+GraalPy を活用し、Ansible 本家の Python 製コールバックプラグインをそのまま実行可能にするための実装詳細です。
 
 ### 9.1 ブリッジメカニズム
 - `ActionPlugin` と同様のブリッジメカニズム（`ansible_bridge.py`）を利用して、Python 側の実行環境を構成します。

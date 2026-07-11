@@ -30,8 +30,10 @@ public class PythonCallbackTest {
             "class CallbackModule(CallbackBase):\n" +
             "    def v2_playbook_on_play_start(self, play):\n" +
             "        print(f'CUSTOM_CALLBACK_PLAY_START: {play.name}')\n" +
+            "    def v2_playbook_on_task_start(self, task, is_conditional):\n" +
+            "        print(f'CUSTOM_CALLBACK_TASK_START: {task.name} ({task.action})')\n" +
             "    def v2_runner_on_ok(self, result):\n" +
-            "        print(f'CUSTOM_CALLBACK_OK: {result._host.name}')\n";
+            "        print(f'CUSTOM_CALLBACK_OK: {result._host.name} for task {result._task.name} with action {result._task.action}')\n";
 
         java.nio.file.Files.writeString(callbackFile.toPath(), pythonCode);
 
@@ -44,14 +46,18 @@ public class PythonCallbackTest {
             Play play = new Play("test play", "localhost", List.of());
             callback.v2_playbook_on_play_start(play);
 
+            Task task = new Task("test task name", "test_action", Map.of());
+            callback.v2_playbook_on_task_start(task, false);
+
             TaskResult result = TaskResult.success(false, Map.of("msg", "hello"));
-            callback.v2_runner_on_ok("localhost", result);
+            callback.v2_runner_on_ok(task, "localhost", result);
         } finally {
             System.setOut(originalOut);
         }
 
         String output = outContent.toString();
         assertTrue(output.contains("CUSTOM_CALLBACK_PLAY_START: test play"), "Output should contain play start message. Got: " + output);
-        assertTrue(output.contains("CUSTOM_CALLBACK_OK: localhost"), "Output should contain ok message. Got: " + output);
+        assertTrue(output.contains("CUSTOM_CALLBACK_TASK_START: test task name (test_action)"), "Output should contain task start message. Got: " + output);
+        assertTrue(output.contains("CUSTOM_CALLBACK_OK: localhost for task test task name with action test_action"), "Output should contain ok message. Got: " + output);
     }
 }

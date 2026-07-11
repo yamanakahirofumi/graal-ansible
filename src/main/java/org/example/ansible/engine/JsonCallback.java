@@ -65,12 +65,12 @@ public class JsonCallback implements Callback {
     }
 
     @Override
-    public void v2_runner_on_ok(String host, TaskResult result) {
+    public void v2_runner_on_ok(Task task, String host, TaskResult result) {
         addHostResult(host, result);
     }
 
     @Override
-    public void v2_runner_on_failed(String host, TaskResult result, boolean ignoreErrors) {
+    public void v2_runner_on_failed(Task task, String host, TaskResult result, boolean ignoreErrors) {
         Map<String, Object> data = addHostResult(host, result);
         if (ignoreErrors) {
             data.put("ignore_errors", true);
@@ -78,12 +78,12 @@ public class JsonCallback implements Callback {
     }
 
     @Override
-    public void v2_runner_on_skipped(String host, TaskResult result) {
+    public void v2_runner_on_skipped(Task task, String host, TaskResult result) {
         addHostResult(host, result);
     }
 
     @Override
-    public void v2_runner_on_unreachable(String host, TaskResult result) {
+    public void v2_runner_on_unreachable(Task task, String host, TaskResult result) {
         addHostResult(host, result);
     }
 

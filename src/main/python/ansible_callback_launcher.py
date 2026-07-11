@@ -21,7 +21,19 @@ def initialize_callback() -> None:
     ansible_bridge.setup_sys_path(site_packages, collection_paths)
     _callback_plugin = ansible_bridge._create_callback_plugin(callback_name)
 
-def _wrap_result(host: str, result_java: Any) -> Any:
+def _create_task_mock(task_java: Any) -> Any:
+    if task_java is None:
+        return None
+    t = types.SimpleNamespace()
+    t.get_name = lambda: str(task_java.name())
+    t.name = str(task_java.name())
+    t.action = str(task_java.action())
+    t.args = ansible_bridge._deep_convert(task_java.args())
+    t.vars = ansible_bridge._deep_convert(task_java.vars())
+    t.tags = ansible_bridge._deep_convert(task_java.tags())
+    return t
+
+def _wrap_result(task_java: Any, host: str, result_java: Any) -> Any:
     # Mock TaskResult object for Python callbacks
     res = types.SimpleNamespace()
     res._host = types.SimpleNamespace()
@@ -36,10 +48,7 @@ def _wrap_result(host: str, result_java: Any) -> Any:
         if result_java.message():
             res._result['msg'] = result_java.message()
 
-    # Mock Task object inside result if possible
-    res._task = types.SimpleNamespace()
-    res._task.get_name = lambda: "mock_task"
-    res._task.action = "unknown"
+    res._task = _create_task_mock(task_java)
 
     return res
 
@@ -47,6 +56,7 @@ def v2_playbook_on_start(playbook_java: Any) -> None:
     if hasattr(_callback_plugin, 'v2_playbook_on_start'):
         # Simplified playbook mock
         pb = types.SimpleNamespace()
+        # Extract plays if needed, but usually not required for display
         _callback_plugin.v2_playbook_on_start(pb)
 
 def v2_playbook_on_play_start(play_java: Any) -> None:
@@ -58,27 +68,24 @@ def v2_playbook_on_play_start(play_java: Any) -> None:
 
 def v2_playbook_on_task_start(task_java: Any, is_conditional: bool) -> None:
     if hasattr(_callback_plugin, 'v2_playbook_on_task_start'):
-        t = types.SimpleNamespace()
-        t.get_name = lambda: str(task_java.name())
-        t.name = str(task_java.name())
-        t.action = str(task_java.action())
+        t = _create_task_mock(task_java)
         _callback_plugin.v2_playbook_on_task_start(t, is_conditional)
 
-def v2_runner_on_ok(host: str, result_java: Any) -> None:
+def v2_runner_on_ok(task_java: Any, host: str, result_java: Any) -> None:
     if hasattr(_callback_plugin, 'v2_runner_on_ok'):
-        _callback_plugin.v2_runner_on_ok(_wrap_result(host, result_java))
+        _callback_plugin.v2_runner_on_ok(_wrap_result(task_java, host, result_java))
 
-def v2_runner_on_failed(host: str, result_java: Any, ignore_errors: bool) -> None:
+def v2_runner_on_failed(task_java: Any, host: str, result_java: Any, ignore_errors: bool) -> None:
     if hasattr(_callback_plugin, 'v2_runner_on_failed'):
-        _callback_plugin.v2_runner_on_failed(_wrap_result(host, result_java), ignore_errors=ignore_errors)
+        _callback_plugin.v2_runner_on_failed(_wrap_result(task_java, host, result_java), ignore_errors=ignore_errors)
 
-def v2_runner_on_skipped(host: str, result_java: Any) -> None:
+def v2_runner_on_skipped(task_java: Any, host: str, result_java: Any) -> None:
     if hasattr(_callback_plugin, 'v2_runner_on_skipped'):
-        _callback_plugin.v2_runner_on_skipped(_wrap_result(host, result_java))
+        _callback_plugin.v2_runner_on_skipped(_wrap_result(task_java, host, result_java))
 
-def v2_runner_on_unreachable(host: str, result_java: Any) -> None:
+def v2_runner_on_unreachable(task_java: Any, host: str, result_java: Any) -> None:
     if hasattr(_callback_plugin, 'v2_runner_on_unreachable'):
-        _callback_plugin.v2_runner_on_unreachable(_wrap_result(host, result_java))
+        _callback_plugin.v2_runner_on_unreachable(_wrap_result(task_java, host, result_java))
 
 def v2_playbook_on_handler_stats(handler_name: str) -> None:
     if hasattr(_callback_plugin, 'v2_playbook_on_handler_stats'):
