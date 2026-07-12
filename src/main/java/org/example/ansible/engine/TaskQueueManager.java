@@ -231,7 +231,7 @@ public class TaskQueueManager {
             } else {
                 failedHosts.add(host.name());
                 TaskResult unreachableResult = TaskResult.unreachable(e.getMessage());
-                callbacks.forEach(c -> c.v2_runner_on_unreachable(host.name(), unreachableResult));
+                callbacks.forEach(c -> c.v2_runner_on_unreachable(task, host.name(), unreachableResult));
                 checkAnyErrorsFatal(play, host, task, blockVars, activeRoles, includeParams, variableManager);
                 return;
             }
@@ -242,13 +242,13 @@ public class TaskQueueManager {
             results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(finalResult);
 
             if (finalResult.isUnreachable()) {
-                callbacks.forEach(c -> c.v2_runner_on_unreachable(host.name(), finalResult));
+                callbacks.forEach(c -> c.v2_runner_on_unreachable(task, host.name(), finalResult));
             } else if (finalResult.isSkipped()) {
-                callbacks.forEach(c -> c.v2_runner_on_skipped(host.name(), finalResult));
+                callbacks.forEach(c -> c.v2_runner_on_skipped(task, host.name(), finalResult));
             } else if (finalResult.success()) {
-                callbacks.forEach(c -> c.v2_runner_on_ok(host.name(), finalResult));
+                callbacks.forEach(c -> c.v2_runner_on_ok(task, host.name(), finalResult));
             } else {
-                callbacks.forEach(c -> c.v2_runner_on_failed(host.name(), finalResult, task.ignoreErrors()));
+                callbacks.forEach(c -> c.v2_runner_on_failed(task, host.name(), finalResult, task.ignoreErrors()));
             }
 
             if (finalResult.success() && !finalResult.isSkipped() && "meta".equals(task.action()) && "flush_handlers".equals(task.args().get("_raw_params"))) {

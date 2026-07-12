@@ -23,7 +23,7 @@ public class JsonCallbackTest {
 
         callback.v2_playbook_on_play_start(playbook);
         callback.v2_playbook_on_task_start(task, false);
-        callback.v2_runner_on_ok("localhost", result);
+        callback.v2_runner_on_ok(task, "localhost", result);
 
         Map<String, Map<String, Integer>> stats = Map.of("localhost", Map.of("ok", 1, "changed", 0, "failed", 0, "skipped", 0));
 

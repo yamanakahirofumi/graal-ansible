@@ -94,23 +94,23 @@ public class PythonCallback implements Callback, AutoCloseable {
     }
 
     @Override
-    public synchronized void v2_runner_on_ok(String host, TaskResult result) {
-        callPython("v2_runner_on_ok", host, result);
+    public synchronized void v2_runner_on_ok(Task task, String host, TaskResult result) {
+        callPython("v2_runner_on_ok", task, host, result);
     }
 
     @Override
-    public synchronized void v2_runner_on_failed(String host, TaskResult result, boolean ignoreErrors) {
-        callPython("v2_runner_on_failed", host, result, ignoreErrors);
+    public synchronized void v2_runner_on_failed(Task task, String host, TaskResult result, boolean ignoreErrors) {
+        callPython("v2_runner_on_failed", task, host, result, ignoreErrors);
     }
 
     @Override
-    public synchronized void v2_runner_on_skipped(String host, TaskResult result) {
-        callPython("v2_runner_on_skipped", host, result);
+    public synchronized void v2_runner_on_skipped(Task task, String host, TaskResult result) {
+        callPython("v2_runner_on_skipped", task, host, result);
     }
 
     @Override
-    public synchronized void v2_runner_on_unreachable(String host, TaskResult result) {
-        callPython("v2_runner_on_unreachable", host, result);
+    public synchronized void v2_runner_on_unreachable(Task task, String host, TaskResult result) {
+        callPython("v2_runner_on_unreachable", task, host, result);
     }
 
     @Override
