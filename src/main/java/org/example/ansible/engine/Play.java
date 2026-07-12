@@ -14,6 +14,8 @@ import java.util.Map;
  * @param varsPrompt      The list of interactive variable prompts.
  * @param roles           The list of roles to include in this play.
  * @param handlers        The list of handlers defined for this play.
+ * @param preTasks        The list of tasks to execute before roles.
+ * @param postTasks       The list of tasks to execute after tasks.
  * @param become          Whether to enable privilege escalation.
  * @param becomeMethod    The privilege escalation method (e.g., sudo, su).
  * @param becomeUser      The user to become.
@@ -36,6 +38,8 @@ public record Play(
         List<Map<String, Object>> varsPrompt,
         List<Role> roles,
         List<Task> handlers,
+        List<Task> preTasks,
+        List<Task> postTasks,
         Object become,
         String becomeMethod,
         String becomeUser,
@@ -50,11 +54,11 @@ public record Play(
         Object maxFailPercentage
 ) {
     public Play(String name, String hosts, List<Task> tasks) {
-        this(name, hosts, tasks, Map.of(), List.of(), List.of(), List.of(), List.of(), null, null, null, null, null, null, List.of(), null, "linear", null, null, null);
+        this(name, hosts, tasks, Map.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), null, null, null, null, null, null, List.of(), null, "linear", null, null, null);
     }
 
     public Play(String name, String hosts, List<Task> tasks, Map<String, Object> vars) {
-        this(name, hosts, tasks, vars, List.of(), List.of(), List.of(), List.of(), null, null, null, null, null, null, List.of(), null, "linear", null, null, null);
+        this(name, hosts, tasks, vars, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), null, null, null, null, null, null, List.of(), null, "linear", null, null, null);
     }
 
     public Play(
@@ -71,7 +75,7 @@ public record Play(
             Object checkMode,
             Object environment
     ) {
-        this(name, hosts, tasks, vars, varsFiles, List.of(), List.of(), handlers, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, List.of(), null, "linear", null, null, null);
+        this(name, hosts, tasks, vars, varsFiles, List.of(), List.of(), handlers, List.of(), List.of(), become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, List.of(), null, "linear", null, null, null);
     }
 
     public Play(
@@ -89,7 +93,7 @@ public record Play(
             Object environment,
             List<String> tags
     ) {
-        this(name, hosts, tasks, vars, varsFiles, List.of(), List.of(), handlers, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, null, "linear", null, null, null);
+        this(name, hosts, tasks, vars, varsFiles, List.of(), List.of(), handlers, List.of(), List.of(), become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, null, "linear", null, null, null);
     }
 
     public Play(
@@ -108,7 +112,7 @@ public record Play(
             Object environment,
             List<String> tags
     ) {
-        this(name, hosts, tasks, vars, varsFiles, List.of(), roles, handlers, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, null, "linear", null, null, null);
+        this(name, hosts, tasks, vars, varsFiles, List.of(), roles, handlers, List.of(), List.of(), become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, null, "linear", null, null, null);
     }
 
     public Play(
@@ -128,7 +132,7 @@ public record Play(
             Object environment,
             List<String> tags
     ) {
-        this(name, hosts, tasks, vars, varsFiles, varsPrompt, roles, handlers, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, null, "linear", null, null, null);
+        this(name, hosts, tasks, vars, varsFiles, varsPrompt, roles, handlers, List.of(), List.of(), become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, null, "linear", null, null, null);
     }
 
     public Play(
@@ -149,7 +153,7 @@ public record Play(
             List<String> tags,
             Object anyErrorsFatal
     ) {
-        this(name, hosts, tasks, vars, varsFiles, varsPrompt, roles, handlers, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, anyErrorsFatal, "linear", null, null, null);
+        this(name, hosts, tasks, vars, varsFiles, varsPrompt, roles, handlers, List.of(), List.of(), become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, anyErrorsFatal, "linear", null, null, null);
     }
 
     public Play(
@@ -171,7 +175,7 @@ public record Play(
             Object anyErrorsFatal,
             String strategy
     ) {
-        this(name, hosts, tasks, vars, varsFiles, varsPrompt, roles, handlers, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, anyErrorsFatal, strategy, null, null, null);
+        this(name, hosts, tasks, vars, varsFiles, varsPrompt, roles, handlers, List.of(), List.of(), become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, anyErrorsFatal, strategy, null, null, null);
     }
 
     public Play(
@@ -194,7 +198,7 @@ public record Play(
             String strategy,
             Object serial
     ) {
-        this(name, hosts, tasks, vars, varsFiles, varsPrompt, roles, handlers, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, anyErrorsFatal, strategy, serial, null, null);
+        this(name, hosts, tasks, vars, varsFiles, varsPrompt, roles, handlers, List.of(), List.of(), become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, anyErrorsFatal, strategy, serial, null, null);
     }
 
     public Play(
@@ -218,6 +222,6 @@ public record Play(
             Object serial,
             Object throttle
     ) {
-        this(name, hosts, tasks, vars, varsFiles, varsPrompt, roles, handlers, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, anyErrorsFatal, strategy, serial, throttle, null);
+        this(name, hosts, tasks, vars, varsFiles, varsPrompt, roles, handlers, List.of(), List.of(), become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, anyErrorsFatal, strategy, serial, throttle, null);
     }
 }

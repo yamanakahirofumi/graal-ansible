@@ -25,6 +25,12 @@ public class LinearStrategy implements Strategy {
 
             variableManager.setBatchContext(batch.stream().map(Host::name).toList());
 
+            // Pre Tasks for this batch
+            for (Task task : play.preTasks()) {
+                executeTask(play, task, batch, tqm, variableManager, results, failedHosts, hostNotifications, globalCheckMode, runTags, skipTags);
+            }
+            flushHandlers(play, batch, tqm, variableManager, results, failedHosts, hostNotifications, globalCheckMode, runTags, skipTags);
+
             // Roles for this batch
             for (Role role : play.roles()) {
                 if (tqm.isPlayFatalError()) break;
@@ -33,59 +39,71 @@ public class LinearStrategy implements Strategy {
 
             // Tasks for this batch
             for (Task task : play.tasks()) {
-                if (tqm.isPlayFatalError()) break;
-                if (!tqm.isTaskToBeExecuted(task, runTags, skipTags)) {
-                    for (Host host : batch) {
-                        results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(TaskResult.skipped("Skipped due to tags"));
-                    }
-                    continue;
-                }
+                executeTask(play, task, batch, tqm, variableManager, results, failedHosts, hostNotifications, globalCheckMode, runTags, skipTags);
+            }
+            flushHandlers(play, batch, tqm, variableManager, results, failedHosts, hostNotifications, globalCheckMode, runTags, skipTags);
 
-                tqm.getCallbacks().forEach(c -> c.v2_playbook_on_task_start(task, task.when() != null));
+            // Post Tasks for this batch
+            for (Task task : play.postTasks()) {
+                executeTask(play, task, batch, tqm, variableManager, results, failedHosts, hostNotifications, globalCheckMode, runTags, skipTags);
+            }
+            flushHandlers(play, batch, tqm, variableManager, results, failedHosts, hostNotifications, globalCheckMode, runTags, skipTags);
+        }
+    }
 
-                boolean executedOnce = false;
-                for (Host host : batch) {
-                    if (failedHosts.contains(host.name())) {
-                        continue;
-                    }
-                    if (task.runOnce() && executedOnce) {
-                        continue;
-                    }
+    private void executeTask(Play play, Task task, List<Host> batch, TaskQueueManager tqm, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean globalCheckMode, List<String> runTags, List<String> skipTags) {
+        if (tqm.isPlayFatalError()) return;
+        if (!tqm.isTaskToBeExecuted(task, runTags, skipTags)) {
+            for (Host host : batch) {
+                results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(TaskResult.skipped("Skipped due to tags"));
+            }
+            return;
+        }
 
-                    Map<String, Object> vars = variableManager.getAllVariables(play, host, task, null, (List<Role>) null, null);
-                    boolean playCheckMode = tqm.getVariableResolver().resolveCheckMode(play.checkMode(), vars, globalCheckMode);
+        tqm.getCallbacks().forEach(c -> c.v2_playbook_on_task_start(task, task.when() != null));
 
-                    try {
-                        Connection connection = tqm.getOrCreateConnection(host, vars);
-                        tqm.executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications, playCheckMode, new ArrayList<>(), null, null, null, connection, runTags, skipTags);
-                    } catch (UnreachableException e) {
-                        if (task.ignoreUnreachable()) {
-                            TaskResult unreachableResult = TaskResult.unreachable(e.getMessage());
-                            results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(unreachableResult);
-                        } else {
-                            failedHosts.add(host.name());
-                            tqm.checkAnyErrorsFatal(play, host, task, null, null, null, variableManager);
-                        }
-                    }
-                    executedOnce = true;
-                }
-                tqm.checkMaxFailPercentage(play, task, batch, failedHosts, variableManager);
+        boolean executedOnce = false;
+        for (Host host : batch) {
+            if (failedHosts.contains(host.name())) {
+                continue;
+            }
+            if (task.runOnce() && executedOnce) {
+                continue;
             }
 
-            // Execute handlers for this batch
-            if (!tqm.isPlayFatalError()) {
-                for (Host host : batch) {
-                    if (failedHosts.contains(host.name())) {
-                        continue;
-                    }
-                    Map<String, Object> vars = variableManager.getAllVariables(play, host, null, null, (List<Role>) null, null);
-                    boolean playCheckMode = tqm.getVariableResolver().resolveCheckMode(play.checkMode(), vars, globalCheckMode);
-                    try {
-                        Connection connection = tqm.getOrCreateConnection(host, vars);
-                        tqm.flushHandlersForHost(play, host, variableManager, results, failedHosts, hostNotifications, playCheckMode, connection, runTags, skipTags);
-                    } catch (UnreachableException e) {
-                        failedHosts.add(host.name());
-                    }
+            Map<String, Object> vars = variableManager.getAllVariables(play, host, task, null, (List<Role>) null, null);
+            boolean playCheckMode = tqm.getVariableResolver().resolveCheckMode(play.checkMode(), vars, globalCheckMode);
+
+            try {
+                Connection connection = tqm.getOrCreateConnection(host, vars);
+                tqm.executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications, playCheckMode, new ArrayList<>(), null, null, null, connection, runTags, skipTags);
+            } catch (UnreachableException e) {
+                if (task.ignoreUnreachable()) {
+                    TaskResult unreachableResult = TaskResult.unreachable(e.getMessage());
+                    results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(unreachableResult);
+                } else {
+                    failedHosts.add(host.name());
+                    tqm.checkAnyErrorsFatal(play, host, task, null, null, null, variableManager);
+                }
+            }
+            executedOnce = true;
+        }
+        tqm.checkMaxFailPercentage(play, task, batch, failedHosts, variableManager);
+    }
+
+    private void flushHandlers(Play play, List<Host> batch, TaskQueueManager tqm, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean globalCheckMode, List<String> runTags, List<String> skipTags) {
+        if (!tqm.isPlayFatalError()) {
+            for (Host host : batch) {
+                if (failedHosts.contains(host.name())) {
+                    continue;
+                }
+                Map<String, Object> vars = variableManager.getAllVariables(play, host, null, null, (List<Role>) null, null);
+                boolean playCheckMode = tqm.getVariableResolver().resolveCheckMode(play.checkMode(), vars, globalCheckMode);
+                try {
+                    Connection connection = tqm.getOrCreateConnection(host, vars);
+                    tqm.flushHandlersForHost(play, host, variableManager, results, failedHosts, hostNotifications, playCheckMode, connection, runTags, skipTags);
+                } catch (UnreachableException e) {
+                    failedHosts.add(host.name());
                 }
             }
         }
