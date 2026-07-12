@@ -66,6 +66,10 @@
 - **状況**: 実装済み。
 - **詳細**: `free` 戦略などの並列実行環境において、標準出力の混在やタスクヘッダーの重複出力を防ぐための最適化が行われています。`DefaultCallback` は `synchronized` メソッドによるスレッドセーフな出力と、`ConcurrentHashMap` を使用したタスクヘッダーの重複排除機能を備えています。
 
+### 2.9 Python ベースのコールバックのサポート (Implemented)
+- **状況**: 実装済み。
+- **詳細**: GraalPy を活用し、Ansible 本家のコールバックプラグインをそのまま実行可能にするための仕組みが導入されています。詳細は、[コールバックプラグインの設計仕様](../implementation/Callback-Plugins.md#9-python-ベースのコールバックのサポート-implemented) を参照してください。
+
 ## 3. タスクのフィルタリング (Tags and Limit)
 
 Playbook の実行範囲を制御するためのフィルタリング機能を提供します。
@@ -85,8 +89,4 @@ Playbook の実行範囲を制御するためのフィルタリング機能を�
 
 ## 4. 将来的な拡張事項 (Future Extensions)
 
-以下の機能は現在計画中であり、将来のアップデートで提供される予定です。
-
-- **Python ベースのコールバックのサポート**: GraalPy を活用し、Ansible 本家のコールバックプラグインをそのまま実行可能にする。
-
-詳細は、[検討事項・TODOリスト](../TODO-Details.md#5-今後の設計・拡張事項-future-design-and-extensions) を参照してください。
+現在、主要な機能の多くは実装済みです。今後の拡張については、[検討事項・TODOリスト](../TODO-Details.md#5-今後の設計・拡張事項-future-design-and-extensions) を参照してください。

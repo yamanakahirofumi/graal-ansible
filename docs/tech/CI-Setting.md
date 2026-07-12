@@ -8,7 +8,7 @@
 GitHub へのプッシュ（Push）またはプルリクエスト（Pull Request）が作成された際に、以下のプロセスが自動的に実行されます。
 
 1. **チェックアウト**：リポジトリのソースコードを取得します。
-2. **GraalVM のセットアップ**：ネイティブビルドに必要な GraalVM JDK をセットアップします。`python` コンポーネントを明示的に指定して、Ansible コアの実行環境を構築します。
+2. **GraalVM のセットアップ**：ネイティブビルドに必要な GraalVM JDK をセットアップします。Java 21 以降では GraalPy が標準的なアーティファクトとして提供されるため、`python` コンポーネントの明示的な指定は不要です。
 3. **マルチプラットフォーム・マトリックス**：Ubuntu, Windows の各環境でテストを実行し、OS非依存性を検証します。
 4. **ビルドとテスト**：`mvn verify` を実行し、ユニットテストおよび結合テストを実施します。
 5. **テスト結果の送信**: JUnit 形式のテスト結果（XML）を Codecov へ転送します（Ubuntu 環境のみ）。
@@ -43,17 +43,16 @@ jobs:
       with:
         java-version: '21'
         distribution: 'graalvm'
-        version: '25.0.2'
-        components: 'python'
         github-token: ${{ secrets.GITHUB_TOKEN }}
         native-image-job-reports: 'true'
     - name: Build and Test
       run: mvn -B verify
     - name: Upload test results to Codecov
       if: always() && runner.os == 'Linux'
-      uses: codecov/test-results-action@v1
+      uses: codecov/codecov-action@v5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
+        report_type: test_results
         directory: ./target/surefire-reports/
     - name: Build Native Image
       run: mvn -Pnative native:compile

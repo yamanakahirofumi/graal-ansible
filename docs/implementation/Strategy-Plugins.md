@@ -68,7 +68,3 @@ Ansible のデフォルト戦略であり、`graal-ansible` における標準�
 - `TaskQueueManager.executePlay` は、タスク実行ループの制御を、選択された `Strategy.run` メソッドに委譲します。
 - これにより、`TaskQueueManager` はコネクション管理や結果の集計といった「実行インフラ」に専念し、実行の「順序制御」をストラテジ・プラグインが担う構成となっています。
 
-## 5. 今後の課題
-
-### 5.1 その他
-その他の設計・拡張事項については、[検討事項・TODOリスト](../TODO-Details.md#5-今後の設計・拡張事項-future-design-and-extensions) を参照してください。

@@ -41,3 +41,9 @@
     - 実行結果レポートのさらなる詳細化とフィルタリング機能。
 
 ## 5. 今後の設計・拡張事項 (Future Design and Extensions)
+
+### 5.1 [ ] Inventory Plugins のサポート (Python-first)
+- **概要**: GraalPy 上でオリジナルの Ansible Inventory Plugin を実行し、AWS/GCP 等の動的インベントリソースをサポートする。
+- **検討内容**:
+    - [Action Plugin 実装仕様](implementation/Action-Plugins.md) と同様のブリッジメカニズム（`ansible_bridge.py`）の利用。
+    - プラグインの実行結果（Python 辞書）を Java 側の `Inventory` レコードへ変換するロジックの実装。
