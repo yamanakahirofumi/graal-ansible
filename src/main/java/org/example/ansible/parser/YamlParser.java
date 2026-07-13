@@ -28,7 +28,7 @@ public class YamlParser {
             "vars", "notify", "listen", "with_items", "with_list", "with_dict",
             "failed_when", "changed_when", "delegate_to", "delegate_facts", "run_once",
             "block", "rescue", "always", "check_mode", "environment", "any_errors_fatal",
-            "async", "poll", "throttle", "max_fail_percentage"
+            "async", "poll", "throttle", "max_fail_percentage", "pre_tasks", "post_tasks"
     );
 
     private final Yaml yaml;
@@ -96,6 +96,8 @@ public class YamlParser {
                                     play.varsPrompt(),
                                     play.roles(),
                                     play.handlers(),
+                                play.preTasks(),
+                                play.postTasks(),
                                     play.become(),
                                     play.becomeMethod(),
                                     play.becomeUser(),
@@ -217,6 +219,9 @@ public class YamlParser {
             }
         }
 
+        List<Task> preTasks = parseTaskList(map.get("pre_tasks"), playTags);
+        List<Task> postTasks = parseTaskList(map.get("post_tasks"), playTags);
+
         Map<String, Object> vars = (Map<String, Object>) map.getOrDefault("vars", Map.of());
 
         List<String> varsFiles = new ArrayList<>();
@@ -257,7 +262,7 @@ public class YamlParser {
         Object throttle = map.get("throttle");
         Object maxFailPercentage = map.get("max_fail_percentage");
 
-        return new Play(name, hosts, tasks, vars, varsFiles, varsPrompt, roles, handlers, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, playTags, anyErrorsFatal, strategy, serial, throttle, maxFailPercentage);
+        return new Play(name, hosts, tasks, vars, varsFiles, varsPrompt, roles, handlers, preTasks, postTasks, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, playTags, anyErrorsFatal, strategy, serial, throttle, maxFailPercentage);
     }
 
     @SuppressWarnings("unchecked")

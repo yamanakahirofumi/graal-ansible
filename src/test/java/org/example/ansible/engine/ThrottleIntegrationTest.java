@@ -72,7 +72,7 @@ public class ThrottleIntegrationTest {
                 0, 10
         );
 
-        Play play = new Play("throttle play", "all", List.of(task), new HashMap<>(), List.of(), List.of(), List.of(), List.of(), null, null, null, null, null, null, List.of(), null, "free", null, null, null);
+        Play play = new Play("throttle play", "all", List.of(task), new HashMap<>(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), null, null, null, null, null, null, List.of(), null, "free", null, null, null);
 
         VariableManager variableManager = new VariableManager(inventory, Collections.emptyMap());
         Map<String, List<TaskResult>> results = new ConcurrentHashMap<>();
