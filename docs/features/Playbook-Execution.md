@@ -85,8 +85,4 @@ Playbook の実行範囲を制御するためのフィルタリング機能を�
 
 ## 4. 将来的な拡張事項 (Future Extensions)
 
-以下の機能は現在計画中であり、将来のアップデートで提供される予定です。
-
-- **Python ベースのコールバックのサポート**: GraalPy を活用し、Ansible 本家のコールバックプラグインをそのまま実行可能にする。
-
 詳細は、[検討事項・TODOリスト](../TODO-Details.md#5-今後の設計・拡張事項-future-design-and-extensions) を参照してください。

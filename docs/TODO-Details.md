@@ -41,3 +41,20 @@
     - 実行結果レポートのさらなる詳細化とフィルタリング機能。
 
 ## 5. 今後の設計・拡張事項 (Future Design and Extensions)
+
+### 5.1 [ ] インベントリ・ホストパターンのレンジ指定サポート
+- **概要**: `web[0-5]` や `10.0.0.[10:20]` などのレンジ指定をサポート。
+- **検討内容**:
+    - `Inventory` クラスにおけるホストパターンマッチングロジックの拡張。
+
+### 5.2 [ ] Python-first によるインベントリ・プラグインのサポート
+- **概要**: GraalPy 上でオリジナルの Ansible Inventory Plugin を実行可能にする。
+- **検討内容**:
+    - [Action Plugin 実装仕様](implementation/Action-Plugins.md) と同様のブリッジメカニズム（`ansible_bridge.py`）の活用。
+    - AWS, GCP, NetBox 等の動的インベントリへの対応。
+
+### 5.3 [ ] 追加のコネクションプラグインの実装
+- **概要**: Docker および Windows (WinRM) ターゲットへの接続サポート。
+- **検討内容**:
+    - **Docker**: Docker CLI 呼び出しによる実装。
+    - **WinRM**: [WinRM4J](https://github.com/CloudBees-Community/winrm4j) ライブラリの統合。
