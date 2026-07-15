@@ -19,8 +19,10 @@ import org.example.ansible.engine.VariableManager;
 import org.example.ansible.inventory.FileInventoryProvider;
 import org.example.ansible.inventory.Inventory;
 import org.example.ansible.inventory.InventoryManager;
+import org.example.ansible.inventory.PythonInventoryProvider;
 import org.example.ansible.inventory.ScriptInventoryProvider;
 import org.example.ansible.parser.YamlParser;
+import org.example.ansible.util.PythonEnv;
 import org.example.ansible.util.YamlUtil;
 import org.graalvm.polyglot.Context;
 import org.yaml.snakeyaml.Yaml;
@@ -110,6 +112,7 @@ public class PlaybookCli implements Callable<Integer> {
             if (inventoryPath != null) {
                 InventoryManager inventoryManager = new InventoryManager();
                 inventoryManager.addProvider(new ScriptInventoryProvider());
+                inventoryManager.addProvider(new PythonInventoryProvider(PythonEnv.getCollectionPaths(null)));
                 inventoryManager.addProvider(new FileInventoryProvider());
 
                 inventory = inventoryManager.loadInventory(List.of(inventoryPath));

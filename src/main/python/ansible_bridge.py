@@ -634,6 +634,76 @@ def apply_mocks() -> None:
 
     create_mock('ansible.plugins.callback', {'CallbackBase': CallbackBase})
 
+    class InventoryData:
+        def __init__(self):
+            self.hosts = {}
+            self.groups = {'all': {'hosts': [], 'children': [], 'vars': {}}, 'ungrouped': {'hosts': [], 'children': [], 'vars': {}}}
+            self.groups['all']['children'].append('ungrouped')
+
+        def add_group(self, group):
+            if group not in self.groups:
+                self.groups[group] = {'hosts': [], 'children': [], 'vars': {}}
+                if group != 'all':
+                    self.add_child('all', group)
+            return group
+
+        def add_host(self, host, group=None, port=None):
+            if host not in self.hosts:
+                self.hosts[host] = {'vars': {}}
+            if port:
+                self.hosts[host]['vars']['ansible_port'] = port
+            if group:
+                self.add_group(group)
+                if host not in self.groups[group]['hosts']:
+                    self.groups[group]['hosts'].append(host)
+            else:
+                if host not in self.groups['ungrouped']['hosts']:
+                    self.groups['ungrouped']['hosts'].append(host)
+
+        def add_child(self, group, child):
+            self.add_group(group)
+            self.add_group(child)
+            if child not in self.groups[group]['children']:
+                self.groups[group]['children'].append(child)
+
+        def set_variable(self, entity, varname, value):
+            if entity in self.groups:
+                self.groups[entity]['vars'][varname] = value
+            elif entity in self.hosts:
+                self.hosts[entity]['vars'][varname] = value
+            else:
+                # If neither group nor host, assume host and create it
+                self.add_host(entity)
+                self.hosts[entity]['vars'][varname] = value
+
+        def to_dict(self):
+            return {'hosts': self.hosts, 'groups': self.groups}
+
+    class BaseInventoryPlugin:
+        def __init__(self):
+            self.display = Display()
+            self.loader = None
+            self.inventory = None
+            self._options = {}
+        def parse(self, inventory, loader, path, cache=True):
+            self.inventory = inventory
+            self.loader = loader
+        def verify_file(self, path):
+            return os.path.exists(_normalize_path(path))
+        def set_options(self, *args, **kwargs): pass
+        def get_option(self, k): return self._options.get(k)
+
+    class BaseFileInventoryPlugin(BaseInventoryPlugin):
+        pass
+
+    create_mock('ansible.plugins.inventory', {
+        'BaseInventoryPlugin': BaseInventoryPlugin,
+        'BaseFileInventoryPlugin': BaseFileInventoryPlugin
+    })
+    create_mock('ansible.inventory.data', {
+        'InventoryData': InventoryData
+    })
+
     class VariableLayer:
         FACTS = 'facts'
         VARS = 'vars'
@@ -1022,6 +1092,54 @@ def _create_callback_plugin(callback_name: str) -> Any:
             raise ImportError(f"Could not load callback plugin {callback_name}")
 
     return mod.CallbackModule()
+
+def _create_inventory_plugin(plugin_name: str) -> Any:
+    import importlib.util
+    base_name = plugin_name
+    if base_name.startswith('ansible.builtin.'): base_name = base_name[16:]
+    elif base_name.startswith('ansible.legacy.'): base_name = base_name[15:]
+
+    path = None
+
+    # Check collections
+    if '.' in plugin_name:
+        parts = plugin_name.split('.')
+        if len(parts) >= 3:
+            ns, coll, pl = parts[0], parts[1], parts[2]
+            coll_pkgs = globals().get('collection_paths_java')
+            if coll_pkgs:
+                for p in coll_pkgs:
+                    cand = os.path.join(_normalize_path(p), 'ansible_collections', ns, coll, 'plugins/inventory', pl + '.py')
+                    if os.path.exists(cand): path = cand; break
+
+    if not path:
+        site_pkgs = globals().get('site_packages_java')
+        if site_pkgs:
+            for p in site_pkgs:
+                cand = os.path.join(_normalize_path(p), 'ansible/plugins/inventory', base_name + '.py')
+                if os.path.exists(cand): path = cand; break
+
+    if not path:
+        for p in sys.path:
+            cand = os.path.join(p, 'ansible/plugins/inventory', base_name + '.py')
+            if os.path.exists(cand): path = cand; break
+
+    if not path:
+        raise ImportError(f"Could not find inventory plugin {plugin_name}")
+
+    fqcn = "ansible.plugins.inventory." + base_name
+    if fqcn in sys.modules:
+        mod = sys.modules[fqcn]
+    else:
+        spec = importlib.util.spec_from_file_location(fqcn, path)
+        if spec and spec.loader:
+            mod = importlib.util.module_from_spec(spec)
+            sys.modules[spec.name] = mod
+            spec.loader.exec_module(mod)
+        else:
+            raise ImportError(f"Could not load inventory plugin {plugin_name}")
+
+    return mod.InventoryModule()
 
 def execute_module(module_name: str, complex_args: Dict[str, Any], module_code: Optional[str] = None) -> str:
     import __main__
