@@ -15,7 +15,10 @@ GitHub へのプッシュ（Push）またはプルリクエスト（Pull Request
 6. **Native Image ビルド**：各OS向けのネイティブバイナリを生成し、動作確認を行います。
 
 ### 1.2 設定ファイルの例 (`.github/workflows/build.yml`)
-以下は、Maven を使用した標準的なワークフロー構成です。
+以下は、GraalVM のMaven を使用した標準的なワークフロー構成の例です。
+
+> [!IMPORTANT]
+> 以下の例で使用されている各アクションやツールのバージョン（`actions/checkout@v4` や `java-version: '21'`, `version: '25.0.2'` など）は、ドキュメント作成時のものです。実際の設定にあたっては、最新の安定バージョンを確認して使用してください。
 
 ```yaml
 name: Java CI with Maven
