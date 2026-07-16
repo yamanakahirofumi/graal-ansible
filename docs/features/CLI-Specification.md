@@ -56,11 +56,20 @@ graal-ansible [options] playbook.yml
 
 `graal-ansible` は、以下の環境変数をサポートしています。
 
-| 環境変数 | 説明 | 実装状況 |
-| :--- | :--- | :---: |
-| `ANSIBLE_STDOUT_CALLBACK` | 使用するコールバックプラグインを指定（例: `default`, `json`） | ◎ |
-| `ANSIBLE_COLLECTIONS_PATH` | コレクションの探索パスをコロン区切りで指定 | ◎ |
-| `ANSIBLE_HASH_BEHAVIOUR` | 辞書型変数のマージ戦略を指定 (`replace` または `merge`) | ◎ |
+| 環境変数                   | 説明                                                                         | 実装状況 |
+| :------------------------- | :--------------------------------------------------------------------------- | :------: |
+| `ANSIBLE_STDOUT_CALLBACK`  | 使用するコールバックプラグインを指定（例: `default`, `json`）                |    ◎     |
+| `ANSIBLE_COLLECTIONS_PATH` | コレクションの探索パスをコロン区切りで指定                                   |    ◎     |
+| `ANSIBLE_HASH_BEHAVIOUR`   | 辞書型変数のマージ戦略を指定 (`replace` または `merge`)                      |    ◎     |
+| `ANSIBLE_SITE_PACKAGES`    | Python の `site-packages` （依存ライブラリの探索パス）をコロン区切りで指定   |    ◎     |
+
+### 5.1 Java システムプロパティ (Java System Properties)
+
+Java の起動時オプション（`-Dproperty=value`）として、以下の設定をサポートしています。
+
+| プロパティ名            | 説明                                                                         | 実装状況 |
+| :---------------------- | :--------------------------------------------------------------------------- | :------: |
+| `ansible.site.packages` | Python の `site-packages` （依存ライブラリの探索パス）をコロン区切りで指定   |    ◎     |
 
 ## 6. コレクション探索パスの優先順位
 
