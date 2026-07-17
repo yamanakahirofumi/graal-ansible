@@ -8,17 +8,17 @@
 GitHub へのプッシュ（Push）またはプルリクエスト（Pull Request）が作成された際に、以下のプロセスが自動的に実行されます。
 
 1. **チェックアウト**：リポジトリのソースコードを取得します。
-2. **GraalVM のセットアップ**：ネイティブビルドに必要な GraalVM JDK をセットアップします。`python` コンポーネントを明示的に指定して、Ansible コアの実行環境を構築します。
+2. **GraalVM のセットアップ**：ネイティブビルドに必要な GraalVM JDK をセットアップします。GraalVM Java 21 との互換性確保のため、`python` コンポーネントおよび明示的なバージョン（`version: '25.0.2'`など）の指定は行いません。
 3. **マルチプラットフォーム・マトリックス**：Ubuntu, Windows の各環境でテストを実行し、OS非依存性を検証します。
 4. **ビルドとテスト**：`mvn verify` を実行し、ユニットテストおよび結合テストを実施します。
 5. **テスト結果の送信**: JUnit 形式のテスト結果（XML）を Codecov へ転送します（Ubuntu 環境のみ）。
 6. **Native Image ビルド**：各OS向けのネイティブバイナリを生成し、動作確認を行います。
 
 ### 1.2 設定ファイルの例 (`.github/workflows/build.yml`)
-以下は、GraalVM のMaven を使用した標準的なワークフロー構成の例です。
+以下は、GraalVM の Maven を使用した標準的なワークフロー構成の例です。
 
 > [!IMPORTANT]
-> 以下の例で使用されている各アクションやツールのバージョン（`actions/checkout@v4` や `java-version: '21'`, `version: '25.0.2'` など）は、ドキュメント作成時のものです。実際の設定にあたっては、最新の安定バージョンを確認して使用してください。
+> 以下の例で使用されている各アクションやツールのバージョン（`actions/checkout@v4` や `java-version: '21'`, `codecov-action@v5` など）は、ドキュメント作成時のものです。実際の設定にあたっては、最新の安定バージョンを確認して使用してください。
 
 ```yaml
 name: Java CI with Maven
@@ -26,40 +26,43 @@ name: Java CI with Maven
 on:
   push:
     branches: [ main ]
+    paths:
+      - 'src/**'
   pull_request:
     branches: [ main ]
+    paths:
+      - 'src/**'
 
 jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ ubuntu-latest, windows-latest ]
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v4
-    - name: Build test Docker image
-      if: runner.os == 'Linux'
-      run: |
-        docker build -t mokojarasi/test-python-sshd:latest src/test/docker/
-    - name: Set up GraalVM
-      uses: graalvm/setup-graalvm@v1
-      with:
-        java-version: '21'
-        distribution: 'graalvm'
-        version: '25.0.2'
-        components: 'python'
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        native-image-job-reports: 'true'
-    - name: Build and Test
-      run: mvn -B verify
-    - name: Upload test results to Codecov
-      if: always() && runner.os == 'Linux'
-      uses: codecov/test-results-action@v1
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-        directory: ./target/surefire-reports/
-    - name: Build Native Image
-      run: mvn -Pnative native:compile
+      - uses: actions/checkout@v4
+      - name: Build test Docker image
+        if: runner.os == 'Linux'
+        run: |
+          docker build -t mokojarasi/test-python-sshd:latest src/test/docker/
+      - name: Set up GraalVM
+        uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: '21'
+          distribution: 'graalvm'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          native-image-job-reports: 'true'
+      - name: Build and Test
+        run: mvn -B verify
+      - name: Upload test results to Codecov
+        if: always() && runner.os == 'Linux'
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          report_type: test_results
+          directory: ./target/surefire-reports/
+      - name: Build Native Image
+        run: mvn -Pnative native:compile
 ```
 
 ## 2. テスト結果の可視化

@@ -89,7 +89,10 @@ graal-ansible playbook.yml
 
 `ansible.builtin` などのコアモジュールについては、以下のパスから解決を試みます。
 
-1.  Python インタプリタ（GraalPy）の `sys.path` (インストール済みの `ansible-core` 内)
+1.  Python インタプリタ（GraalPy）の `sys.path`（インストール済みの `ansible-core` 等を含む依存ライブラリパス）。この探索パスは以下の優先順位で決定され、`sys.path` に登録されます：
+    - 環境変数 `ANSIBLE_SITE_PACKAGES` で指定されたコロン（Windows はセミコロン）区切りのパス。
+    - Java システムプロパティ `-Dansible.site.packages` で指定されたパス。
+    - デフォルトパス（`target/python-packages` が存在する場合はその絶対パス）。
 2.  `ANSIBLE_COLLECTIONS_PATH` 内の `ansible_collections/ansible/builtin`
 
 ## 4. 手順のまとめ
