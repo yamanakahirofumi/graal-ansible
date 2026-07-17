@@ -219,10 +219,18 @@
 
 ### 1.33 [✓] ストラテジ固有のコールバック最適化
 - **完了日**: 2026-07-07
-- **概要**: `free` 戦略などにおいて、ホストごとに進捗が異なる場合の出力形式のさらなる最適化。
+- **概要**: `free` 戦略などにおいて、ホストごとに進捗が異なる場合の標準出力の出力形式を最適化。
 - **解決策**:
     - `DefaultCallback` において、タスクおよびハンドラーのヘッダー出力を 1 回のみに制限する重複排除ロジック（Deduplication）を実装。
     - 全てのコールバックメソッドに `synchronized` を付与し、並列実行時（`free` 戦略等）の出力の混在を防止。
+
+### 1.34 [✓] Python ベースのインベントリ・プラグインのサポート
+- **完了日**: 2026-04-18
+- **概要**: GraalPy 上でオリジナルの Ansible Inventory Plugin を実行する「Python-first」アプローチのサポート。
+- **解決策**:
+    - `PythonInventoryProvider` を実装し、拡張子が `.yml` または `.yaml` で、かつトップレベルに `plugin` キーを持つインベントリファイルを自動検知する仕組みを導入。
+    - `ansible_bridge.py` および `ansible_inventory_launcher.py` を介して、GraalPy 環境上でオリジナルの Python 製インベントリプラグインを読み込み、実行するブリッジメカニズムを確立。
+    - 実行結果を JSON 形式で出力（`InventoryData.to_dict()`）し、Java 側で Jackson を用いて解析、Java `Inventory` レコード（Group、Host、変数、親子関係）に透過的にマージして構築するパーサを実装。
 
 ## 2. 整理・調整済み (Refactored/Adjusted)
 

@@ -13,7 +13,9 @@
 - **group_by モジュール**: ファクトに基づいて実行時にグループを動的に作成する機能をサポート済み。
 
 ### 1.3 外部インベントリ (Dynamic Inventory)
-- **インベントリ・プラグイン/スクリプト**: JSON 形式等を出力する外部プログラムとの連携をサポートします。詳細は [インベントリシステムの実装詳細](../implementation/Inventory-System.md#5-外部インベントリの統合-external-inventory-integration) を参照してください。
+- **インベントリ・プラグイン (Python-first)**: GraalPy を活用し、Ansible 本来の Python 製インベントリプラグインをそのまま実行可能な仕組み（`PythonInventoryProvider`）を完全にサポートしています。
+- **インベントリ・スクリプト**: JSON 形式を出力する外部のインベントリスクリプト（`ScriptInventoryProvider`）との連携をサポートしています。
+- **詳細**: 詳細は [インベントリシステムの実装詳細](../implementation/Inventory-System.md#5-外部インベントリの統合-external-inventory-integration) を参照してください。
 
 ## 2. 実装上の留意点 (Implementation Considerations)
 
