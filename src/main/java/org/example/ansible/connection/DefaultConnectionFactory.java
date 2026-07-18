@@ -21,6 +21,10 @@ public class DefaultConnectionFactory implements ConnectionFactory {
 
         if ("local".equals(connectionType)) {
             return new LocalConnection();
+        } else if ("docker".equals(connectionType)) {
+            String containerName = (String) variables.getOrDefault("ansible_host", host.name());
+            String user = (String) variables.get("ansible_user");
+            return new DockerConnection(containerName, user);
         } else if ("ssh".equals(connectionType) || "smart".equals(connectionType)) {
             String ansibleHost = (String) variables.getOrDefault("ansible_host", host.name());
             int port = 22;
