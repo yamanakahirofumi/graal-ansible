@@ -232,6 +232,15 @@
     - `ansible_bridge.py` および `ansible_inventory_launcher.py` を介して、GraalPy 環境上でオリジナルの Python 製インベントリプラグインを読み込み、実行するブリッジメカニズムを確立。
     - 実行結果を JSON 形式で出力（`InventoryData.to_dict()`）し、Java 側で Jackson を用いて解析、Java `Inventory` レコード（Group、Host、変数、親子関係）に透過的にマージして構築するパーサを実装。
 
+### 1.35 [✓] Docker コネクション・プラグインの実装
+- **完了日**: 2026-07-18
+- **概要**: 稼働中の Docker コンテナへの接続およびコマンド実行、ファイルの転送。
+- **解決策**:
+    - `DockerConnection.java` を実装し、コネクションタイプ `docker` を `DefaultConnectionFactory` に統合。
+    - `docker exec` によるコマンド実行、`docker cp` による双方向ファイル転送 (`putFile`, `fetchFile`)、`docker inspect` によるコンテナ実行状態チェックを実装。
+    - コマンド実行時の環境変数指定 (`-e`)、および各種権限昇格オプション (`sudo`, `su`, native `-u` オプション) をサポート。
+    - `DockerConnectionTest.java` において `Mockito` を用いたプロセス実行シミュレーション（パッケージプライベートな `startProcess` メソッド経由）により、デーモン不要かつ安全な例外シナリオを含む単体テストカバレッジを実現。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築

@@ -12,7 +12,7 @@ Ansible と同様に、ターゲットノードに対する実行環境（ロー
 | :--- | :--- | :--- | :--- |
 | `ssh` | **実装済** | 標準的なリモート接続 (OpenSSH 互換) | [Apache MINA SSHD](https://mina.apache.org/sshd-project/) |
 | `local` | **実装済** | 管理ノード（制御ノード）自身での実行 | `java.lang.ProcessBuilder` |
-| `docker` | 未実装 | 稼働中の Docker コンテナ内での実行 | Docker CLI 呼び出し |
+| `docker` | **実装済** | 稼働中の Docker コンテナ内での実行 | Docker CLI |
 | `winrm` | 未実装 | Windows ターゲットノードへの接続 | [WinRM4J](https://github.com/CloudBees-Community/winrm4j) |
 
 ## 3. インターフェース定義
@@ -56,13 +56,32 @@ GraalVM Native Image との相性を考慮し、純粋な Java 実装である *
 - `sudo` が指定された場合、`sudo -n` (non-interactive) を付与して実行します。
 - `exec_command` で渡された `environment` マップを、`ProcessBuilder` の `environment()` にマージして実行します。
 
-## 7. 実装上の注意
+## 7. Docker コネクションの詳細設計
+
+稼働中の Docker コンテナ内でコマンドを実行、およびファイルの転送を行います。
+
+### 7.1 Docker CLI との連携
+外部の Docker デーモンおよび CLI を利用して動作します。
+- **コンテナ状態の確認**: 接続開始時 (`connect`)、`docker inspect -f {{.State.Running}} <container>` を実行してコンテナが正常に起動しているか確認します。
+- **ファイル転送**: `docker cp` コマンドを用いて、管理ノードとコンテナ間の双方向ファイル転送 (`put_file`, `fetch_file`) を実現します。
+
+### 7.2 実行時環境変数の伝播
+- タスクに指定された環境変数マップ (`environment`) を、`docker exec -e KEY=VALUE` オプション群へ変換してコマンド実行時に引き渡します。
+
+### 7.3 権限昇格 (become) とユーザー制御
+- **sudo/su の利用**: `become_method` が `sudo` または `su` の場合、コマンド自体を `sudo` / `su` ラップして実行します。
+- **Native ユーザー指定**: 上記以外の become メソッド、または `become_user` が指定された場合、`docker exec -u <user>` オプションを用いてコンテナ内の実行ユーザーを直接切り替えます。
+
+### 7.4 テストとモック化
+- プロセス実行部分 (`ProcessBuilder.start()`) をパッケージプライベートメソッド `startProcess` として抽出し、`DockerConnectionTest.java` において Mockito によるプロセスシミュレーションを行い、Docker デーモンが存在しない CI 環境でも一連のライフサイクルと例外制御を安全にテスト・検証できるように設計されています。
+
+## 8. 実装上の注意
 
 - **タイムアウト管理**: 接続およびコマンド実行に対して、Ansible 互換のタイムアウト設定を適用可能にします。
 - **リソース解放**: 実行完了後（またはエラー発生時）に確実に接続をクローズする仕組み（Try-with-resources 等）を徹底します。
 - **Native Image 対応**: SSH ライブラリが使用する暗号化アルゴリズムのリフレクション/JNI設定を `reflect-config.json` 等に含める必要があります。
 
-## 8. コネクションファクトリと解決ロジック
+## 9. コネクションファクトリと解決ロジック
 
 インベントリ変数（`ansible_connection` 等）に基づき動的に `Connection` インスタンスを生成するため、`ConnectionFactory` を導入しています。
 
