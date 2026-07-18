@@ -42,13 +42,7 @@
 
 ## 5. 今後の設計・拡張事項 (Future Design and Extensions)
 
-### 5.1 [ ] Python ベースのインベントリ・プラグインのサポート
-- **概要**: GraalPy 上でオリジナルの Ansible Inventory Plugin を実行する「Python-first」アプローチ。
-- **検討内容**:
-    - `ansible_bridge.py` を介したプラグインの実行と、結果（Python 辞書）の Java `Inventory` レコードへの変換。
-    - AWS, GCP などのクラウドプロバイダー向け動的インベントリのサポート。
-
-### 5.2 [ ] コネクション・プラグインの拡充 (Docker, WinRM)
+### 5.1 [ ] コネクション・プラグインの拡充 (Docker, WinRM)
 - **概要**: SSH/Local 以外の接続プロトコルのサポート。
 - **検討内容**:
     - **Docker**: Docker CLI または API を利用したコンテナ内実行。

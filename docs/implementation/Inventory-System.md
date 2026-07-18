@@ -78,9 +78,20 @@ Ansible 互換の外部インベントリ（スクリプトまたはプラグイ
 ### 5.2 プラグイン方式 (Inventory Plugins)
 YAML 設定ファイルに基づき、特定のソース（AWS, GCP, NetBox 等）から動的にホストを取得します。
 
-- **実装方針**:
-    - **将来的な課題**: GraalPy 上でオリジナルの Ansible Inventory Plugin を実行する「Python-first」アプローチを検討します。
-    - [Action Plugin 実装仕様](Action-Plugins.md) と同様のブリッジメカニズム（`ansible_bridge.py`）を利用し、プラグインを実行して得られた結果（Python 辞書）を Java 側で `Inventory` レコードに変換することを計画しています。
+- **実装詳細 (Python-first アプローチ)**:
+    - `PythonInventoryProvider` を用いて、GraalPy 上でオリジナルの Python 製 Ansible Inventory Plugin を実行する仕組みを完全にサポートしています。
+    - **サポート判定 (`supports`)**:
+        - ファイルが存在し、拡張子が `.yml` または `.yaml` であるかを検証します。
+        - `YamlUtil.createYaml()` を用いてファイルをロードし、最上位に `plugin` キー（例: `test_ns.test_coll.test_plugin`）が定義されている場合に対象ファイルとして自動判定します。
+    - **GraalPy 統合とブリッジ**:
+        - `Context` API を介して Python 実行環境を構築します。この際、ネイティブモジュールの分離設定として `python.IsolateNativeModules` に `false` を指定して初期化します。
+        - Java 側で用意した OS 互換性ブリッジ（`PythonOSMock`）およびモジュールファクトリ（`PythonAnsibleModuleMock.Factory`）を Python の bindings に注入します。
+        - Python の共有ブリッジ `ansible_bridge.py` を事前ロードし、`ansible.plugins.inventory` などの名前空間や `BaseInventoryPlugin`、`BaseFileInventoryPlugin` のモック群を適用します。
+    - **プラグイン実行と変換 (`load`)**:
+        - 解決された Python パスやライブラリパスを sys.path に追加設定した上で、`ansible_inventory_launcher.py` を実行します。
+        - ランチャーは `ansible_bridge._create_inventory_plugin(plugin_name)` により本物の Python プラグインを動的に解決・インスタンス化し、`plugin.parse(inventory, loader, inventory_path)` を呼び出します。
+        - 解析結果を蓄積した `InventoryData` オブジェクトから `to_dict()` 経由で JSON 形式にシリアライズされ、Java の呼び出し元に返却されます。
+        - Java の `PythonInventoryProvider` は Jackson を用いてこの JSON をパースし、Java の `Inventory` レコード（Group、Host、変数、およびグループ間親子関係）へと動的にパージ・マージしてインベントリを再構築します。
 
 ### 5.3 インベントリ・プロバイダー (InventoryProvider)
 インベントリのソース（静的ファイル、スクリプト、プラグイン）を抽象化するため、`InventoryProvider` インターフェースを導入し、以下の通り実装しています。
