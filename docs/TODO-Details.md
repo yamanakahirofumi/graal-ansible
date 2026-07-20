@@ -42,8 +42,7 @@
 
 ## 5. 今後の設計・拡張事項 (Future Design and Extensions)
 
-### 5.1 [ ] コネクション・プラグインの拡充 (Docker, WinRM)
-- **概要**: SSH/Local 以外の接続プロトコルのサポート。
+### 5.1 [ ] コネクション・プラグインの拡充 (WinRM)
+- **概要**: SSH/Local/Docker 以外の接続プロトコルのサポート。
 - **検討内容**:
-    - **Docker**: Docker CLI または API を利用したコンテナ内実行。
     - **WinRM**: `winrm4j` 等を利用した Windows ターゲットノードへの接続。

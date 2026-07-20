@@ -12,7 +12,7 @@ Ansible と同様に、ターゲットノードに対する実行環境（ロー
 | :--- | :--- | :--- | :--- |
 | `ssh` | **実装済** | 標準的なリモート接続 (OpenSSH 互換) | [Apache MINA SSHD](https://mina.apache.org/sshd-project/) |
 | `local` | **実装済** | 管理ノード（制御ノード）自身での実行 | `java.lang.ProcessBuilder` |
-| `docker` | 未実装 | 稼働中の Docker コンテナ内での実行 | Docker CLI 呼び出し |
+| `docker` | **実装済** | 稼働中の Docker コンテナ内での実行 | Docker CLI (`docker exec`, `docker cp`) |
 | `winrm` | 未実装 | Windows ターゲットノードへの接続 | [WinRM4J](https://github.com/CloudBees-Community/winrm4j) |
 
 ## 3. インターフェース定義
@@ -99,3 +99,44 @@ public interface ConnectionFactory {
 2. **プラグインの特定**: `ansible_connection` の値に基づき、対応する `Connection` 実装クラス（`LocalConnection`, `SshConnection` 等）を選択します。
 3. **インスタンス化とパラメータ注入**: 解決された接続情報（ホスト、ポート、ユーザー等）をインスタンスに注入します。
 4. **接続のキャッシュ**: 同一ホスト・同一パラメータのコネクションは `TaskQueueManager` レベルで保持（Map等）し、プレイ内のタスク間で再利用することでオーバーヘッドを削減します。
+
+## 9. Docker コネクションの詳細設計
+
+`DockerConnection` は、すでに稼働している Docker コンテナ内でタスクを実行するためのコネクションプラグインです。コンテナオーケストレーションやローカル検証環境でのテストなどで利用されます。
+
+### 9.1 CLI インタラクション
+
+Docker デーモンや API ライブラリへの直接的な依存を避け、ポータビリティと互換性を最大化するため、システムにインストールされている **Docker CLI バイナリ** を直接呼び出して操作します。
+
+- **接続確認 (`connect`)**:
+  - `docker inspect -f "{{.State.Running}}" <container_name>` を実行し、終了コードが `0` かつ出力が `true` であるかを検証することで、指定されたコンテナが存在し、かつ実行中であることを保証します。コンテナが見つからない、または停止している場合は `UnreachableException` をスローします。
+- **ファイル転送 (`putFile` / `fetchFile`)**:
+  - ファイルのアップロードおよびダウンロードには、`docker cp` コマンドを使用します。
+  - `putFile`: `docker cp <local_path> <container_name>:<remote_path>`
+  - `fetchFile`: `docker cp <container_name>:<remote_path> <local_path>`
+- **コマンド実行 (`execCommand`)**:
+  - `docker exec` を使用してコンテナ内でシェルコマンド（デフォルトで `/bin/sh -c`）を実行します。
+
+### 9.2 環境変数の伝播
+
+Jinja2 テンプレート等で評価されたタスク固有の環境変数 (`Map<String, String>`) は、`docker exec` コマンドの実行時に、一つずつ `-e KEY=VALUE` オプションとして付与され、コンテナ内の実行プロセスへ透過的に伝播されます。
+
+### 9.3 権限昇格 (Become) への対応
+
+`BecomeContext` に応じて、コンテナ内での適切な実行ユーザーや権限の切り替えをサポートします。
+
+- **`sudo` モード**:
+  - ターゲットコマンドを `sudo -H -S -n -p BECOME-PROMPT [-u <user>] /bin/sh -c '<command>'` にラップして `docker exec` 内で実行します。
+- **`su` モード**:
+  - ターゲットコマンドを `su [<user>] -c '<command>'` にラップして実行します。
+- **ネイティブ Docker ユーザー上書き (become_method=runas または become_user 指定時)**:
+  - `docker exec` コマンドの `-u` オプションに `become_user`（指定がない場合は `root`）を直接指定することで、Docker レベルで実行ユーザーをオーバーライドします。
+
+### 9.4 Mockito によるテスト戦略
+
+外部の Docker デーモンが起動していない環境でも、継続的インテグレーション（CI）環境で一貫したテストを実行できるよう、`DockerConnectionTest.java` では Mockito を使用した高度なプロセスモッキングテストスイートが構築されています。
+
+- **テスト用サブクラス (`TestableDockerConnection`)**:
+  - `DockerConnection` 内のプロセス起動メソッド (`startProcess`) をパッケージプライベートで定義し、テストコード側でプロセス呼び出しを横取りしてモック化。
+- **シミュレーション**:
+  - 正常接続時の `inspect` の出力 (`true`)、コンテナ未検出エラー（終了コード `1`、エラー出力）、各種 become 構文に変換された `docker exec` CLI 引数のアサーション、標準入出力バッファのデッドロック防止を考慮した並行ストリーム読み込みのモック処理を網羅しています。
