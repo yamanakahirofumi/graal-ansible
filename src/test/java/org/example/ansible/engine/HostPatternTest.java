@@ -128,4 +128,65 @@ public class HostPatternTest {
         assertTrue(results.containsKey("host2"), "Should match host in db_servers");
         assertFalse(results.containsKey("host3"), "Should NOT match host in other");
     }
+
+    @Test
+    void testNumericalAndAlphabeticalRangeExpansion() {
+        Host web0 = new Host("web0");
+        Host web1 = new Host("web1");
+        Host web2 = new Host("web2");
+        Host web3 = new Host("web3");
+        Host dba = new Host("dba");
+        Host dbb = new Host("dbb");
+        Host dbc = new Host("dbc");
+
+        Group web = new Group("web", List.of(web0, web1, web2, web3), List.of(), Map.of());
+        Group db = new Group("db", List.of(dba, dbb, dbc), List.of(), Map.of());
+        Group all = new Group("all", List.of(), List.of(web, db), Map.of());
+        Inventory inventory = new Inventory(all);
+
+        ITaskExecutor executor = mock(ITaskExecutor.class);
+        when(executor.execute(any(), any(), any(), any(), anyBoolean(), any(), any(), any(), any(), any(), any())).thenReturn(TaskResult.success(false, Map.of()));
+        TaskQueueManager tqm = new TaskQueueManager(executor, (h, v) -> mock(Connection.class));
+        VariableManager vm = new VariableManager(inventory, Map.of());
+        List<Task> tasks = List.of(new Task("test_task", "ping", Map.of()));
+
+        Map<String, List<TaskResult>> results = new HashMap<>();
+        Play play = new Play("Play Ranges", "web[0:2],db[a:b]", tasks);
+        tqm.executePlay(play, inventory, vm, results, false);
+
+        assertTrue(results.containsKey("web0"), "Should contain web0");
+        assertTrue(results.containsKey("web1"), "Should contain web1");
+        assertTrue(results.containsKey("web2"), "Should contain web2");
+        assertTrue(results.containsKey("dba"), "Should contain dba");
+        assertTrue(results.containsKey("dbb"), "Should contain dbb");
+        assertFalse(results.containsKey("web3"), "Should NOT contain web3");
+        assertFalse(results.containsKey("dbc"), "Should NOT contain dbc");
+    }
+
+    @Test
+    void testBracketAwareSplitting() {
+        Host web1 = new Host("web1");
+        Host web2 = new Host("web2");
+        Host db = new Host("db");
+
+        Group web = new Group("web", List.of(web1, web2), List.of(), Map.of());
+        Group dbGroup = new Group("dbGroup", List.of(db), List.of(), Map.of());
+        Group all = new Group("all", List.of(), List.of(web, dbGroup), Map.of());
+        Inventory inventory = new Inventory(all);
+
+        ITaskExecutor executor = mock(ITaskExecutor.class);
+        when(executor.execute(any(), any(), any(), any(), anyBoolean(), any(), any(), any(), any(), any(), any())).thenReturn(TaskResult.success(false, Map.of()));
+        TaskQueueManager tqm = new TaskQueueManager(executor, (h, v) -> mock(Connection.class));
+        VariableManager vm = new VariableManager(inventory, Map.of());
+        List<Task> tasks = List.of(new Task("test_task", "ping", Map.of()));
+
+        // Bracket-aware split on commas inside bracket should not happen
+        Map<String, List<TaskResult>> results = new HashMap<>();
+        Play play = new Play("Play Split", "web[1:2],db", tasks);
+        tqm.executePlay(play, inventory, vm, results, false);
+
+        assertTrue(results.containsKey("web1"), "Should contain web1");
+        assertTrue(results.containsKey("web2"), "Should contain web2");
+        assertTrue(results.containsKey("db"), "Should contain db");
+    }
 }
