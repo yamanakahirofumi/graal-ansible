@@ -78,4 +78,64 @@ class HostPatternParserTest {
         // Bracket unmatched
         assertEquals(List.of("web[0:2"), HostPatternParser.expandPattern("web[0:2"));
     }
+
+    @Test
+    void testSplitBracketAwareExtra() {
+        // Unmatched brackets
+        assertEquals(List.of("web[0,1,db"), HostPatternParser.splitBracketAware("web[0,1,db"));
+        assertEquals(List.of("web]db"), HostPatternParser.splitBracketAware("web]db"));
+
+        // Multiple brackets with no separators
+        assertEquals(List.of("web[1:2]db[a:b]"), HostPatternParser.splitBracketAware("web[1:2]db[a:b]"));
+
+        // Only separators and spaces
+        assertEquals(List.of("web"), HostPatternParser.splitBracketAware(" , web , : "));
+    }
+
+    @Test
+    void testExpandPatternNumericalExtra() {
+        // Complex zero padding with larger bounds
+        assertEquals(
+            List.of("app01", "app02", "app03", "app04", "app05", "app06", "app07", "app08", "app09", "app10"),
+            HostPatternParser.expandPattern("app[01:10]")
+        );
+
+        // Mix of start and end lengths with no zero padding
+        assertEquals(
+            List.of("web9", "web10", "web11"),
+            HostPatternParser.expandPattern("web[9:11]")
+        );
+
+        // Non-padded starting with 0, but length is 1
+        assertEquals(
+            List.of("web0", "web1", "web2"),
+            HostPatternParser.expandPattern("web[0:2]")
+        );
+
+        // Negative bounds within range - currently the regex is ^(\d+)([:-])(\d+)$ which only matches positive integers
+        // Thus negative bounds are treated as non-range brackets
+        assertEquals(
+            List.of("web[-1:3]"),
+            HostPatternParser.expandPattern("web[-1:3]")
+        );
+    }
+
+    @Test
+    void testExpandPatternAlphabeticalExtra() {
+        // Mixed uppercase and lowercase alphabetical range
+        // From 'Z' (90) to 'a' (97): Z (90), [ (91), \ (92), ] (93), ^ (94), _ (95), ` (96), a (97)
+        List<String> expectedMixed = List.of(
+            "dbZ", "db[", "db\\", "db]", "db^", "db_", "db`", "dba"
+        );
+        assertEquals(expectedMixed, HostPatternParser.expandPattern("db[Z:a]"));
+
+        // Single character range
+        assertEquals(List.of("dba"), HostPatternParser.expandPattern("db[a:a]"));
+    }
+
+    @Test
+    void testExpandPatternRecursiveNested() {
+        // Nested bracket structure
+        assertEquals(List.of("web[[0:2]]"), HostPatternParser.expandPattern("web[[0:2]]"));
+    }
 }
