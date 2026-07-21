@@ -8,6 +8,7 @@ import org.example.ansible.inventory.Group;
 import org.example.ansible.inventory.Host;
 import org.example.ansible.inventory.Inventory;
 import org.example.ansible.parser.YamlParser;
+import org.example.ansible.util.HostPatternParser;
 
 import java.io.FileInputStream;
 import java.io.InputStream;
@@ -437,39 +438,41 @@ public class TaskQueueManager {
         Set<String> matchedHostNames = new HashSet<>();
         List<Host> allHosts = getAllHosts(inventory.all());
 
-        for (String subPattern : pattern.split("[,:]")) {
-            String trimmed = subPattern.trim();
-            if (trimmed.isEmpty()) continue;
+        for (String subPattern : HostPatternParser.splitBracketAware(pattern)) {
+            for (String expandedPattern : HostPatternParser.expandPattern(subPattern)) {
+                String trimmed = expandedPattern.trim();
+                if (trimmed.isEmpty()) continue;
 
-            if ("all".equals(trimmed)) {
-                for (Host h : allHosts) matchedHostNames.add(h.name());
-                continue;
-            }
+                if ("all".equals(trimmed)) {
+                    for (Host h : allHosts) matchedHostNames.add(h.name());
+                    continue;
+                }
 
-            if (trimmed.contains("*")) {
-                String regex = trimmed.replace(".", "\\.").replace("*", ".*");
-                // Match hosts
-                for (Host h : allHosts) {
-                    if (h.name().matches(regex)) {
-                        matchedHostNames.add(h.name());
-                    }
-                }
-                // Match groups
-                matchGroupsByWildcard(inventory.all(), regex, matchedHostNames);
-            } else {
-                // Exact match
-                boolean foundAsHost = false;
-                for (Host h : allHosts) {
-                    if (h.name().equals(trimmed)) {
-                        matchedHostNames.add(h.name());
-                        foundAsHost = true;
-                    }
-                }
-                if (!foundAsHost) {
-                    Group group = findGroup(inventory.all(), trimmed);
-                    if (group != null) {
-                        for (Host h : getAllHosts(group)) {
+                if (trimmed.contains("*")) {
+                    String regex = trimmed.replace(".", "\\.").replace("*", ".*");
+                    // Match hosts
+                    for (Host h : allHosts) {
+                        if (h.name().matches(regex)) {
                             matchedHostNames.add(h.name());
+                        }
+                    }
+                    // Match groups
+                    matchGroupsByWildcard(inventory.all(), regex, matchedHostNames);
+                } else {
+                    // Exact match
+                    boolean foundAsHost = false;
+                    for (Host h : allHosts) {
+                        if (h.name().equals(trimmed)) {
+                            matchedHostNames.add(h.name());
+                            foundAsHost = true;
+                        }
+                    }
+                    if (!foundAsHost) {
+                        Group group = findGroup(inventory.all(), trimmed);
+                        if (group != null) {
+                            for (Host h : getAllHosts(group)) {
+                                matchedHostNames.add(h.name());
+                            }
                         }
                     }
                 }
