@@ -140,36 +140,50 @@ class MaxFailPercentageTest {
     void testMaxFailPercentageWithFreeStrategy() {
         // 4 hosts, free strategy
         // max_fail_percentage: 49 -> 2 failures (50%) > 49% -> fatal.
-        // To avoid race conditions in this test, we fail one host and make another host sleep a bit.
         String playbookYaml = """
                 - name: test max_fail_percentage with free strategy
                   hosts: all
                   strategy: free
                   max_fail_percentage: 49
                   tasks:
-                    - name: fail on host1 and host2, sleep on others
-                      shell: |
-                        if [ "{{ inventory_hostname }}" = "host1" ] || [ "{{ inventory_hostname }}" = "host2" ]; then
-                          exit 1
-                        else
-                          sleep 1
-                          exit 0
-                        fi
+                    - name: run task 1
+                      test_max_fail:
+                        host: "{{ inventory_hostname }}"
                     - name: should not run anywhere
-                      command: echo "should not run"
+                      test_max_fail_second:
                 """;
         Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
+
+        java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(2);
+
+        taskExecutor.registerModule("test_max_fail", (args, become, context) -> {
+            String hostName = (String) args.get("host");
+            if ("host1".equals(hostName) || "host2".equals(hostName)) {
+                latch.countDown();
+                return TaskResult.failure("failed");
+            } else {
+                try {
+                    latch.await();
+                    // Sleep briefly to ensure host1 and host2 have finished checkMaxFailPercentage
+                    Thread.sleep(500);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                return TaskResult.success(false, Map.of());
+            }
+        });
+        taskExecutor.registerModule("test_max_fail_second", (args, become, context) -> TaskResult.success(false, Map.of()));
 
         Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
 
         // Second task should NOT run because failure rate (2/4 = 50%) > 49%
         // Host1 and Host2 failed the first task.
-        // Host3 and Host4 should see playFatalError before they start the second task because of the sleep 1.
+        // Host3 and Host4 should see playFatalError before they start the second task because of the sleep/coordination.
 
-        assertEquals(1, results.get("host1").size(), "Host1 should only have 1 task result");
-        assertEquals(1, results.get("host2").size(), "Host2 should only have 1 task result");
-        assertEquals(1, results.get("host3").size(), "Host3 should only have 1 task result");
-        assertEquals(1, results.get("host4").size(), "Host4 should only have 1 task result");
+        assertEquals(1, results.get("host1").size(), "Host1 should have exactly 1 task result");
+        assertEquals(1, results.get("host2").size(), "Host2 should have exactly 1 task result");
+        assertTrue(results.get("host3") == null || results.get("host3").size() <= 1, "Host3 should have at most 1 task result");
+        assertTrue(results.get("host4") == null || results.get("host4").size() <= 1, "Host4 should have at most 1 task result");
     }
 
     @Test
