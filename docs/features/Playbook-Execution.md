@@ -46,7 +46,7 @@
 
 ### 2.5 独自タグの処理 (Implemented)
 - **概要**: `!vault` などの YAML 独自タグが含まれている場合、通常の YAML パーサーではエラーになります。
-- **実装内容**: `org.example.ansible.util.YamlUtil` を通じて `SnakeYAML` をカスタマイズし、未知のタグをその基底となる YAML 型（Scalar, Sequence, Mapping）として透過的に扱う仕組みを実装済みです。これにより、特別な設定なしに未知のタグを含む YAML を解析可能です。
+- **実装内容**: `org.example.ansible.util.YamlUtil` を通じて `SnakeYAML` をカスタマイズし、未知のタグをその基底となる YAML 型（Scalar, Sequence, Mapping）として透過的に扱う仕組みを実装済みです。これにより、特別な設定なしに未知のタグを含む YAML を解析可能です。実際の暗号化データの復号化仕様については、[Ansible Vault 暗号化・復号化サポート](Vault-Support.md) を参照してください。
 
 ### 2.6 並列実行制御 (`forks` / `serial` / `throttle` / `max_fail_percentage`)
 - **状況**: 実装済み。

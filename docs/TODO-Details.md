@@ -46,3 +46,11 @@
 - **概要**: SSH/Local/Docker 以外の接続プロトコルのサポート。
 - **検討内容**:
     - **WinRM**: `winrm4j` 等を利用した Windows ターゲットノードへの接続。
+
+### 5.2 [ ] Ansible Vault 暗号化・復号化サポートの実装
+- **概要**: `!vault` タグや Vault 暗号化ファイルの透過的な復号化と統合。
+- **詳細は [Vault-Support.md](features/Vault-Support.md) を参照。**
+- **検討内容**:
+    - Java 標準 JCE による AES-256-CTR / PBKDF2 復号エンジンの実装。
+    - `VariableResolver` と `YamlParser` への Vault 復号ロジックの統合。
+    - `--vault-password-file`, `--ask-vault-pass`, `--vault-id` のサポート。
