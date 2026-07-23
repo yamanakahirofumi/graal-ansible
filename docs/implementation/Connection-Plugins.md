@@ -140,3 +140,83 @@ Jinja2 テンプレート等で評価されたタスク固有の環境変数 (`M
   - `DockerConnection` 内のプロセス起動メソッド (`startProcess`) をパッケージプライベートで定義し、テストコード側でプロセス呼び出しを横取りしてモック化。
 - **シミュレーション**:
   - 正常接続時の `inspect` の出力 (`true`)、コンテナ未検出エラー（終了コード `1`、エラー出力）、各種 become 構文に変換された `docker exec` CLI 引数のアサーション、標準入出力バッファのデッドロック防止を考慮した並行ストリーム読み込みのモック処理を網羅しています。
+
+## 10. WinRM コネクションの詳細設計（拡張・実装仕様）
+
+`WinRMConnection` は、Windows ターゲットノード上でコマンド実行やファイル操作を安全かつ効率的に行うためのコネクションプラグインです。
+
+### 10.1 技術選定とライブラリ構成の比較
+
+Windows ノードへの WinRM 接続を実現するために、以下の2つのアプローチを検討・定義します。
+
+1. **winrm4j ライブラリの採用 (標準アプローチ)**:
+   - **概要**: `winrm4j` (CloudBees) を用いて WinRM SOAP API と対話します。
+   - **課題と対策**:
+     - `winrm4j` は内部で CXF や JAX-WS 等の重厚な XML/SOAP フレームワークを使用するため、**GraalVM Native Image** において膨大なリフレクション定義やリソース定義が必要になります。
+     - 解決策として、`reflect-config.json` および `resource-config.json` に JAXB、SOAP メッセージ処理、HTTP クライアント関連クラスを網羅的に定義します。
+
+2. **Java 21 HttpClient による軽量ネイティブフレンドリー実装 (推奨代替案)**:
+   - **概要**: 外部ライブラリへの依存を排除し、Java 21 標準の `java.net.http.HttpClient` を用いて、WinRM の SOAP 封筒（WS-Management 規格）を直接組み立てて HTTP/HTTPS POST 送信するカスタム軽量エンジンを構築します。
+   - **メリット**: リフレクションや動的プロキシを最小限に抑え、GraalVM Native Image のビルド時間を大幅に短縮し、実行時バイナリサイズとメモリ使用量を削減します。
+
+### 10.2 認証方式 (Authentication)
+
+WinRM の接続では、以下の認証メカニズムを定義します。
+
+- **Basic 認証**:
+  - HTTP ヘッダーに `Authorization: Basic <credentials>` を付与します。
+  - セキュリティ保護のため、原則として HTTPS（ポート 5986）との併用、またはローカル検証用の `AllowUnencrypted = true` 設定下での HTTP 接続に限定します。
+- **NTLM 認証**:
+  - `winrm4j` 内蔵、またはカスタム HTTP クライアントにおける `Authorization: NTLM` ハンドシェイク（Type 1, 2, 3 メッセージの往復）をエミュレートして認証します。
+
+### 10.3 コマンド実行 (execCommand) とシェルラッパー
+
+Windows ターゲットでは POSIX 互換シェル（`/bin/sh`）が存在しないため、以下のようにシェルおよびコマンドを解釈・実行します。
+
+- **PowerShell ラッパー**:
+  - 実行コマンドは、デフォルトで PowerShell を介して実行されます。
+  - 具体的には、指定されたコマンドを `powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand <Base64Command>` または `-Command "<command>"` としてラップして WinRM SOAP メッセージの `CommandLine` に投入します。
+- **実行結果の回収**:
+  - WinRM レスポンス（`ReceiveResponse`）内の `CommandState` から終了コード（Exit Code）を取得し、標準出力（stdout）および標準エラー出力（stderr）のストリームを結合して `ConnectionResult` オブジェクトとして返却します。
+
+### 10.4 ファイル転送 (putFile / fetchFile) の設計
+
+WinRM (WS-Management) には SSH/SCP のようなネイティブなファイル転送プロトコルが存在しません。そのため、以下の**分割Base64転送アルゴリズム**を実装します。
+
+#### putFile (ローカルから Windows ノードへの転送):
+1. **ファイルの分割とエンコード**:
+   - 送信対象ファイルを一定のバッファサイズ（例: 8KB）に分割し、Base64 でエンコードします。
+2. **一時ファイルへの順次書き込み**:
+   - 分割された Base64 文字列を引数とする PowerShell コマンド（`[System.IO.File]::WriteAllText` または `Add-Content`）を生成し、WinRM 経由で順次実行して、リモートの一時ディレクトリ（`$env:TEMP`）配下に書き込みます。
+3. **リモートデコード**:
+   - すべてのフラグメントの送信完了後、リモート上で PowerShell を実行し、一時ファイルをバイナリにデコードして目的のパスに配置します。
+     - `[System.Convert]::FromBase64String([System.IO.File]::ReadAllText($tempFile))` を用いたデコード処理。
+
+#### fetchFile (Windows ノードからローカルへの取得):
+1. **リモートエンコード**:
+   - ターゲットファイルを PowerShell コマンドで Base64 文字列にエンコードし、コンソール出力（stdout）に出力させます。
+2. **ストリーミング回収**:
+   - `execCommand` 経由で stdout をストリーミング読み込みし、管理ノード（ローカル）側で Base64 をデコードしてファイルとして復元・保存します。
+
+### 10.5 Windows 権限昇格 (Become - runas) のエミュレーション
+
+Windows 環境においては Unix 系の `sudo` / `su` が存在しないため、`become` は以下のように処理されます。
+
+- **`become_method: runas`**:
+  - `become_user` および `become_password` を指定し、WinRM セッション内で別ユーザーの資格情報を利用してプロセスを起動します。
+- **認証二重ホップ問題（Double-Hop Issue）の回避**:
+  - 通常の WinRM 接続では、接続先 Windows ノードからさらに別のネットワークリソース（ファイル共有等）にアクセスする権限が制限されます。
+  - これを解決するため、Credential Security Support Provider (CredSSP) 認証、または Kerberos 委任を有効化するオプション（`ansible_winrm_transport: credssp`）をサポートし、安全な権限委譲を行います。
+
+### 10.6 WinRM 固有のインベントリ変数仕様
+
+`ConnectionFactory` において、以下の Windows/WinRM 固有変数をサポートし、適切に設定を反映します。
+
+| 変数名 | 用途 | 指定値の例 |
+| :--- | :--- | :--- |
+| `ansible_connection` | 接続プラグインの指定 | `winrm` |
+| `ansible_port` | ポート番号の指定 | `5985` (HTTP) / `5986` (HTTPS) |
+| `ansible_winrm_transport` | 認証トランスポートの指定 | `basic`, `ntlm`, `credssp` |
+| `ansible_winrm_server_cert_validation` | 自己署名証明書の検証ポリシー | `ignore` (検証スキップ) / `validate` |
+| `ansible_winrm_operation_timeout_sec` | 1命令のタイムアウト（秒） | `60` |
+| `ansible_winrm_read_timeout_sec` | ソケットの読み込みタイムアウト（秒） | `70` |

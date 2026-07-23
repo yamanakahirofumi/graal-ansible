@@ -44,5 +44,6 @@
 
 ### 5.1 [ ] コネクション・プラグインの拡充 (WinRM)
 - **概要**: SSH/Local/Docker 以外の接続プロトコルのサポート。
+- **設計書**: [WinRM コネクションの詳細設計](../implementation/Connection-Plugins.md#10-winrm-コネクションの詳細設計拡張実装仕様) にて詳細な拡張・実装仕様を定義済み。
 - **検討内容**:
-    - **WinRM**: `winrm4j` 等を利用した Windows ターゲットノードへの接続。
+    - **WinRM**: 定義された設計仕様に基づき、`winrm4j` または Java 21 `HttpClient` を用いた Windows ターゲットノードへの接続と、Base64 分割転送アルゴリズムの実装。
