@@ -302,3 +302,10 @@
     - `PythonCallback` を実装し、Java のコールバックイベントを Python 側のプラグインへブリッジ。
     - `ansible_callback_launcher.py` により、Python 側の `CallbackBase` 互換のオブジェクト（TaskResult, Task, Host等）を生成して渡す仕組みを構築。
     - 環境変数 `ANSIBLE_STDOUT_CALLBACK` を通じた動的なプラグイン選択をサポート。
+
+### 2.10 [✓] 集合演算フィルターのサポートと統合テストの追加
+- **完了日**: 2026-10-24
+- **概要**: `difference`, `intersect`, `union`, `symmetric_difference` 集合演算フィルターのテスト追加・検証とドキュメント整備。
+- **解決策**:
+    - `SetFiltersTest.java` による各集合演算フィルターの動作確認と堅牢性の担保。
+    - `docs/features/Playbook-Execution.md` を更新し、対応するフィルター数の増補を反映。
