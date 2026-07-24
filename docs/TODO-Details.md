@@ -45,4 +45,4 @@
 ### 5.1 [ ] コネクション・プラグインの拡充 (WinRM)
 - **概要**: SSH/Local/Docker 以外の接続プロトコルのサポート。
 - **検討内容**:
-    - **WinRM**: `winrm4j` 等を利用した Windows ターゲットノードへの接続。
+    - **WinRM**: `winrm4j` 等を利用した Windows ターゲットノードへの接続。詳細設計については、[WinRM コネクションの詳細設計](implementation/Connection-Plugins.md#10-winrm-コネクションの詳細設計) を参照。
