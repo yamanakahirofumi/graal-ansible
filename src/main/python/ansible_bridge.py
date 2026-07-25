@@ -76,6 +76,12 @@ def mock_get_bin_path(arg: str, required: bool = False, opt_dirs: Optional[List[
         return arg
     return arg
 
+def _unwrap_val(k: Any, v: Any) -> Any:
+    key_str = str(k)
+    if key_str in ('dest', 'path', 'src', 'name') and isinstance(v, list) and len(v) == 1:
+        return v[0]
+    return v
+
 def _deep_convert(obj: Any) -> Any:
     if obj is None: return None
     if isinstance(obj, (str, bytes)): return _normalize_path(obj)
@@ -84,7 +90,10 @@ def _deep_convert(obj: Any) -> Any:
     if hasattr(obj, 'getClass'):
         from java.util import Map, List as JavaList, Set as JavaSet
         if isinstance(obj, Map):
-            return {str(k): _deep_convert(v) for k, v in obj.items()}
+            res = {}
+            for k, v in obj.items():
+                res[str(k)] = _unwrap_val(k, _deep_convert(v))
+            return res
         if isinstance(obj, (JavaList, JavaSet)):
             return [_deep_convert(i) for i in obj]
 
@@ -104,7 +113,10 @@ def _deep_convert(obj: Any) -> Any:
         except: return obj
 
     if isinstance(obj, dict):
-        return {str(k): _deep_convert(v) for k, v in obj.items()}
+        res = {}
+        for k, v in obj.items():
+            res[str(k)] = _unwrap_val(k, _deep_convert(v))
+        return res
     if isinstance(obj, (list, tuple, set, frozenset)):
         return [_deep_convert(i) for i in obj]
     return obj
