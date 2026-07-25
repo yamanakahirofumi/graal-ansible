@@ -140,3 +140,62 @@ Jinja2 テンプレート等で評価されたタスク固有の環境変数 (`M
   - `DockerConnection` 内のプロセス起動メソッド (`startProcess`) をパッケージプライベートで定義し、テストコード側でプロセス呼び出しを横取りしてモック化。
 - **シミュレーション**:
   - 正常接続時の `inspect` の出力 (`true`)、コンテナ未検出エラー（終了コード `1`、エラー出力）、各種 become 構文に変換された `docker exec` CLI 引数のアサーション、標準入出力バッファのデッドロック防止を考慮した並行ストリーム読み込みのモック処理を網羅しています。
+
+## 10. WinRM コネクションの詳細設計
+
+`WinRMConnection` は、Windows ターゲットノードと通信し、タスクを実行するためのコネクションプラグインです。
+
+### 10.1 winrm4j ライブラリの選定と統合
+
+Windows へのリモート接続には、Java 実装の **winrm4j** ライブラリを使用します。
+- **トランスポートと認証**:
+  - HTTP (5985) および HTTPS (5986) をサポート。
+  - 基本認証 (Basic)、Kerberos 認証、および NTLM 認証に対応。
+  - HTTPS 接続時の自己署名証明書の検証スキップオプション（`ansible_winrm_server_cert_validation`）を解決。
+- **セッションのライフサイクル**:
+  - `connect()` 呼び出し時に `WinRmTool` または `WinRmClient` インスタンスをビルドしてセッションを確立。
+  - 実行効率向上のため、同一ホスト・同一ポートへのセッションはクローズされるまで再利用されます。
+
+### 10.2 PowerShell コマンド実行 (Command Execution)
+
+Windows ではデフォルトのコマンドインタプリタとして **PowerShell** を使用します。
+
+- **コマンドのラップ**:
+  - 実行するコマンドがネイティブの cmd コマンドか PowerShell スクリプトかに応じて、実行方法を切り替えます。
+  - 基本的に、渡された `command` は `powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "<encoded_command>"` 形式または Base64 エンコードされたコマンド（`-EncodedCommand`）としてラップして安全に実行します。
+- **環境変数の伝播**:
+  - Windows 環境では `environment` で渡された変数マップを PowerShell のプロセスレベル環境変数（例: `$env:KEY = "VALUE"`）としてコマンド実行前に動的に評価・宣言します。
+- **出力のパースとデコード**:
+  - WinRM レスポンスに含まれる UTF-8 または UTF-16LE でエンコードされた標準出力および標準エラーを適切に Java 文字列へ変換します。
+  - 終了コード（Exit Code）を確実に取得し、`ConnectionResult` として返却します。
+
+### 10.3 Base64 分割ファイル転送 (File Transfer)
+
+WinRM には SCP/SFTP のようなネイティブなファイル転送プロトコルが存在しないため、**Base64 エンコードと PowerShell による分割復元デコード（Chunked Transfer）**を採用します。
+
+- **アップロード処理 (`putFile`)**:
+  1. ローカルファイルを適切なバッファサイズ（例: 8KB）に分割します。
+  2. 各チャンクを Base64 文字列にエンコードします。
+  3. PowerShell コマンドを介して、ターゲット一時ディレクトリ上のファイルに各 Base64 チャンクを順次追記（`Add-Content`）します。
+  4. すべてのチャンクの転送完了後、PowerShell の `[System.Convert]::FromBase64String` または `certutil -decode` を使用してバイナリファイルに復元・デコードします。
+- **ダウンロード処理 (`fetchFile`)**:
+  1. ターゲット上のリモートファイルを PowerShell で読み込み、Base64 にエンコードして標準出力にストリーム出力させます。
+  2. Java 側でその標準出力を受信し、Base64 デコードしながらローカルの指定パスへ書き込みます。
+
+### 10.4 権限昇格 (Become) への対応
+
+Windows ターゲットにおける become（権限昇格）は、通常 `become_method=runas` を使用して実装されます。
+
+- **`runas` モード**:
+  - `BecomeContext` に指定された `become_user`（例: `Administrator`）と `become_password` を用いて、新たなネットワーク認証情報またはローカルの管理者権限トークンで PowerShell セッション/プロセスを起動します。
+  - PowerShell の `Start-Process -Credential` などのコマンドラップ、または WinRM 接続時のユーザー資格情報の再認証として処理されます。
+
+### 10.5 Mockito によるテスト戦略
+
+Windows 実機や WinRM ポートが利用できない CI 環境でも接続・実行ロジックを検証可能にするため、Mockito を用いたプロセス/ライブラリ呼び出しのモックテストスイートを構築します。
+
+- **`WinRmClient` / `WinRmTool` のモック化**:
+  - 接続確立時のクライアント生成部分をファクトリ経由でモック化し、実接続をバイパス。
+- **モック動作のシミュレーション**:
+  - PowerShell コマンド実行に対するダミーの標準出力、標準エラー、終了コード（`0` またはエラーコード）の返却動作をシミュレート。
+  - ファイルアップロード時の PowerShell による追記コマンド（`Add-Content`）やデコード処理の CLI 引数の正当性をアサーション。
