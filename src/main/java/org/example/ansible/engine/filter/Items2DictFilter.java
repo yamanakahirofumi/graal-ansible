@@ -12,8 +12,9 @@ import java.util.Map;
  * This is compatible with Ansible's items2dict filter.
  */
 public class Items2DictFilter implements Filter {
+
     @Override
-    public Object filter(Object var, JinjavaInterpreter interpreter, String... args) {
+    public Object filter(Object var, JinjavaInterpreter interpreter, Object[] args, Map<String, Object> kwargs) {
         if (!(var instanceof List<?> list)) {
             return var;
         }
@@ -21,10 +22,20 @@ public class Items2DictFilter implements Filter {
         String keyName = "key";
         String valueName = "value";
 
-        if (args.length > 0) {
+        if (kwargs != null) {
+            if (kwargs.containsKey("key_name") && kwargs.get("key_name") != null) {
+                keyName = String.valueOf(kwargs.get("key_name"));
+            }
+            if (kwargs.containsKey("value_name") && kwargs.get("value_name") != null) {
+                valueName = String.valueOf(kwargs.get("value_name"));
+            }
+        }
+
+        if (args != null && args.length > 0) {
             for (int i = 0; i < args.length; i++) {
-                String arg = args[i];
-                if (arg == null) continue;
+                Object argObj = args[i];
+                if (argObj == null) continue;
+                String arg = argObj.toString();
                 if (arg.contains("=")) {
                     String[] parts = arg.split("=", 2);
                     String k = parts[0].trim();
@@ -50,6 +61,11 @@ public class Items2DictFilter implements Filter {
         }
 
         return result;
+    }
+
+    @Override
+    public Object filter(Object var, JinjavaInterpreter interpreter, String... args) {
+        return filter(var, interpreter, args, Map.of());
     }
 
     @Override

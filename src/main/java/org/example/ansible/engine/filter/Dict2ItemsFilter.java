@@ -13,8 +13,10 @@ import java.util.Map;
  * This is compatible with Ansible's dict2items filter.
  */
 public class Dict2ItemsFilter implements Filter {
+
     @Override
-    public Object filter(Object var, JinjavaInterpreter interpreter, String... args) {
+    @SuppressWarnings("unchecked")
+    public Object filter(Object var, JinjavaInterpreter interpreter, Object[] args, Map<String, Object> kwargs) {
         if (!(var instanceof Map<?, ?> map)) {
             return var;
         }
@@ -22,14 +24,24 @@ public class Dict2ItemsFilter implements Filter {
         String keyName = "key";
         String valueName = "value";
 
-        // Handle named arguments if passed as a map (Jinjava behavior)
-        if (args.length > 0 && args[0] != null) {
-            // Very basic support for key_name and value_name from args
-            for (String arg : args) {
-                if (arg.startsWith("key_name=")) {
-                    keyName = arg.substring("key_name=".length()).trim().replace("'", "").replace("\"", "");
-                } else if (arg.startsWith("value_name=")) {
-                    valueName = arg.substring("value_name=".length()).trim().replace("'", "").replace("\"", "");
+        if (kwargs != null) {
+            if (kwargs.containsKey("key_name") && kwargs.get("key_name") != null) {
+                keyName = String.valueOf(kwargs.get("key_name"));
+            }
+            if (kwargs.containsKey("value_name") && kwargs.get("value_name") != null) {
+                valueName = String.valueOf(kwargs.get("value_name"));
+            }
+        }
+
+        if (args != null && args.length > 0) {
+            for (Object arg : args) {
+                if (arg != null) {
+                    String argStr = arg.toString();
+                    if (argStr.startsWith("key_name=")) {
+                        keyName = argStr.substring("key_name=".length()).trim().replace("'", "").replace("\"", "");
+                    } else if (argStr.startsWith("value_name=")) {
+                        valueName = argStr.substring("value_name=".length()).trim().replace("'", "").replace("\"", "");
+                    }
                 }
             }
         }
@@ -43,6 +55,11 @@ public class Dict2ItemsFilter implements Filter {
         }
 
         return result;
+    }
+
+    @Override
+    public Object filter(Object var, JinjavaInterpreter interpreter, String... args) {
+        return filter(var, interpreter, args, Map.of());
     }
 
     @Override
