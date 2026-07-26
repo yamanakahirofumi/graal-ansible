@@ -13,7 +13,7 @@ Ansible と同様に、ターゲットノードに対する実行環境（ロー
 | `ssh` | **実装済** | 標準的なリモート接続 (OpenSSH 互換) | [Apache MINA SSHD](https://mina.apache.org/sshd-project/) |
 | `local` | **実装済** | 管理ノード（制御ノード）自身での実行 | `java.lang.ProcessBuilder` |
 | `docker` | **実装済** | 稼働中の Docker コンテナ内での実行 | Docker CLI (`docker exec`, `docker cp`) |
-| `winrm` | 未実装 | Windows ターゲットノードへの接続 | [WinRM4J](https://github.com/CloudBees-Community/winrm4j) |
+| `winrm` | 設計済 | Windows ターゲットノードへの接続 | [WinRM4J](https://github.com/CloudBees-Community/winrm4j) |
 
 ## 3. インターフェース定義
 
@@ -140,3 +140,56 @@ Jinja2 テンプレート等で評価されたタスク固有の環境変数 (`M
   - `DockerConnection` 内のプロセス起動メソッド (`startProcess`) をパッケージプライベートで定義し、テストコード側でプロセス呼び出しを横取りしてモック化。
 - **シミュレーション**:
   - 正常接続時の `inspect` の出力 (`true`)、コンテナ未検出エラー（終了コード `1`、エラー出力）、各種 become 構文に変換された `docker exec` CLI 引数のアサーション、標準入出力バッファのデッドロック防止を考慮した並行ストリーム読み込みのモック処理を網羅しています。
+
+## 10. WinRM コネクションの詳細設計
+
+`WinRMConnection` は、Windows ターゲットノード上でタスクを実行するためのコネクションプラグインです。Windows 環境へのシームレスなプロビジョニングや管理を行うために設計されています。
+
+### 10.1 WinRM4J の統合
+
+Java から Windows リモート管理 (WinRM) を介して安全かつ高効率に接続を行うため、純粋な Java 実装ライブラリである **[winrm4j](https://github.com/CloudBees-Community/winrm4j)** を使用します。これにより、外部の `winrm` や `powershell` バイナリに依存することなく、管理ノード（Linux/macOS/Windows）から Windows ターゲットノードへリモート接続が可能になります。
+
+- **接続オプションとプロトコル**:
+  - HTTP および HTTPS (安全性の観点から推奨) の両方をサポートします。
+  - 基本認証 (Basic Authentication)、Kerberos 認証、および NTLM 認証に対応します。
+  - 自己署名証明書の検証をスキップするオプション (`ansible_winrm_server_cert_validation=ignore`) を提供します。
+
+### 10.2 PowerShell によるコマンド実行
+
+Windows ターゲットでのコマンド実行は、Cmd ではなく **PowerShell** を標準シェルとして使用します。
+- `execCommand` で受け取るターゲットコマンドを自動的に PowerShell 実行形式（例：`powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "<Command>"`）にラップします。
+- コマンド文字列は、エスケープやエンコーディングの不整合を避けるため、Base64 でエンコードされた文字列（`-EncodedCommand` オプション）として渡す仕組みを採用します。
+- コマンド実行時の標準出力 (stdout)、標準エラー出力 (stderr)、および終了コードを `ConnectionResult` として正確に捕捉します。
+
+### 10.3 Base64 による分割転送 (File Transfer)
+
+WinRM プロトコル自体には、SSH の SFTP や SCP のようなネイティブなファイル転送プロトコルが存在しません。そのため、以下の **Base64 分割転送アルゴリズム** を用いてファイルの送受信を実現します。
+
+- **アップロード (`putFile`)**:
+  1. ローカルファイルを適度なサイズ（例: 24KB 単位）のブロックに分割し、それぞれを Base64 エンコードします。
+  2. PowerShell のコマンド（`[System.Convert]::FromBase64String` 等）を用いて、各ブロックをターゲットノードの一時フォルダ（`$env:TEMP`）内にデコードして順次追記 (`Add-Content`) します。
+  3. すべてのブロックの転送が完了した後、最終的なデコードを行い、指定されたターゲットパス (`remotePath`) へ移動します。
+- **ダウンロード (`fetchFile`)**:
+  1. ターゲットノード上でファイルを Base64 エンコードする PowerShell スクリプトを実行し、その出力をバッファリングして取得します。
+  2. 取得した Base64 文字列を管理ノード（ローカル）側でデコードし、ローカルファイル (`localPath`) として復元します。
+
+### 10.4 権限昇格 (Become) への対応
+
+Windows における権限昇格は、Linux の `sudo` や `su` とは異なり、Windows 固有のセキュリティコンテキスト（RunAs や資格情報の伝達）に基づいて行われます。
+
+- **`become_method=runas`**:
+  - `BecomeContext` の指定に基づいて、管理者特権を持つユーザーとして別のプロセスを起動します。
+  - `runas` 実行時には、`winrm4j` にて提供されるユーザー資格情報を指定し、PowerShell の `Start-Process -Credential` または `runas.exe` を使用して特権プロセスを構築します。
+- **管理者権限へのバイパス**:
+  - ユーザーがすでに `Administrators` グループに属している場合は、WinRM セッション内で UAC (User Account Control) をバイパスするため、昇格トークンを適用して PowerShell スクリプトを実行します。
+
+### 10.5 Mockito によるテスト戦略
+
+`DockerConnection` と同様に、実機（Windows サーバーなど）が存在しない CI 環境下でも、堅牢かつ一貫した単体テストを実施できるよう、Mockito を用いた詳細なモッキングテストスイート (`WinRmConnectionTest.java`) を用意します。
+
+- **モック対象**:
+  - `winrm4j` のクライアントインスタンス、シェルコンテキスト、および実行結果クラス。
+- **テストケースの網羅**:
+  - 正常な接続およびコマンド実行による stdout/stderr/終了コードの返却。
+  - ファイルアップロード時の複数ブロックにわたる Base64 コマンドの組み立てとアサーション。
+  - 接続エラー（タイムアウト、不当な資格情報など）発生時の `UnreachableException` のスロー判定。
