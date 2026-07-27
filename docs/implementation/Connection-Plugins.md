@@ -140,3 +140,52 @@ Jinja2 テンプレート等で評価されたタスク固有の環境変数 (`M
   - `DockerConnection` 内のプロセス起動メソッド (`startProcess`) をパッケージプライベートで定義し、テストコード側でプロセス呼び出しを横取りしてモック化。
 - **シミュレーション**:
   - 正常接続時の `inspect` の出力 (`true`)、コンテナ未検出エラー（終了コード `1`、エラー出力）、各種 become 構文に変換された `docker exec` CLI 引数のアサーション、標準入出力バッファのデッドロック防止を考慮した並行ストリーム読み込みのモック処理を網羅しています。
+
+## 10. WinRM コネクションの詳細設計
+
+`WinRMConnection` は、Windows ターゲットノードに接続し、PowerShell 経由でタスクを実行するためのコネクションプラグインです。
+
+### 10.1 ライブラリ選定
+
+Java からの WinRM 接続およびコマンド実行をサポートするため、Java 実装ライブラリである **[WinRM4J](https://github.com/CloudBees-Community/winrm4j)** を使用します。これにより、外部の `winrm` コマンドラインツールに依存することなく、純粋な Java コードから直接リモートの Windows OS 制御が可能になります。
+
+### 10.2 PowerShell コマンド実行
+
+WinRM を介したコマンド実行では、Windows の標準シェルである **PowerShell** を使用します。
+
+- **実行ラッパー**:
+  - 送信されたコマンドは、Jinja2 評価済みの環境変数（`environment`）を適用した上で、PowerShell スクリプトブロック（例: `powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command ...`）に適切にラップして実行します。
+- **環境変数の伝播**:
+  - タスク固有の環境変数 (`Map<String, String>`) は、コマンドの実行直前に PowerShell のセッション内環境変数（`$env:KEY = "VALUE"`）として定義、設定した上で、ターゲットコマンドを同一セッションでチェーン実行します。
+
+### 10.3 Base64 によるファイル転送
+
+Windows 環境では SSH の SCP のような標準的かつ高効率なファイル転送プロトコルがデフォルトで利用できない場合が多いため、WinRM 上のファイル転送（`putFile` / `fetchFile`）は **Base64 エンコードとチャンク転送** を組み合わせて実装します。
+
+- **`putFile` (アップロード)**:
+  1. ローカルファイルを読み込み、Base64 形式でエンコードします。
+  2. メモリと帯域の消費を抑えるため、Base64 文字列を適切なサイズ（例: 8KB）のチャンクに分割します。
+  3. 各チャンクを、PowerShell コマンド（例: `[System.IO.File]::AppendAllText`）を用いてリモートの一時ファイルに順次追記します。
+  4. 追記完了後、PowerShell コマンド（例: `[System.Convert]::FromBase64String`）を用いて一時ファイルをデコードし、目的のリモートパスにデコード済みのバイナリを書き出します。
+- **`fetchFile` (ダウンロード)**:
+  1. PowerShell を用いてリモートファイルを Base64 エンコードして標準出力に出力させます。
+  2. Java 側でその標準出力を取得し、デコードしてローカルパスに保存します。
+
+### 10.4 権限昇格 (Become) への対応
+
+Windows における実行権限やユーザーの切り替え（Become）について、`BecomeContext` に応じた適切なマッピングを行います。
+
+- **`become_method=runas` または `runas` によるユーザー指定**:
+  - `WinRM4J` で WinRM クライアントのセッションを作成する際、解決された `become_user` および `become_password` を使用して、接続時のアカウント認証情報そのものを上書きまたは動的に再生成してコマンドを実行します。
+  - 特殊な become 設定がない場合は、`ansible_user` および `ansible_password` に基づいて通常の認証を行います。
+
+### 10.5 Mockito によるテスト戦略
+
+外部に本物の Windows ターゲットサーバーが存在しない環境でも一貫したテストを実行するため、Mockito を使用した詳細なモックテストスイート `WinRMConnectionTest.java` を設計します。
+
+- **`winrm4j` クライアントのモッキング**:
+  - `WinRM4J` の `WinRmTool` / `WinRmClient` などのコアインターフェースを Mockito でモック化します。
+- **シミュレーションと検証**:
+  - 接続成功・失敗（タイムアウト・認証エラー等）に応じた適切な例外ハンドリングの検証。
+  - 各種 become パラメータに応じたクライアント生成時におけるユーザー資格情報アサーションの検証。
+  - ファイル転送時に、ローカルファイルが正しく Base64 チャンクに分割され、想定される PowerShell コマンドが `execCommand` に渡されているかどうかのコール回数と引数のアサーションを網羅します。
