@@ -39,6 +39,26 @@ public class DefaultConnectionFactory implements ConnectionFactory {
             String password = (String) variables.get("ansible_password");
 
             return new SshConnection(ansibleHost, port, user, password);
+        } else if ("winrm".equals(connectionType)) {
+            String ansibleHost = (String) variables.getOrDefault("ansible_host", host.name());
+            String scheme = (String) variables.getOrDefault("ansible_winrm_scheme", "http");
+            boolean useHttps = "https".equalsIgnoreCase(scheme);
+
+            int port = useHttps ? 5986 : 5985;
+            Object portVar = variables.get("ansible_port");
+            if (portVar instanceof Number n) {
+                port = n.intValue();
+            } else if (portVar instanceof String s) {
+                port = Integer.parseInt(s);
+            }
+
+            String user = (String) variables.get("ansible_user");
+            String password = (String) variables.get("ansible_password");
+
+            String certValidation = (String) variables.getOrDefault("ansible_winrm_server_cert_validation", "ignore");
+            boolean disableCertificateChecks = "ignore".equalsIgnoreCase(certValidation);
+
+            return new WinRMConnection(ansibleHost, port, user, password, useHttps, disableCertificateChecks);
         }
 
         throw new IllegalArgumentException("Unsupported connection type: " + connectionType);
