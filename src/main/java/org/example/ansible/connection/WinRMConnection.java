@@ -129,7 +129,10 @@ public class WinRMConnection implements Connection {
                     "if (Test-Path $tempFile) { Remove-Item -Path $tempFile -Force }",
                     tempFileName
             );
-            currentTool.executePs(clearCmd);
+            WinRmToolResponse clearResponse = currentTool.executePs(clearCmd);
+            if (clearResponse.getStatusCode() != 0) {
+                throw new UnreachableException("Failed to prepare remote temp file: " + clearResponse.getStdErr());
+            }
 
             for (String chunk : chunks) {
                 String appendCmd = String.format(
@@ -139,7 +142,7 @@ public class WinRMConnection implements Connection {
                 );
                 WinRmToolResponse response = currentTool.executePs(appendCmd);
                 if (response.getStatusCode() != 0) {
-                    throw new RuntimeException("Failed to upload file chunk: " + response.getStdErr());
+                    throw new UnreachableException("Failed to upload file chunk: " + response.getStdErr());
                 }
             }
 
@@ -154,11 +157,13 @@ public class WinRMConnection implements Connection {
             );
             WinRmToolResponse decodeResponse = currentTool.executePs(decodeCmd);
             if (decodeResponse.getStatusCode() != 0) {
-                throw new RuntimeException("Failed to decode remote file: " + decodeResponse.getStdErr());
+                throw new UnreachableException("Failed to decode remote file: " + decodeResponse.getStdErr());
             }
 
         } catch (IOException e) {
             throw new RuntimeException("Failed to read local file for upload: " + e.getMessage(), e);
+        } catch (Exception e) {
+            throw new UnreachableException("Failed to upload file to remote path " + remotePath + " over WinRM - " + e.getMessage(), e);
         }
     }
 
@@ -174,7 +179,7 @@ public class WinRMConnection implements Connection {
 
             WinRmToolResponse response = getTool().executePs(fetchCmd);
             if (response.getStatusCode() != 0) {
-                throw new RuntimeException("Failed to fetch remote file: " + response.getStdErr());
+                throw new UnreachableException("Failed to fetch remote file: " + response.getStdErr());
             }
 
             String base64Output = response.getStdOut().replaceAll("\\s+", "");
@@ -201,6 +206,8 @@ public class WinRMConnection implements Connection {
 
         } catch (IOException e) {
             throw new RuntimeException("Failed to write downloaded file locally: " + e.getMessage(), e);
+        } catch (Exception e) {
+            throw new UnreachableException("Failed to download file from remote path " + remotePath + " over WinRM - " + e.getMessage(), e);
         }
     }
 

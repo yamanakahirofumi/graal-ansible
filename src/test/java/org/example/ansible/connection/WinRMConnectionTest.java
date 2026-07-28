@@ -196,4 +196,97 @@ class WinRMConnectionTest {
         // but close should run without null pointer exceptions.
         assertDoesNotThrow(() -> connection.close());
     }
+
+    @Test
+    void testPutFilePrepareFailure(@TempDir Path tempDir) throws IOException {
+        Path localFile = tempDir.resolve("test-fail.txt");
+        Files.write(localFile, "some content".getBytes(StandardCharsets.UTF_8));
+
+        WinRmToolResponse failResponse = new WinRmToolResponse("", "mock error preparing temp file", 1);
+        when(mockTool.executePs(anyString())).thenReturn(failResponse);
+
+        UnreachableException ex = assertThrows(UnreachableException.class, () ->
+            connection.putFile(localFile, "C:\\remote\\path\\test-fail.txt")
+        );
+        assertTrue(ex.getMessage().contains("Failed to prepare remote temp file"));
+    }
+
+    @Test
+    void testPutFileChunkFailure(@TempDir Path tempDir) throws IOException {
+        Path localFile = tempDir.resolve("test-fail-chunk.txt");
+        Files.write(localFile, "some content".getBytes(StandardCharsets.UTF_8));
+
+        WinRmToolResponse okResponse = new WinRmToolResponse("", "", 0);
+        WinRmToolResponse failResponse = new WinRmToolResponse("", "mock error uploading chunk", 1);
+
+        // First call (clear/prepare) succeeds, second call (append chunk) fails
+        when(mockTool.executePs(anyString()))
+                .thenReturn(okResponse)
+                .thenReturn(failResponse);
+
+        UnreachableException ex = assertThrows(UnreachableException.class, () ->
+            connection.putFile(localFile, "C:\\remote\\path\\test-fail-chunk.txt")
+        );
+        assertTrue(ex.getMessage().contains("Failed to upload file chunk"));
+    }
+
+    @Test
+    void testPutFileDecodeFailure(@TempDir Path tempDir) throws IOException {
+        Path localFile = tempDir.resolve("test-fail-decode.txt");
+        Files.write(localFile, "some content".getBytes(StandardCharsets.UTF_8));
+
+        WinRmToolResponse okResponse = new WinRmToolResponse("", "", 0);
+        WinRmToolResponse failResponse = new WinRmToolResponse("", "mock error decoding file", 1);
+
+        // First call (clear/prepare) succeeds, second call (append chunk) succeeds, third call (decode) fails
+        when(mockTool.executePs(anyString()))
+                .thenReturn(okResponse)
+                .thenReturn(okResponse)
+                .thenReturn(failResponse);
+
+        UnreachableException ex = assertThrows(UnreachableException.class, () ->
+            connection.putFile(localFile, "C:\\remote\\path\\test-fail-decode.txt")
+        );
+        assertTrue(ex.getMessage().contains("Failed to decode remote file"));
+    }
+
+    @Test
+    void testPutFileException(@TempDir Path tempDir) throws IOException {
+        Path localFile = tempDir.resolve("test-exc.txt");
+        Files.write(localFile, "some content".getBytes(StandardCharsets.UTF_8));
+
+        when(mockTool.executePs(anyString())).thenThrow(new RuntimeException("Connection timed out"));
+
+        UnreachableException ex = assertThrows(UnreachableException.class, () ->
+            connection.putFile(localFile, "C:\\remote\\path\\test-exc.txt")
+        );
+        assertTrue(ex.getMessage().contains("Failed to upload file to remote path"));
+        assertTrue(ex.getMessage().contains("Connection timed out"));
+    }
+
+    @Test
+    void testFetchFileFailure(@TempDir Path tempDir) {
+        Path localDest = tempDir.resolve("test-fail-fetch.txt");
+
+        WinRmToolResponse failResponse = new WinRmToolResponse("", "mock fetch failure", 1);
+        when(mockTool.executePs(anyString())).thenReturn(failResponse);
+
+        UnreachableException ex = assertThrows(UnreachableException.class, () ->
+            connection.fetchFile("C:\\remote\\source.txt", localDest)
+        );
+        assertTrue(ex.getMessage().contains("Failed to fetch remote file"));
+    }
+
+    @Test
+    void testFetchFileException(@TempDir Path tempDir) {
+        Path localDest = tempDir.resolve("test-fail-fetch-exc.txt");
+
+        when(mockTool.executePs(anyString())).thenThrow(new RuntimeException("Connection reset"));
+
+        UnreachableException ex = assertThrows(UnreachableException.class, () ->
+            connection.fetchFile("C:\\remote\\source.txt", localDest)
+        );
+        assertTrue(ex.getMessage().contains("Failed to download file from remote path"));
+        assertTrue(ex.getMessage().contains("Connection reset"));
+    }
 }

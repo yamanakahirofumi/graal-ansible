@@ -241,6 +241,15 @@
     - `DockerConnectionTest` による、プロセスおよびデータストリームをモックした詳細なユニットテストを実装。
     - `DefaultConnectionFactory` にて、`ansible_connection` が `docker` の場合に自動的に `DockerConnection` が解決されるようマージ。
 
+### 1.36 [✓] WinRM コネクションプラグインの実装
+- **完了日**: 2026-07-28
+- **概要**: Windows ターゲットノードに接続し、PowerShell 経由でタスクを実行する `winrm` コネクションプラグインの実装。
+- **解決策**:
+    - `WinRMConnection` クラスを実装し、`WinRM4J` ライブラリを使用して外部コマンドに依存せず pure Java から WinRM 接続および PowerShell コマンド実行をサポート。
+    - タスク固有の環境変数をセッション内環境変数として伝播させ、Base64 エンコードとチャンク転送を組み合わせて WinRM 経由の `putFile` / `fetchFile` を実装。
+    - `runas` による `BecomeContext` 特権昇格をサポートし、セッション構築時の資格情報を動的に再生成してコマンドを実行。
+    - `WinRMConnectionTest` により、`winrm4j` クライアントや転送・昇格をモックした詳細なユニットテストを実装。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築
