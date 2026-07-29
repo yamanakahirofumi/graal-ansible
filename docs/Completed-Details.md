@@ -238,8 +238,17 @@
 - **解決策**:
     - `DockerConnection` クラスを実装し、Docker CLI (`docker exec`, `docker cp`, `docker inspect`) を用いたコンテナ内でのコマンド実行やファイル転送をサポート。
     - 環境変数転送（`docker exec -e`）や複数権限昇格モード（`sudo`, `su`, `docker exec -u` によるネイティブユーザーの上書き）に対応。
-    - `DockerConnectionTest` による、プロセスおよびデータストリームをモックした詳細なユニットテストを実装。
+    - `DockerConnectionTest` による、プロセスおよびデータストリームをモックした詳細なユニットテストを実装.
     - `DefaultConnectionFactory` にて、`ansible_connection` が `docker` の場合に自動的に `DockerConnection` が解決されるようマージ。
+
+### 1.36 [✓] WinRM コネクションプラグインの実装
+- **完了日**: 2026-10-20
+- **概要**: `winrm` コネクションプラグインの実装。
+- **解決策**:
+    - `WinRMConnection` クラスを実装し、`winrm4j` を使用して Windows ターゲットノードに接続し、PowerShell 経由でタスクを実行する仕組みを導入。
+    - Base64 チャンク転送によるファイル転送（`putFile` / `fetchFile`）および PowerShell への環境変数の伝播、`runas` 等による権限昇格（Become）に対応。
+    - `WinRMConnectionTest` による、`winrm4j` クライアントやコマンド送信、Base64 分割処理等をモックした詳細なユニットテストを実装。
+    - `DefaultConnectionFactory` にて、`ansible_connection` が `winrm` の場合に自動的に `WinRMConnection` が解決されるようマージ。
 
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
