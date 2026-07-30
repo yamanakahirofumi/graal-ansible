@@ -241,6 +241,14 @@
     - `DockerConnectionTest` による、プロセスおよびデータストリームをモックした詳細なユニットテストを実装。
     - `DefaultConnectionFactory` にて、`ansible_connection` が `docker` の場合に自動的に `DockerConnection` が解決されるようマージ。
 
+### 1.36 [✓] WinRM コネクションプラグインの実装
+- **完了日**: 2026-10-24
+- **概要**: `winrm` コネクションプラグインの実装。
+- **解決策**:
+    - `WinRMConnection` クラスを実装し、`WinRM4J` ライブラリを使用して Windows ターゲットノードへの接続、PowerShell 経由のコマンド実行、環境変数の伝播、および Base64 チャンク転送によるファイル転送（`putFile` / `fetchFile`）をサポート。
+    - `DefaultConnectionFactory` において、`ansible_connection` が `winrm` の場合に、動的に `WinRMConnection` を作成・解決するロジック（SSL 検証やポート、プロトコルの設定を含む）を統合。
+    - `WinRMConnectionTest` による、`WinRM4J` クライアントやセッションを Mockito で詳細にモック化したテストスイートを構築し、エラーハンドリングや become 設定に応じた動作を検証。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築
