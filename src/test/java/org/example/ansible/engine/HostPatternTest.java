@@ -189,4 +189,42 @@ public class HostPatternTest {
         assertTrue(results.containsKey("web2"), "Should contain web2");
         assertTrue(results.containsKey("db"), "Should contain db");
     }
+
+    @Test
+    void testAdvancedRangeExpansions() {
+        // 1. Zero padding: [01:05]
+        List<String> r1 = org.example.ansible.util.HostPatternParser.expandPattern("web[01:03]");
+        assertEquals(List.of("web01", "web02", "web03"), r1);
+
+        // 2. Reverse numerical range: [5:1]
+        List<String> r2 = org.example.ansible.util.HostPatternParser.expandPattern("web[3:1]");
+        assertEquals(List.of("web3", "web2", "web1"), r2);
+
+        // 3. Reverse alphabetical range: [c:a]
+        List<String> r3 = org.example.ansible.util.HostPatternParser.expandPattern("web[c:a]");
+        assertEquals(List.of("webc", "webb", "weba"), r3);
+
+        // 4. Cartesian product / Multiple ranges: web[1:2]-[a:b]
+        List<String> r4 = org.example.ansible.util.HostPatternParser.expandPattern("web[1:2]-[a:b]");
+        assertEquals(List.of("web1-a", "web1-b", "web2-a", "web2-b"), r4);
+
+        // 5. Unmatched bracket / normal string
+        List<String> r5 = org.example.ansible.util.HostPatternParser.expandPattern("web[1:3");
+        assertEquals(List.of("web[1:3"), r5);
+
+        List<String> r6 = org.example.ansible.util.HostPatternParser.expandPattern("web1:3]");
+        assertEquals(List.of("web1:3]"), r6);
+    }
+
+    @Test
+    void testSplitBracketAware() {
+        List<String> s1 = org.example.ansible.util.HostPatternParser.splitBracketAware("web[0:5],db_servers");
+        assertEquals(List.of("web[0:5]", "db_servers"), s1);
+
+        List<String> s2 = org.example.ansible.util.HostPatternParser.splitBracketAware("web[0:5]:db_servers");
+        assertEquals(List.of("web[0:5]", "db_servers"), s2);
+
+        List<String> s3 = org.example.ansible.util.HostPatternParser.splitBracketAware(null);
+        assertTrue(s3.isEmpty());
+    }
 }
