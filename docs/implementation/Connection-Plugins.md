@@ -189,3 +189,61 @@ Windows における実行権限やユーザーの切り替え（Become）につ
   - 接続成功・失敗（タイムアウト・認証エラー等）に応じた適切な例外ハンドリングの検証。
   - 各種 become パラメータに応じたクライアント生成時におけるユーザー資格情報アサーションの検証。
   - ファイル転送時に、ローカルファイルが正しく Base64 チャンクに分割され、想定される PowerShell コマンドが `execCommand` に渡されているかどうかのコール回数と引数のアサーションを網羅します。
+
+### 10.6 依存ライブラリの定義 (Maven Coordinates)
+
+`winrm4j` を Java エンジンで使用するための標準的な Maven 依存関係は以下の通り定義します。これらを `pom.xml` に追加してビルドおよびコンパイル環境を整備します。
+
+```xml
+<dependency>
+    <groupId>io.cloudsoft.windows</groupId>
+    <artifactId>winrm4j</artifactId>
+    <version>0.12.3</version>
+</dependency>
+<dependency>
+    <groupId>io.cloudsoft.windows</groupId>
+    <artifactId>winrm4j-client</artifactId>
+    <version>0.12.3</version>
+</dependency>
+```
+
+### 10.7 サポートする接続パラメータ/変数定義
+
+Ansible 互換の WinRM 接続およびクライアント動作を制御するために、以下のパラメータ（変数）をサポートします。
+
+| 変数名 | 型 | デフォルト値 | 説明 |
+| :--- | :--- | :--- | :--- |
+| `ansible_winrm_scheme` | `String` | `https` | 接続スキーム（`http` または `https`）を指定します。 |
+| `ansible_winrm_transport` | `String` | `negotiate` | 認証プロトコル（`basic`, `ntlm`, `kerberos`, `credssp`, `negotiate`）を指定します。 |
+| `ansible_winrm_server_cert_validation` | `String` | `validate` | SSL/TLS 証明書の検証（`ignore` または `validate`）を指定します。 |
+| `ansible_winrm_operation_timeout_sec` | `Integer` | `20` | WinRM 内部の操作タイムアウト時間（秒）を指定します。 |
+| `ansible_winrm_read_timeout_sec` | `Integer` | `30` | ソケットの読み込みタイムアウト時間（秒）を指定します。 |
+| `ansible_winrm_ca_trust_path` | `String` | なし | SSL証明書検証用の信頼ストア（CA証明書など）のファイルパス。 |
+
+### 10.8 PowerShell 実行ポリシーの制御
+
+Windows リモートホスト上でスクリプトやコマンドの実行を阻害する ExecutionPolicy（実行ポリシー）を安全に回避するため、以下の仕様に従ってコマンド実行を行います。
+
+- システム全体のポリシーを恒久的に変更するのではなく、現在のセッションまたはプロセススコープでのみ適用される `-ExecutionPolicy Bypass` オプションを明示的に付与して PowerShell を呼び出します。
+- コマンド呼び出し形式の基本設計：
+  ```bash
+  powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "<ラップされたスクリプトブロック>"
+  ```
+
+### 10.9 例外マッピングと接続結果の返却
+
+WinRM の実行またはセッション管理時に発生する WinRM4J 起因のエラー、および基盤となるネットワークエラーを以下のように Java エンジン側の例外にマッピングします。
+
+1. **`UnreachableException` へのマッピング**:
+   - ホストへのネットワーク接続失敗、名前解決エラー、HTTP 401 などの認証エラー、および WinRM のサービス疎通確認失敗時は、`UnreachableException` をスローし、対象ホストを即時到達不能ステータスに移行させます。
+2. **`ConnectionResult` へのマッピング**:
+   - コマンド実行中にタイムアウトが発生した場合は、タイムアウトを示すエラーメッセージ、終了コード（非ゼロ値、例：`-1`）、および空でない `stderr` を保持する `ConnectionResult` を返却します。
+   - 予期しない HTTP 500 等のエラー、または WinRM4J クライアントが検知したプロセス停止例外も同様に `ConnectionResult` でラップして返し、プレイブックレベルでの `ignore_errors` 等の制御ロジックを阻害しないようにします。
+
+### 10.10 SSLおよび証明書の検証セキュリティ
+
+自己署名証明書（Self-Signed Certificate）が一般的に使用される環境への接続ポータビリティを担保するため、証明書検証動作のバイパス仕様をサポートします。
+
+- **証明書検証のスキップ (`ansible_winrm_server_cert_validation=ignore`)**:
+  - `ansible_winrm_server_cert_validation` の値が `ignore` に設定されている場合、すべての証明書を無条件に検証成功とするダミーの `X509TrustManager` およびすべてのホスト名を検証成功とする `HostnameVerifier` をインジェクションして、HTTPS クライアントを構築します。
+  - セキュリティ侵害を防ぐため、実運用時（検証・開発環境以外）においては `validate` を推奨する警告ログ（またはドキュメント上の注記）を出力するように設計します。
