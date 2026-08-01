@@ -42,4 +42,10 @@
 
 ## 5. 今後の設計・拡張事項 (Future Design and Extensions)
 
-- 現時点で未着手の設計・拡張事項はありません。
+### 5.1 [ ] Ansible Vault 復号機能の設計と統合
+- **概要**: `$ANSIBLE_VAULT;1.1;AES256` 形式で暗号化された変数およびファイルの復号機能を Java エンジンに統合。
+- **検討内容**:
+    - CLI 引数（`--vault-password-file`, `--ask-vault-pass`）経由でのパスワードの安全な取得。
+    - PBKDF2 with HMAC-SHA256 鍵導出および AES256-CTR / HMAC-SHA256 復号の Java Native（JCE）による実装。
+    - `VariableManager` および `VariableResolver` とのオンデマンド復号インフラの連携設計。
+    - 詳細は [Ansible Vault 復号サポートの設計と提案](features/Vault-Support.md) を参照。

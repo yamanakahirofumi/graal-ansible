@@ -38,6 +38,7 @@
 - [モジュールサポート状態](features/Module-Support-Status.md)：OSごとのコレクション・モジュールサポート状況
 - [モジュールとモックの対応リファレンス](features/Module-Mock-Reference.md)：各モジュールが依存するモックの詳細一覧
 - [モジュールの開発方針](features/Module-Development-Policy.md)：Ansibleモジュールの実行および再実装禁止の方針
+- [Ansible Vault 復号サポートの設計と提案](features/Vault-Support.md)：Ansible Vault 暗号化データの復号仕様と設計方針
 
 ## 4. 技術・開発設定 (`docs/tech/`)
 - [アーキテクチャ設計](tech/Architecture.md)：システムのパッケージ構造と主要クラスの責務
