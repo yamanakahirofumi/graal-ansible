@@ -42,4 +42,10 @@
 
 ## 5. 今後の設計・拡張事項 (Future Design and Extensions)
 
-- 現時点で未着手の設計・拡張事項はありません。
+### 5.1 [ ] ネイティブ Java による Ansible Vault 復号サポートの実装
+- **概要**: 外部 Python プロセスに依存せず、Java 21 の標準暗号 API (JCA) のみを用いて AES256-CTR / HMAC-SHA256 PBKDF2 による Ansible Vault 暗号化データの復号をサポートする。
+- **検討内容**:
+    - **[人間が主導すべきこと]** `javax.crypto` API と PBKDF2 アルゴリズムを用いた `AnsibleVaultDecryptor` クラスの設計と、各種暗号化ケース（マルチVault ID対応等）に対する例外設計。
+    - YAML 解析器 (`YamlParser`) および変数解決エンジン (`VariableResolver`) との統合タイミング（パース時即時 vs. 評価時遅延評価）。
+    - 起動時にインタラクティブにパスワードを入力させる仕組み（`System.console()` または Picocli のプロンプト機能）の共通コンポーネント設計。
+    - GraalVM Native Image コンパイル時の SunJCE プロバイダに関するリフレクション・リソース定義。
