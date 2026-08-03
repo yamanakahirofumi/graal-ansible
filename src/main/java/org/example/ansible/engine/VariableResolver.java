@@ -27,6 +27,9 @@ import org.example.ansible.engine.filter.ToJsonFilter;
 import org.example.ansible.engine.filter.ToYamlFilter;
 import org.example.ansible.engine.filter.UniqueFilter;
 import org.example.ansible.engine.filter.UrlencodeFilter;
+import org.example.ansible.engine.filter.ToUuidFilter;
+import org.example.ansible.engine.filter.UrlsplitFilter;
+import org.example.ansible.engine.filter.CommentFilter;
 import org.example.ansible.engine.lookup.DictLookup;
 import org.example.ansible.engine.lookup.EnvLookup;
 import org.example.ansible.engine.lookup.FileLookup;
@@ -99,6 +102,9 @@ public class VariableResolver {
         jinjava.getGlobalContext().registerFilter(new Items2DictFilter());
         jinjava.getGlobalContext().registerFilter(new UniqueFilter());
         jinjava.getGlobalContext().registerFilter(new UrlencodeFilter());
+        jinjava.getGlobalContext().registerFilter(new ToUuidFilter());
+        jinjava.getGlobalContext().registerFilter(new UrlsplitFilter());
+        jinjava.getGlobalContext().registerFilter(new CommentFilter());
     }
 
     /**
