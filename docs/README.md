@@ -33,6 +33,7 @@
 - [インベントリ管理](features/Inventory-System.md)：静的・動的インベントリのサポート範囲
 - [コレクションの管理と取得方法](features/Collection-Management.md)：実際のコレクションを取得・利用する手順
 - [Playbook実行仕様](features/Playbook-Execution.md)：タスク実行、ループ、条件分岐のサポート範囲
+- [Ansible Vault 復号サポート仕様](features/Vault-Support.md)：暗号化された変数・ファイルのネイティブ Java 復号機能の設計と提案
 - [Ansible用語集](features/Ansible-Terminology.md)：コレクション、モジュール、ロール等の用語定義
 - [モジュール互換性](features/Module-Compatibility.md)：モジュール互換性の目標と設計指針
 - [モジュールサポート状態](features/Module-Support-Status.md)：OSごとのコレクション・モジュールサポート状況

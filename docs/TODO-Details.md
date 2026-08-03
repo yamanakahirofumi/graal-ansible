@@ -42,4 +42,11 @@
 
 ## 5. 今後の設計・拡張事項 (Future Design and Extensions)
 
-- 現時点で未着手の設計・拡張事項はありません。
+### 5.1 [ ] ネイティブ Java による Ansible Vault 復号機能の追加
+- **概要**: 制御ノード（管理ノード）側で、暗号化された変数やファイルのネイティブ Java 復号機能を追加します。
+- **詳細は [Vault-Support.md](features/Vault-Support.md) を参照。**
+- **検討内容**:
+    - `PBKDF2WithHmacSHA256` 鍵導出および `AES/CTR/NoPadding` 復号アルゴリズムの実装。
+    - CLI オプション (`--vault-password-file`, `--ask-vault-pass`) の追加。
+    - `YamlParser` / `VariableResolver` との統合による `!vault` タグ自動復号のサポート。
+    - 安全な機密データライフサイクルの管理（メモリ上のキー消去処理）。
