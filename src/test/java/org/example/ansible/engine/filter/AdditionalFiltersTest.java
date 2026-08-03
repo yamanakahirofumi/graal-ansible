@@ -128,4 +128,43 @@ class AdditionalFiltersTest {
         // Map order is not guaranteed, check both possibilities
         assertTrue(str.equals("a=1&b=c%20d") || str.equals("b=c%20d&a=1"));
     }
+
+    @Test
+    void testToUuid() {
+        // Standard UUID v5 using Ansible's default namespace and name 'ansible' is 5ecca099-0345-5f70-b25a-bacaea0dd909
+        assertEquals("5ecca099-0345-5f70-b25a-bacaea0dd909", resolver.resolveValue("{{ 'ansible' | to_uuid }}", Map.of()));
+        // Custom namespace DNS (6ba7b810-9dad-11d1-80b4-00c04fd430c8) with name 'ansible' should yield 0977e110-4652-5d85-b04c-a0c4dfdbb195
+        assertEquals("0977e110-4652-5d85-b04c-a0c4dfdbb195", resolver.resolveValue("{{ 'ansible' | to_uuid('6ba7b810-9dad-11d1-80b4-00c04fd430c8') }}", Map.of()));
+    }
+
+    @Test
+    void testUrlsplit() {
+        String url = "http://user:pass@example.com:8080/path?query=1#frag";
+        Object result = resolver.resolveValue("{{ '" + url + "' | urlsplit }}", Map.of());
+        assertTrue(result instanceof Map);
+        Map<?, ?> map = (Map<?, ?>) result;
+        assertEquals("http", map.get("scheme"));
+        assertEquals("user:pass@example.com:8080", map.get("netloc"));
+        assertEquals("/path", map.get("path"));
+        assertEquals("query=1", map.get("query"));
+        assertEquals("frag", map.get("fragment"));
+        assertEquals("user", map.get("username"));
+        assertEquals("pass", map.get("password"));
+        assertEquals("example.com", map.get("hostname"));
+        assertEquals(8080, map.get("port"));
+
+        // Single component requested
+        assertEquals("http", resolver.resolveValue("{{ '" + url + "' | urlsplit('scheme') }}", Map.of()));
+        assertEquals("example.com", resolver.resolveValue("{{ '" + url + "' | urlsplit('hostname') }}", Map.of()));
+        assertEquals(8080, resolver.resolveValue("{{ '" + url + "' | urlsplit('port') }}", Map.of()));
+        assertEquals("query=1", resolver.resolveValue("{{ '" + url + "' | urlsplit('query') }}", Map.of()));
+    }
+
+    @Test
+    void testComment() {
+        assertEquals("# hello\n# world", resolver.resolveValue("{{ 'hello\nworld' | comment }}", Map.of()));
+        assertEquals("% hello\n% world", resolver.resolveValue("{{ 'hello\nworld' | comment('erlang') }}", Map.of()));
+        assertEquals("/*\n * hello\n * world\n */", resolver.resolveValue("{{ 'hello\nworld' | comment('c') }}", Map.of()));
+        assertEquals("<!--\n  hello\n  world\n-->", resolver.resolveValue("{{ 'hello\nworld' | comment('xml') }}", Map.of()));
+    }
 }

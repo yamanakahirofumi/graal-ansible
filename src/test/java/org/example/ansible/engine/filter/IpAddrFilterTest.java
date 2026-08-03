@@ -32,13 +32,38 @@ class IpAddrFilterTest {
 
     @Test
     void testInvalidIpV4Numeric() {
-        // Current implementation uses regex ^(\d{1,3}\.){3}\d{1,3}$
-        // which technically allows 999.999.999.999.
-        // We should test what it actually does.
         Map<String, Object> context = new HashMap<>();
         context.put("my_ip", "999.999.999.999");
         String rendered = jinjava.render("{{ my_ip | ipaddr }}", context);
-        assertEquals("999.999.999.999", rendered);
+        assertEquals("false", rendered);
+    }
+
+    @Test
+    void testInvalidIpV4LeadingZeros() {
+        Map<String, Object> context = new HashMap<>();
+        context.put("my_ip", "192.168.01.1");
+        String rendered = jinjava.render("{{ my_ip | ipaddr }}", context);
+        assertEquals("false", rendered);
+    }
+
+    @Test
+    void testValidIpV6() {
+        Map<String, Object> context = new HashMap<>();
+        context.put("my_ip", "2001:db8::1");
+        String rendered = jinjava.render("{{ my_ip | ipaddr }}", context);
+        assertEquals("2001:db8::1", rendered);
+
+        context.put("my_ip", "::1");
+        rendered = jinjava.render("{{ my_ip | ipaddr }}", context);
+        assertEquals("::1", rendered);
+    }
+
+    @Test
+    void testInvalidIpV6() {
+        Map<String, Object> context = new HashMap<>();
+        context.put("my_ip", "1200::AB00:12:34::56");
+        String rendered = jinjava.render("{{ my_ip | ipaddr }}", context);
+        assertEquals("false", rendered);
     }
 
     @Test
