@@ -88,6 +88,51 @@ public class PlaybookCli implements Callable<Integer> {
     @Option(names = {"-K", "--ask-become-pass"}, description = "Ask for privilege escalation password")
     private boolean askBecomePass;
 
+    @Option(names = {"--vault-password-file"}, description = "Vault password file")
+    private File vaultPasswordFile;
+
+    @Option(names = {"--vault-id"}, description = "Vault ID and password source")
+    private String vaultId;
+
+    private String getVaultPassword() {
+        String passwordFilePath = null;
+        if (vaultPasswordFile != null) {
+            passwordFilePath = vaultPasswordFile.getAbsolutePath();
+        } else if (vaultId != null) {
+            if (vaultId.contains("@")) {
+                passwordFilePath = vaultId.substring(vaultId.indexOf("@") + 1);
+            } else {
+                passwordFilePath = vaultId;
+            }
+        } else {
+            passwordFilePath = System.getenv("ANSIBLE_VAULT_PASSWORD_FILE");
+        }
+
+        if (passwordFilePath != null) {
+            if ("prompt".equalsIgnoreCase(passwordFilePath)) {
+                java.io.Console console = System.console();
+                if (console != null) {
+                    char[] passwordChars = console.readPassword("Vault password: ");
+                    return passwordChars != null ? new String(passwordChars) : "";
+                } else {
+                    throw new RuntimeException("Vault password source 'prompt' specified but no console available.");
+                }
+            }
+
+            File file = new File(passwordFilePath);
+            if (file.exists() && file.isFile()) {
+                try {
+                    return java.nio.file.Files.readString(file.toPath()).trim();
+                } catch (java.io.IOException e) {
+                    throw new RuntimeException("Failed to read vault password file: " + passwordFilePath, e);
+                }
+            } else {
+                throw new RuntimeException("Vault password file not found: " + passwordFilePath);
+            }
+        }
+        return null;
+    }
+
     @Override
     public Integer call() {
         int verbosity = verbose == null ? 0 : verbose.length;
@@ -132,6 +177,11 @@ public class PlaybookCli implements Callable<Integer> {
                 // Execute Playbook
                 PlaybookExecutor executor = new PlaybookExecutor(taskExecutor);
                 executor.setForks(forks);
+
+                String vaultPassword = getVaultPassword();
+                if (vaultPassword != null) {
+                    executor.setVaultPassword(vaultPassword);
+                }
 
                 // Select Callback Plugin
                 String callbackName = System.getenv("ANSIBLE_STDOUT_CALLBACK");

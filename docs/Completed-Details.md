@@ -249,6 +249,15 @@
     - `DefaultConnectionFactory` において、`ansible_connection` が `winrm` の場合に、動的に `WinRMConnection` を作成・解決するロジック（SSL 検証やポート、プロトコルの設定を含む）を統合。
     - `WinRMConnectionTest` による、`WinRM4J` クライアントやセッションを Mockito で詳細にモック化したテストスイートを構築し、エラーハンドリングや become 設定に応じた動作を検証。
 
+### 1.37 [✓] Native Java Ansible Vault 復号の実装
+- **完了日**: 2026-08-05
+- **概要**: `VaultDecrypter` の実装と `YamlParser` / `VariableResolver` への統合によるネイティブ復号のサポート。
+- **解決策**:
+    - PBKDF2WithHmacSHA256、HMAC-SHA256、および AES-CTR 暗号を用いた Java 標準暗号ライブラリベースの復号エンジン `VaultDecrypter` を実装。
+    - SnakeYAML 解析フェーズにおいて `!vault` 独自タグを検知し `VaultDecryptedValue` オブジェクトへ透過的にマッピングするカスタムコンストラクタを `YamlUtil` に導入。
+    - `VariableResolver` にて `VaultDecryptedValue` の変数解決時にパスワードを用いて動的復号するロジックを統合。パスワード未指定時の適切なエラーハンドリングをサポート。
+    - `--vault-password-file` および `--vault-id` CLI引数のパースを `PlaybookCli` に追加し、パスワード解決およびエンジンへの伝播を実現。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築

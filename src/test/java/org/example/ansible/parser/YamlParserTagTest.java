@@ -13,10 +13,10 @@ class YamlParserTagTest {
     @Test
     void testUnknownTagParsing() {
         String yaml = """
-                - name: play with vault
+                - name: play with unknown scalar tag
                   hosts: localhost
                   vars:
-                    secret: !vault |
+                    secret: !unknown_scalar |
                       $ANSIBLE_VAULT;1.1;AES256
                       31323334353637383930
                   tasks:
@@ -26,14 +26,14 @@ class YamlParserTagTest {
                 """;
         YamlParser parser = new YamlParser();
 
-        // Verify that unknown tags like !vault do not cause ConstructorException
+        // Verify that unknown tags like !unknown_scalar do not cause ConstructorException
         assertDoesNotThrow(() -> {
             Playbook playbook = parser.parse(new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8)));
             assertNotNull(playbook);
             Object secret = playbook.plays().get(0).vars().get("secret");
             assertNotNull(secret);
             assertTrue(secret instanceof String);
-        }, "YamlParser should handle unknown tags like !vault");
+        }, "YamlParser should handle unknown scalar tags");
     }
 
     @Test

@@ -42,9 +42,4 @@
 
 ## 5. 今後の設計・拡張事項 (Future Design and Extensions)
 
-### 5.1 [ ] Native Java Ansible Vault 復号の実装
-- **概要**: `VaultDecrypter` の実装と `YamlParser`/`VariableResolver` への統合によるネイティブ復号のサポート。
-- **検討内容**:
-    - PBKDF2WithHmacSHA256 および AES-CTR 復号のパフォーマンス。
-    - パスワードプロバイダの抽象化とマルチスレッド時における安全な共有。
-    - インライン `!vault` タグ以外の、暗号化ファイルの自動判別と透過的復号（`vault_password_file` 経由）。
+*(現在、未着手の新規設計・拡張事項はありません)*

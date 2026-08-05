@@ -49,12 +49,26 @@ import java.util.stream.Collectors;
 public class VariableResolver {
     private final Jinjava jinjava;
     private final Map<String, Lookup> lookups = new HashMap<>();
+    private String vaultPassword;
 
     public VariableResolver() {
+        this(null);
+    }
+
+    public VariableResolver(String vaultPassword) {
+        this.vaultPassword = vaultPassword;
         this.jinjava = new Jinjava();
         registerFilters();
         registerLookups();
         registerFunctions();
+    }
+
+    public void setVaultPassword(String vaultPassword) {
+        this.vaultPassword = vaultPassword;
+    }
+
+    public String getVaultPassword() {
+        return this.vaultPassword;
     }
 
     private void registerLookups() {
@@ -173,7 +187,14 @@ public class VariableResolver {
      */
     @SuppressWarnings("unchecked")
     public Object resolveValue(Object value, Map<String, Object> variables) {
-        if (value instanceof String str) {
+        if (value instanceof VaultDecryptedValue vaultValue) {
+            if (vaultPassword == null) {
+                throw new RuntimeException("Decryption password was not provided for vault-encrypted value.");
+            }
+            VaultDecrypter decrypter = new VaultDecrypter();
+            byte[] decryptedBytes = decrypter.decrypt(vaultValue.getEncryptedRawText(), vaultPassword);
+            return new String(decryptedBytes, java.nio.charset.StandardCharsets.UTF_8);
+        } else if (value instanceof String str) {
             return resolveString(str, variables);
         } else if (value instanceof Map<?, ?> map) {
             return resolve((Map<String, Object>) map, variables);
