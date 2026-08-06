@@ -24,6 +24,8 @@ import org.example.ansible.engine.filter.RegexReplaceFilter;
 import org.example.ansible.engine.filter.SplitextFilter;
 import org.example.ansible.engine.filter.TernaryFilter;
 import org.example.ansible.engine.filter.ToJsonFilter;
+import org.example.ansible.engine.filter.ToNiceJsonFilter;
+import org.example.ansible.engine.filter.ToNiceYamlFilter;
 import org.example.ansible.engine.filter.ToYamlFilter;
 import org.example.ansible.engine.filter.UniqueFilter;
 import org.example.ansible.engine.filter.UrlencodeFilter;
@@ -97,7 +99,9 @@ public class VariableResolver {
         jinjava.getGlobalContext().registerFilter(new Dict2ItemsFilter());
         jinjava.getGlobalContext().registerFilter(new BoolFilter());
         jinjava.getGlobalContext().registerFilter(new ToJsonFilter());
+        jinjava.getGlobalContext().registerFilter(new ToNiceJsonFilter());
         jinjava.getGlobalContext().registerFilter(new ToYamlFilter());
+        jinjava.getGlobalContext().registerFilter(new ToNiceYamlFilter());
         jinjava.getGlobalContext().registerFilter(new CombineFilter());
         jinjava.getGlobalContext().registerFilter(new RegexReplaceFilter());
         jinjava.getGlobalContext().registerFilter(new QuoteFilter());
