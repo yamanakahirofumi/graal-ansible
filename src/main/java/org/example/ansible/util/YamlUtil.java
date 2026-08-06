@@ -1,5 +1,6 @@
 package org.example.ansible.util;
 
+import org.example.ansible.engine.VaultDecryptedValue;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
@@ -9,7 +10,8 @@ import org.yaml.snakeyaml.constructor.Construct;
 
 /**
  * Utility for creating configured SnakeYAML instances.
- * Handles unknown tags (like !vault) by treating them as their underlying types.
+ * Handles unknown tags (like !vault) by treating them as their underlying types,
+ * and specifically maps !vault tag to VaultDecryptedValue.
  */
 public class YamlUtil {
 
@@ -24,6 +26,7 @@ public class YamlUtil {
     private static class AnsibleYamlConstructor extends SafeConstructor {
         public AnsibleYamlConstructor(LoaderOptions options) {
             super(options);
+            this.yamlConstructors.put(new Tag("!vault"), new ConstructVault());
         }
 
         @Override
@@ -46,6 +49,19 @@ public class YamlUtil {
                 }
             }
             return super.getConstructor(node);
+        }
+
+        private class ConstructVault implements Construct {
+            @Override
+            public Object construct(Node node) {
+                String val = (String) yamlConstructors.get(Tag.STR).construct(node);
+                return new VaultDecryptedValue(val);
+            }
+
+            @Override
+            public void construct2ndStep(Node node, Object object) {
+                yamlConstructors.get(Tag.STR).construct2ndStep(node, object);
+            }
         }
     }
 }

@@ -23,6 +23,7 @@ public class PlaybookExecutor {
     private PromptProvider promptProvider = new ConsolePromptProvider();
     private int forks = 5;
     private final List<Callback> callbacks = new ArrayList<>(List.of(new DefaultCallback()));
+    private String vaultPassword;
 
     public PlaybookExecutor(ITaskExecutor taskExecutor) {
         this(taskExecutor, new DefaultConnectionFactory());
@@ -39,6 +40,14 @@ public class PlaybookExecutor {
 
     public void setForks(int forks) {
         this.forks = forks;
+    }
+
+    public void setVaultPassword(String vaultPassword) {
+        this.vaultPassword = vaultPassword;
+    }
+
+    public String getVaultPassword() {
+        return vaultPassword;
     }
 
     public void addCallback(Callback callback) {
@@ -150,6 +159,12 @@ public class PlaybookExecutor {
         TaskQueueManager tqm = new TaskQueueManager(taskExecutor, connectionFactory);
         tqm.setPromptProvider(promptProvider);
         tqm.setForks(forks);
+        if (vaultPassword != null) {
+            tqm.getVariableResolver().setVaultPassword(vaultPassword);
+            if (taskExecutor != null && taskExecutor.getVariableResolver() != null) {
+                taskExecutor.getVariableResolver().setVaultPassword(vaultPassword);
+            }
+        }
         callbacks.forEach(tqm::addCallback);
 
         for (Play play : playbook.plays()) {
