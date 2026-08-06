@@ -1,12 +1,12 @@
-# Ansible Vault 復号サポート仕様 (Ansible Vault Decryption Support)
+# Ansible Vault 復号仕様 (Ansible Vault Decryption Specification)
 
-本ドキュメントでは、`graal-ansible` における Ansible Vault 暗号化データ（ファイルおよびインラインの `!vault` 独自タグ）を Java でネイティブに復号・統合するための機能提案およびアーキテクチャ設計について定義します。
+本ドキュメントでは、`graal-ansible` における Ansible Vault 暗号化データ（ファイルおよびインラインの `!vault` 独自タグ）を Java でネイティブに復号・統合するための実装仕様およびアーキテクチャ設計について定義します。
 
 ## 1. 概要 (Overview)
 
-Ansible Vault は、機密情報（パスワード、APIキー、秘密鍵など）を暗号化して Git リポジトリ等に安全に保管するための仕組みです。現在の `graal-ansible` は、YAML 解析時に `!vault` タグをエラーなく透過的にパースする設計になっていますが、値自体の復号には対応していません。
+Ansible Vault は、機密情報（パスワード、APIキー、秘密鍵など）を暗号化して Git リポジトリ等に安全に保管するための仕組みです。`graal-ansible` では、YAML 解析時に `!vault` タグをエラーなく透過的にパースするだけでなく、値自体のネイティブ復号に対応しています。
 
-本提案は、外部の Python プロセスや GraalPy を介さず、Java の標準暗号ライブラリ（`javax.crypto`）を用いて安全かつ高速にネイティブ復号を実行する仕組みを導入するものです。これにより、プレイブック実行時における機密データの自動展開を可能にします。
+本機能は、外部の Python プロセスや GraalPy を介さず、Java の標準暗号ライブラリ（`javax.crypto`）を用いて安全かつ高速にネイティブ復号を実行する仕組みを導入したものです。これにより、プレイブック実行時における機密データの自動展開を実現しています。
 
 ## 2. 暗号仕様と復号アルゴリズム (Cryptographic Specifications)
 
@@ -61,17 +61,17 @@ $ANSIBLE_VAULT;1.2;AES256;vault-id-label
 4.  インナーテキストを改行文字（`\n`）で分割し、3つの要素（ソルト、HMAC、暗号文）のヘキサ文字列を抽出する。
 5.  3つのヘキサ文字列をそれぞれデコードし、生バイト配列（生ソルト: 32 bytes, 生HMAC: 32 bytes, 生暗号文: N bytes）を得る。
 6.  生ソルトと Vault パスワードを用いて `PBKDF2WithHmacSHA256` (10,000回、出力80バイト) を実行する。
-7.  出力80バイトから、AES鍵 (32 bytes)、HMAC鍵 (32 bytes)、IV (16 bytes) を切り出す。
+7.  出力80バイトから、AES鍵 (32 bytes), HMAC鍵 (32 bytes), IV (16 bytes) を切り出す。
 8.  生暗号文に対して HMAC鍵を用いた HMAC-SHA256 署名を計算し、生HMACと一致するかを定数時間比較などで厳格に検証する。不一致なら例外スロー。
 9.  AES鍵とIVを用いて `AES/CTR/NoPadding` で生暗号文を復号し、パディングされたプレーンテキストバイト配列を得る。
 10. PKCS#7 規則に従ってパディング部分を取り除き、UTF-8 文字列としてプレーンテキストを返却する。
 
 ## 3. クラス設計とアーキテクチャ (Architecture and Class Design)
 
-Java エンジン内において、Vault 復号処理は以下のコンポーネントに統合されます。
+Java 実行エンジン内において、Vault 復号処理は以下のコンポーネントによって完全に統合されています。
 
 ### 3.1 復号ユーティリティ (`VaultDecrypter.java`)
-暗号データのパース、PBKDF2 による鍵導出、HMAC 検証、および AES-CTR 復号を担当するコアクラス。
+暗号データのパース、PBKDF2 による鍵導出、HMAC 検証、および AES-CTR 復号を担当するコアクラスです。
 ```java
 public class VaultDecrypter {
     /**
@@ -91,10 +91,10 @@ public class VaultDecrypter {
 ```
 
 ### 3.2 YAML 解析への統合 (`YamlParser` & `VaultConstructor`)
-SnakeYAML の解析フェーズにおいて、`!vault` タグが検出された際に、自動的に `VaultDecryptedValue` などのプレースホルダーオブジェクト、または遅延復号用コンテキストにマッピングします。
+SnakeYAML の解析フェーズにおいて、`!vault` タグが検出された際に、自動的に `VaultDecryptedValue` オブジェクトへマッピングする仕組みが `YamlUtil.java` に実装されています。
 
 - 参照リンク：[YAML解析エンジン](../implementation/YAML-Parser.md)
-- `VaultConstructor` を SnakeYAML のカスタムコンストラクタとして追加し、`!vault` タグの値（ScalarNode）を保持。
+- `VaultConstructor` を SnakeYAML のカスタムコンストラクタとして追加し、`!vault` タグの値（ScalarNode）を保持します。
 
 ### 3.3 変数解決時の動的復号 (`VariableResolver`)
 暗号化された変数は、タスク実行直前の変数解決（Jinja2 テンプレート展開）フェーズで、提供されたパスワードを用いて動的に復号・文字列展開されます。
@@ -105,7 +105,7 @@ SnakeYAML の解析フェーズにおいて、`!vault` タグが検出された�
 ## 4. パスワード管理とコマンドライン仕様 (CLI Specifications)
 
 復号用パスワードは、セキュリティ要件に応じて以下の手段でエンジンに提供可能です。
-`ansible-playbook` 互換の CLI 引数をサポートします。
+`ansible-playbook` 互換の CLI 引数をサポートしています。
 
 - 参照リンク：[CLI仕様](CLI-Specification.md)
 
@@ -120,7 +120,7 @@ SnakeYAML の解析フェーズにおいて、`!vault` タグが検出された�
 
 - 参照リンク：[エラーハンドリング方針](../tech/Error-Handling-Policy.md)
 
-復号処理中にエラーが発生した場合、セキュリティおよび整合性を担保するため、以下の挙動とします。
+復号処理中にエラーが発生した場合、セキュリティおよび整合性を担保するため、以下の挙動となります。
 
 1. **パスワード不一致 / HMAC 検証失敗**:
    - `VaultDecryptionException` (または `RuntimeException`) をスローし、プレイブックの実行を即座に安全に停止（any_errors_fatal 相当）または対象ホストを失敗とします。
