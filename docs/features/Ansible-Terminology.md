@@ -68,5 +68,5 @@ Ansible によって管理されるターゲットマシン（ホスト）です
 - **本プロジェクトでの扱い**: SSH 等で接続可能なリモートホスト、または `local` 接続時の自分自身が対象となります。
 
 ### 4.3 接続プラグイン (Connection Plugins)
-管理ノードから管理対象ノードへの接続手段を提供するプラグインです（例: `ssh`, `local`, `docker`）。
-- **本プロジェクトでの扱い**: `ssh` および `local` 接続を優先的にサポートします。詳細は [接続プラグイン実装](../implementation/Connection-Plugins.md) を参照してください。
+管理ノードから管理対象ノードへの接続手段を提供するプラグインです（例: `ssh`, `local`, `docker`, `winrm`）。
+- **本プロジェクトでの扱い**: `ssh`, `local`, `docker`, および `winrm` 接続を完全にサポートしています。詳細は [接続プラグイン実装](../implementation/Connection-Plugins.md) を参照してください。

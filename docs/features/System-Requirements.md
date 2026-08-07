@@ -15,7 +15,7 @@
 | :--- | :--- | :--- |
 | **Linux** | Ubuntu 22.04 LTS+, RHEL 8/9+ | 第一優先 (Main) |
 | **macOS** | macOS 13 (Ventura) 以上 (x64/ARM) | 準優先 (Secondary) |
-| **Windows** | Windows 10/11 (PowerShell/WSL2) | 検討中 (Experimental) |
+| **Windows** | Windows 10/11 (PowerShell/WinRM) | 対応済 (Supported) |
 
 ## 3. 依存ライブラリ・ツール
 

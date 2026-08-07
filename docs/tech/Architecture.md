@@ -18,7 +18,7 @@
 │   │   │       ├── engine/           # Playbook 実行エンジン (タスク制御)
 │   │   │       ├── inventory/        # インベントリ管理 (静的/動的)
 │   │   │       ├── module/           # モジュール実行ブリッジ (GraalPy経由)
-│   │   │       ├── connection/       # 接続プラグイン (Local, SSH)
+│   │   │       ├── connection/       # 接続プラグイン (Local, SSH, Docker, WinRM)
 │   │   │       └── util/             # OS抽象化レイヤー、共通ユーティリティ
 │   │   └── resources
 │   │       └── META-INF/native-image # GraalVM Native Image 設定
@@ -42,7 +42,7 @@
 ### 2.3 Provider / Plugin 層 (管理ノード / Control Node)
 - **InventoryManager**：ホスト情報およびグループ変数を管理します。
 - **Action Plugin**：管理ノード上で動作し、ファイル転送の準備やテンプレートのレンダリング、必要に応じてターゲットノードへのモジュール実行指示を行います。
-- **Connection Plugin**：ターゲットノードとの通信を担当し、ファイルの転送やリモートコマンド実行を抽象化します。
+- **Connection Plugin**：ターゲットノードとの通信を担当し、ファイルの転送やリモートコマンド実行を抽象化します（Local, SSH, Docker, WinRM をサポート）。
 - **Python Runtime (GraalPy)**：管理ノード側で Action Plugin や local 接続モジュールを実行するためのランタイム環境を提供します。
 
 ### 2.4 ターゲット実行層 (ターゲットノード / Target Node)
