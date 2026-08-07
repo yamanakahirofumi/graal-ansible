@@ -204,4 +204,99 @@ class SerialIntegrationTest {
         assertEquals("handler1", executedTasks.get(5).name());
         assertEquals("host3", executedHosts.get(5).name());
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void testSerialListDetailed() {
+        // Arrange
+        Task task1 = new Task("task 1", "debug", Map.of("msg", "{{ ansible_play_batch }}"));
+        // 5 hosts. serial: [1, 2] -> Batch 1: [host1] (size 1). Batch 2: [host2, host3] (size 2). Batch 3: [host4, host5] (size 2, since 2 is the last element).
+        Play play = new Play("test play", "all", List.of(task1), Map.of(), List.of(), List.of(), List.of(), List.of(), null, null, null, null, null, null, List.of(), null, "linear", List.of(1, 2));
+        VariableManager variableManager = new VariableManager(inventory, Collections.emptyMap());
+        Map<String, List<TaskResult>> results = new HashMap<>();
+
+        when(taskExecutor.execute(any(), any(), any(), any(), anyBoolean(), any(), any(), any(), any(), any(), any()))
+                .thenAnswer(invocation -> {
+                    Play p = invocation.getArgument(0);
+                    Host h = invocation.getArgument(1);
+                    Task t = invocation.getArgument(2);
+                    VariableManager vm = invocation.getArgument(3);
+                    Map<String, Object> vars = vm.getAllVariables(p, h, t, null);
+                    return TaskResult.success(Map.of("msg", vars.get("ansible_play_batch")));
+                });
+
+        // Act
+        tqm.executePlay(play, inventory, variableManager, results, false);
+
+        // Assert
+        // We expect 5 total invocations
+        ArgumentCaptor<Host> hostCaptor = ArgumentCaptor.forClass(Host.class);
+        verify(taskExecutor, times(5)).execute(eq(play), hostCaptor.capture(), eq(task1), any(), anyBoolean(), any(), any(), any(), any(), any(), any());
+
+        List<Host> executedHosts = hostCaptor.getAllValues();
+        assertEquals("host1", executedHosts.get(0).name());
+        assertEquals("host2", executedHosts.get(1).name());
+        assertEquals("host3", executedHosts.get(2).name());
+        assertEquals("host4", executedHosts.get(3).name());
+        assertEquals("host5", executedHosts.get(4).name());
+
+        // Dynamic ansible_play_batch verification
+        List<String> batch1 = new ArrayList<>((List<String>) results.get("host1").get(0).data().get("msg"));
+        List<String> batch2_h2 = new ArrayList<>((List<String>) results.get("host2").get(0).data().get("msg"));
+        List<String> batch2_h3 = new ArrayList<>((List<String>) results.get("host3").get(0).data().get("msg"));
+        List<String> batch3_h4 = new ArrayList<>((List<String>) results.get("host4").get(0).data().get("msg"));
+        List<String> batch3_h5 = new ArrayList<>((List<String>) results.get("host5").get(0).data().get("msg"));
+
+        Collections.sort(batch1);
+        Collections.sort(batch2_h2);
+        Collections.sort(batch2_h3);
+        Collections.sort(batch3_h4);
+        Collections.sort(batch3_h5);
+
+        assertEquals(List.of("host1"), batch1);
+        assertEquals(List.of("host2", "host3"), batch2_h2);
+        assertEquals(List.of("host2", "host3"), batch2_h3);
+        assertEquals(List.of("host4", "host5"), batch3_h4);
+        assertEquals(List.of("host4", "host5"), batch3_h5);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void testSerialListMixedAnsiblePlayBatch() {
+        // Arrange
+        Task task1 = new Task("task 1", "debug", Map.of("msg", "{{ ansible_play_batch }}"));
+        // 5 hosts. serial: [1, "40%"] -> 40% of 5 is 2.
+        // Batch 1: [host1] (size 1).
+        // Batch 2: [host2, host3] (size 2).
+        // Batch 3: [host4, host5] (size 2, since "40%" is the last element, resolved to 2).
+        Play play = new Play("test play", "all", List.of(task1), Map.of(), List.of(), List.of(), List.of(), List.of(), null, null, null, null, null, null, List.of(), null, "linear", List.of(1, "40%"));
+        VariableManager variableManager = new VariableManager(inventory, Collections.emptyMap());
+        Map<String, List<TaskResult>> results = new HashMap<>();
+
+        when(taskExecutor.execute(any(), any(), any(), any(), anyBoolean(), any(), any(), any(), any(), any(), any()))
+                .thenAnswer(invocation -> {
+                    Play p = invocation.getArgument(0);
+                    Host h = invocation.getArgument(1);
+                    Task t = invocation.getArgument(2);
+                    VariableManager vm = invocation.getArgument(3);
+                    Map<String, Object> vars = vm.getAllVariables(p, h, t, null);
+                    return TaskResult.success(Map.of("msg", vars.get("ansible_play_batch")));
+                });
+
+        // Act
+        tqm.executePlay(play, inventory, variableManager, results, false);
+
+        // Assert
+        List<String> batch1 = new ArrayList<>((List<String>) results.get("host1").get(0).data().get("msg"));
+        List<String> batch2 = new ArrayList<>((List<String>) results.get("host2").get(0).data().get("msg"));
+        List<String> batch3 = new ArrayList<>((List<String>) results.get("host4").get(0).data().get("msg"));
+
+        Collections.sort(batch1);
+        Collections.sort(batch2);
+        Collections.sort(batch3);
+
+        assertEquals(List.of("host1"), batch1);
+        assertEquals(List.of("host2", "host3"), batch2);
+        assertEquals(List.of("host4", "host5"), batch3);
+    }
 }

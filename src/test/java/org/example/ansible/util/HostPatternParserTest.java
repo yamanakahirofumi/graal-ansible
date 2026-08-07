@@ -138,4 +138,27 @@ class HostPatternParserTest {
         // Nested bracket structure
         assertEquals(List.of("web[[0:2]]"), HostPatternParser.expandPattern("web[[0:2]]"));
     }
+
+    @Test
+    void testExpandPatternRecursiveThreeLevels() {
+        // 3-level Cartesian product
+        List<String> expected = List.of(
+            "web1-dba-app01", "web1-dba-app02",
+            "web1-dbb-app01", "web1-dbb-app02",
+            "web2-dba-app01", "web2-dba-app02",
+            "web2-dbb-app01", "web2-dbb-app02"
+        );
+        assertEquals(expected, HostPatternParser.expandPattern("web[1:2]-db[a:b]-app[01:02]"));
+    }
+
+    @Test
+    void testExpandPatternEmptyAndComplexUnmatched() {
+        // Empty brackets
+        assertEquals(List.of("web[]"), HostPatternParser.expandPattern("web[]"));
+
+        // Multiple unmatched brackets
+        assertEquals(List.of("web[1:2"), HostPatternParser.expandPattern("web[1:2"));
+        assertEquals(List.of("web]1:2["), HostPatternParser.expandPattern("web]1:2["));
+        assertEquals(List.of("web1-db[a:b", "web2-db[a:b"), HostPatternParser.expandPattern("web[1:2]-db[a:b"));
+    }
 }
