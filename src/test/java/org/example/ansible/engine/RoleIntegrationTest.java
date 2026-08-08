@@ -197,4 +197,74 @@ class RoleIntegrationTest {
 
         taskExecutor.close();
     }
+
+    @Test
+    void testImportRole() throws IOException {
+        // Setup role directory structure
+        Path rolesDir = tempDir.resolve("roles");
+        Path testRoleDir = rolesDir.resolve("imported_role");
+        Files.createDirectories(testRoleDir.resolve("tasks"));
+        Files.createDirectories(testRoleDir.resolve("vars"));
+
+        Files.writeString(testRoleDir.resolve("vars").resolve("main.yml"), "role_var: role_val_imported");
+        Files.writeString(testRoleDir.resolve("tasks").resolve("main.yml"),
+                "- debug: { msg: \"{{ role_var }} and {{ param_var }}\" }");
+
+        Host host = new Host("localhost");
+        Inventory inventory = new Inventory(new Group("all", List.of(host), List.of(), Map.of()));
+
+        // Play that uses import_role
+        Play play = new Play("play with import_role", "all", List.of(
+                new Task("import role", "import_role", Map.of(
+                        "name", "imported_role",
+                        "param_var", "param_val_imported"
+                ))
+        ));
+
+        VariableManager vm = new VariableManager(inventory, Map.of(), tempDir);
+        TaskExecutor taskExecutor = new TaskExecutor();
+        TaskQueueManager tqm = new TaskQueueManager(taskExecutor, (h, vars) -> new org.example.ansible.connection.LocalConnection());
+
+        Map<String, List<TaskResult>> results = new HashMap<>();
+        tqm.executePlay(play, inventory, vm, results, false);
+
+        List<TaskResult> hostResults = results.get("localhost");
+        assertEquals(1, hostResults.size());
+        assertEquals("role_val_imported and param_val_imported", hostResults.get(0).data().get("msg"));
+
+        taskExecutor.close();
+    }
+
+    @Test
+    void testImportRoleTasksFrom() throws IOException {
+        Path rolesDir = tempDir.resolve("roles");
+        Path testRoleDir = rolesDir.resolve("imported_tasks_from_role");
+        Files.createDirectories(testRoleDir.resolve("tasks"));
+
+        Files.writeString(testRoleDir.resolve("tasks").resolve("other.yml"),
+                "- debug: { msg: \"other imported tasks executed\" }");
+
+        Host host = new Host("localhost");
+        Inventory inventory = new Inventory(new Group("all", List.of(host), List.of(), Map.of()));
+
+        Play play = new Play("play with import_role tasks_from", "all", List.of(
+                new Task("import role", "import_role", Map.of(
+                        "name", "imported_tasks_from_role",
+                        "tasks_from", "other"
+                ))
+        ));
+
+        VariableManager vm = new VariableManager(inventory, Map.of(), tempDir);
+        TaskExecutor taskExecutor = new TaskExecutor();
+        TaskQueueManager tqm = new TaskQueueManager(taskExecutor, (h, vars) -> new org.example.ansible.connection.LocalConnection());
+
+        Map<String, List<TaskResult>> results = new HashMap<>();
+        tqm.executePlay(play, inventory, vm, results, false);
+
+        List<TaskResult> hostResults = results.get("localhost");
+        assertEquals(1, hostResults.size());
+        assertEquals("other imported tasks executed", hostResults.get(0).data().get("msg"));
+
+        taskExecutor.close();
+    }
 }
