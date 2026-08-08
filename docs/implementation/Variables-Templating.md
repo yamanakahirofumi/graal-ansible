@@ -94,9 +94,9 @@ Ansible 特有のフィルターは、Javaによる独自実装、または基�
 - `splitext`: パスを名前と拡張子に分割。
 - `ternary`: 条件に応じて値を切り替える。
 - `to_json`: オブジェクトを JSON 文字列に変換。
-- `to_nice_json`: オブジェクトを整形された pretty JSON 文字列に変換。
+- `to_nice_json`: オブジェクトを整形された pretty JSON 文字列に変換（インデント、キーソートのカスタマイズ対応）。詳細および使用例は [### 4.2 to_nice_json / to_nice_yaml の詳細仕様](#42-to_nice_json--to_nice_yaml-の詳細仕様) を参照。
 - `to_yaml`: オブジェクトを YAML 文字列に変換。
-- `to_nice_yaml`: オブジェクトを整形された pretty YAML 文字列に変換。
+- `to_nice_yaml`: オブジェクトを整形された pretty YAML 文字列に変換（インデント、最大幅のカスタマイズ対応）。詳細および使用例は [### 4.2 to_nice_json / to_nice_yaml の詳細仕様](#42-to_nice_json--to_nice_yaml-の詳細仕様) を参照。
 - `unique`: リストから重複する要素を排除。
 - `urlencode`: URLエンコード処理。
 
@@ -107,7 +107,63 @@ Ansible 特有のフィルターは、Javaによる独自実装、または基�
 - `union`: 2つのリスト間の和集合を返します。
 - `symmetric_difference`: 2つのリスト間の対称差（排他的な要素）を返します。
 
-### 4.2 独自フィルターの追加手順
+### 4.2 to_nice_json / to_nice_yaml の詳細仕様
+
+`to_nice_json` および `to_nice_yaml` フィルターは、Jinja2 テンプレート内でオブジェクトを人間が読みやすい形式に整形・出力するためのフィルターです。位置引数（Positional Arguments）と名前付き/キーワード引数（Keyword Arguments）の両方をサポートしています。
+
+#### 1. to_nice_json
+オブジェクト（Map、List等）を整形された pretty JSON 文字列に変換します。
+
+- **パラメータ**:
+  - `indent` (`Integer`, デフォルト: `4`): インデントのスペース数。
+  - `sort_keys` (`Boolean`, デフォルト: `true`): オブジェクトのキーをアルファベット順にソートするかどうか。
+- **使用例**:
+  - **デフォルト（インデント4、キーソートあり）**:
+    ```jinja2
+    {{ data | to_nice_json }}
+    ```
+  - **位置引数によるインデント指定（インデント2、キーソートあり）**:
+    ```jinja2
+    {{ data | to_nice_json(2) }}
+    ```
+  - **位置引数によるインデント・キーソート指定（インデント4、キーソートなし）**:
+    ```jinja2
+    {{ data | to_nice_json(4, false) }}
+    ```
+  - **キーワード引数による指定（インデント3、キーソートなし）**:
+    ```jinja2
+    {{ data | to_nice_json(indent=3, sort_keys=false) }}
+    ```
+  - **キーワード引数（一部のみ指定）**:
+    ```jinja2
+    {{ data | to_nice_json(sort_keys=false) }}
+    ```
+
+#### 2. to_nice_yaml
+オブジェクト（Map、List等）を整形された pretty YAML 文字列に変換します。
+
+- **パラメータ**:
+  - `indent` (`Integer`, デフォルト: `4`): インデントのスペース数。
+  - `width` (`Integer`, デフォルト: `80`): 各行の最大文字幅（折り返し幅）。
+- **使用例**:
+  - **デフォルト（インデント4、最大幅80）**:
+    ```jinja2
+    {{ data | to_nice_yaml }}
+    ```
+  - **位置引数によるインデント指定（インデント2、最大幅80）**:
+    ```jinja2
+    {{ data | to_nice_yaml(2) }}
+    ```
+  - **位置引数によるインデント・最大幅指定（インデント4、最大幅120）**:
+    ```jinja2
+    {{ data | to_nice_yaml(4, 120) }}
+    ```
+  - **キーワード引数による指定（インデント2、最大幅100）**:
+    ```jinja2
+    {{ data | to_nice_yaml(indent=2, width=100) }}
+    ```
+
+### 4.3 独自フィルターの追加手順
 
 新しい Jinja2 フィルターを Java で実装してエンジンに追加する手順は以下の通りです。
 
