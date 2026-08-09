@@ -403,12 +403,20 @@ public class TaskQueueManager {
         if (blockFailed) {
             for (Task task : blockTask.rescue()) {
                 if (this.playFatalError) break;
+                if (!isTaskToBeExecuted(task, runTags, skipTags)) {
+                    results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(TaskResult.skipped("Skipped due to tags"));
+                    continue;
+                }
                 executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications, blockCheckMode, effectiveBlockEnvs, combinedBlockVars, activeRoles, includeParams, connection, runTags, skipTags);
             }
         }
 
         for (Task task : blockTask.always()) {
             if (this.playFatalError) break;
+            if (!isTaskToBeExecuted(task, runTags, skipTags)) {
+                results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(TaskResult.skipped("Skipped due to tags"));
+                continue;
+            }
             executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications, blockCheckMode, effectiveBlockEnvs, combinedBlockVars, activeRoles, includeParams, connection, runTags, skipTags);
         }
 
@@ -529,7 +537,29 @@ public class TaskQueueManager {
             return true;
         }
 
-        return taskTags.stream().anyMatch(runTags::contains);
+        if (taskTags.stream().anyMatch(runTags::contains)) {
+            return true;
+        }
+
+        if (!task.block().isEmpty()) {
+            for (Task t : task.block()) {
+                if (isTaskToBeExecuted(t, runTags, skipTags)) {
+                    return true;
+                }
+            }
+            for (Task t : task.rescue()) {
+                if (isTaskToBeExecuted(t, runTags, skipTags)) {
+                    return true;
+                }
+            }
+            for (Task t : task.always()) {
+                if (isTaskToBeExecuted(t, runTags, skipTags)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private List<Host> getAllHosts(Group group) {
