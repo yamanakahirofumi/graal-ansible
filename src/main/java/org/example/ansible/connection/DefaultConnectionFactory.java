@@ -37,8 +37,11 @@ public class DefaultConnectionFactory implements ConnectionFactory {
 
             String user = (String) variables.get("ansible_user");
             String password = (String) variables.get("ansible_password");
+            String privateKeyFile = (String) variables.get("ansible_ssh_private_key_file");
 
-            return new SshConnection(ansibleHost, port, user, password);
+            java.util.List<BastionConfig> bastionConfigs = SshJumpHostParser.getBastionConfigs(variables);
+
+            return new SshConnection(ansibleHost, port, user, password, privateKeyFile, bastionConfigs);
         } else if ("winrm".equals(connectionType)) {
             String ansibleHost = (String) variables.getOrDefault("ansible_host", host.name());
             String scheme = (String) variables.getOrDefault("ansible_winrm_scheme", "http");
