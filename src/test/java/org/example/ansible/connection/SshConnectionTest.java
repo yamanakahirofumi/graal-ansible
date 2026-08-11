@@ -21,6 +21,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -231,6 +232,185 @@ class SshConnectionTest {
 
         verify(mockSession).close();
         verify(mockClient).stop();
+    }
+
+    // --- SSH Jump Host / Bastion Tests ---
+
+    @Test
+    void testConnectWithBastionSuccess() throws IOException {
+        BastionConfig bastion = new BastionConfig("bastion.host", 22, "bastionuser", "bastionpass", null);
+        List<BastionConfig> bastions = List.of(bastion);
+
+        // Connection with 1 bastion
+        connection = new SshConnection("target.host", 22, "targetuser", "targetpass", null, bastions);
+
+        // Mock connect for bastion
+        ClientSession mockBastionSession = mock(ClientSession.class);
+        ConnectFuture mockBastionConnectFuture = mock(ConnectFuture.class);
+        when(mockClient.connect("bastionuser", "bastion.host", 22)).thenReturn(mockBastionConnectFuture);
+        when(mockBastionConnectFuture.verify(any(Duration.class))).thenReturn(mockBastionConnectFuture);
+        when(mockBastionConnectFuture.getSession()).thenReturn(mockBastionSession);
+
+        AuthFuture mockBastionAuthFuture = mock(AuthFuture.class);
+        when(mockBastionSession.auth()).thenReturn(mockBastionAuthFuture);
+        when(mockBastionAuthFuture.verify(any(Duration.class))).thenReturn(mockBastionAuthFuture);
+
+        // Mock port forward
+        org.apache.sshd.common.util.net.SshdSocketAddress mockLocalAddr = new org.apache.sshd.common.util.net.SshdSocketAddress("localhost", 12345);
+        when(mockBastionSession.startLocalPortForwarding(any(), any())).thenReturn(mockLocalAddr);
+
+        // Mock connect for target through localhost:12345
+        ConnectFuture mockTargetConnectFuture = mock(ConnectFuture.class);
+        when(mockClient.connect("targetuser", "localhost", 12345)).thenReturn(mockTargetConnectFuture);
+        when(mockTargetConnectFuture.verify(any(Duration.class))).thenReturn(mockTargetConnectFuture);
+        when(mockTargetConnectFuture.getSession()).thenReturn(mockSession);
+
+        assertDoesNotThrow(() -> connection.connect());
+
+        verify(mockClient).connect("bastionuser", "bastion.host", 22);
+        verify(mockClient).connect("targetuser", "localhost", 12345);
+        verify(mockBastionSession).startLocalPortForwarding(any(), any());
+
+        // Verify cascading cleanup in REVERSE order
+        connection.close();
+        verify(mockSession).close();
+        verify(mockBastionSession).stopLocalPortForwarding(eq(mockLocalAddr));
+        verify(mockBastionSession).close();
+    }
+
+    @Test
+    void testConnectBastionUnreachable() throws IOException {
+        BastionConfig bastion = new BastionConfig("bastion.host", 22, "bastionuser", "bastionpass", null);
+        connection = new SshConnection("target.host", 22, "targetuser", "targetpass", null, List.of(bastion));
+
+        when(mockClient.connect("bastionuser", "bastion.host", 22)).thenThrow(new IOException("Host unreachable"));
+
+        UnreachableException ex = assertThrows(UnreachableException.class, () -> connection.connect());
+        assertTrue(ex.getMessage().contains("[Bastion]"));
+    }
+
+    @Test
+    void testConnectBastionAuthFailed() throws IOException {
+        BastionConfig bastion = new BastionConfig("bastion.host", 22, "bastionuser", "bastionpass", null);
+        connection = new SshConnection("target.host", 22, "targetuser", "targetpass", null, List.of(bastion));
+
+        ClientSession mockBastionSession = mock(ClientSession.class);
+        ConnectFuture mockBastionConnectFuture = mock(ConnectFuture.class);
+        when(mockClient.connect("bastionuser", "bastion.host", 22)).thenReturn(mockBastionConnectFuture);
+        when(mockBastionConnectFuture.verify(any(Duration.class))).thenReturn(mockBastionConnectFuture);
+        when(mockBastionConnectFuture.getSession()).thenReturn(mockBastionSession);
+
+        AuthFuture mockBastionAuthFuture = mock(AuthFuture.class);
+        when(mockBastionSession.auth()).thenReturn(mockBastionAuthFuture);
+        when(mockBastionAuthFuture.verify(any(Duration.class))).thenThrow(new IOException("Bad credentials"));
+
+        UnreachableException ex = assertThrows(UnreachableException.class, () -> connection.connect());
+        assertTrue(ex.getMessage().contains("[Bastion Auth Failed]"));
+        verify(mockBastionSession).close();
+    }
+
+    @Test
+    void testConnectBastionPortForwardDenied() throws IOException {
+        BastionConfig bastion = new BastionConfig("bastion.host", 22, "bastionuser", "bastionpass", null);
+        connection = new SshConnection("target.host", 22, "targetuser", "targetpass", null, List.of(bastion));
+
+        ClientSession mockBastionSession = mock(ClientSession.class);
+        ConnectFuture mockBastionConnectFuture = mock(ConnectFuture.class);
+        when(mockClient.connect("bastionuser", "bastion.host", 22)).thenReturn(mockBastionConnectFuture);
+        when(mockBastionConnectFuture.verify(any(Duration.class))).thenReturn(mockBastionConnectFuture);
+        when(mockBastionConnectFuture.getSession()).thenReturn(mockBastionSession);
+
+        AuthFuture mockBastionAuthFuture = mock(AuthFuture.class);
+        when(mockBastionSession.auth()).thenReturn(mockBastionAuthFuture);
+        when(mockBastionAuthFuture.verify(any(Duration.class))).thenReturn(mockBastionAuthFuture);
+
+        when(mockBastionSession.startLocalPortForwarding(any(), any())).thenThrow(new IOException("Port forwarding disabled"));
+
+        UnreachableException ex = assertThrows(UnreachableException.class, () -> connection.connect());
+        assertTrue(ex.getMessage().contains("[Bastion Port Forward Denied]"));
+        verify(mockBastionSession).close();
+    }
+
+    // --- Parser Tests ---
+
+    @Test
+    void testSshJumpHostParserDirectVariables() {
+        Map<String, Object> variables = Map.of(
+            "ansible_bastion_host", "bastion.direct",
+            "ansible_bastion_port", 2222,
+            "ansible_bastion_user", "directuser",
+            "ansible_bastion_password", "directpass",
+            "ansible_bastion_private_key_file", "/path/to/directkey",
+            "ansible_user", "targetuser",
+            "ansible_password", "targetpass"
+        );
+
+        List<BastionConfig> configs = SshJumpHostParser.getBastionConfigs(variables);
+        assertEquals(1, configs.size());
+        BastionConfig cfg = configs.get(0);
+        assertEquals("bastion.direct", cfg.host());
+        assertEquals(2222, cfg.port());
+        assertEquals("directuser", cfg.user());
+        assertEquals("directpass", cfg.password());
+        assertEquals("/path/to/directkey", cfg.privateKeyFile());
+    }
+
+    @Test
+    void testSshJumpHostParserProxyJump() {
+        Map<String, Object> variables = Map.of(
+            "ansible_ssh_common_args", "-o ProxyJump=jumpuser@jumphost:3333",
+            "ansible_user", "targetuser",
+            "ansible_password", "targetpass",
+            "ansible_ssh_private_key_file", "/path/to/targetkey"
+        );
+
+        List<BastionConfig> configs = SshJumpHostParser.getBastionConfigs(variables);
+        assertEquals(1, configs.size());
+        BastionConfig cfg = configs.get(0);
+        assertEquals("jumphost", cfg.host());
+        assertEquals(3333, cfg.port());
+        assertEquals("jumpuser", cfg.user());
+        assertEquals("targetpass", cfg.password());
+        assertEquals("/path/to/targetkey", cfg.privateKeyFile());
+    }
+
+    @Test
+    void testSshJumpHostParserProxyJumpMultiHop() {
+        Map<String, Object> variables = Map.of(
+            "ansible_ssh_extra_args", "-o ProxyJump=\"user1@hop1:1001,user2@hop2:1002\"",
+            "ansible_user", "targetuser",
+            "ansible_password", "targetpass",
+            "ansible_ssh_private_key_file", "/path/to/targetkey"
+        );
+
+        List<BastionConfig> configs = SshJumpHostParser.getBastionConfigs(variables);
+        assertEquals(2, configs.size());
+
+        BastionConfig cfg1 = configs.get(0);
+        assertEquals("hop1", cfg1.host());
+        assertEquals(1001, cfg1.port());
+        assertEquals("user1", cfg1.user());
+
+        BastionConfig cfg2 = configs.get(1);
+        assertEquals("hop2", cfg2.host());
+        assertEquals(1002, cfg2.port());
+        assertEquals("user2", cfg2.user());
+    }
+
+    @Test
+    void testSshJumpHostParserProxyCommand() {
+        Map<String, Object> variables = Map.of(
+            "ansible_ssh_common_args", "ProxyCommand ssh -q -W %h:%p proxyuser@proxyhost -p 4444",
+            "ansible_user", "targetuser",
+            "ansible_password", "targetpass"
+        );
+
+        List<BastionConfig> configs = SshJumpHostParser.getBastionConfigs(variables);
+        assertEquals(1, configs.size());
+        BastionConfig cfg = configs.get(0);
+        assertEquals("proxyhost", cfg.host());
+        assertEquals(4444, cfg.port());
+        assertEquals("proxyuser", cfg.user());
     }
 
     // A helper interface/class wrapper to assist in matching creator creation safely.
