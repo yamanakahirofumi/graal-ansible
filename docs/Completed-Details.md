@@ -258,6 +258,15 @@
     - `VariableResolver` にて `VaultDecryptedValue` の変数解決時にパスワードを用いて動的復号するロジックを統合。パスワード未指定時の適切なエラーハンドリングをサポート。
     - `--vault-password-file` および `--vault-id` CLI引数のパースを `PlaybookCli` に追加し、パスワード解決およびエンジンへの伝播を実現。
 
+### 1.38 [✓] SSH 踏み台サーバー (Bastion / Jump Host) 経由接続のサポート
+- **完了日**: 2026-10-24
+- **概要**: ターゲットホストがプライベートネットワークにあり、踏み台サーバー（Bastion）経由でしか接続できない環境において、Apache MINA SSHD を用いた Java ネイティブな多段 SSH トンネリング（ローカルポートフォワード等）による接続サポートを実装。
+- **解決策**:
+    - `SshJumpHostParser` クラスを実装し、`ansible_ssh_common_args`、`ansible_ssh_extra_args` 内の `ProxyJump` (-J) や `ProxyCommand` 形式の記述のパース、および `graal-ansible` 独自の踏み台サーバー専用変数（`ansible_bastion_host` 等）の解決ロジックをサポート。
+    - `SshConnection` クラスにおいて、Apache MINA SSHD のセッションから `startLocalPortForwarding` を使用し、ローカルの動的ポートからターゲットホストへのポートフォワーディングを確立して接続する仕組みを実装。
+    - クローズ処理（`close()`）の呼び出し時に、ターゲットセッション、ポートフォワード停止、踏み台セッションを逆順で安全に終了するカスケードクローズ（リソースリーク防止）を実装。
+    - `SshConnectionTest.java` において、Mockito による `SshClient` や `ClientSession` の詳細なモック化を含む単体テストスイートを構築・検証。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築
