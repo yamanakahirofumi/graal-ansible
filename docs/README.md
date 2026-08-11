@@ -70,6 +70,7 @@
 - [コールバックプラグインの設計仕様](implementation/Callback-Plugins.md)：実行イベントの通知と出力形式の制御
 - [Ansible モジュールの初期化と設定](implementation/Ansible-Module-Initialization.md)：AnsibleModule のインスタンス構成、引数の受け渡し、モンキーパッチの詳細
 - [接続プラグイン実装](implementation/Connection-Plugins.md)：Local, SSH(JSch/Apache MINA SSHD)の実装
+- [SSH 踏み台サーバー経由接続の実装詳細](implementation/Ssh-Jump-Host-Support.md)：Apache MINA SSHD による踏み台経由 SSH 接続（多段トンネル）の実装詳細
 - [リモートノードでのモジュール実行仕様](implementation/Remote-Module-Execution.md)：ターゲットノードへモジュールを転送して実行する仕組み（モジュール転送型）
 - [権限昇格 (become)](implementation/Privilege-Escalation.md)：sudo, su等による実行ユーザーの切り替え
 - [変数とテンプレート](implementation/Variables-Templating.md)：Jinja2互換エンジンの統合
