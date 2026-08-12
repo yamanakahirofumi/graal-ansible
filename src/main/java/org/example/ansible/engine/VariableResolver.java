@@ -32,6 +32,7 @@ import org.example.ansible.engine.filter.UrlencodeFilter;
 import org.example.ansible.engine.lookup.DictLookup;
 import org.example.ansible.engine.lookup.EnvLookup;
 import org.example.ansible.engine.lookup.FileLookup;
+import org.example.ansible.engine.lookup.FirstFoundLookup;
 import org.example.ansible.engine.lookup.Lookup;
 import org.example.ansible.engine.lookup.PipeLookup;
 import org.example.ansible.engine.lookup.TemplateLookup;
@@ -80,6 +81,7 @@ public class VariableResolver {
         registerLookup(new PipeLookup());
         registerLookup(new TemplateLookup());
         registerLookup(new VarsLookup());
+        registerLookup(new FirstFoundLookup());
     }
 
     private void registerLookup(Lookup lookup) {

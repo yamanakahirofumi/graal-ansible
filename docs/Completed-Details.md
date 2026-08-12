@@ -267,6 +267,14 @@
     - クローズ処理（`close()`）の呼び出し時に、ターゲットセッション、ポートフォワード停止、踏み台セッションを逆順で安全に終了するカスケードクローズ（リソースリーク防止）を実装。
     - `SshConnectionTest.java` において、Mockito による `SshClient` や `ClientSession` の詳細なモック化を含む単体テストスイートを構築・検証。
 
+### 1.39 [✓] first_found ルックアッププラグインの実装とテスト
+- **完了日**: 2026-10-24
+- **概要**: 候補ファイルリストの中から、最初に実在するファイルの絶対パスを解決する `first_found` ルックアッププラグインを Java でネイティブに実装。
+- **解決策**:
+    - `FirstFoundLookup.java` を追加し、`terms` や `kwargs` 内の `files`, `paths`, `skip` 引数をパースして適切にファイル存在チェックを行うロジックを実装。
+    - `VariableResolver.java` において `first_found` ルックアッププラグインの登録を行い、Jinja2 テンプレート解決フェーズで呼び出せるよう統合。
+    - `FirstFoundLookupTest.java` にて、ファイルのリスト指定、絶対・相対パス、comma区切りの解釈、inline map（Jinja2辞書）引数、`skip` パラメータ、および例外発生の境界テストなどを網羅。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築
