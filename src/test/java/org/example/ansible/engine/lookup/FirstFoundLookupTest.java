@@ -77,7 +77,9 @@ class FirstFoundLookupTest {
         final VariableResolver resolver = new VariableResolver();
         final Map<String, Object> variables = new HashMap<>();
 
-        final String template = "{{ lookup('first_found', '" + file1.toAbsolutePath().toString() + "') }}";
+        // Normalize path to use forward slashes for Jinja2 template to avoid backslash escaping issues on Windows
+        final String normalizedPath = file1.toAbsolutePath().toString().replace('\\', '/');
+        final String template = "{{ lookup('first_found', '" + normalizedPath + "') }}";
         final Object result = resolver.resolveValue(template, variables);
 
         assertEquals(file1.toAbsolutePath().toString(), result);
