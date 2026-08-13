@@ -135,4 +135,190 @@ public class TagLimitIntegrationTest {
         assertTrue(results.containsKey("host2"));
         assertFalse(results.containsKey("host3"));
     }
+
+    @Test
+    void testBlockLevelTagInheritance() {
+        // block_tag is inherited by task inside block
+        String yaml = """
+                - name: Play
+                  hosts: all
+                  tasks:
+                    - name: Outer task
+                      debug: msg="outer"
+                    - block:
+                        - name: Inner task
+                          debug: msg="inner"
+                      tags: [block_tag]
+                """;
+
+        YamlParser parser = new YamlParser();
+        Playbook playbook = parser.parse(new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8)));
+
+        Inventory inventory = new Inventory(new Group("all", List.of(new Host("localhost")), List.of(), Map.of()));
+        ITaskExecutor executor = mock(ITaskExecutor.class);
+        when(executor.execute(any(), any(), any(), any(), anyBoolean(), any(), any(), any(), any(), any(), any())).thenReturn(TaskResult.success(false, Map.of()));
+
+        TaskQueueManager tqm = new TaskQueueManager(executor, (h, v) -> mock(Connection.class));
+        VariableManager vm = new VariableManager(inventory, Map.of());
+        Map<String, List<TaskResult>> results = new HashMap<>();
+
+        // Run with block_tag only
+        tqm.executePlay(playbook.plays().get(0), inventory, vm, results, false, List.of("block_tag"), List.of(), null);
+
+        List<TaskResult> hostResults = results.get("localhost");
+        assertNotNull(hostResults);
+        assertEquals(2, hostResults.size());
+        assertTrue(hostResults.get(0).isSkipped(), "outer task should be skipped");
+        assertFalse(hostResults.get(1).isSkipped(), "inner task should be executed");
+    }
+
+    @Test
+    void testSpecialTagPriorities() {
+        String yaml = """
+                - name: Play
+                  hosts: all
+                  tasks:
+                    - name: task always
+                      debug: msg="always"
+                      tags: [always]
+                    - name: task never
+                      debug: msg="never"
+                      tags: [never]
+                    - name: task normal
+                      debug: msg="normal"
+                      tags: [normal]
+                """;
+
+        YamlParser parser = new YamlParser();
+        Playbook playbook = parser.parse(new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8)));
+
+        Inventory inventory = new Inventory(new Group("all", List.of(new Host("localhost")), List.of(), Map.of()));
+        ITaskExecutor executor = mock(ITaskExecutor.class);
+        when(executor.execute(any(), any(), any(), any(), anyBoolean(), any(), any(), any(), any(), any(), any())).thenReturn(TaskResult.success(false, Map.of()));
+
+        TaskQueueManager tqm = new TaskQueueManager(executor, (h, v) -> mock(Connection.class));
+        VariableManager vm = new VariableManager(inventory, Map.of());
+        Map<String, List<TaskResult>> results = new HashMap<>();
+
+        // Case 1: run with --tags "normal" and --skip-tags "always"
+        tqm.executePlay(playbook.plays().get(0), inventory, vm, results, false, List.of("normal"), List.of("always"), null);
+        List<TaskResult> hostResults = results.get("localhost");
+        assertTrue(hostResults.get(0).isSkipped(), "always task should be skipped because 'always' is in skipTags");
+        assertTrue(hostResults.get(1).isSkipped(), "never task should be skipped");
+        assertFalse(hostResults.get(2).isSkipped(), "normal task should be executed");
+
+        // Case 2: run with --tags "never"
+        results.clear();
+        tqm.executePlay(playbook.plays().get(0), inventory, vm, results, false, List.of("never"), List.of(), null);
+        hostResults = results.get("localhost");
+        assertFalse(hostResults.get(0).isSkipped(), "always task should run");
+        assertFalse(hostResults.get(1).isSkipped(), "never task should run when explicitly run");
+        assertTrue(hostResults.get(2).isSkipped(), "normal task should be skipped");
+    }
+
+    @Test
+    void testNestedStructuresAndTagMatching() {
+        String yaml = """
+                - name: Play
+                  hosts: all
+                  tasks:
+                    - block:
+                        - name: inside block tagged
+                          debug: msg="match"
+                          tags: [target]
+                        - name: inside block untagged
+                          debug: msg="nomatch"
+                      rescue:
+                        - name: inside rescue tagged
+                          debug: msg="match rescue"
+                          tags: [target]
+                      always:
+                        - name: inside always tagged
+                          debug: msg="match always"
+                          tags: [target]
+                        - name: inside always untagged
+                          debug: msg="nomatch always"
+                """;
+
+        YamlParser parser = new YamlParser();
+        Playbook playbook = parser.parse(new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8)));
+
+        Inventory inventory = new Inventory(new Group("all", List.of(new Host("localhost")), List.of(), Map.of()));
+        ITaskExecutor executor = mock(ITaskExecutor.class);
+        when(executor.execute(any(), any(), argThat(t -> t != null && "inside block tagged".equals(t.name())), any(), anyBoolean(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(TaskResult.failure("block task failed"));
+        when(executor.execute(any(), any(), argThat(t -> t != null && !"inside block tagged".equals(t.name())), any(), anyBoolean(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(TaskResult.success(false, Map.of()));
+
+        TaskQueueManager tqm = new TaskQueueManager(executor, (h, v) -> mock(Connection.class));
+        VariableManager vm = new VariableManager(inventory, Map.of());
+        Map<String, List<TaskResult>> results = new HashMap<>();
+
+        // Run with tags 'target'
+        tqm.executePlay(playbook.plays().get(0), inventory, vm, results, false, List.of("target"), List.of(), null);
+
+        List<TaskResult> hostResults = results.get("localhost");
+        assertNotNull(hostResults);
+
+        System.out.println("TEST_RESULTS: " + hostResults);
+
+        assertEquals(4, hostResults.size());
+        assertFalse(hostResults.get(0).success()); // failed
+        assertFalse(hostResults.get(0).isSkipped());
+
+        assertTrue(hostResults.get(1).success()); // rescue tagged executed
+        assertFalse(hostResults.get(1).isSkipped());
+
+        assertTrue(hostResults.get(2).success()); // always tagged executed
+        assertFalse(hostResults.get(2).isSkipped());
+
+        assertTrue(hostResults.get(3).isSkipped()); // untagged always skipped
+    }
+
+    @Test
+    void testSpacingAndNonexistentHostLimit() {
+        String yaml = """
+                - name: Play
+                  hosts: all
+                  tasks:
+                    - name: task1
+                      debug: msg="task1"
+                      tags: [tag1]
+                    - name: task2
+                      debug: msg="task2"
+                      tags: [tag2]
+                """;
+
+        YamlParser parser = new YamlParser();
+        Playbook playbook = parser.parse(new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8)));
+
+        Host host1 = new Host("host1");
+        Host host2 = new Host("host2");
+        Inventory inventory = new Inventory(new Group("all", List.of(host1, host2), List.of(), Map.of()));
+        ITaskExecutor executor = mock(ITaskExecutor.class);
+        when(executor.execute(any(), any(), any(), any(), anyBoolean(), any(), any(), any(), any(), any(), any())).thenReturn(TaskResult.success(false, Map.of()));
+
+        TaskQueueManager tqm = new TaskQueueManager(executor, (h, v) -> mock(Connection.class));
+        VariableManager vm = new VariableManager(inventory, Map.of());
+        Map<String, List<TaskResult>> results = new HashMap<>();
+
+        // Test spacing trimming in tags: " tag1 , tag2 "
+        tqm.executePlay(playbook.plays().get(0), inventory, vm, results, false, List.of(" tag1 , tag2 "), List.of(), null);
+        assertNotNull(results.get("host1"));
+        assertFalse(results.get("host1").get(0).isSkipped(), "task1 should run");
+        assertFalse(results.get("host1").get(1).isSkipped(), "task2 should run");
+
+        // Test nonexistent limit and spacing limit: " host1 , nonexistent "
+        results.clear();
+        tqm.executePlay(playbook.plays().get(0), inventory, vm, results, false, List.of(), List.of(), " host1 , nonexistent ");
+        assertTrue(results.containsKey("host1"), "host1 should be executed");
+        assertFalse(results.containsKey("host2"), "host2 should be limited out");
+
+        // Test totally nonexistent host limit: "nonexistent"
+        results.clear();
+        assertDoesNotThrow(() -> {
+            tqm.executePlay(playbook.plays().get(0), inventory, vm, results, false, List.of(), List.of(), "nonexistent");
+        }, "Should safely skip play and not throw exception on nonexistent limit");
+        assertTrue(results.isEmpty(), "No results should be recorded as play is skipped safely");
+    }
 }
