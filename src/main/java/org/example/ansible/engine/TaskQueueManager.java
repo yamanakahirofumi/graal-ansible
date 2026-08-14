@@ -232,6 +232,7 @@ public class TaskQueueManager {
             } else {
                 failedHosts.add(host.name());
                 TaskResult unreachableResult = TaskResult.unreachable(e.getMessage());
+                results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(unreachableResult);
                 callbacks.forEach(c -> c.v2_runner_on_unreachable(task, host.name(), unreachableResult));
                 checkAnyErrorsFatal(play, host, task, blockVars, activeRoles, includeParams, variableManager);
                 return;
@@ -308,8 +309,10 @@ public class TaskQueueManager {
 
             if (!result.success()) {
                 if (result.isUnreachable()) {
-                    failedHosts.add(host.name());
-                    checkAnyErrorsFatal(play, host, task, blockVars, activeRoles, includeParams, variableManager);
+                    if (!task.ignoreUnreachable()) {
+                        failedHosts.add(host.name());
+                        checkAnyErrorsFatal(play, host, task, blockVars, activeRoles, includeParams, variableManager);
+                    }
                 } else if (!result.isSkipped() && !task.ignoreErrors()) {
                     failedHosts.add(host.name());
                     checkAnyErrorsFatal(play, host, task, blockVars, activeRoles, includeParams, variableManager);
