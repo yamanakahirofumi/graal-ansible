@@ -206,6 +206,61 @@ class FileModulesIntegrationTest {
     }
 
     @Test
+    void testLineInFileCheckMode() throws IOException {
+        Path targetFile = tempDir.resolve("line-check-test.txt");
+        Files.writeString(targetFile, "line 1\nline 3\n");
+
+        Task taskCheck = new Task("Add line check mode", "lineinfile", Map.of(
+                "path", targetFile.toString(),
+                "line", "line 2",
+                "insertafter", "line 1"
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult resultCheck = taskExecutor.execute(play, host, taskCheck, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertTrue(resultCheck.success(), resultCheck.message());
+        assertTrue(resultCheck.changed(), "Check mode should report changed = true");
+
+        String contentCheck = Files.readString(targetFile);
+        assertFalse(contentCheck.contains("line 2"), "Target file should not be modified in check mode");
+
+        Task taskRun = new Task("Add line run mode", "lineinfile", Map.of(
+                "path", targetFile.toString(),
+                "line", "line 2",
+                "insertafter", "line 1"
+        ));
+        TaskResult resultRun = taskExecutor.execute(play, host, taskRun, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertTrue(resultRun.success(), resultRun.message());
+        assertTrue(resultRun.changed());
+        String contentRun = Files.readString(targetFile);
+        assertTrue(contentRun.contains("line 2"), "Target file should be modified when check mode is false");
+    }
+
+    @Test
+    void testLineInFileStateAbsent() throws IOException {
+        Path targetFile = tempDir.resolve("line-absent-test.txt");
+        Files.writeString(targetFile, "alpha\nbeta\ngamma\n");
+
+        Task task = new Task("Remove line", "lineinfile", Map.of(
+                "path", targetFile.toString(),
+                "regexp", "beta",
+                "state", "absent"
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertTrue(result.success(), result.message());
+        assertTrue(result.changed());
+
+        String content = Files.readString(targetFile);
+        assertFalse(content.contains("beta"));
+        assertTrue(content.contains("alpha"));
+        assertTrue(content.contains("gamma"));
+    }
+
+    @Test
     void testReplaceModule() throws IOException {
         Path targetFile = tempDir.resolve("replace-test.txt");
         Files.writeString(targetFile, "hello world");
@@ -222,6 +277,28 @@ class FileModulesIntegrationTest {
 
         String content = Files.readString(targetFile);
         assertEquals("hello ansible", content.trim());
+    }
+
+    @Test
+    void testReplaceCheckMode() throws IOException {
+        Path targetFile = tempDir.resolve("replace-check-test.txt");
+        Files.writeString(targetFile, "foo bar baz");
+
+        Task taskCheck = new Task("Replace text in check mode", "replace", Map.of(
+                "path", targetFile.toString(),
+                "regexp", "bar",
+                "replace", "qux"
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult resultCheck = taskExecutor.execute(play, host, taskCheck, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertTrue(resultCheck.success(), resultCheck.message());
+        assertTrue(resultCheck.changed(), "Check mode should report changed = true");
+
+        String contentCheck = Files.readString(targetFile);
+        assertEquals("foo bar baz", contentCheck.trim(), "Target file should not be modified in check mode");
     }
 
     @Test
