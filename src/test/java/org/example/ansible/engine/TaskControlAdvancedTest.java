@@ -1,6 +1,7 @@
 package org.example.ansible.engine;
 
 import org.example.ansible.connection.LocalConnection;
+import org.example.ansible.connection.UnreachableException;
 import org.example.ansible.inventory.Group;
 import org.example.ansible.inventory.Host;
 import org.example.ansible.inventory.Inventory;
@@ -44,6 +45,19 @@ class TaskControlAdvancedTest {
         // Register a module that can fail
         taskExecutor.registerModule("fail_module", (args, become, context) ->
             TaskResult.failure("Intentional failure"));
+
+        // Register an unreachable module
+        taskExecutor.registerModule("unreachable_module", (args, become, context) -> {
+            throw new UnreachableException("Connection refused");
+        });
+
+        // Register a module checking privilege escalation (become)
+        taskExecutor.registerModule("become_check_module", (args, become, context) -> {
+            if (become != null && become.become()) {
+                return TaskResult.failure("Privilege escalation failed");
+            }
+            return TaskResult.success(Map.of("msg", "no become"));
+        });
 
         tqm = new TaskQueueManager(taskExecutor, (host, vars) -> new LocalConnection());
         Host host = new Host("localhost");
@@ -216,5 +230,124 @@ class TaskControlAdvancedTest {
         List<TaskResult> hostResults = results.get("localhost");
         assertEquals(2, hostResults.size());
         assertEquals("first was one", hostResults.get(1).data().get("msg"));
+    }
+
+    @Test
+    void testBlockExecutionOnUnreachableWithRescueAndAlways() {
+        Task unreachableTask = new Task("unreachable in block", "unreachable_module", Map.of());
+        Task rescueTask = new Task("rescue task", "debug", Map.of("msg", "rescued unreachable"));
+        Task alwaysTask = new Task("always task", "debug", Map.of("msg", "always executed"));
+
+        Task block = new Task("block with unreachable", null, Map.of(), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(unreachableTask), List.of(rescueTask), List.of(alwaysTask),
+                null, null, null, null, null, null);
+
+        Task postBlockTask = new Task("post block task", "debug", Map.of("msg", "post block"));
+
+        Play play = new Play("Unreachable Block Play", "all", List.of(block, postBlockTask));
+        Map<String, List<TaskResult>> results = new HashMap<>();
+
+        tqm.executePlay(play, inventory, vm, results, false);
+
+        List<TaskResult> hostResults = results.get("localhost");
+        assertEquals(4, hostResults.size());
+        assertTrue(hostResults.get(0).isUnreachable());
+        assertTrue(hostResults.get(1).success());
+        assertEquals("rescued unreachable", hostResults.get(1).data().get("msg"));
+        assertTrue(hostResults.get(2).success());
+        assertEquals("always executed", hostResults.get(2).data().get("msg"));
+        assertTrue(hostResults.get(3).success());
+        assertEquals("post block", hostResults.get(3).data().get("msg"));
+    }
+
+    @Test
+    void testBlockExecutionOnUnreachableWithIgnoreUnreachable() {
+        Task unreachableTask = new Task("ignore unreachable task", "unreachable_module", Map.of(), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, true, List.of(), List.of(), List.of(),
+                null, null, null, null, null, null);
+
+        Task nextBlockTask = new Task("next in block", "debug", Map.of("msg", "next in block"));
+        Task rescueTask = new Task("rescue task", "debug", Map.of("msg", "rescue task"));
+        Task alwaysTask = new Task("always task", "debug", Map.of("msg", "always task"));
+
+        Task block = new Task("block with ignore unreachable", null, Map.of(), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(unreachableTask, nextBlockTask), List.of(rescueTask), List.of(alwaysTask),
+                null, null, null, null, null, null);
+
+        Play play = new Play("Ignore Unreachable Block Play", "all", List.of(block));
+        Map<String, List<TaskResult>> results = new HashMap<>();
+
+        tqm.executePlay(play, inventory, vm, results, false);
+
+        List<TaskResult> hostResults = results.get("localhost");
+        assertEquals(3, hostResults.size());
+        assertTrue(hostResults.get(0).isUnreachable());
+        assertTrue(hostResults.get(1).success());
+        assertEquals("next in block", hostResults.get(1).data().get("msg"));
+        assertTrue(hostResults.get(2).success());
+        assertEquals("always task", hostResults.get(2).data().get("msg"));
+    }
+
+    @Test
+    void testBlockExecutionOnBecomeFailureWithRescueAndAlways() {
+        Task becomeTask = new Task("become task", "become_check_module", Map.of(), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                true, "sudo", "root", null, null, null);
+
+        Task rescueTask = new Task("rescue become", "debug", Map.of("msg", "rescued become failure"));
+        Task alwaysTask = new Task("always become", "debug", Map.of("msg", "always become executed"));
+
+        Task block = new Task("block with become failure", null, Map.of(), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(becomeTask), List.of(rescueTask), List.of(alwaysTask),
+                null, null, null, null, null, null);
+
+        Play play = new Play("Become Failure Block Play", "all", List.of(block));
+        Map<String, List<TaskResult>> results = new HashMap<>();
+
+        tqm.executePlay(play, inventory, vm, results, false);
+
+        List<TaskResult> hostResults = results.get("localhost");
+        assertEquals(3, hostResults.size());
+        assertFalse(hostResults.get(0).success());
+        assertTrue(hostResults.get(1).success());
+        assertEquals("rescued become failure", hostResults.get(1).data().get("msg"));
+        assertTrue(hostResults.get(2).success());
+        assertEquals("always become executed", hostResults.get(2).data().get("msg"));
+    }
+
+    @Test
+    void testBlockExecutionOnNestedUnreachableFailure() {
+        Task innerUnreachable = new Task("inner unreachable", "unreachable_module", Map.of());
+        Task innerRescue = new Task("inner rescue", "debug", Map.of("msg", "inner rescue"));
+        Task innerAlways = new Task("inner always", "debug", Map.of("msg", "inner always"));
+
+        Task innerBlock = new Task("inner block", null, Map.of(), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(innerUnreachable), List.of(innerRescue), List.of(innerAlways),
+                null, null, null, null, null, null);
+
+        Task outerNext = new Task("outer next", "debug", Map.of("msg", "outer next"));
+        Task outerRescue = new Task("outer rescue", "debug", Map.of("msg", "outer rescue"));
+        Task outerAlways = new Task("outer always", "debug", Map.of("msg", "outer always"));
+
+        Task outerBlock = new Task("outer block", null, Map.of(), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(innerBlock, outerNext), List.of(outerRescue), List.of(outerAlways),
+                null, null, null, null, null, null);
+
+        Play play = new Play("Nested Unreachable Play", "all", List.of(outerBlock));
+        Map<String, List<TaskResult>> results = new HashMap<>();
+
+        tqm.executePlay(play, inventory, vm, results, false);
+
+        List<TaskResult> hostResults = results.get("localhost");
+        assertEquals(5, hostResults.size());
+        assertTrue(hostResults.get(0).isUnreachable());
+        assertTrue(hostResults.get(1).success());
+        assertEquals("inner rescue", hostResults.get(1).data().get("msg"));
+        assertTrue(hostResults.get(2).success());
+        assertEquals("inner always", hostResults.get(2).data().get("msg"));
+        assertTrue(hostResults.get(3).success());
+        assertEquals("outer next", hostResults.get(3).data().get("msg"));
+        assertTrue(hostResults.get(4).success());
+        assertEquals("outer always", hostResults.get(4).data().get("msg"));
     }
 }

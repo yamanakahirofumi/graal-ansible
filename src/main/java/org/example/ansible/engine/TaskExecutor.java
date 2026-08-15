@@ -668,6 +668,8 @@ public class TaskExecutor implements ITaskExecutor {
         }
         try {
             return module.execute(task.args(), becomeContext, context);
+        } catch (UnreachableException e) {
+            throw e;
         } catch (Exception e) {
             return TaskResult.failure("Execution failed: " + e.getMessage());
         }
