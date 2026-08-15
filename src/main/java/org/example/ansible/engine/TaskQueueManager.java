@@ -406,12 +406,20 @@ public class TaskQueueManager {
         if (blockFailed) {
             for (Task task : blockTask.rescue()) {
                 if (this.playFatalError) break;
+                if (!isTaskToBeExecuted(task, runTags, skipTags)) {
+                    results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(TaskResult.skipped("Skipped due to tags"));
+                    continue;
+                }
                 executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications, blockCheckMode, effectiveBlockEnvs, combinedBlockVars, activeRoles, includeParams, connection, runTags, skipTags);
             }
         }
 
         for (Task task : blockTask.always()) {
             if (this.playFatalError) break;
+            if (!isTaskToBeExecuted(task, runTags, skipTags)) {
+                results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(TaskResult.skipped("Skipped due to tags"));
+                continue;
+            }
             executeTaskOnHost(play, host, task, variableManager, results, failedHosts, hostNotifications, blockCheckMode, effectiveBlockEnvs, combinedBlockVars, activeRoles, includeParams, connection, runTags, skipTags);
         }
 
@@ -502,37 +510,83 @@ public class TaskQueueManager {
         }
     }
 
-    boolean isTaskToBeExecuted(Task task, List<String> runTags, List<String> skipTags) {
-        List<String> taskTags = task.tags();
+    private List<String> cleanTags(List<String> tags) {
+        if (tags == null) return List.of();
+        List<String> cleaned = new ArrayList<>();
+        for (String t : tags) {
+            if (t == null) continue;
+            for (String part : t.split(",")) {
+                String trimmed = part.trim();
+                if (!trimmed.isEmpty()) {
+                    cleaned.add(trimmed);
+                }
+            }
+        }
+        return cleaned;
+    }
 
-        // 1. Handle skip_tags
-        if (skipTags != null && !skipTags.isEmpty()) {
-            if (taskTags.stream().anyMatch(skipTags::contains)) {
-                // Special case: 'always' tag is only skipped if 'always' is in skipTags
-                if (!taskTags.contains("always") || skipTags.contains("always")) {
+    boolean isTaskToBeExecuted(Task task, List<String> runTags, List<String> skipTags) {
+        List<String> cleanedRunTags = cleanTags(runTags);
+        List<String> cleanedSkipTags = cleanTags(skipTags);
+
+        boolean isBlockTask = !task.block().isEmpty() || !task.rescue().isEmpty() || !task.always().isEmpty();
+        if (isBlockTask) {
+            boolean hasExecutableChild = false;
+            for (Task child : task.block()) {
+                if (isTaskToBeExecuted(child, cleanedRunTags, cleanedSkipTags)) {
+                    hasExecutableChild = true;
+                    break;
+                }
+            }
+            if (!hasExecutableChild) {
+                for (Task child : task.rescue()) {
+                    if (isTaskToBeExecuted(child, cleanedRunTags, cleanedSkipTags)) {
+                        hasExecutableChild = true;
+                        break;
+                    }
+                }
+            }
+            if (!hasExecutableChild) {
+                for (Task child : task.always()) {
+                    if (isTaskToBeExecuted(child, cleanedRunTags, cleanedSkipTags)) {
+                        hasExecutableChild = true;
+                        break;
+                    }
+                }
+            }
+            return hasExecutableChild;
+        }
+
+        List<String> taskTags = cleanTags(task.tags());
+
+        // 2. Handle skipTags
+        if (!cleanedSkipTags.isEmpty()) {
+            if (taskTags.stream().anyMatch(cleanedSkipTags::contains)) {
+                // Special priority: 'always' tag is only skipped if 'always' is in skipTags
+                if (!taskTags.contains("always") || cleanedSkipTags.contains("always")) {
                     return false;
                 }
             }
         }
 
-        // 2. Handle 'always' tag (if not skipped)
+        // 3. Handle 'always' tag (if not skipped)
         if (taskTags.contains("always")) {
             return true;
         }
 
-        // 3. Handle 'never' tag
+        // 4. Handle 'never' tag
         if (taskTags.contains("never")) {
-            if (runTags == null || !runTags.contains("never")) {
+            if (!cleanedRunTags.contains("never")) {
                 return false;
             }
         }
 
-        // 4. Handle run_tags
-        if (runTags == null || runTags.isEmpty() || runTags.contains("all")) {
+        // 5. Handle runTags
+        if (cleanedRunTags.isEmpty() || cleanedRunTags.contains("all")) {
             return true;
         }
 
-        return taskTags.stream().anyMatch(runTags::contains);
+        return taskTags.stream().anyMatch(cleanedRunTags::contains);
     }
 
     private List<Host> getAllHosts(Group group) {
