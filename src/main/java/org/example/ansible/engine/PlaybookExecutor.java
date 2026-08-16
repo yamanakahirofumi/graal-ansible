@@ -176,6 +176,48 @@ public class PlaybookExecutor {
         return results;
     }
 
+    /**
+     * Executes the playbook and returns an ExecutionReport.
+     */
+    public ExecutionReport executeAndReport(Playbook playbook, Inventory inventory) {
+        return ExecutionReport.of(execute(playbook, inventory));
+    }
+
+    /**
+     * Executes the playbook with extra variables and returns an ExecutionReport.
+     */
+    public ExecutionReport executeAndReport(Playbook playbook, Inventory inventory, Map<String, Object> extraVars) {
+        return ExecutionReport.of(execute(playbook, inventory, extraVars));
+    }
+
+    /**
+     * Executes the playbook with extra variables, baseDir, and returns an ExecutionReport.
+     */
+    public ExecutionReport executeAndReport(Playbook playbook, Inventory inventory, Map<String, Object> extraVars, Path baseDir) {
+        return ExecutionReport.of(execute(playbook, inventory, extraVars, baseDir));
+    }
+
+    /**
+     * Executes the playbook with extra variables, baseDir, globalCheckMode, and returns an ExecutionReport.
+     */
+    public ExecutionReport executeAndReport(Playbook playbook, Inventory inventory, Map<String, Object> extraVars, Path baseDir, boolean globalCheckMode) {
+        return ExecutionReport.of(execute(playbook, inventory, extraVars, baseDir, globalCheckMode));
+    }
+
+    /**
+     * Executes the playbook with VariableManager, globalCheckMode, and returns an ExecutionReport.
+     */
+    public ExecutionReport executeAndReport(Playbook playbook, Inventory inventory, VariableManager variableManager, boolean globalCheckMode) {
+        return ExecutionReport.of(execute(playbook, inventory, variableManager, globalCheckMode));
+    }
+
+    /**
+     * Executes the playbook with tags and limit filtering and returns an ExecutionReport.
+     */
+    public ExecutionReport executeAndReport(Playbook playbook, Inventory inventory, VariableManager variableManager, boolean globalCheckMode, List<String> runTags, List<String> skipTags, String limit) {
+        return ExecutionReport.of(execute(playbook, inventory, variableManager, globalCheckMode, runTags, skipTags, limit));
+    }
+
     private Map<String, Map<String, Integer>> calculateStats(Map<String, List<TaskResult>> results) {
         Map<String, Map<String, Integer>> stats = new HashMap<>();
         for (Map.Entry<String, List<TaskResult>> entry : results.entrySet()) {

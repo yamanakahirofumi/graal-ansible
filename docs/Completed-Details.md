@@ -343,3 +343,12 @@
 - **解決策**:
     - `SetFiltersTest.java` による各集合演算フィルターの動作確認と堅牢性の担保。
     - `docs/features/Playbook-Execution.md` を更新し、対応するフィルター数の増補を反映。
+
+### 2.11 [✓] PlaybookExecutor 実行結果レポート (ExecutionReport) およびフィルタリング機能の実装
+- **完了日**: 2026-10-24
+- **概要**: `PlaybookExecutor` 実行後の詳細統計取得およびホスト・タスク結果のフィルタリング機能を `ExecutionReport` として標準実装。
+- **解決策**:
+    - `ExecutionReport` クラスを `org.example.ansible.engine` パッケージに追加。
+    - ホスト別・全体共通のメトリクス（ok, changed, unreachable, failed, skipped, total）の自動集計、`isSuccess()` 判定、および `toSummaryMap()` によるレポート出力機能をサポート。
+    - ホスト状態フィルタ（`getFailedHosts`, `getChangedHosts`, `getSkippedHosts`, Predicate）およびタスク結果フィルタ（`getFailedTaskResults`, `getUnreachableTaskResults`, `getChangedTaskResults`, Predicate）をサポート。
+    - `PlaybookExecutor` に `executeAndReport` オーバーロードメソッドを統合し、`ExecutionReportTest` による単体テストスイートを構築。
