@@ -32,6 +32,7 @@ on:
     branches: [ main ]
     paths:
       - 'src/**'
+  workflow_dispatch: {}
 
 jobs:
   build:
