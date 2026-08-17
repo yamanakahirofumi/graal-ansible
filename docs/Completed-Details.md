@@ -76,7 +76,7 @@
 ### 1.11 [✓] 独自 Jinja2 フィルターの拡充 (Ansible 互換)
 - **完了日**: 2026-05-11
 - **概要**: Playbook で頻繁に使用される Ansible 特有の Jinja2 フィルターを Java で実装。
-- **解決策**: `mandatory`, `basename`, `dirname`, `splitext`, `realpath`, `ternary`, `flatten` を含む、計 21 種類のフィルターを実装し `VariableResolver` に登録済み。
+- **解決策**: `mandatory`, `basename`, `dirname`, `splitext`, `realpath`, `ternary`, `flatten`, `to_nice_json`, `to_nice_yaml` を含む、計 27 種類のフィルターを実装し `VariableResolver` に登録済み。
 
 ### 1.12 [✓] GraalPy と Java のシームレスな統合
 - **完了日**: 2026-03-04
@@ -105,7 +105,7 @@
 - **概要**: Playbook や変数ファイル内の Jinja2 テンプレートを展開する仕組み。
 - **解決策**:
     - `VariableResolver` にて Jinjava を統合し、動的な変数展開を実装済み。
-    - 計 21 種類の Ansible 互換フィルター（`bool`, `combine`, `default`, `dict2items`, `ipaddr`, `to_json`, `to_yaml` 等）を Java で実装し登録済み。
+    - 計 27 種類の Ansible 互換フィルター（`bool`, `combine`, `default`, `dict2items`, `ipaddr`, `to_json`, `to_nice_json`, `to_yaml`, `to_nice_yaml` 等）を Java で実装し登録済み。
 
 ### 1.17 [✓] タスク制御機能（when, register, loop, handlers, block, retry, check_mode 等）の実装
 - **完了日**: 2026-03-05
@@ -274,6 +274,13 @@
     - `FirstFoundLookup.java` を追加し、`terms` や `kwargs` 内の `files`, `paths`, `skip` 引数をパースして適切にファイル存在チェックを行うロジックを実装。
     - `VariableResolver.java` において `first_found` ルックアッププラグインの登録を行い、Jinja2 テンプレート解決フェーズで呼び出せるよう統合。
     - `FirstFoundLookupTest.java` にて、ファイルのリスト指定、絶対・相対パス、comma区切りの解釈、inline map（Jinja2辞書）引数、`skip` パラメータ、および例外発生の境界テストなどを網羅。
+
+### 1.40 [✓] to_nice_json / to_nice_yaml フィルターの実装とカスタマイズ拡張
+- **完了日**: 2026-10-24
+- **概要**: Jinja2 テンプレート内でオブジェクトを整形出力するための `to_nice_json` および `to_nice_yaml` フィルターを Java で実装し、`indent`, `sort_keys`, `width` などのカスタマイズ引数をサポート。
+- **解決策**:
+    - `ToNiceJsonFilter` および `ToNiceYamlFilter` を実装し、位置引数（Positional Arguments）およびキーワード/名前付き引数（Keyword Arguments）の両方によるパラメータ展開をサポート。
+    - `VariableResolver` にて両フィルターを登録し、`ToNiceJsonFilterTest` および `ToNiceYamlFilterTest` により動作を検証済み。
 
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
