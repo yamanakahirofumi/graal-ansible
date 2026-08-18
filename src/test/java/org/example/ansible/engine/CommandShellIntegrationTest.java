@@ -130,4 +130,38 @@ class CommandShellIntegrationTest {
         assertNotNull(stdout, "stdout should not be null");
         assertEquals("my_value", stdout.trim());
     }
+
+    @Test
+    void testSetupModule() {
+        Task task = new Task("Gather facts", "setup", Map.of());
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message() + " Data: " + result.data());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
+        assertNotNull(facts, "ansible_facts should not be null");
+        assertTrue(facts.containsKey("ansible_system") || facts.containsKey("ansible_architecture") || facts.containsKey("ansible_python_version"),
+            "ansible_facts should contain system/architecture/python information");
+    }
+
+    @Test
+    void testCommandAndShellCheckMode() {
+        Task commandTask = new Task("Run command check mode", "command",
+            Map.of("_raw_params", "echo check_mode_test"),
+            Map.of(), null, null, null, List.of(), null, null, false,
+            null, 0, 0, null, false, false, false, List.of(), List.of(), List.of(),
+            null, null, null, null, true, Map.of());
+
+        TaskResult commandResult = taskExecutor.execute(play, host, commandTask, variableManager, true, null, null, new LocalConnection(), null);
+        assertTrue(commandResult.success(), "Command task execution failed: " + commandResult.message());
+
+        Task shellTask = new Task("Run shell check mode", "shell",
+            Map.of("_raw_params", "echo check_mode_test"),
+            Map.of(), null, null, null, List.of(), null, null, false,
+            null, 0, 0, null, false, false, false, List.of(), List.of(), List.of(),
+            null, null, null, null, true, Map.of());
+
+        TaskResult shellResult = taskExecutor.execute(play, host, shellTask, variableManager, true, null, null, new LocalConnection(), null);
+        assertTrue(shellResult.success(), "Shell task execution failed: " + shellResult.message());
+    }
 }
