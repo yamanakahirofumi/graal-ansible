@@ -111,4 +111,23 @@ class CopyIntegrationTest {
         assertEquals("testuser", result.data().get("owner"));
         assertTrue(Files.exists(destFile));
     }
+
+    @Test
+    void testCopyCheckMode() throws IOException {
+        Path destFile = tempDir.resolve("dest-check.txt");
+        String content = "Hello from CopyAction check mode";
+
+        Task task = new Task("Copy Content Check Mode", "copy", Map.of(
+                "content", content,
+                "dest", destFile.toString()
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertTrue(result.success(), result.message());
+        assertTrue(result.changed(), "Check mode should report changed = true when file would be created");
+        assertFalse(Files.exists(destFile), "Destination file should not be created in check mode");
+    }
 }

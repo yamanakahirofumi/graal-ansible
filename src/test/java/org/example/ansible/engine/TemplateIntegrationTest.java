@@ -109,4 +109,25 @@ class TemplateIntegrationTest {
         assertEquals("admin", result.data().get("owner"));
         assertTrue(Files.exists(destFile));
     }
+
+    @Test
+    void testTemplateCheckMode() throws IOException {
+        Path templateFile = tempDir.resolve("check.j2");
+        Files.writeString(templateFile, "Hello {{ user_name }} in check mode!");
+
+        Path destFile = tempDir.resolve("check.txt");
+
+        Task task = new Task("Template Check Mode Test", "template", Map.of(
+                "src", "check.j2",
+                "dest", destFile.toString()
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertTrue(result.success(), result.message());
+        assertTrue(result.changed(), "Check mode should report changed = true when file would be created");
+        assertFalse(Files.exists(destFile), "Destination file should not be created in check mode");
+    }
 }
