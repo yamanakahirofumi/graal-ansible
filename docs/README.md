@@ -7,7 +7,7 @@
 
 - **コアエンジン (管理ノード)**: linear（順次）および free（並列）戦略による Playbook 実行、マルチホスト対応、バッチ実行 (`serial`)、PlaybookExecutor による実行管理。
 - **YAML 解析**: SnakeYAML 2.x による Playbook (Record) へのマッピング、独自タグの処理、`block/rescue/always` 対応。
-- **変数解決**: Jinjava による Jinja2 互換テンプレート、22段階の変数優先順位（all, group, host, play, extra-vars等）。
+- **変数解決**: Jinjava による Jinja2 互換テンプレート、22段階の変数優先順位（all, group, host, play, extra-vars等）、Ansible Vault 暗号化データのネイティブ動的復号対応。
 - **タスク制御 (Worker)**: `when`, `loop`, `register`, `notify/handlers`, `until/retries`, `delegate_to`, `ignore_unreachable`, `delegate_facts`, `check_mode`, `async/poll`, `throttle`, `max_fail_percentage` 等のサポート。
 - **権限昇格**: `become` (sudo, su) の実装。
 - **コレクション対応**: フェーズ 1 進行中（ansible-core の完全ロードと Linux での 67 モジュールの検証完了：61 ◎, 4 ○, 2 ●）。

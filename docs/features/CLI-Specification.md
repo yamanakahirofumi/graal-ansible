@@ -25,6 +25,8 @@ graal-ansible [options] playbook.yml
 | `--become-user` | - | 昇格後のユーザーを指定 (デフォルト: root) | ◎ |
 | `--become-flags` | - | 権限昇格に使用するフラグを指定 | ◎ |
 | `--ask-become-pass` | `-K` | 権限昇格パスワードをプロンプトで問い合せる | ◎ |
+| `--vault-password-file` | - | Ansible Vault 暗号化データの復号用パスワードファイルを指定 | ◎ |
+| `--vault-id` | - | Vault ID およびパスワードソース (`label@source` または `source`) を指定 | ◎ |
 | `--forks` | `-f` | 並列実行するホストの数を指定 | ◎ |
 | `--version` | - | バージョン情報を表示 | ◎ |
 | `--collections-path` | - | コレクションの探索パスを指定 | ◎ |
@@ -52,16 +54,32 @@ graal-ansible [options] playbook.yml
 - `@file.yml`, `@file.yaml`, `@file.json`: ファイルからの変数の読み込み。
 - インライン JSON/YAML: `{"key": "value"}` 形式の直接指定。
 
+### 4.1 Ansible Vault パスワードオプションの詳細仕様
+
+Ansible Vault で暗号化された変数の動的復号に使用するパスワードの指定オプションについて、以下の構文および解決優先順位をサポートしています（◎）。
+
+- **`--vault-password-file`**: パスワードテキストが格納されたファイルの絶対パスまたは相対パスを指定します。
+- **`--vault-id`**: `vault_id@source` 形式またはソース単体を指定します。ソース部としてファイルパス、または `prompt` キーワードが利用可能です。
+- **`prompt` キーワードによる対話型入力**: パスワードソースとして `prompt` が指定された場合（例: `--vault-id dev@prompt` または `--vault-password-file prompt`）、コンソールからインタラクティブに Vault パスワードを入力させます。
+
+#### パスワードソースの解決優先順位
+複数の設定が存在する場合、`PlaybookCli` は以下の優先順位に従って使用する Vault パスワードソースを決定します。
+
+1. **`--vault-password-file` CLI オプション**
+2. **`--vault-id` CLI オプション**
+3. **`ANSIBLE_VAULT_PASSWORD_FILE` 環境変数**
+
 ## 5. 環境変数 (Environment Variables)
 
 `graal-ansible` は、以下の環境変数をサポートしています。
 
 | 環境変数                   | 説明                                                                         | 実装状況 |
 | :------------------------- | :--------------------------------------------------------------------------- | :------: |
-| `ANSIBLE_STDOUT_CALLBACK`  | 使用するコールバックプラグインを指定（例: `default`, `json`）                |    ◎     |
-| `ANSIBLE_COLLECTIONS_PATH` | コレクションの探索パスをコロン区切りで指定                                   |    ◎     |
-| `ANSIBLE_HASH_BEHAVIOUR`   | 辞書型変数のマージ戦略を指定 (`replace` または `merge`)                      |    ◎     |
-| `ANSIBLE_SITE_PACKAGES`    | Python の `site-packages` （依存ライブラリの探索パス）をコロン区切りで指定   |    ◎     |
+| `ANSIBLE_STDOUT_CALLBACK`     | 使用するコールバックプラグインを指定（例: `default`, `json`）                |    ◎     |
+| `ANSIBLE_COLLECTIONS_PATH`    | コレクションの探索パスをコロン区切りで指定                                   |    ◎     |
+| `ANSIBLE_HASH_BEHAVIOUR`      | 辞書型変数のマージ戦略を指定 (`replace` または `merge`)                      |    ◎     |
+| `ANSIBLE_SITE_PACKAGES`       | Python の `site-packages` （依存ライブラリの探索パス）をコロン区切りで指定   |    ◎     |
+| `ANSIBLE_VAULT_PASSWORD_FILE` | デフォルトの Vault パスワードファイルパスを指定                               |    ◎     |
 
 ### 5.1 Java システムプロパティ (Java System Properties)
 
