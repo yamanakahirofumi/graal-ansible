@@ -246,4 +246,120 @@ class BecomeTest {
 
         assertEquals("secret2", taskExecutor.executedContexts.get(0).becomePassword());
     }
+
+    @Test
+    void testBecomeMethodAndFlagsResolution() {
+        String yaml = """
+            - name: Play with method and flags
+              hosts: all
+              become: yes
+              become_method: su
+              become_flags: "-s /bin/bash"
+              vars:
+                custom_flags: "-H -S"
+                custom_method: pbrun
+              tasks:
+                - name: Task inheriting play method and flags
+                  debug:
+                    msg: hello
+                - name: Task overriding method and flags with variables
+                  debug:
+                    msg: world
+                  become_method: "{{ custom_method }}"
+                  become_flags: "{{ custom_flags }}"
+            """;
+
+        YamlParser parser = new YamlParser();
+        Playbook playbook = parser.parse(new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8)));
+
+        MockTaskExecutor taskExecutor = new MockTaskExecutor();
+        PlaybookExecutor playbookExecutor = new PlaybookExecutor(taskExecutor);
+
+        org.example.ansible.inventory.Group allGroup = new org.example.ansible.inventory.Group("all", List.of(new org.example.ansible.inventory.Host("localhost")), List.of(), Map.of());
+        Inventory inventory = new Inventory(allGroup);
+
+        playbookExecutor.execute(playbook, inventory);
+
+        List<BecomeContext> contexts = taskExecutor.executedContexts;
+        assertEquals(2, contexts.size());
+
+        // Task 1: inherits play become_method and become_flags
+        assertTrue(contexts.get(0).become());
+        assertEquals("su", contexts.get(0).becomeMethod());
+        assertEquals("-s /bin/bash", contexts.get(0).becomeFlags());
+
+        // Task 2: overrides become_method and become_flags via variables
+        assertTrue(contexts.get(1).become());
+        assertEquals("pbrun", contexts.get(1).becomeMethod());
+        assertEquals("-H -S", contexts.get(1).becomeFlags());
+    }
+
+    @Test
+    void testBecomeDefaults() {
+        String yaml = """
+            - name: Play with minimal become
+              hosts: all
+              become: yes
+              tasks:
+                - name: Task with default become settings
+                  debug:
+                    msg: hello
+            """;
+
+        YamlParser parser = new YamlParser();
+        Playbook playbook = parser.parse(new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8)));
+
+        MockTaskExecutor taskExecutor = new MockTaskExecutor();
+        PlaybookExecutor playbookExecutor = new PlaybookExecutor(taskExecutor);
+
+        org.example.ansible.inventory.Group allGroup = new org.example.ansible.inventory.Group("all", List.of(new org.example.ansible.inventory.Host("localhost")), List.of(), Map.of());
+        Inventory inventory = new Inventory(allGroup);
+
+        playbookExecutor.execute(playbook, inventory);
+
+        assertEquals(1, taskExecutor.executedContexts.size());
+        BecomeContext context = taskExecutor.executedContexts.get(0);
+
+        assertTrue(context.become());
+        assertEquals("sudo", context.becomeMethod(), "Default become_method should be 'sudo'");
+        assertEquals("root", context.becomeUser(), "Default become_user should be 'root'");
+        assertEquals("", context.becomeFlags(), "Default become_flags should be empty string");
+    }
+
+    @Test
+    void testBecomeCliMethodAndFlagsResolution() {
+        String yaml = """
+            - name: Play without explicit method or flags
+              hosts: all
+              become: yes
+              tasks:
+                - name: Task using CLI settings
+                  debug:
+                    msg: hello
+            """;
+
+        YamlParser parser = new YamlParser();
+        Playbook playbook = parser.parse(new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8)));
+
+        MockTaskExecutor taskExecutor = new MockTaskExecutor();
+        PlaybookExecutor playbookExecutor = new PlaybookExecutor(taskExecutor);
+
+        org.example.ansible.inventory.Group allGroup = new org.example.ansible.inventory.Group("all", List.of(new org.example.ansible.inventory.Host("localhost")), List.of(), Map.of());
+        Inventory inventory = new Inventory(allGroup);
+
+        Map<String, Object> cliVars = Map.of(
+                "ansible_become_method", "su",
+                "ansible_become_flags", "-m"
+        );
+        VariableManager vm = new VariableManager(inventory, cliVars, Map.of(), null, null);
+
+        playbookExecutor.execute(playbook, inventory, vm, false);
+
+        assertEquals(1, taskExecutor.executedContexts.size());
+        BecomeContext context = taskExecutor.executedContexts.get(0);
+
+        assertTrue(context.become());
+        assertEquals("su", context.becomeMethod(), "CLI ansible_become_method should be used");
+        assertEquals("-m", context.becomeFlags(), "CLI ansible_become_flags should be used");
+    }
 }
