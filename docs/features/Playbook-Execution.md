@@ -14,7 +14,7 @@
     - 必要に応じて、Action Plugin 内からターゲットノードへのモジュール実行指示（`_execute_module`）が行われます。
 5.  **モジュール転送・実行 (Worker -> CP -> TN)**:
     - 通常モジュール（例: `command`, `ping`）の場合、または Action Plugin から指示された場合、Ansiballz 形式でパッケージングを行い、ターゲットノードへ転送して実行します。
-6.  **結果集計 (TQM)**: 各ホストの実行結果を収集し、レポートを出力。
+6.  **結果集計 (TQM / PE)**: 各ホストの実行結果を収集し、`ExecutionReport` として統計情報やレポートを生成。
 
 ## 2. 実装時にブレる恐れがある仕様 (実装上の留意点)
 
@@ -69,6 +69,14 @@
 ### 2.9 Python ベースのコールバックのサポート (Implemented)
 - **状況**: 実装済み。
 - **詳細**: GraalPy を活用し、Ansible 本家のコールバックプラグインをそのまま実行可能です。環境変数 `ANSIBLE_STDOUT_CALLBACK` を通じて動的にプラグインを選択できます。
+
+### 2.10 実行結果レポートと統計情報 (ExecutionReport)
+- **状況**: 実装済み。
+- **詳細**: `PlaybookExecutor.executeAndReport` を通じて、Playbook 実行完了時にホスト別・全体共通のメトリクス（ok, changed, unreachable, failed, skipped, total）を集計した `ExecutionReport` オブジェクトを生成します。
+    - **統計情報**: ホスト単位 (`getHostStats`) および全体集計 (`getOverallStats`) の統計データを取得可能です。
+    - **ホストフィルタリング**: `getFailedHosts()`, `getChangedHosts()`, `getSkippedHosts()` または Predicate による柔軟なホストの抽出に対応します。
+    - **タスク結果フィルタリング**: `getFailedTaskResults()`, `getUnreachableTaskResults()`, `getChangedTaskResults()` により特定の状態のタスク結果を抽出可能です。
+    - **エクスポート**: `toSummaryMap()` メソッドにより、結果サマリーを Map 構造で出力可能です。
 
 ## 3. タスクのフィルタリング (Tags and Limit)
 
