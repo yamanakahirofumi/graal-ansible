@@ -8,7 +8,11 @@ import org.example.ansible.inventory.Inventory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -22,6 +26,9 @@ class CommandShellIntegrationTest {
     private VariableManager variableManager;
     private Play play;
     private Host host;
+
+    @TempDir
+    Path tempDir;
 
     @BeforeEach
     void setUp() {
@@ -163,5 +170,32 @@ class CommandShellIntegrationTest {
 
         TaskResult shellResult = taskExecutor.execute(play, host, shellTask, variableManager, true, null, null, new LocalConnection(), null);
         assertTrue(shellResult.success(), "Shell task execution failed: " + shellResult.message());
+    }
+
+    @Test
+    void testCommandCreatesAndRemoves() throws IOException {
+        Path subDir = tempDir.resolve("subdir");
+        Files.createDirectories(subDir);
+        Path existingFile = subDir.resolve("exists.txt");
+        Files.writeString(existingFile, "content");
+
+        // 1. test creates (file exists -> task skipped / changed=false)
+        Task createsTask = new Task("Run echo when file exists", "command", Map.of(
+                "_raw_params", "echo should_not_run",
+                "creates", existingFile.toAbsolutePath().toString()
+        ));
+        TaskResult createsResult = taskExecutor.execute(play, host, createsTask, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(createsResult.success(), "createsResult failed: " + createsResult.message());
+        assertFalse(createsResult.changed(), "Task with creates should report changed=false when target file exists");
+
+        // 2. test removes (file does not exist -> task skipped / changed=false)
+        Path nonExistentFile = subDir.resolve("missing.txt");
+        Task removesTask = new Task("Run echo when file does not exist", "command", Map.of(
+                "_raw_params", "echo should_not_run",
+                "removes", nonExistentFile.toAbsolutePath().toString()
+        ));
+        TaskResult removesResult = taskExecutor.execute(play, host, removesTask, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(removesResult.success(), removesResult.message());
+        assertFalse(removesResult.changed(), "Task with removes should report changed=false when target file does not exist");
     }
 }

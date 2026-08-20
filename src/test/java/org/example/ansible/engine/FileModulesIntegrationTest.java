@@ -407,4 +407,79 @@ class FileModulesIntegrationTest {
         assertNotNull(result.data().get("before"));
         assertNotNull(result.data().get("after"));
     }
+
+    @Test
+    void testLineInFileCreateAndBackrefsAndBackup() throws IOException {
+        Path missingFile = tempDir.resolve("missing-line.txt");
+
+        // 1. test lineinfile with create: true
+        Task taskCreate = new Task("Create lineinfile", "lineinfile", Map.of(
+                "path", missingFile.toString(),
+                "line", "CREATED_LINE=1",
+                "create", true
+        ));
+        TaskResult resultCreate = taskExecutor.execute(play, host, taskCreate, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(resultCreate.success(), resultCreate.message());
+        assertTrue(resultCreate.changed());
+        assertTrue(Files.exists(missingFile));
+        assertTrue(Files.readString(missingFile).contains("CREATED_LINE=1"));
+
+        // 2. test lineinfile with backrefs and backup
+        Task taskBackrefs = new Task("Update with backrefs and backup", "lineinfile", Map.of(
+                "path", missingFile.toString(),
+                "regexp", "CREATED_LINE=(.*)",
+                "line", "UPDATED_LINE=\\1",
+                "backrefs", true,
+                "backup", true
+        ));
+        TaskResult resultBackrefs = taskExecutor.execute(play, host, taskBackrefs, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(resultBackrefs.success(), resultBackrefs.message());
+        assertTrue(resultBackrefs.changed());
+        assertTrue(Files.readString(missingFile).contains("UPDATED_LINE=1"));
+        assertTrue(resultBackrefs.data().containsKey("backup_file") || resultBackrefs.data().containsKey("backup"),
+                "backup_file or backup should be returned in data when backup=true. Data: " + resultBackrefs.data());
+    }
+
+    @Test
+    void testFileModuleCheckMode() throws IOException {
+        Path checkFile = tempDir.resolve("file-check.txt");
+
+        // 1. touch check mode
+        Task taskTouchCheck = new Task("Touch file in check mode", "file", Map.of(
+                "path", checkFile.toString(),
+                "state", "touch"
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+        TaskResult resultTouchCheck = taskExecutor.execute(play, host, taskTouchCheck, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(resultTouchCheck.success(), resultTouchCheck.message());
+        assertTrue(resultTouchCheck.changed());
+        assertFalse(Files.exists(checkFile), "File should not be created in check mode");
+
+        // 2. directory check mode
+        Path checkDir = tempDir.resolve("check-dir");
+        Task taskDirCheck = new Task("Create directory in check mode", "file", Map.of(
+                "path", checkDir.toString(),
+                "state", "directory"
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+        TaskResult resultDirCheck = taskExecutor.execute(play, host, taskDirCheck, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(resultDirCheck.success(), resultDirCheck.message());
+        assertTrue(resultDirCheck.changed());
+        assertFalse(Files.exists(checkDir), "Directory should not be created in check mode");
+
+        // 3. absent check mode on existing file
+        Files.writeString(checkFile, "exist");
+        Task taskAbsentCheck = new Task("Remove file in check mode", "file", Map.of(
+                "path", checkFile.toString(),
+                "state", "absent"
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+        TaskResult resultAbsentCheck = taskExecutor.execute(play, host, taskAbsentCheck, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(resultAbsentCheck.success(), resultAbsentCheck.message());
+        assertTrue(resultAbsentCheck.changed());
+        assertTrue(Files.exists(checkFile), "File should not be deleted in check mode");
+    }
 }

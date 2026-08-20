@@ -130,4 +130,26 @@ class TemplateIntegrationTest {
         assertTrue(result.changed(), "Check mode should report changed = true when file would be created");
         assertFalse(Files.exists(destFile), "Destination file should not be created in check mode");
     }
+
+    @Test
+    void testTemplateWithBackup() throws IOException {
+        Path templateFile = tempDir.resolve("backup.j2");
+        Files.writeString(templateFile, "New template {{ user_name }}");
+
+        Path destFile = tempDir.resolve("dest-template-backup.txt");
+        Files.writeString(destFile, "Original template content");
+
+        Task task = new Task("Template with Backup", "template", Map.of(
+                "src", "backup.j2",
+                "dest", destFile.toString(),
+                "backup", true
+        ));
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertTrue(result.success(), result.message());
+        assertTrue(result.changed());
+        assertEquals("New template jules", Files.readString(destFile));
+        assertTrue(result.data().containsKey("backup_file"), "backup_file should be returned when backup=true");
+    }
 }
