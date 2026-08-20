@@ -34,7 +34,7 @@
 - **Parser**：Playbook (YAML) を解析し、内部の実行モデル（Play, Taskのリスト）に変換します。
 
 ### 2.2 Execution Engine 層 (管理ノード / Control Node)
-- **PlaybookExecutor (PE)**：Playbook 全体の実行フローを管理します。Play, Block, Task の階層構造を辿ります。
+- **PlaybookExecutor (PE)**：Playbook 全体の実行フローを管理します。Play, Block, Task の階層構造を辿り、実行完了時には統計情報を含む `ExecutionReport` を集計・生成します。
 - **TaskQueueManager (TQM)**：各ホストへのタスク配信や結果の集計を制御します（将来的な拡張ポイント）。
 - **TaskExecutor (Worker Process)**：個別のタスク実行を担当します。変数の解決 (Jinja2) やプラグインの呼び出しを行います。
 - **VariableManager**：変数のスコープ管理と、Jinja2ライクなテンプレート展開を担当します。
