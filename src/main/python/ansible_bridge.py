@@ -499,6 +499,10 @@ class AnsibleModule:
     def makedirs_safe(self, path: str, mode: Optional[int] = None) -> None:
         self._java_mock.makedirs_safe(_to_java_str(path), mode)
 
+    def backup_local(self, path: str) -> Optional[str]:
+        res = self._java_mock.backup_local(_to_java_str(path))
+        return str(res) if res is not None else None
+
 # --- Mock Application ---
 
 def apply_mocks() -> None:

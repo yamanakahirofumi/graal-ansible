@@ -130,4 +130,23 @@ class CopyIntegrationTest {
         assertTrue(result.changed(), "Check mode should report changed = true when file would be created");
         assertFalse(Files.exists(destFile), "Destination file should not be created in check mode");
     }
+
+    @Test
+    void testCopyWithBackup() throws IOException {
+        Path destFile = tempDir.resolve("dest-backup.txt");
+        Files.writeString(destFile, "Original content");
+
+        Task task = new Task("Copy with Backup", "copy", Map.of(
+                "content", "New content",
+                "dest", destFile.toString(),
+                "backup", true
+        ));
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertTrue(result.success(), result.message());
+        assertTrue(result.changed());
+        assertEquals("New content", Files.readString(destFile));
+        assertTrue(result.data().containsKey("backup_file"), "backup_file should be returned when backup=true");
+    }
 }

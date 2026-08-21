@@ -416,6 +416,18 @@ public class PythonAnsibleModuleMock implements Serializable {
         }
     }
 
+    public String backup_local(String path) {
+        String p = osMock.normalizePath(path);
+        if (p == null || !osMock.exists(p)) return null;
+        try {
+            String backupPath = p + "." + System.currentTimeMillis() + "~";
+            Files.copy(Paths.get(p), Paths.get(backupPath), StandardCopyOption.REPLACE_EXISTING);
+            return backupPath;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     public static class Factory {
         private final PythonOSMock osMock;
 
