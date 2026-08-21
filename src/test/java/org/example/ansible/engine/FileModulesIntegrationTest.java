@@ -131,6 +131,31 @@ class FileModulesIntegrationTest {
     }
 
     @Test
+    void testTempfileModuleVariations() {
+        // Directory state execution with prefix and suffix
+        Task taskDir = new Task("Create temp directory", "tempfile", Map.of(
+                "state", "directory",
+                "prefix", "testdir_",
+                "suffix", "_dir"
+        ));
+        TaskResult resultDir = taskExecutor.execute(play, host, taskDir, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(resultDir.success(), resultDir.message());
+        assertTrue(resultDir.changed());
+        String dirPath = (String) resultDir.data().get("path");
+        assertNotNull(dirPath);
+        assertTrue(dirPath.contains("testdir_"));
+        assertTrue(dirPath.endsWith("_dir"));
+        Path pathObj = Path.of(dirPath);
+        assertTrue(Files.exists(pathObj));
+        assertTrue(Files.isDirectory(pathObj));
+
+        // Cleanup
+        try {
+            Files.deleteIfExists(pathObj);
+        } catch (IOException ignored) {}
+    }
+
+    @Test
     void testFindModule() throws IOException {
         Path f1 = tempDir.resolve("find-1.txt");
         Files.writeString(f1, "data");
@@ -155,6 +180,41 @@ class FileModulesIntegrationTest {
         assertNotNull(files, "files should not be null. Full data: " + result.data());
 
         assertEquals(2, files.size(), "Should find 2 files. Found: " + files.size() + ". Data: " + result.data());
+    }
+
+    @Test
+    void testFindModuleVariationsAndCheckMode() throws IOException {
+        Path subDir = tempDir.resolve("subfolder");
+        Files.createDirectory(subDir);
+        Path nestedFile = subDir.resolve("find-nested.txt");
+        Files.writeString(nestedFile, "nested data");
+
+        // 1. Recurse and file_type: directory in check mode
+        Task taskCheckDir = new Task("Find directories in check mode", "find", Map.of(
+                "paths", List.of(tempDir.toAbsolutePath().toString()),
+                "file_type", "directory",
+                "recurse", true
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null); // check_mode: true
+
+        TaskResult resultCheckDir = taskExecutor.execute(play, host, taskCheckDir, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(resultCheckDir.success(), resultCheckDir.message());
+        List<Map<String, Object>> dirFiles = (List<Map<String, Object>>) resultCheckDir.data().get("files");
+        assertNotNull(dirFiles);
+        assertTrue(dirFiles.stream().anyMatch(f -> f.get("path").toString().endsWith("subfolder")));
+
+        // 2. Recurse with pattern matching for nested file
+        Task taskRecurseFile = new Task("Find nested file with recurse", "find", Map.of(
+                "paths", List.of(tempDir.toAbsolutePath().toString()),
+                "patterns", List.of("find-nested.txt"),
+                "recurse", true
+        ));
+        TaskResult resultRecurseFile = taskExecutor.execute(play, host, taskRecurseFile, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(resultRecurseFile.success(), resultRecurseFile.message());
+        List<Map<String, Object>> nestedFiles = (List<Map<String, Object>>) resultRecurseFile.data().get("files");
+        assertNotNull(nestedFiles);
+        assertEquals(1, nestedFiles.size());
     }
 
     @Test
@@ -319,6 +379,57 @@ class FileModulesIntegrationTest {
         assertTrue(content.contains("BEGIN ANSIBLE MANAGED BLOCK"));
         assertTrue(content.contains("line 2"));
         assertTrue(content.contains("line 3"));
+    }
+
+    @Test
+    void testBlockInFileModuleVariationsAndCheckMode() throws IOException {
+        Path targetFile = tempDir.resolve("block-var-test.txt");
+        Files.writeString(targetFile, "header line\nfooter line\n");
+
+        // 1. Check mode execution
+        Task taskCheck = new Task("Add block in check mode", "blockinfile", Map.of(
+                "path", targetFile.toString(),
+                "block", "custom content block",
+                "marker", "# {mark} CUSTOM BLOCK"
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null); // check_mode: true
+
+        TaskResult resultCheck = taskExecutor.execute(play, host, taskCheck, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(resultCheck.success(), resultCheck.message());
+        assertTrue(resultCheck.changed(), "Check mode should report changed = true");
+        String contentCheck = Files.readString(targetFile);
+        assertFalse(contentCheck.contains("CUSTOM BLOCK"), "File should not be modified in check mode");
+
+        // 2. Add block with custom marker and backup
+        Task taskAddBlock = new Task("Add block with custom marker and backup", "blockinfile", Map.of(
+                "path", targetFile.toString(),
+                "block", "custom content block",
+                "marker", "# {mark} CUSTOM BLOCK",
+                "insertafter", "header line",
+                "backup", true
+        ));
+        TaskResult resultAddBlock = taskExecutor.execute(play, host, taskAddBlock, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(resultAddBlock.success(), resultAddBlock.message());
+        assertTrue(resultAddBlock.changed());
+        String contentAdded = Files.readString(targetFile);
+        assertTrue(contentAdded.contains("# BEGIN CUSTOM BLOCK"));
+        assertTrue(contentAdded.contains("custom content block"));
+        assertTrue(resultAddBlock.data().containsKey("backup_file") || resultAddBlock.data().containsKey("backup"),
+                "Backup information should be included in result data when backup=true");
+
+        // 3. Remove block with state: absent
+        Task taskRemoveBlock = new Task("Remove block with state absent", "blockinfile", Map.of(
+                "path", targetFile.toString(),
+                "marker", "# {mark} CUSTOM BLOCK",
+                "state", "absent"
+        ));
+        TaskResult resultRemoveBlock = taskExecutor.execute(play, host, taskRemoveBlock, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(resultRemoveBlock.success(), resultRemoveBlock.message());
+        assertTrue(resultRemoveBlock.changed());
+        String contentRemoved = Files.readString(targetFile);
+        assertFalse(contentRemoved.contains("custom content block"));
+        assertFalse(contentRemoved.contains("CUSTOM BLOCK"));
     }
 
     @Test
