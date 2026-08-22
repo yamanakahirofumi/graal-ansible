@@ -227,7 +227,7 @@ Lookup プラグインは、外部ソース（ファイル、環境変数、コ�
 ### 7.2 実装方針
 - **Jinjava の拡張**: `com.hubspot.jinjava.lib.fn.ELFunction` またはカスタムタグを使用して、`lookup` および `query` 関数を実装します。
 - **プラグインの解決**: 指定されたプラグイン名に基づき、Java 側で実装された対応するクラスを呼び出します。
-- **実装済みの主要プラグイン (7種類)**:
+- **実装済みの主要プラグイン (7種類)** (file, env, template, pipe, dict, vars, first_found):
 
   #### 1. `file`
   指定されたファイル（`playbook_dir` 相対または絶対パス）の内容を文字列として読み込みます。
