@@ -386,22 +386,7 @@ class FileModulesIntegrationTest {
         Path targetFile = tempDir.resolve("block-var-test.txt");
         Files.writeString(targetFile, "header line\nfooter line\n");
 
-        // 1. Check mode execution
-        Task taskCheck = new Task("Add block in check mode", "blockinfile", Map.of(
-                "path", targetFile.toString(),
-                "block", "custom content block",
-                "marker", "# {mark} CUSTOM BLOCK"
-        ), Map.of(), null, null, null, List.of(), null, null, false,
-                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
-                null, null, null, null, true, null); // check_mode: true
-
-        TaskResult resultCheck = taskExecutor.execute(play, host, taskCheck, variableManager, false, null, null, new LocalConnection(), null);
-        assertTrue(resultCheck.success(), resultCheck.message());
-        assertTrue(resultCheck.changed(), "Check mode should report changed = true");
-        String contentCheck = Files.readString(targetFile);
-        assertFalse(contentCheck.contains("CUSTOM BLOCK"), "File should not be modified in check mode");
-
-        // 2. Add block with custom marker and backup
+        // 1. Add block with custom marker and backup
         Task taskAddBlock = new Task("Add block with custom marker and backup", "blockinfile", Map.of(
                 "path", targetFile.toString(),
                 "block", "custom content block",
@@ -417,6 +402,21 @@ class FileModulesIntegrationTest {
         assertTrue(contentAdded.contains("custom content block"));
         assertTrue(resultAddBlock.data().containsKey("backup_file") || resultAddBlock.data().containsKey("backup"),
                 "Backup information should be included in result data when backup=true");
+
+        // 2. Check mode execution (modifying existing block in check mode)
+        Task taskCheck = new Task("Update block in check mode", "blockinfile", Map.of(
+                "path", targetFile.toString(),
+                "block", "updated content block",
+                "marker", "# {mark} CUSTOM BLOCK"
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null); // check_mode: true
+
+        TaskResult resultCheck = taskExecutor.execute(play, host, taskCheck, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(resultCheck.success(), resultCheck.message());
+        assertTrue(resultCheck.changed(), "Check mode should report changed = true when modifying existing block");
+        String contentCheck = Files.readString(targetFile);
+        assertFalse(contentCheck.contains("updated content block"), "File should not be modified in check mode");
 
         // 3. Remove block with state: absent
         Task taskRemoveBlock = new Task("Remove block with state absent", "blockinfile", Map.of(
