@@ -72,11 +72,11 @@
 
 ### 2.10 実行結果レポートと統計情報 (ExecutionReport)
 - **状況**: 実装済み。
-- **詳細**: `PlaybookExecutor.executeAndReport` を通じて、Playbook 実行完了時にホスト別・全体共通のメトリクス（ok, changed, unreachable, failed, skipped, total）を集計した `ExecutionReport` オブジェクトを生成します。
-    - **統計情報**: ホスト単位 (`getHostStats`) および全体集計 (`getOverallStats`) の統計データを取得可能です。
-    - **ホストフィルタリング**: `getFailedHosts()`, `getChangedHosts()`, `getSkippedHosts()` または Predicate による柔軟なホストの抽出に対応します。
-    - **タスク結果フィルタリング**: `getFailedTaskResults()`, `getUnreachableTaskResults()`, `getChangedTaskResults()` により特定の状態のタスク結果を抽出可能です。
-    - **エクスポート**: `toSummaryMap()` メソッドにより、結果サマリーを Map 構造で出力可能です。
+- **詳細**: `PlaybookExecutor.executeAndReport` を通じて、Playbook 実行完了時にホスト別・全体共通のメトリクス（ok, changed, unreachable, failed, skipped, total_tasks）を集計した `ExecutionReport` オブジェクトを生成します。
+    - **統計情報**: ホスト単位 (`getHostStats`) および全体集計 (`getOverallStats`) の統計データを取得可能であり、`isSuccess()` により全体としての成功判定が可能です。
+    - **ホストフィルタリング**: `getFailedHosts()`, `getChangedHosts()`, `getSkippedHosts()` または Predicate (`filterHosts`) による柔軟なホストの抽出に対応します。
+    - **タスク結果フィルタリング**: `getFailedTaskResults()`, `getUnreachableTaskResults()`, `getChangedTaskResults()` または Predicate (`filterTaskResults`) により特定状態の `TaskResult` を抽出可能です。
+    - **エクスポート**: `toSummaryMap()` メソッドにより、ホストごとの実行結果サマリーを Map 構造（`Map<String, Map<String, Integer>>`）で出力・連携可能です。
 
 ## 3. タスクのフィルタリング (Tags and Limit)
 
