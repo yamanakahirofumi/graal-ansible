@@ -858,14 +858,29 @@ public class TaskQueueManager {
         if (name == null) {
             name = (String) addHostData.get("host_name");
         }
+        if (name == null) {
+            name = (String) addHostData.get("hostname");
+        }
         if (name == null) return;
 
         Object groupsObj = addHostData.get("groups");
+        if (groupsObj == null) {
+            groupsObj = addHostData.get("groupname");
+        }
+        if (groupsObj == null) {
+            groupsObj = addHostData.get("group");
+        }
+
         List<String> groups = new ArrayList<>();
         if (groupsObj instanceof List<?> list) {
             for (Object o : list) groups.add(o.toString());
         } else if (groupsObj instanceof String s) {
-            groups.add(s);
+            for (String g : s.split(",")) {
+                String trimmed = g.trim();
+                if (!trimmed.isEmpty()) {
+                    groups.add(trimmed);
+                }
+            }
         }
 
         if (groups.isEmpty()) {
@@ -888,7 +903,7 @@ public class TaskQueueManager {
 
             for (Map.Entry<String, Object> entry : addHostData.entrySet()) {
                 String key = entry.getKey();
-                if (!List.of("name", "host_name", "groups", "host_vars", "changed", "failed").contains(key)) {
+                if (!List.of("name", "host_name", "hostname", "groups", "groupname", "group", "host_vars", "changed", "failed").contains(key)) {
                     varsToAdd.put(key, entry.getValue());
                 }
             }
