@@ -350,4 +350,96 @@ class TaskControlAdvancedTest {
         assertTrue(hostResults.get(4).success());
         assertEquals("outer always", hostResults.get(4).data().get("msg"));
     }
+
+    @Test
+    void testUntilRetrySuccess() {
+        // Register a counter module that increments counter on each call
+        final int[] attempts = {0};
+        taskExecutor.registerModule("counter_module", (args, become, context) -> {
+            attempts[0]++;
+            return TaskResult.success(false, Map.of("count", attempts[0]));
+        });
+
+        // Task retries until count == 3
+        Task task = new Task("retry counter", "counter_module", Map.of(), Map.of(), null, "reg_count", null, List.of(),
+                null, null, false, "reg_count.count == 3", 5, 0, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, null, null);
+
+        Play play = new Play("Retry Success Play", "all", List.of(task));
+        Map<String, List<TaskResult>> results = new HashMap<>();
+
+        tqm.executePlay(play, inventory, vm, results, false);
+
+        List<TaskResult> hostResults = results.get("localhost");
+        assertEquals(1, hostResults.size());
+        assertTrue(hostResults.get(0).success());
+        assertEquals(3, attempts[0]);
+        assertEquals(3, hostResults.get(0).data().get("attempts"));
+    }
+
+    @Test
+    void testUntilRetryExceedMaxRetries() {
+        // Module that always returns count 1
+        taskExecutor.registerModule("static_counter", (args, become, context) ->
+                TaskResult.success(false, Map.of("count", 1)));
+
+        // Task retries until count == 5, but retries = 3
+        Task task = new Task("retry fail", "static_counter", Map.of(), Map.of(), null, "reg_static", null, List.of(),
+                null, null, false, "reg_static.count == 5", 3, 0, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, null, null);
+
+        Play play = new Play("Retry Failure Play", "all", List.of(task));
+        Map<String, List<TaskResult>> results = new HashMap<>();
+
+        tqm.executePlay(play, inventory, vm, results, false);
+
+        List<TaskResult> hostResults = results.get("localhost");
+        assertEquals(1, hostResults.size());
+        assertFalse(hostResults.get(0).success(), "Should fail because until condition was not met after 3 retries");
+        assertEquals("Until condition not met after 3 retries", hostResults.get(0).message());
+        assertEquals(3, hostResults.get(0).data().get("attempts"));
+    }
+
+    @Test
+    void testFailedWhenAndChangedWhenListAndEvaluation() {
+        // Register a custom module returning status code 200 and custom flag
+        taskExecutor.registerModule("custom_status", (args, become, context) ->
+                TaskResult.success(false, Map.of("status", 200, "flag", "active")));
+
+        // Task 1: failed_when as list where both conditions are true -> task fails
+        Task failedTask = new Task("list failed when", "custom_status", Map.of(), Map.of(), null, null, null, List.of(),
+                List.of("status == 200", "flag == 'active'"), null, false, null, 1, 0, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, null, null);
+
+        // Task 2: failed_when as list where one condition is false -> task succeeds
+        Task succeedTask = new Task("list failed when partial", "custom_status", Map.of(), Map.of(), null, null, null, List.of(),
+                List.of("status == 200", "flag == 'inactive'"), null, false, null, 1, 0, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, null, null);
+
+        // Task 3: changed_when as list where both conditions are true -> changed = true
+        Task changedTask = new Task("list changed when", "custom_status", Map.of(), Map.of(), null, null, null, List.of(),
+                null, List.of("status == 200", "flag == 'active'"), false, null, 1, 0, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, null, null);
+
+        Play play = new Play("Customization List Play", "all", List.of(failedTask, succeedTask, changedTask));
+        Map<String, List<TaskResult>> results = new HashMap<>();
+
+        tqm.executePlay(play, inventory, vm, results, false);
+
+        List<TaskResult> hostResults = results.get("localhost");
+        // failedTask fails, stopping play for localhost
+        assertEquals(1, hostResults.size());
+        assertFalse(hostResults.get(0).success(), "failed_when list with all true conditions should cause failure");
+
+        // Execute succeedTask and changedTask in a separate play
+        Play play2 = new Play("Customization List Play 2", "all", List.of(succeedTask, changedTask));
+        Map<String, List<TaskResult>> results2 = new HashMap<>();
+
+        tqm.executePlay(play2, inventory, vm, results2, false);
+
+        List<TaskResult> hostResults2 = results2.get("localhost");
+        assertEquals(2, hostResults2.size());
+        assertTrue(hostResults2.get(0).success(), "failed_when list with one false condition should NOT cause failure");
+        assertTrue(hostResults2.get(1).changed(), "changed_when list with all true conditions should set changed = true");
+    }
 }
