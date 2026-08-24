@@ -50,6 +50,12 @@ GraalVM Native Image との相性を考慮し、純粋な Java 実装である *
 - 公開鍵認証 (`~/.ssh/id_rsa` 等、および `ssh-agent`)
 - パスワード認証 (インタラクティブな入力または変数経由)
 
+### 5.3 SSH 踏み台サーバー（Bastion / Jump Host）経由の接続
+プライベートネットワーク等に配置されたターゲットホストに対して、踏み台サーバー経由で多段 SSH トンネリング接続を確立する仕様をサポートしています。
+- **ProxyJump / ProxyCommand パース**: `ansible_ssh_common_args` や `ansible_ssh_extra_args` 内の `-J` / `ProxyJump` オプションおよび `ProxyCommand` 記述の自動解決。
+- **ローカルポートフォワード**: Apache MINA SSHD の `startLocalPortForwarding` を使用したネイティブ Java トンネル処理。
+- **詳細設計**: クラス設計、資格情報解決、リソースリークを防ぐカスケードクローズ等については [SSH 踏み台サーバー経由接続の実装詳細](Ssh-Jump-Host-Support.md) を参照してください。
+
 ## 6. ローカルコネクションの詳細設計
 
 管理ノード（制御ノード）上で直接コマンドを実行します。
