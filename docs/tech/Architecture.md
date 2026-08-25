@@ -34,15 +34,15 @@
 - **Parser**：Playbook (YAML) を解析し、内部の実行モデル（Play, Taskのリスト）に変換します。
 
 ### 2.2 Execution Engine 層 (管理ノード / Control Node)
-- **PlaybookExecutor (PE)**：Playbook 全体の実行フローを管理します。Play, Block, Task の階層構造を辿り、実行完了時には統計情報を含む `ExecutionReport` を集計・生成します。
-- **TaskQueueManager (TQM)**：各ホストへのタスク配信や結果の集計を制御します（将来的な拡張ポイント）。
-- **TaskExecutor (Worker Process)**：個別のタスク実行を担当します。変数の解決 (Jinja2) やプラグインの呼び出しを行います。
-- **VariableManager**：変数のスコープ管理と、Jinja2ライクなテンプレート展開を担当します。
+- **PlaybookExecutor (PE)**：Playbook 全体の実行フローを管理します。Play, Block, Task の階層構造を辿り、実行完了時にはホスト・全タスク統計（`ok`, `changed`, `unreachable`, `failed`, `skipped`, `total_tasks`）を保持し、各種条件フィルタリングおよび `toSummaryMap()` エクスポート機能を備えた `ExecutionReport` オブジェクトを集計・生成します。
+- **TaskQueueManager (TQM)**：各ホストへのタスク配信や結果の集計、実行戦略（`LinearStrategy`, `FreeStrategy`）に基づく並列性・バッチ制御（`serial`, `forks`, `throttle`, `max_fail_percentage`）を担当します。
+- **TaskExecutor (Worker Process)**：個別のタスク実行を担当します。`loop`（`loop_control`）, `until/retries`, `failed_when/changed_when`, `check_mode`, `environment`, `delegate_to` の動的制御および Jinja2 テンプレートの評価を行います。
+- **VariableManager / VariableResolver**：全 22 段階の変数優先順位（CLI, Play, Host, Role, Extra-vars等）とスコープ管理、`Jinjava` によるテンプレート展開を担当します。27 種類の Ansible 互換 Jinja2 フィルター（`to_nice_json`, `to_nice_yaml`, 集合演算フィルター等）および 7 種類の Lookup プラグイン（`file`, `env`, `template`, `pipe`, `dict`, `vars`, `first_found`）をサポートします。
 
 ### 2.3 Provider / Plugin 層 (管理ノード / Control Node)
-- **InventoryManager**：ホスト情報およびグループ変数を管理します。
+- **InventoryManager**：静的インベントリ（INI/YAML）、動的インベントリ（スクリプト / Python インベントリプラグイン）、およびインベントリ・ディレクトリの階層構造と変数を統合管理します。ブラケットを考慮した分割（Bracket-Aware Splitting）と範囲パターン展開（Range Pattern Expansion）によるホストパターン解決をサポートします。
 - **Action Plugin**：管理ノード上で動作し、ファイル転送の準備やテンプレートのレンダリング、必要に応じてターゲットノードへのモジュール実行指示を行います。
-- **Connection Plugin**：ターゲットノードとの通信を担当し、ファイルの転送やリモートコマンド実行を抽象化します（Local, SSH, Docker, WinRM をサポート）。
+- **Connection Plugin**：ターゲットノードとの通信を担当し、ファイルの転送やリモートコマンド実行を抽象化します（Local, SSH [多段 Bastion / Jump Host サポート含む], Docker, WinRM をサポート）。
 - **Python Runtime (GraalPy)**：管理ノード側で Action Plugin や local 接続モジュールを実行するためのランタイム環境を提供します。
 
 ### 2.4 ターゲット実行層 (ターゲットノード / Target Node)
