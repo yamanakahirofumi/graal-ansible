@@ -362,4 +362,79 @@ class BecomeTest {
         assertEquals("su", context.becomeMethod(), "CLI ansible_become_method should be used");
         assertEquals("-m", context.becomeFlags(), "CLI ansible_become_flags should be used");
     }
+
+    @Test
+    void testBecomeInBlockRescueAlways() {
+        String yaml = """
+            - name: Play with block rescue always become settings
+              hosts: all
+              vars:
+                ansible_become: yes
+                ansible_become_user: admin
+                ansible_become_method: su
+                ansible_become_flags: "-s /bin/sh"
+              tasks:
+                - block:
+                    - name: Task in block inheriting block become
+                      debug:
+                        msg: block task 1
+                    - name: Task in block overriding become_user
+                      debug:
+                        msg: block task 2
+                      become_user: appuser
+                  rescue:
+                    - name: Task in rescue section
+                      debug:
+                        msg: rescue task
+                      become_flags: "-n"
+                  always:
+                    - name: Task in always section
+                      debug:
+                        msg: always task
+                      become: no
+            """;
+
+        YamlParser parser = new YamlParser();
+        Playbook playbook = parser.parse(new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8)));
+
+        MockTaskExecutor taskExecutor = new MockTaskExecutor() {
+            @Override
+            public TaskResult execute(Play play, Host host, Task task, VariableManager variableManager, boolean inheritedCheckMode, List<Object> inheritedEnvironments, Map<String, Object> blockVars, Connection connection, ConnectionFactory connectionFactory) {
+                // Return failure for task 1 (block task) to trigger rescue section
+                if (executedTasks.isEmpty()) {
+                    executedTasks.add(task);
+                    Map<String, Object> resolvedVars = variableManager.getAllVariables(play, host, task, blockVars);
+                    BecomeContext bc = getVariableResolver().resolveBecomeContext(play, task, resolvedVars);
+                    executedContexts.add(bc);
+                    return TaskResult.failure("block task failed");
+                }
+                return super.execute(play, host, task, variableManager, inheritedCheckMode, inheritedEnvironments, blockVars, connection, connectionFactory);
+            }
+        };
+
+        PlaybookExecutor playbookExecutor = new PlaybookExecutor(taskExecutor);
+
+        org.example.ansible.inventory.Group allGroup = new org.example.ansible.inventory.Group("all", List.of(new org.example.ansible.inventory.Host("localhost")), List.of(), Map.of("ansible_connection", "local"));
+        Inventory inventory = new Inventory(allGroup);
+
+        playbookExecutor.execute(playbook, inventory);
+
+        List<BecomeContext> contexts = taskExecutor.executedContexts;
+        assertEquals(3, contexts.size());
+
+        // Task 1: block task 1
+        assertTrue(contexts.get(0).become());
+        assertEquals("admin", contexts.get(0).becomeUser());
+        assertEquals("su", contexts.get(0).becomeMethod());
+        assertEquals("-s /bin/sh", contexts.get(0).becomeFlags());
+
+        // Task 2: rescue task
+        assertTrue(contexts.get(1).become());
+        assertEquals("admin", contexts.get(1).becomeUser());
+        assertEquals("su", contexts.get(1).becomeMethod());
+        assertEquals("-n", contexts.get(1).becomeFlags());
+
+        // Task 3: always task
+        assertFalse(contexts.get(2).become());
+    }
 }
