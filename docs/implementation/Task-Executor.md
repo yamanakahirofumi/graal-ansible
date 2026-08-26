@@ -112,3 +112,23 @@
   - `results` キー配下に全イテレーションの実行結果 Map（各要素の `item`, `changed`, `failed`, `_ansible_item_label` 等を含む）のリストを格納した Map が `register` 名で保存されます。
 - **リトライタスク**:
   - 試行のたびに最新の試行データおよび `results` リストが更新され、同タスク内の `until` 条件判定や以降のタスクから透過的にアクセス可能となります。
+
+## 11. 非同期タスクの実行とポーリング制御 (`async` / `poll`)
+
+タスクをバックグラウンドで非同期実行し、結果をポーリング待機または後続処理へ引き継ぐ `TaskExecutor` の実行制御仕様です。
+
+- **`asyncVal` の評価と判定**:
+  - タスク実行時、解決された `resolvedTask.asyncVal()` が 0 より大きい場合、非同期タスクとして実行ロジックが起動されます。
+- **ジョブ ID と実行コンテキストの生成**:
+  - UUID (`java.util.UUID.randomUUID().toString()`) を用いて一意のジョブ ID (`jid`) を生成します。
+  - バックグラウンドスレッド実行時に正しいコンテキストで処理が行われるよう、現在の接続インスタンス (`Connection`)、環境変数 (`environment`)、権限昇格コンテキスト (`BecomeContext`)、およびコレクションパス (`collectionPaths`) をクロージャ上に捕捉（キャプチャ）し、`AsyncJobManager.submit` へ投入します。
+  - バックグラウンド実行スレッド内では、`ThreadLocal` によるコレクションパス設定 (`setCurrentCollectionPaths`) が適用され、タスク完了時に `finally` ブロックにて確実にクリーンアップされます。
+- **ポーリング制御 (`poll > 0`)**:
+  - `poll` に 0 より大きい秒数が指定されている場合、`TaskExecutor` はメインスレッド側でルックアップ・ループに入ります。
+  - `asyncVal` のタイムアウト時間（`System.currentTimeMillis() + asyncVal * 1000L`）に達するまで、`poll` 秒間隔（`Thread.sleep`）で `AsyncJobManager.isCompleted(jid)` を確認します。
+  - 完了を検知した場合は、`AsyncJob` の実行結果 Map を抽出し、`TaskResult`（成功/失敗ステータス、変更の有無、メッセージ、データ）として返却します。
+  - タイムアウト上限に達した場合は、`TaskResult.failure("Async task timed out during polling")` を返却します。
+- **投げっぱなしモード (`poll = 0`)**:
+  - `poll` が 0 の場合、タスクをバックグラウンドスレッドへ投入した直後に、`ansible_job_id` (jid), `started`, `finished=0`, `results_file` を含む成功レスポンス Map を返し、後続のタスク（`async_status` モジュール等での状態チェック）へ制御を渡します。
+- **ライフサイクルとリソースクリーンアップ**:
+  - `TaskExecutor.close()` の呼び出し時に、`AsyncJobManager.shutdown()` が自動的に実行され、非同期ジョブ実行用 ExecutorService のシャットダウンとリソース解放が行われます。
