@@ -34,6 +34,11 @@ public class LocalConnection implements Connection {
         // No-op for local connection
     }
 
+    // Package-private method to allow overriding/mocking during tests
+    Process startProcess(ProcessBuilder pb) throws IOException {
+        return pb.start();
+    }
+
     @Override
     public ConnectionResult execCommand(String command, BecomeContext becomeContext, java.util.Map<String, String> environment) {
         List<String> commandList = new ArrayList<>();
@@ -73,7 +78,7 @@ public class LocalConnection implements Connection {
             pb.environment().putAll(environment);
         }
         try {
-            Process process = pb.start();
+            Process process = startProcess(pb);
 
             if (becomeContext != null && becomeContext.become() && becomeContext.becomePassword() != null) {
                 try (java.io.OutputStream os = process.getOutputStream()) {
