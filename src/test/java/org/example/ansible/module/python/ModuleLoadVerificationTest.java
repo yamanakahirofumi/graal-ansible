@@ -48,6 +48,22 @@ class ModuleLoadVerificationTest {
                 break;
             }
         }
+
+        if (!sitePackages.isEmpty()) {
+            StringBuilder sb = new StringBuilder();
+            sb.append("import sys, types\n");
+            for (String sp : sitePackages) {
+                sb.append("if '").append(sp.replace("\\", "/")).append("' not in sys.path:\n");
+                sb.append("    sys.path.insert(0, '").append(sp.replace("\\", "/")).append("')\n");
+            }
+            sb.append("if 'grp' not in sys.modules:\n");
+            sb.append("    grp_mock = types.ModuleType('grp')\n");
+            sb.append("    grp_mock.getgrnam = lambda *a, **kw: None\n");
+            sb.append("    grp_mock.getgrgid = lambda *a, **kw: None\n");
+            sb.append("    grp_mock.getgrall = lambda: []\n");
+            sb.append("    sys.modules['grp'] = grp_mock\n");
+            context.eval("python", sb.toString());
+        }
     }
 
     @AfterEach
@@ -71,6 +87,15 @@ class ModuleLoadVerificationTest {
             } catch (PolyglotException e) {
                 fail("Failed to compile module " + moduleName + ": " + e.getMessage(), e);
             }
+        }
+    }
+
+    @Test
+    void testVerifyModuleUtilsImportable() {
+        try {
+            context.eval("python", "import ansible.module_utils.basic\nimport ansible.module_utils.common.text.converters");
+        } catch (PolyglotException e) {
+            fail("Failed to import ansible.module_utils: " + e.getMessage(), e);
         }
     }
 }
