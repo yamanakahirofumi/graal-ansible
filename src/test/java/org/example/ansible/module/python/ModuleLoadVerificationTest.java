@@ -1,13 +1,18 @@
 package org.example.ansible.module.python;
 
+import org.example.ansible.util.PythonAnsibleModuleMock;
 import org.example.ansible.util.PythonEnv;
+import org.example.ansible.util.PythonOSMock;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
+import org.graalvm.polyglot.Source;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -49,20 +54,24 @@ class ModuleLoadVerificationTest {
             }
         }
 
-        if (!sitePackages.isEmpty()) {
-            StringBuilder sb = new StringBuilder();
-            sb.append("import sys, types\n");
-            for (String sp : sitePackages) {
-                sb.append("if '").append(sp.replace("\\", "/")).append("' not in sys.path:\n");
-                sb.append("    sys.path.insert(0, '").append(sp.replace("\\", "/")).append("')\n");
+        try {
+            PythonOSMock pythonOSMock = new PythonOSMock();
+            context.getBindings("python").putMember("os_java", pythonOSMock);
+            context.getBindings("python").putMember("AnsibleModuleJava", new PythonAnsibleModuleMock.Factory(pythonOSMock));
+
+            try (InputStream is = getClass().getClassLoader().getResourceAsStream("ansible_bridge.py")) {
+                if (is != null) {
+                    String content = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+                    context.eval(Source.newBuilder("python", content, "ansible_bridge.py").build());
+                }
             }
-            sb.append("if 'grp' not in sys.modules:\n");
-            sb.append("    grp_mock = types.ModuleType('grp')\n");
-            sb.append("    grp_mock.getgrnam = lambda *a, **kw: None\n");
-            sb.append("    grp_mock.getgrgid = lambda *a, **kw: None\n");
-            sb.append("    grp_mock.getgrall = lambda: []\n");
-            sb.append("    sys.modules['grp'] = grp_mock\n");
-            context.eval("python", sb.toString());
+
+            if (!sitePackages.isEmpty()) {
+                context.getBindings("python").putMember("site_packages_list", sitePackages);
+                context.eval("python", "setup_sys_path(site_packages_list)");
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to initialize ansible_bridge.py in test", e);
         }
     }
 
