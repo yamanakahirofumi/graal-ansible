@@ -9,6 +9,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
@@ -40,6 +43,23 @@ class NegativeIntegrationTest {
         if (taskExecutor != null) {
             taskExecutor.close();
         }
+        // Ensure read-only permissions are restored so @TempDir cleanup succeeds
+        File dir = tempDir.toFile();
+        if (dir.exists()) {
+            makeWritableRecursively(dir);
+        }
+    }
+
+    private void makeWritableRecursively(File file) {
+        file.setWritable(true, false);
+        if (file.isDirectory()) {
+            File[] children = file.listFiles();
+            if (children != null) {
+                for (File child : children) {
+                    makeWritableRecursively(child);
+                }
+            }
+        }
     }
 
     @Test
@@ -59,8 +79,6 @@ class NegativeIntegrationTest {
     @Test
     void testInvalidArgumentType() {
         // For 'copy' module, 'dest' must be a string.
-        // We now flatten single-element lists, so we use a multi-element list to ensure failure if appropriate,
-        // or we check that a multi-element list still fails gracefully.
         Task task = new Task("Invalid type", "copy", Map.of(
                 "dest", List.of("/tmp/invalid1", "/tmp/invalid2"),
                 "content", "test"
@@ -82,7 +100,6 @@ class NegativeIntegrationTest {
         TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
 
         assertFalse(result.success(), "Slurp should have failed for non-existent file");
-        // Module usually returns failed=True and a message
         assertTrue(result.data().containsKey("msg"));
     }
 
@@ -106,5 +123,131 @@ class NegativeIntegrationTest {
         assertThrows(RuntimeException.class, () ->
                 taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null)
         );
+    }
+
+    @Test
+    void testCopyNonExistentSourceFile() {
+        Path nonExistentSrc = tempDir.resolve("non_existent_source.txt");
+        Path destFile = tempDir.resolve("dest.txt");
+
+        Task task = new Task("Copy non-existent src", "copy", Map.of(
+                "src", nonExistentSrc.toString(),
+                "dest", destFile.toString()
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertFalse(result.success(), "Copy should have failed for non-existent source file");
+        assertTrue(result.data().containsKey("msg") || result.data().containsKey("exception"),
+                "Result data should contain error information: " + result.data());
+    }
+
+    @Test
+    void testCopyParentDirDoesNotExist() {
+        Path nonExistentParent = tempDir.resolve("no_such_dir").resolve("target.txt");
+
+        Task task = new Task("Copy to non-existent directory", "copy", Map.of(
+                "content", "sample content",
+                "dest", nonExistentParent.toString()
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertFalse(result.success(), "Copy should have failed when target parent directory does not exist");
+    }
+
+    @Test
+    void testFetchMissingRequiredParams() {
+        Task task = new Task("Fetch missing dest", "fetch", Map.of(
+                "src", tempDir.resolve("file.txt").toString()
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertFalse(result.success(), "Fetch should have failed due to missing 'dest' parameter");
+    }
+
+    @Test
+    void testLineInFileMissingRequiredParams() {
+        Task task = new Task("Lineinfile missing line", "lineinfile", Map.of(
+                "path", tempDir.resolve("file.txt").toString()
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertFalse(result.success(), "Lineinfile should have failed due to missing 'line' or 'regexp'");
+    }
+
+    @Test
+    void testReplaceMissingRequiredParams() {
+        Task task = new Task("Replace missing regexp", "replace", Map.of(
+                "path", tempDir.resolve("file.txt").toString(),
+                "replace", "new_value"
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertFalse(result.success(), "Replace should have failed due to missing 'regexp'");
+    }
+
+    @Test
+    void testGetUrlMissingRequiredParams() {
+        Task task = new Task("get_url missing url", "get_url", Map.of(
+                "dest", tempDir.resolve("downloaded.txt").toString()
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertFalse(result.success(), "get_url should have failed due to missing 'url'");
+    }
+
+    @Test
+    void testUserMissingRequiredParams() {
+        Task task = new Task("user missing name", "user", Map.of(
+                "state", "present"
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertFalse(result.success(), "user module should have failed due to missing 'name'");
+    }
+
+    @Test
+    void testUnarchiveMissingRequiredParams() {
+        Task task = new Task("unarchive missing dest", "unarchive", Map.of(
+                "src", tempDir.resolve("archive.tar.gz").toString()
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertFalse(result.success(), "unarchive module should have failed due to missing 'dest'");
+    }
+
+    @Test
+    void testGitMissingRequiredParams() {
+        Task task = new Task("git missing repo", "git", Map.of(
+                "dest", tempDir.resolve("repo_dir").toString()
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertFalse(result.success(), "git module should have failed due to missing 'repo'");
+    }
+
+    @Test
+    void testFilePermissionDenied() throws IOException {
+        Path readOnlyDir = tempDir.resolve("readonly_dir");
+        Files.createDirectories(readOnlyDir);
+        File dirFile = readOnlyDir.toFile();
+        boolean permissionChanged = dirFile.setWritable(false, false);
+
+        if (!permissionChanged) {
+            // Skip test if running as root or OS does not enforce setWritable(false)
+            return;
+        }
+
+        try {
+            Path targetFile = readOnlyDir.resolve("test.txt");
+            Task task = new Task("Touch file in read-only dir", "file", Map.of(
+                    "path", targetFile.toString(),
+                    "state", "touch"
+            ));
+            TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+            assertFalse(result.success(), "Creating file in read-only dir should fail");
+        } finally {
+            dirFile.setWritable(true, false);
+        }
     }
 }
