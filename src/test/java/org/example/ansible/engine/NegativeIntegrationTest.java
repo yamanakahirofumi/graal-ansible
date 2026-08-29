@@ -250,4 +250,88 @@ class NegativeIntegrationTest {
             dirFile.setWritable(true, false);
         }
     }
+
+    @Test
+    void testLineInFileNonExistentPathWithoutCreate() {
+        Path nonExistent = tempDir.resolve("non_existent_linefile.txt");
+        Task task = new Task("Lineinfile non-existent path without create", "lineinfile", Map.of(
+                "path", nonExistent.toString(),
+                "line", "some line"
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertFalse(result.success(), "lineinfile should fail when target file does not exist and create=false");
+        assertTrue(result.data().containsKey("msg"));
+    }
+
+    @Test
+    void testLineInFileBackrefsNoMatch() throws IOException {
+        Path targetFile = tempDir.resolve("backrefs_nomatch.txt");
+        Files.writeString(targetFile, "line 1\nline 2\n");
+
+        Task task = new Task("Lineinfile backrefs no match", "lineinfile", Map.of(
+                "path", targetFile.toString(),
+                "regexp", "^nonexistent_pattern",
+                "line", "REPLACED_LINE",
+                "backrefs", true
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertTrue(result.success(), result.message());
+        assertFalse(result.changed(), "lineinfile with backrefs=true and no regexp match should not change the file");
+        assertEquals("line 1\nline 2\n", Files.readString(targetFile));
+    }
+
+    @Test
+    void testReplaceNonExistentPath() {
+        Path nonExistent = tempDir.resolve("non_existent_replace.txt");
+        Task task = new Task("Replace non-existent path", "replace", Map.of(
+                "path", nonExistent.toString(),
+                "regexp", "foo",
+                "replace", "bar"
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertFalse(result.success(), "replace should fail when target file does not exist");
+        assertTrue(result.data().containsKey("msg"));
+    }
+
+    @Test
+    void testBlockInFileNonExistentPathWithoutCreate() {
+        Path nonExistent = tempDir.resolve("non_existent_blockfile.txt");
+        Task task = new Task("Blockinfile non-existent path without create", "blockinfile", Map.of(
+                "path", nonExistent.toString(),
+                "block", "some block content"
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertFalse(result.success(), "blockinfile should fail when target file does not exist and create=false");
+        assertTrue(result.data().containsKey("msg"));
+    }
+
+    @Test
+    void testStatNonExistentPath() {
+        Path nonExistent = tempDir.resolve("non_existent_stat.txt");
+        Task task = new Task("Stat non-existent path", "stat", Map.of(
+                "path", nonExistent.toString()
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertTrue(result.success(), result.message());
+        Map<String, Object> stat = (Map<String, Object>) result.data().get("stat");
+        assertNotNull(stat, "stat data should be present");
+        assertFalse((Boolean) stat.get("exists"), "stat.exists should be false for non-existent path");
+    }
+
+    @Test
+    void testFileInvalidState() {
+        Task task = new Task("File invalid state", "file", Map.of(
+                "path", tempDir.resolve("test.txt").toString(),
+                "state", "invalid_state_value"
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertFalse(result.success(), "file module should fail for invalid state choice");
+        assertTrue(result.data().containsKey("msg"));
+    }
 }
