@@ -317,6 +317,10 @@ Lookup プラグインは、外部ソース（ファイル、環境変数、コ�
       ```jinja2
       {{ lookup('vars', 'ansible_' + env_type + '_host') }}
       ```
+    - **デフォルト値を指定した変数名の参照**:
+      ```jinja2
+      {{ lookup('vars', 'maybe_missing_var', default='fallback_value') }}
+      ```
 
   #### 7. `first_found`
   指定された複数の候補ファイルパス（または `files` と `paths` の組み合わせ）の中から、最初に実在するファイルの絶対パスを返します。
