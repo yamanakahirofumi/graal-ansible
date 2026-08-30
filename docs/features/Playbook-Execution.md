@@ -77,6 +77,7 @@
     - **ホストフィルタリング**: `getFailedHosts()`, `getChangedHosts()`, `getSkippedHosts()` または Predicate (`filterHosts`) による柔軟なホストの抽出に対応します。
     - **タスク結果フィルタリング**: `getFailedTaskResults()`, `getUnreachableTaskResults()`, `getChangedTaskResults()` または Predicate (`filterTaskResults`) により特定状態の `TaskResult` を抽出可能です。
     - **エクスポート**: `toSummaryMap()` メソッドにより、ホストごとの実行結果サマリーを Map 構造（`Map<String, Map<String, Integer>>`）で出力・連携可能です。
+    - **実装詳細**: クラス設計や各種 API の詳細については、[タスク実行エンジンの実装詳細](../implementation/Task-Executor.md#12-実行結果レポートと統計管理-executionreport) を参照してください。
 
 ## 3. タスクのフィルタリング (Tags and Limit)
 
