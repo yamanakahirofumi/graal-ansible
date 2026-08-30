@@ -132,3 +132,20 @@
   - `poll` が 0 の場合、タスクをバックグラウンドスレッドへ投入した直後に、`ansible_job_id` (jid), `started`, `finished=0`, `results_file` を含む成功レスポンス Map を返し、後続のタスク（`async_status` モジュール等での状態チェック）へ制御を渡します。
 - **ライフサイクルとリソースクリーンアップ**:
   - `TaskExecutor.close()` の呼び出し時に、`AsyncJobManager.shutdown()` が自動的に実行され、非同期ジョブ実行用 ExecutorService のシャットダウンとリソース解放が行われます。
+
+## 12. 実行結果レポートと統計管理 (`ExecutionReport`)
+
+`PlaybookExecutor` による Playbook 実行完了時、全ホストの実行タスク結果（`Map<String, List<TaskResult>>`）を元に集計・生成される詳細レポートオブジェクト `ExecutionReport` の実装詳細仕様です。
+
+- **ホスト別・全体統計メトリクスの動的集計**:
+  - `calculateHostStats`: 各ホストごとに `ok`, `changed`, `unreachable`, `failed`, `skipped`, および合計 `total` タスク数を集計します。
+  - `calculateOverallStats`: 全ホストを通じた総合メトリクス（`total_hosts`, `ok`, `changed`, `unreachable`, `failed`, `skipped`, `total_tasks`）を自動算出します。
+- **全体成功判定 (`isSuccess`)**:
+  - 全体統計における `failed` および `unreachable` がともに 0 である場合に `true` を返します。
+- **ホストおよびタスク結果のフィルタリング API**:
+  - **ホストフィルタ**: `getFailedHosts()`, `getChangedHosts()`, `getSkippedHosts()`, および `filterHosts(Predicate)` により特定条件を満たすホスト名リストを取得できます。
+  - **タスク結果フィルタ**: `getFailedTaskResults()`, `getUnreachableTaskResults()`, `getChangedTaskResults()`, および `filterTaskResults(Predicate)` により特定ステータスの `TaskResult` リストをホスト別に抽出できます。
+- **構造化データの出力 (`toSummaryMap`)**:
+  - `summary.put("success", isSuccess())`, `summary.put("overall", overallStats)`, `summary.put("hosts", hostStats)` を含む Map 構造を出力し、JSON 等へのシリアライズや外部システム連携を容易にします。
+- **`PlaybookExecutor` との連携**:
+  - `PlaybookExecutor.executeAndReport` オーバーロードメソッドを介して、実行完了と同時に `ExecutionReport` インスタンスを取得可能です。
