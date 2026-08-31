@@ -262,6 +262,11 @@ public class PythonAnsibleModuleMock implements Serializable {
             command = argsObj.toString();
         }
 
+        Object chdirObj = params.get("chdir");
+        if (chdirObj != null && !chdirObj.toString().isEmpty()) {
+            command = "cd " + chdirObj.toString() + " && " + command;
+        }
+
         try {
             ConnectionResult res = connection.execCommand(command, becomeContext, environment);
             return new Object[]{res.exitCode(), res.stdout(), res.stderr()};

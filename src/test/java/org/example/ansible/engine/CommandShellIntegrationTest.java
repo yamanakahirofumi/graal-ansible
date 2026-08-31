@@ -198,4 +198,30 @@ class CommandShellIntegrationTest {
         assertTrue(removesResult.success(), removesResult.message());
         assertFalse(removesResult.changed(), "Task with removes should report changed=false when target file does not exist");
     }
+
+    @Test
+    void testCommandWithChdir() throws IOException {
+        Path subDir = tempDir.resolve("chdir_dir");
+        Files.createDirectories(subDir);
+
+        boolean isWindows = System.getProperty("os.name").toLowerCase().contains("win");
+        String pwdCommand = isWindows ? "cd" : "pwd";
+
+        Task task = new Task("Run pwd with chdir", "command", Map.of(
+                "_raw_params", pwdCommand,
+                "chdir", subDir.toAbsolutePath().toString()
+        ));
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message() + " Data: " + result.data());
+        assertTrue(result.changed());
+
+        String stdout = (String) result.data().get("stdout");
+        assertNotNull(stdout, "stdout should not be null");
+
+        Path expectedPath = subDir.toRealPath();
+        Path actualPath = Path.of(stdout.trim()).toRealPath();
+        assertEquals(expectedPath, actualPath, "Working directory should match chdir parameter");
+    }
 }
