@@ -264,7 +264,13 @@ public class PythonAnsibleModuleMock implements Serializable {
 
         Object chdirObj = params.get("chdir");
         if (chdirObj != null && !chdirObj.toString().isEmpty()) {
-            command = "cd " + chdirObj.toString() + " && " + command;
+            String chdirPath = osMock != null ? osMock.normalizePath(chdirObj.toString()) : chdirObj.toString();
+            boolean isWindows = osMock != null && osMock.getOSHandler() != null && "Windows".equals(osMock.getOSHandler().getOSFamily());
+            if (isWindows) {
+                command = "cd /d \"" + chdirPath + "\" && " + command;
+            } else {
+                command = "cd \"" + chdirPath + "\" && " + command;
+            }
         }
 
         try {
