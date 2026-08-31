@@ -107,4 +107,84 @@ class ModuleLoadVerificationTest {
             fail("Failed to import ansible.module_utils: " + e.getMessage(), e);
         }
     }
+
+    @Test
+    void testVerifyAllModulesExistAndCompileMacOsContext() {
+        assertNotNull(modulesDir, "Ansible modules directory could not be located in site-packages");
+
+        Context.Builder builder = Context.newBuilder("python").allowAllAccess(true);
+        builder.option("python.IsolateNativeModules", "false");
+        try (Context macContext = builder.build()) {
+            org.example.ansible.util.PythonOSMock macOSMock = new org.example.ansible.util.PythonOSMock(new org.example.ansible.util.MacOSHandler());
+            macContext.getBindings("python").putMember("os_java", macOSMock);
+            macContext.getBindings("python").putMember("AnsibleModuleJava", new PythonAnsibleModuleMock.Factory(macOSMock));
+
+            try (InputStream is = getClass().getClassLoader().getResourceAsStream("ansible_bridge.py")) {
+                if (is != null) {
+                    String content = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+                    macContext.eval(Source.newBuilder("python", content, "ansible_bridge.py").build());
+                }
+            }
+
+            List<String> sitePackages = PythonEnv.getSitePackagesFromEnv();
+            if (!sitePackages.isEmpty()) {
+                macContext.getBindings("python").putMember("site_packages_list", sitePackages);
+                macContext.eval("python", "setup_sys_path(site_packages_list)");
+            }
+
+            for (String moduleName : BUILTIN_MODULES) {
+                File moduleFile = new File(modulesDir, moduleName + ".py");
+                assertTrue(moduleFile.exists(), "Module file " + moduleFile.getAbsolutePath() + " does not exist");
+
+                try {
+                    macContext.getBindings("python").putMember("module_file_path", moduleFile.getAbsolutePath());
+                    macContext.eval("python", "import py_compile\npy_compile.compile(module_file_path, doraise=True)");
+                } catch (PolyglotException e) {
+                    fail("Failed to compile module " + moduleName + " on macOS context: " + e.getMessage(), e);
+                }
+            }
+        } catch (Exception e) {
+            fail("Failed to initialize or run macOS context test: " + e.getMessage(), e);
+        }
+    }
+
+    @Test
+    void testVerifyAllModulesExistAndCompileWindowsContext() {
+        assertNotNull(modulesDir, "Ansible modules directory could not be located in site-packages");
+
+        Context.Builder builder = Context.newBuilder("python").allowAllAccess(true);
+        builder.option("python.IsolateNativeModules", "false");
+        try (Context winContext = builder.build()) {
+            org.example.ansible.util.PythonOSMock winOSMock = new org.example.ansible.util.PythonOSMock(new org.example.ansible.util.WindowsHandler());
+            winContext.getBindings("python").putMember("os_java", winOSMock);
+            winContext.getBindings("python").putMember("AnsibleModuleJava", new PythonAnsibleModuleMock.Factory(winOSMock));
+
+            try (InputStream is = getClass().getClassLoader().getResourceAsStream("ansible_bridge.py")) {
+                if (is != null) {
+                    String content = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+                    winContext.eval(Source.newBuilder("python", content, "ansible_bridge.py").build());
+                }
+            }
+
+            List<String> sitePackages = PythonEnv.getSitePackagesFromEnv();
+            if (!sitePackages.isEmpty()) {
+                winContext.getBindings("python").putMember("site_packages_list", sitePackages);
+                winContext.eval("python", "setup_sys_path(site_packages_list)");
+            }
+
+            for (String moduleName : BUILTIN_MODULES) {
+                File moduleFile = new File(modulesDir, moduleName + ".py");
+                assertTrue(moduleFile.exists(), "Module file " + moduleFile.getAbsolutePath() + " does not exist");
+
+                try {
+                    winContext.getBindings("python").putMember("module_file_path", moduleFile.getAbsolutePath());
+                    winContext.eval("python", "import py_compile\npy_compile.compile(module_file_path, doraise=True)");
+                } catch (PolyglotException e) {
+                    fail("Failed to compile module " + moduleName + " on Windows context: " + e.getMessage(), e);
+                }
+            }
+        } catch (Exception e) {
+            fail("Failed to initialize or run Windows context test: " + e.getMessage(), e);
+        }
+    }
 }
