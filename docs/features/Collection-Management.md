@@ -58,7 +58,8 @@ my-ansible-project/
 
 1.  **CLI オプション (`--collections-path`)**: コマンドラインで明示的に指定されたパスが最優先されます。
 2.  **環境変数 (`ANSIBLE_COLLECTIONS_PATH`)**: CLI オプションが指定されていない場合、この環境変数の値が使用されます。
-3.  **デフォルトパス**: 上記がいずれも指定されていない場合、後述するデフォルトの位置を探索します。
+3.  **`ansible.cfg` 設定**: カレントディレクトリの `ansible.cfg`、ユーザーホームの `~/.ansible.cfg`、または `/etc/ansible/ansible.cfg` 内の `[defaults]` セクションで定義された `collections_paths` または `collections_path` の値が使用されます。
+4.  **デフォルトパス**: 上記がいずれも指定されていない場合、後述するデフォルトの位置を探索します。
 
 ### 3.1 CLI オプション `--collections-path`
 
@@ -77,7 +78,16 @@ export ANSIBLE_COLLECTIONS_PATH="./collections:/usr/share/ansible/collections"
 graal-ansible playbook.yml
 ```
 
-### 3.3 デフォルトパスの探索
+### 3.3 `ansible.cfg` 設定ファイル
+
+`ansible.cfg` の `[defaults]` セクション内にある `collections_paths` または `collections_path` から解決します。
+
+```ini
+[defaults]
+collections_paths = ./my_collections:~/.ansible/collections
+```
+
+### 3.4 デフォルトパスの探索
 
 上位の指定がない場合、以下のデフォルト位置を自動的に探索します。
 
@@ -85,7 +95,7 @@ graal-ansible playbook.yml
 2.  `~/.ansible/collections`
 3.  `/usr/share/ansible/collections`
 
-### 3.4 `ansible.builtin` の解決
+### 3.5 `ansible.builtin` の解決
 
 `ansible.builtin` などのコアモジュールについては、以下のパスから解決を試みます。
 
@@ -119,6 +129,5 @@ graal-ansible playbook.yml
 
 ## 5. 今後の検討事項
 
-- `ansible.cfg` 内の `collections_paths` 設定への対応。
 - `graal-ansible` 自身で `requirements.yml` を解析し、自動的にコレクションをダウンロードする機能の検討。
 - Native Image 実行時に、特定のコレクションをバイナリに埋め込む（静的リンク）オプションの検討。
