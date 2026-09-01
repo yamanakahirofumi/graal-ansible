@@ -31,6 +31,10 @@ public class PythonOSMock {
         this.osHandler = osHandler;
     }
 
+    public OSHandler getOSHandler() {
+        return osHandler;
+    }
+
     public void setPythonClasses(Value statResultFactory, Value exceptionHandler) {
         this.statResultFactory = statResultFactory;
         this.exceptionHandler = exceptionHandler;
