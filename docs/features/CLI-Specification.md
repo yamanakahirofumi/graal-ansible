@@ -38,12 +38,12 @@ graal-ansible [options] playbook.yml
 
 本家 Ansible との互換性を確保するため、CLI で指定された権限昇格フラグは以下の通り内部変数へマッピングされ、Playbook 内の定義よりも高い優先順位で扱われます。
 
-| CLI オプション | 内部変数名 | 説明 |
-| :--- | :--- | :--- |
-| `-b`, `--become` | `ansible_become` | `true` の場合、全タスクでデフォルトで権限昇格を有効にします。 |
-| `--become-method` | `ansible_become_method` | `sudo`, `su` 等のメソッドを指定します。 |
-| `--become-user` | `ansible_become_user` | 昇格後のユーザーを指定します。 |
-| `--become-flags` | `ansible_become_flags` | 昇格コマンドに渡す追加フラグを指定します。 |
+| CLI オプション    | 内部変数名              | 説明                                                           |
+| :---------------- | :---------------------- | :------------------------------------------------------------- |
+| `-b`, `--become`  | `ansible_become`        | `true` の場合、全タスクでデフォルトで権限昇格を有効にします。 |
+| `--become-method` | `ansible_become_method` | `sudo`, `su` 等のメソッドを指定します。                        |
+| `--become-user`   | `ansible_become_user`   | 昇格後のユーザーを指定します。                                 |
+| `--become-flags`  | `ansible_become_flags`  | 昇格コマンドに渡す追加フラグを指定します。                       |
 
 これらの変数は、`VariableManager` において「CLI変数 (Level 1)」として保持され、Play や Task で明示的に `become: no` 等が指定されない限り、実行コンテキストに適用されます。
 
@@ -106,3 +106,12 @@ Java の起動時オプション（`-Dproperty=value`）として、以下の設
     - `1`: 一般的なエラー
     - `2`: ターゲットノードの一部が失敗
     - `4`: 構文エラー
+
+### 7.1 プログラム API とレポート統合
+
+Java コードからのプログラム的な実行や、各種ツールのバックエンドとしての組み込みにおいては、`PlaybookExecutor` クラスのインターフェースを使用します。
+
+- **`PlaybookExecutor.executeAndReport(...)`**:
+  Playbook の実行完了時に `ExecutionReport` オブジェクトを返却します。
+- **実行結果と終了コードの対応関係**:
+  `ExecutionReport.hasFailed()` または `ExecutionReport.hasUnreachable()` が真の場合、コマンドライン実行時には適切な非ゼロ終了コード (`1` または `2`) へマッピングされます。
