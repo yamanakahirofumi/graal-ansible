@@ -248,6 +248,10 @@ public class PythonAnsibleModuleMock implements Serializable {
     }
 
     public Object[] run_command(Object argsObj) {
+        return run_command(argsObj, null);
+    }
+
+    public Object[] run_command(Object argsObj, String cwdOverride) {
         if (connection == null) {
             return new Object[]{1, "", "No connection"};
         }
@@ -257,12 +261,18 @@ public class PythonAnsibleModuleMock implements Serializable {
             List<?> list = (List<?>) argsObj;
             Object[] mockRes = handleGetentMock(list);
             if (mockRes != null) return mockRes;
-            command = list.stream().map(Object::toString).collect(Collectors.joining(" "));
+            command = list.stream().map(item -> {
+                String s = Objects.toString(item);
+                if (osMock != null) {
+                    s = osMock.normalizePath(s);
+                }
+                return s;
+            }).collect(Collectors.joining(" "));
         } else {
-            command = argsObj.toString();
+            command = osMock != null ? osMock.normalizePath(argsObj.toString()) : argsObj.toString();
         }
 
-        Object chdirObj = params.get("chdir");
+        Object chdirObj = cwdOverride != null && !cwdOverride.isEmpty() ? cwdOverride : params.get("chdir");
         if (chdirObj != null && !chdirObj.toString().isEmpty()) {
             String chdirPath = osMock != null ? osMock.normalizePath(chdirObj.toString()) : chdirObj.toString();
             boolean isWindows = osMock != null && osMock.getOSHandler() != null && "Windows".equals(osMock.getOSHandler().getOSFamily());
