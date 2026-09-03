@@ -265,6 +265,45 @@
 - **コンテキストの分離**:
     - ロール実行中は、そのロール固有の変数が優先的に解決されるよう、`activeRoles` コンテキストをスタック状に管理して実行エンジンに伝播させます。
 
+### 13.5 Play レベルでのロール定義と実行構造 (`roles`)
+
+Play レベルで `roles` キーを用いて直接定義されたロールの解析、ディレクトリ構造、および実行ライフサイクルです。
+
+- **Playbook における指定形式**:
+    - **ショートハンド形式 (文字列リスト)**:
+      ```yaml
+      roles:
+        - common
+        - webserver
+      ```
+    - **辞書・パラメータ形式 (マップリスト)**:
+      ```yaml
+      roles:
+        - role: webserver
+          vars:
+            http_port: 8080
+          tags:
+            - web
+          when: enable_webserver
+      ```
+    - **データ構造**: `Play` レコードは `List<Role> roles` フィールドを保持します。`Role` オブジェクトにはロール名（`name`）、定義引数（`vars`）、条件式（`when`）、およびタグ（`tags`）が含まれます。
+- **標準ディレクトリ構造と探索範囲**:
+    - ロール名に基づき、`playbook_dir/roles/<role_name>/` または `ANSIBLE_ROLES_PATH` 設定上のパス配下から以下の構成要素を検索・ロードします。
+        1. **`defaults/main.yml`**: 低優先度変数 (Level 2: Role defaults)。
+        2. **`vars/main.yml`**: 高優先度変数 (Level 15: Role variables)。
+        3. **`tasks/main.yml`** (または `tasks_from` 指定ファイル): メインタスクリスト。
+        4. **`handlers/main.yml`**: ロール固有の通知ハンドラータスク。
+        5. **`meta/main.yml`**: ロール間の依存関係（`dependencies`）。
+- **実行順序とハンドラーのフラッシュタイミング**:
+    - Play の実行時、以下のライフサイクルに従って順番にタスクが実行されます：
+        1. `pre_tasks` の実行 -> ハンドラーのフラッシュ
+        2. **`roles`（定義順）の実行**
+        3. `tasks`（メインタスク）の実行 -> ハンドラーのフラッシュ
+        4. `post_tasks` の実行 -> ハンドラーのフラッシュ
+- **変数優先順位と `activeRoles` スタック伝播**:
+    - `TaskQueueManager` および `TaskExecutor` は、ロール実行中に現在アクティブなロール情報を `List<Role> activeRoles` スタックとしてコンテキストに保持します。
+    - `VariableManager.getAllVariables` において、`activeRoles` スタック上の各ロールから Level 2 (defaults), Level 15 (vars), および Level 20 (Role parameters) の変数が自動的に集約・配置され、Ansible 互換の変数オーバーライドが保証されます。
+
 ## 14. タグ (`tags`) と 実行制限 (`limit`)
 
 Playbook の実行対象を動的に制御する仕組みの実装について。

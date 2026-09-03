@@ -80,6 +80,14 @@
     - **エクスポート**: `toSummaryMap()` メソッドにより、ホストごとの実行結果サマリーを Map 構造（`Map<String, Map<String, Integer>>`）で出力・連携可能です。
     - **実装詳細**: クラス設計や各種 API の詳細については、[タスク実行エンジンの実装詳細](../implementation/Task-Executor.md#12-実行結果レポートと統計管理-executionreport) を参照してください。
 
+### 2.11 Play レベルでのロール定義と実行構造 (roles)
+- **状況**: 実装済み。
+- **詳細**: Playbook 内の `roles` ディレクティブにおいて、文字列によるショートハンド形式（`roles: [common]`）および変数・タグ・条件式を含む辞書形式（`roles: [{role: web, vars: {port: 80}}]`）の両方をサポートしています。
+    - **実行ライフサイクル**: Playbook 実行時、`pre_tasks` -> (ハンドラーフラッシュ) -> `roles` -> `tasks` -> (ハンドラーフラッシュ) -> `post_tasks` -> (ハンドラーフラッシュ) の順序で実行されます。
+    - **構成要素**: 各ロールディレクトリ（`roles/<role_name>/`）配下の `defaults/main.yml` (Level 2), `vars/main.yml` (Level 15), `tasks/main.yml`, `handlers/main.yml`, `meta/main.yml` が自動ロードされます。
+    - **コンテキスト伝播**: `activeRoles` スタックを介して実行エンジンへロール文脈が伝播され、Ansible 互換の変数優先順位が適用されます。
+    - **実装詳細**: ディレクトリ解決や構造の詳細は、[タスク制御の実装詳細](../implementation/Task-Control.md#135-play-レベルでのロール定義と実行構造-roles) を参照してください。
+
 ## 3. タスクのフィルタリング (Tags and Limit)
 
 Playbook の実行範囲を制御するためのフィルタリング機能を提供します。
