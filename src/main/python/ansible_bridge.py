@@ -293,8 +293,12 @@ class ActionBase:
                             r_dict = {'failed': True, 'msg': 'Failed to bridge module result'}
 
                 if 'changed' not in r_dict: r_dict['changed'] = True
+                if 'module_stdout' not in r_dict:
+                    r_dict['module_stdout'] = r_dict.get('stdout', '')
+                if 'module_stderr' not in r_dict:
+                    r_dict['module_stderr'] = r_dict.get('stderr', '')
                 return r_dict
-            return {'changed': True}
+            return {'changed': True, 'module_stdout': '', 'module_stderr': ''}
         return {'failed': True, 'msg': 'task_executor_java not available'}
     def _remove_tmp_path(self, *args: Any, **kwargs: Any) -> None: pass
     def _find_needle(self, name: str, needle: str, *args: Any, **kwargs: Any) -> str:
@@ -1042,8 +1046,17 @@ def _create_action_plugin(action_name: str, task: Any, connection: Any, play_con
             def __init__(self, obj: Any) -> None:
                 self._obj, self._shell = obj, MockShell()
                 self.become = False
+                self.transport = 'local'
+                if obj:
+                    try:
+                        cn = obj.getClass().getName()
+                        if 'Ssh' in cn: self.transport = 'ssh'
+                        elif 'Docker' in cn: self.transport = 'docker'
+                        elif 'WinRM' in cn: self.transport = 'winrm'
+                    except: pass
             def __getattr__(self, name: str) -> Any:
                 if name == 'become': return self.become
+                if name == 'transport': return self.transport
                 return getattr(self._obj, name)
             def reset(self): pass
             def get_option(self, key):

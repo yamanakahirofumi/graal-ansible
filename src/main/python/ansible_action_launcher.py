@@ -45,6 +45,7 @@ def run_action_plugin() -> Dict[str, Any]:
 
         mock_task = Task()
         mock_task.action, mock_task.args = action_name, module_args
+        mock_task.check_mode = bool(module_args.get('_ansible_check_mode', False))
         # Initialize internal fields required by some Action Plugins (like copy)
         src_val = module_args.get('src', '')
         if isinstance(src_val, list) and len(src_val) > 0: src_val = src_val[0]
@@ -57,11 +58,14 @@ def run_action_plugin() -> Dict[str, Any]:
                 l.set_basedir(str(base_dir))
                 mock_task._origin.path = str(base_dir)
 
+        play_ctx = PlayContext()
+        play_ctx.check_mode = mock_task.check_mode
+
         plugin = ansible_bridge._create_action_plugin(
             action_name,
             task=mock_task,
             connection=connection_java if 'connection_java' in globals() else None,
-            play_context=PlayContext(),
+            play_context=play_ctx,
             loader=l,
             templar=Templar(variables=task_vars),
             shared_loader_obj=sys.modules['ansible.plugins.loader']

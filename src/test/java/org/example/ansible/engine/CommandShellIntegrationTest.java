@@ -224,4 +224,27 @@ class CommandShellIntegrationTest {
         Path actualPath = Path.of(stdout.trim()).toRealPath();
         assertEquals(expectedPath, actualPath, "Working directory should match chdir parameter");
     }
+
+    @Test
+    void testRebootCheckMode() {
+        Task task = new Task("Reboot host in check mode", "reboot", Map.of(
+                "msg", "Rebooting system for integration test",
+                "reboot_timeout", 300
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 0, 0, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, Map.of());
+
+        // Provide ansible_distribution fact so reboot action plugin doesn't need live setup execution
+        VariableManager vmWithFacts = new VariableManager(
+                new Inventory(new Group("all", List.of(host), List.of(), Map.of())),
+                Map.of("ansible_distribution", "Debian", "ansible_os_family", "Debian")
+        );
+
+        org.example.ansible.connection.SshConnection sshConnection = new org.example.ansible.connection.SshConnection("127.0.0.1", 22, "user", "pass");
+
+        TaskResult result = taskExecutor.execute(play, host, task, vmWithFacts, true, null, null, sshConnection, null);
+
+        assertTrue(result.success(), "Execution failed: " + result.message() + " Data: " + result.data());
+        assertTrue(result.changed(), "Reboot in check mode should report changed=true");
+    }
 }

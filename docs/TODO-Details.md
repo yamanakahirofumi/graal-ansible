@@ -16,7 +16,7 @@
 
 ### 2.1 [ ] Ansible 本体の完全ロードと基本動作の実現 (フェーズ1)
 - **概要**: `ansible-core` を完全にロードし、Linux/macOS での全 72 モジュールの動作確認。
-- **詳細は [Module-Support-Status.md](features/Module-Support-Status.md) を参照。** (現在 67/72 モジュール検証済み: 61 ◎, 4 ○, 2 ●)
+- **詳細は [Module-Support-Status.md](features/Module-Support-Status.md) を参照。** (現在 68/72 モジュール検証済み: 61 ◎, 5 ○, 2 ●)
 - **テスト拡充戦略については [Test-Expansion-Strategy.md](tech/Test-Expansion-Strategy.md) を参照。**
 - **注意**: `python.IsolateNativeModules` と `python.PosixModuleBackend` はフェーズ 1 においては原則として固定（Linuxでは安定のため True/Native）とする。
 - **備考**: 検証には必要に応じて **Testcontainers** を**ターゲットノード**として活用する。全モジュールの検証完了をもってフェーズ 1 完了とする。
