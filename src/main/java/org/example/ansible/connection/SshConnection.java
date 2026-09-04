@@ -60,6 +60,11 @@ public class SshConnection implements Connection {
     }
 
     @Override
+    public String getTransport() {
+        return "ssh";
+    }
+
+    @Override
     public void connect() {
         try {
             client = SshClient.setUpDefaultClient();

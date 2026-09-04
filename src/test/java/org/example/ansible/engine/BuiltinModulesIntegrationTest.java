@@ -171,4 +171,54 @@ class BuiltinModulesIntegrationTest {
         assertEquals(5432, facts.get("database_port"));
         assertEquals("localhost", facts.get("database_host"));
     }
+
+    @Test
+    void testRebootModuleCheckMode() {
+        variableManager.addFacts("localhost", Map.of(
+                "distribution", "Ubuntu",
+                "os_family", "Debian",
+                "system", "Linux",
+                "ansible_distribution", "Ubuntu",
+                "ansible_os_family", "Debian",
+                "ansible_system", "Linux"
+        ));
+
+        Task task = new Task("Reboot check mode", "reboot", Map.of(), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        LocalConnection localConn = new LocalConnection();
+        org.example.ansible.connection.Connection sshConnection = new org.example.ansible.connection.Connection() {
+            @Override
+            public String getTransport() {
+                return "ssh";
+            }
+            @Override
+            public void connect() {
+                localConn.connect();
+            }
+            @Override
+            public org.example.ansible.connection.ConnectionResult execCommand(String command, org.example.ansible.connection.BecomeContext becomeContext, Map<String, String> environment) {
+                if (command.contains("shutdown") || command.contains("reboot")) {
+                    return new org.example.ansible.connection.ConnectionResult("1000", "", 0);
+                }
+                return localConn.execCommand(command, becomeContext, environment);
+            }
+            @Override
+            public void putFile(Path localPath, String remotePath) {
+                localConn.putFile(localPath, remotePath);
+            }
+            @Override
+            public void fetchFile(String remotePath, Path localPath) {
+                localConn.fetchFile(remotePath, localPath);
+            }
+            @Override
+            public void close() {
+                localConn.close();
+            }
+        };
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, sshConnection, null);
+        assertTrue(result.success(), "reboot check mode failed: " + result.message() + " Data: " + result.data());
+    }
 }

@@ -41,6 +41,11 @@ public class DockerConnection implements Connection {
     }
 
     @Override
+    public String getTransport() {
+        return "docker";
+    }
+
+    @Override
     public void connect() {
         // Verify if the container exists and is running using docker inspect
         List<String> cmd = List.of("docker", "inspect", "-f", "{{.State.Running}}", containerName);

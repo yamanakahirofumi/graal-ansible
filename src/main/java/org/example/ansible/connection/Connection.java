@@ -7,6 +7,15 @@ import java.nio.file.Path;
  */
 public interface Connection extends AutoCloseable {
     /**
+     * Gets the transport type string (e.g. "local", "ssh", "winrm", "docker").
+     *
+     * @return The transport type.
+     */
+    default String getTransport() {
+        return "local";
+    }
+
+    /**
      * Connects to the target host.
      */
     void connect();

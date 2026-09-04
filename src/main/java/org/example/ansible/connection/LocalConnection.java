@@ -30,6 +30,11 @@ public class LocalConnection implements Connection {
     }
 
     @Override
+    public String getTransport() {
+        return "local";
+    }
+
+    @Override
     public void connect() {
         // No-op for local connection
     }
