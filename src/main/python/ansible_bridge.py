@@ -65,16 +65,20 @@ _current_task_context: Dict[str, Any] = {
 def _normalize_path(p: Any) -> str:
     return str(os_java.normalizePath(_to_java_str(p)))
 
-def mock_get_bin_path(arg: str, required: bool = False, opt_dirs: Optional[List[str]] = None) -> str:
+def mock_get_bin_path(arg: str, required: bool = True, opt_dirs: Optional[List[str]] = None) -> Optional[str]:
     if arg == 'python': return sys.executable
-    # Try to find absolute path using shutil.which
+    if opt_dirs:
+        for d in opt_dirs:
+            p = os.path.join(d, arg)
+            if os.path.exists(p): return p
     found = shutil.which(arg)
     if found: return found
+    for d in ['/usr/bin', '/usr/local/bin', '/bin', '/usr/sbin', '/sbin']:
+        p = os.path.join(d, arg)
+        if os.path.exists(p): return p
     if required:
-        # If required but not found, we return the arg and let the module handle it
-        # or we could raise an error here if we wanted to be more strict.
-        return arg
-    return arg
+        raise ValueError(f"Failed to find required executable {arg} in path")
+    return None
 
 def _unwrap_val(k: Any, v: Any) -> Any:
     key_str = str(k)
@@ -166,6 +170,12 @@ def setup_sys_path(site_packages: Optional[List[str]], collection_paths: Optiona
                                 except: pass
 
 def setup_env(env_vars: Optional[Dict[str, Any]]) -> None:
+    if 'PATH' not in os.environ or not os.environ['PATH']:
+        os.environ['PATH'] = '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+    else:
+        for p in ['/usr/bin', '/usr/local/bin', '/bin', '/usr/sbin', '/sbin']:
+            if p not in os.environ['PATH']:
+                os.environ['PATH'] += ':' + p
     if env_vars:
         for k, v in dict(env_vars).items(): os.environ[str(k)] = str(v)
 
@@ -442,6 +452,9 @@ class AnsibleModule:
             _current_task_context.get('environment_java'),
             print, sys.exit
         )
+        import __main__
+        mod_fqn = getattr(__main__, '_module_fqn', 'module')
+        self._name = str(mod_fqn).split('.')[-1] if mod_fqn else 'module'
         self.params: Dict[str, Any] = _deep_convert(self._java_mock.getParams())
         self.check_mode: bool = bool(self._java_mock.getCheck_mode())
         self._debug: bool = bool(self._java_mock.get_debug())
@@ -462,10 +475,11 @@ class AnsibleModule:
         self._java_mock.fail_json(_deep_convert(kwargs))
 
     def run_command(self, args: Union[str, List[str]], **kwargs: Any) -> Tuple[int, str, str]:
-        res = self._java_mock.run_command(args)
+        cwd = kwargs.get('cwd') or kwargs.get('chdir')
+        res = self._java_mock.run_command(args, _to_java_str(cwd))
         return (int(res[0]), str(res[1]), str(res[2]))
 
-    def get_bin_path(self, arg: str, required: bool = False, opt_dirs: Optional[List[str]] = None) -> Optional[str]:
+    def get_bin_path(self, arg: str, required: bool = True, opt_dirs: Optional[List[str]] = None) -> Optional[str]:
         return mock_get_bin_path(arg, required, opt_dirs)
 
     def sha1(self, path: str) -> str: return str(self._java_mock.sha1(_to_java_str(path)))
@@ -1053,6 +1067,10 @@ def _create_action_plugin(action_name: str, task: Any, connection: Any, play_con
                 rp, lp = _normalize_path(remote_path), _normalize_path(local_path)
                 from java.nio.file import Paths
                 self._obj.fetchFile(str(rp), Paths.get(str(lp)))
+            def put_file(self, local_path: str, remote_path: str) -> None:
+                lp, rp = _normalize_path(local_path), _normalize_path(remote_path)
+                from java.nio.file import Paths
+                self._obj.putFile(Paths.get(str(lp)), str(rp))
             def exec_command(self, cmd: str, in_data: Any = None, sudoable: bool = True) -> Tuple[int, str, str]:
                 bc = _current_task_context.get('become_context_java')
                 res = self._obj.execCommand(str(cmd), bc if sudoable else None, _current_task_context.get('environment_java'))

@@ -389,6 +389,11 @@ class FileModulesIntegrationTest {
 
     @Test
     void testDpkgSelectionsModule() {
+        // Skip dpkg_selections test on Windows because the dpkg utility is typically missing
+        if (System.getProperty("os.name").toLowerCase().contains("win")) {
+            return;
+        }
+
         // dpkg_selections is for setting selections, let's use it in check_mode
         Task task = new Task("Set dpkg selections", "dpkg_selections", Map.of(
                 "name", "sed",
