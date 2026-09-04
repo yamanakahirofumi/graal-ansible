@@ -101,7 +101,7 @@
 - **Windows**: `LocalConnection` および `debug` モジュールの動作を確認中。
 
 ### 2.2 テストカテゴリ
-- **Module Load Test**: `ansible.builtin` の各モジュールがインポートエラーなく読み込めるかを確認（Linux では約 50% のロードを確認済。依存関係を順次解決中）。
+- **Module Load Test**: `ModuleLoadVerificationTest.java` により、`ansible.builtin` の全 72 モジュールが Linux、macOS、および Windows 実行コンテキスト（`PythonOSMock`）において存在し、GraalPy 上でコンパイル・ロードエラーなく正常に読み込めることを 100% 検証済み。
 - **Integration Test**: 実際の Playbook を使用して、ターゲットノードの状態が正しく変更されるかを検証。必要に応じて **Testcontainers** を**ターゲットノード**として用いる。
 
 ## 3. 実装フェーズと進捗状況 (Implementation Phases)
