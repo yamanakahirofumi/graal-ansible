@@ -282,6 +282,12 @@
     - `ToNiceJsonFilter` および `ToNiceYamlFilter` を実装し、位置引数（Positional Arguments）およびキーワード/名前付き引数（Keyword Arguments）の両方によるパラメータ展開をサポート。
     - `VariableResolver` にて両フィルターを登録し、`ToNiceJsonFilterTest` および `ToNiceYamlFilterTest` により動作を検証済み。
 
+### 1.41 [✓] Jinja2 カスタムフィルター単体テストの拡充 (MoreFiltersTest.java)
+- **完了日**: 2026-10-24
+- **概要**: `b64encode`, `b64decode`, `quote`, `bool`, `to_json`, `to_yaml`, `regex_replace`, およびパス関連フィルターの境界値・null 処理を含む単体テストスイートを構築。
+- **解決策**:
+    - `MoreFiltersTest.java` を追加し、各種カスタムフィルターの正常系、空文字/未定義変数の評価結果、例外/エスケープ処理のテストを網羅。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築
