@@ -63,6 +63,11 @@ public class WinRMConnection implements Connection {
     }
 
     @Override
+    public String getTransport() {
+        return "winrm";
+    }
+
+    @Override
     public void connect() {
         try {
             WinRmToolResponse response = getTool().executePs("Write-Output 'connected'");

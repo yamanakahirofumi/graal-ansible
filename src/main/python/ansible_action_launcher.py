@@ -57,11 +57,16 @@ def run_action_plugin() -> Dict[str, Any]:
                 l.set_basedir(str(base_dir))
                 mock_task._origin.path = str(base_dir)
 
+        check_mode_val = bool(module_args.get('_ansible_check_mode') or task_vars.get('ansible_check_mode'))
+        play_ctx = PlayContext()
+        play_ctx.check_mode = check_mode_val
+        mock_task.check_mode = check_mode_val
+
         plugin = ansible_bridge._create_action_plugin(
             action_name,
             task=mock_task,
             connection=connection_java if 'connection_java' in globals() else None,
-            play_context=PlayContext(),
+            play_context=play_ctx,
             loader=l,
             templar=Templar(variables=task_vars),
             shared_loader_obj=sys.modules['ansible.plugins.loader']
