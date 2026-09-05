@@ -359,3 +359,10 @@
     - ホスト別・全体共通のメトリクス（ok, changed, unreachable, failed, skipped, total）の自動集計、`isSuccess()` 判定、および `toSummaryMap()` によるレポート出力機能をサポート。
     - ホスト状態フィルタ（`getFailedHosts`, `getChangedHosts`, `getSkippedHosts`, Predicate）およびタスク結果フィルタ（`getFailedTaskResults`, `getUnreachableTaskResults`, `getChangedTaskResults`, Predicate）をサポート。
     - `PlaybookExecutor` に `executeAndReport` オーバーロードメソッドを統合し、`ExecutionReportTest` による単体テストスイートを構築。
+
+### 2.12 [✓] マルチ OS 対応モジュールロード検証テストの展開と CI 統合
+- **完了日**: 2026-10-24
+- **概要**: `ansible.builtin` 全 72 モジュールのロード（`py_compile`）および `ansible.module_utils` 依存関係のロードを、Linux、macOS、Windows 実行コンテキスト（`PythonOSMock`）で全自動検証するテストスイートの構築。
+- **解決策**:
+    - `ModuleLoadVerificationTest.java` を実装し、LinuxContext、macOSContext (`MacOSHandler`)、WindowsContext (`WindowsHandler`) のそれぞれで全 72 モジュールが GraalPy 上でコンパイル・インポートエラーなく正常にロードできることを検証。
+    - `docs/features/Module-Support-Status.md` および `docs/tech/Test-Expansion-Strategy.md` のモジュールロードテストステータスを同期・整理。

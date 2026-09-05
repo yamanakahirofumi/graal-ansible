@@ -9,11 +9,11 @@
 以下の 4 つの観点からテストケースを拡充する。
 
 ### 2.1 モジュールロード互換性テスト (Module Load Verification)
-- **現状**: Linux 上で `ansible.builtin` の 72 モジュールのロード（インポート）確認が完了している。
-- **拡充計画**:
-    - **マルチ OS 対応**: macOS および Windows 環境において、同等のモジュールロードテストを実行し、ロードエラーが発生しないことを確認。
-    - **依存関係の解決**: `ansible.module_utils` が正しくロードされているか、不足している Python パッケージがないかを自動検知。
-    - **自動化**: `PythonModule` を直接生成してロードするだけの軽量なユニットテストスイートを作成し、CI に組み込む。
+- **現状**: `ModuleLoadVerificationTest.java` により、Linux、macOS、および Windows 実行コンテキスト（`PythonOSMock`）における `ansible.builtin` 全 72 モジュールの存在チェックおよび GraalPy によるコンイル・インポート確認が 100% 完了し、CI に統合済み。
+- **実装内容**:
+    - **マルチ OS 対応**: LinuxContext、macOSContext (`MacOSHandler`)、および WindowsContext (`WindowsHandler`) の各擬似環境下で全 72 モジュールの `py_compile` テストを自動化。
+    - **依存関係の解決**: `ansible.module_utils.basic` および `text.converters` の正常インポートを `testVerifyModuleUtilsImportable` にて事前検証。
+    - **自動化**: Polyglot Context を活用した軽量テストスイートとして JUnit 5 実行環境に組み込み済み。
 
 ### 2.2 主要モジュールの機能網羅テスト (Functional Integration Tests)
 - **現状**: `ping`, `copy`, `file`, `stat`, `template` の正常系テストが CI 環境に統合済み。
@@ -46,7 +46,7 @@
 
 | フェーズ | 項目 | 内容 | 優先度 |
 | :--- | :--- | :--- | :--- |
-| 短期 (1-2週) | ロードテストの OS 展開 | macOS/Windows での全モジュールインポート確認 | 高 |
+| 完了 | ロードテストの OS 展開 | macOS/Windows での全モジュールインポート確認 (`ModuleLoadVerificationTest.java`) | 完了 |
 | 短期 (1-2週) | 正常系テストの追加 | `command`, `shell`, `setup` の基本テスト実装 | 高 |
 | 中期 (3-4週) | 異常系テストの導入 | エラーメッセージの検証、権限不足時の挙動確認 | 中 |
 | 中期 (3-4週) | 変数・制御フローの拡充 | 複雑な Playbook 構造のテストセット作成 | 中 |
