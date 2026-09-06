@@ -56,11 +56,66 @@ GraalVM Native Image との相性を考慮し、純粋な Java 実装である *
 - **ローカルポートフォワード**: Apache MINA SSHD の `startLocalPortForwarding` を使用したネイティブ Java トンネル処理。
 - **詳細設計**: クラス設計、資格情報解決、リソースリークを防ぐカスケードクローズ等については [SSH 踏み台サーバー経由接続の実装詳細](Ssh-Jump-Host-Support.md) を参照してください。
 
-## 6. ローカルコネクションの詳細設計
+## 6. ローカルコネクションの詳細設計 (LocalConnection Implementation)
 
-管理ノード（制御ノード）上で直接コマンドを実行します。
-- `sudo` が指定された場合、`sudo -n` (non-interactive) を付与して実行します。
-- `exec_command` で渡された `environment` マップを、`ProcessBuilder` の `environment()` にマージして実行します。
+`LocalConnection` は、管理ノード（制御ノード）自身の上で直接プロセスを起動してタスクを実行するためのコネクションプラグインです。`ansible_connection: local` 指定時や `delegate_to: localhost` 実行時に利用されます。
+
+### 6.1 プロセス実行メカニズムと OS 抽象化 (`OSHandler`)
+
+管理ノードの OS 差分（Linux/macOS vs Windows）を透過的に吸収するため、`OSHandlerFactory` 経由で取得した `OSHandler` インスタンスを使用します。
+
+- **標準シェルの自動選択**:
+  - `OSHandler.getShellExecutable()` を介して、Linux/macOS の場合は `/bin/sh -c`、Windows の場合は `cmd.exe /c` などの OS に適したシェルコマンド配列を自動的にプリペンド（前置）してコマンドラインを構築します。
+- **ProcessBuilder による実行**:
+  - 構築されたコマンドリストを `java.lang.ProcessBuilder` に渡し、`startProcess(pb)` メソッドを通じてローカルプロセスを起動します。
+
+### 6.2 権限昇格 (Become) とパスワードストリーム自動注入
+
+`BecomeContext` が有効（`become=true`）かつ `OSHandler.supportsSudo()` が真を返す場合、ローカル環境での権限昇格コマンド構築および認証処理を行います。
+
+- **`sudo` メソッド (`become_method=sudo` またはデフォルト)**:
+  - コマンドリストの先頭に `sudo` を付与します。
+  - パスワード指定時（`becomePassword != null`）は、プロンプトからの標準入力読み込みを指示する `-S` オプションを追加します。
+  - プロンプト識別用マーカーとして `-p BECOME-PROMPT` を指定します。
+  - ユーザー指定時（`becomeUser != null`）は `-u <user>` を追加します。
+  - フラグ指定時（`becomeFlags`）は空白区切りで各オプションフラグ（例: `-H` 等）を追加します。
+- **`su` メソッド (`become_method=su`)**:
+  - `su [<user>] -c` 構文のコマンドラインラッパーを構築します。
+- **パスワードの標準入力書き込み**:
+  - `process.getOutputStream()` を介して、UTF-8 エンコードされたパスワード（`becomePassword + "\n"`）を安全に子プロセスの標準入力へ即時書き込みし、`flush()` を行って入力を完了させます。
+
+### 6.3 タスク環境変数 (`environment`) の伝播
+
+Jinja2 テンプレートやタスク定義で評価された環境変数マップ (`Map<String, String> environment`) は、`ProcessBuilder.environment()` に直接マージされます。これにより、管理ノードの既存環境変数を維持しながら、タスク固有の環境変数を確実に子プロセスへ伝播させます。
+
+### 6.4 非同期ストリーム読み込みによるデッドロック防止
+
+子プロセスの標準出力（`stdout`）および標準エラー出力（`stderr`）のバッファ溢れによるデッドロックを防ぐため、`CompletableFuture.supplyAsync` を用いて並行スレッド上でそれぞれのストリームを即座に読み込みます。
+
+- `readStreamAsync(InputStream)`: `process.getInputStream()` および `process.getErrorStream()` をバックグラウンドスレッドで全量キャプチャ（`is.readAllBytes()`）します。
+- `process.waitFor()` でプロセスの終了コードを取得した後、`CompletableFuture.get()` で両ストリームの読み込み結果を確定させ、`ConnectionResult(stdout, stderr, exitCode)` として集計・返却します。
+
+### 6.5 ファイル転送 (`putFile` / `fetchFile`) のローカルファイルコピー
+
+ローカル環境におけるファイル転送は、リモート通信プロトコルを必要としないため、Java 標準の `java.nio.file.Files` API を用いて直接コピーします。
+
+- **`putFile(localPath, remotePath)`**:
+  - ターゲットパス (`remotePath`) が既存のディレクトリである場合、`localPath` のファイル名と結合して保存先パスを解決します。
+  - `Files.copy(localPath, targetPath, StandardCopyOption.REPLACE_EXISTING)` により安全にファイルコピーを実行します。
+- **`fetchFile(remotePath, localPath)`**:
+  - ソースパス (`remotePath`) とターゲットパス (`localPath`) を解決し、同様に `Files.copy` を用いてコピーを実行します。
+
+### 6.6 単体テスト・モッキング戦略 (`LocalConnectionTest.java`)
+
+OS の実際の `sudo` や外部プロセスの依存なしに、継続的インテグレーション（CI）環境で一貫したテストを実行するため、`LocalConnection` にはパッケージプライベートなフックメソッドが設計されています。
+
+- **`startProcess(ProcessBuilder pb)` メソッド**:
+  - パッケージプライベートで定義されており、ユニットテストコード (`LocalConnectionTest`) 内でオーバライドすることで、外部プロセスの起動をインターセプトしてダミーの `Process` オブジェクトを注入可能です。
+- **テスト検証範囲**:
+  - `sudo` および `su` 構文に適用される各 CLI 引数（`-S`, `-p`, `-u`, `becomeFlags`）の構築アサーション。
+  - パスワード入力ストリームへの正確なパスワード文字列の書き込みとフラッシュの検証。
+  - `ProcessBuilder` への環境変数セットのマージ検証。
+  - `IOException` や `InterruptedException` 発生時の例外メッセージラッピングと終了コード `1` の安全な返却検証。
 
 ## 7. 実装上の注意
 
