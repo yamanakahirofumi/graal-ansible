@@ -10,7 +10,7 @@
 - **変数解決**: Jinjava による Jinja2 互換テンプレート、22段階の変数優先順位（all, group, host, play, extra-vars等）、Ansible Vault 暗号化データのネイティブ動的復号対応。
 - **タスク制御 (Worker)**: `when`, `loop`, `register`, `notify/handlers`, `until/retries`, `delegate_to`, `ignore_unreachable`, `delegate_facts`, `check_mode`, `async/poll`, `throttle`, `max_fail_percentage` 等のサポート。
 - **権限昇格**: `become` (sudo, su) の実装。
-- **コレクション対応**: フェーズ 1 進行中（ansible-core の完全ロードと Linux での 67 モジュールの検証完了：61 ◎, 4 ○, 2 ●）。
+- **コレクション対応**: フェーズ 1 進行中（ansible-core の完全ロードと Linux での 68 モジュールの検証完了：61 ◎, 5 ○, 2 ●）。
 - **接続 (Connection Plugin)**: `local` 接続、`ssh` (Apache MINA SSHD / 多段 SSH 踏み台サーバー経由接続対応)、`docker` (Docker CLI)、および `winrm` (WinRM4J) のサポート。
 - **ターゲット実行 (ターゲットノード)**: Ansiballz 形式によるモジュール転送・実行モデルの実装。
 - **OS 抽象化**: `OSHandler` によるターゲット OS (Linux/Windows) 間の差異吸収。
