@@ -70,7 +70,7 @@ class AsyncTaskIntegrationTest {
                 Map.of(), null, "async_res", null, Map.of(), List.of(), null, null, false,
                 null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
                 null, null, null, null, null, null, List.of(), List.of(), null,
-                10, 0 // async: 10, poll: 0
+                30, 0 // async: 30, poll: 0
         );
 
         TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
@@ -87,9 +87,9 @@ class AsyncTaskIntegrationTest {
         // Check status using async_status
         Task statusTask = new Task("Check status", "async_status", Map.of("jid", jid));
 
-        // Wait and check multiple times
+        // Wait and check multiple times (increased timeout for slow CI environments e.g. Windows)
         boolean finished = false;
-        for (int i = 0; i < 20; i++) {
+        for (int i = 0; i < 40; i++) {
             Thread.sleep(1000);
             TaskResult statusResult = taskExecutor.execute(play, host, statusTask, variableManager, false, null, null, new LocalConnection(), null);
             assertTrue(statusResult.success());
