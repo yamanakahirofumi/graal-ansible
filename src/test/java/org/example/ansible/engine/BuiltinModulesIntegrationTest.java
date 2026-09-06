@@ -221,4 +221,78 @@ class BuiltinModulesIntegrationTest {
         TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, sshConnection, null);
         assertTrue(result.success(), "reboot check mode failed: " + result.message() + " Data: " + result.data());
     }
+
+    @Test
+    void testSlurpModule() throws IOException {
+        Path targetFile = tempDir.resolve("slurp_test.txt");
+        Files.writeString(targetFile, "Hello Slurp!");
+
+        Task task = new Task("Slurp file", "slurp", Map.of(
+                "src", targetFile.toString()
+        ));
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "slurp failed: " + result.message() + " Data: " + result.data());
+        assertNotNull(result.data().get("content"), "slurp should return content");
+        assertEquals("base64", result.data().get("encoding"));
+    }
+
+    @Test
+    void testStatModuleAndCheckMode() throws IOException {
+        Path targetFile = tempDir.resolve("stat_test.txt");
+        Files.writeString(targetFile, "Stat Test Content");
+
+        Task task = new Task("Stat file", "stat", Map.of(
+                "path", targetFile.toString()
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "stat check mode failed: " + result.message() + " Data: " + result.data());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> statData = (Map<String, Object>) result.data().get("stat");
+        assertNotNull(statData, "stat key should exist in data");
+        assertEquals(true, statData.get("exists"));
+        assertEquals(true, statData.get("isreg"));
+    }
+
+    @Test
+    void testSetStatsModule() {
+        Task task = new Task("Set stats", "set_stats", Map.of(
+                "data", Map.of("build_number", 123)
+        ));
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "set_stats failed: " + result.message() + " Data: " + result.data());
+    }
+
+    @Test
+    void testGetentModule() {
+        Task task = new Task("Getent passwd", "getent", Map.of(
+                "database", "passwd",
+                "key", "root"
+        ));
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "getent failed: " + result.message() + " Data: " + result.data());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
+        assertNotNull(facts, "ansible_facts should be returned by getent");
+        assertNotNull(facts.get("getent_passwd"), "getent_passwd key should exist in facts");
+    }
+
+    @Test
+    void testSetupModuleWithFilter() {
+        Task task = new Task("Setup with filter", "setup", Map.of(
+                "filter", "ansible_system"
+        ));
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "setup with filter failed: " + result.message() + " Data: " + result.data());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
+        assertNotNull(facts, "ansible_facts should be present");
+        assertTrue(facts.containsKey("ansible_system"));
+    }
 }
