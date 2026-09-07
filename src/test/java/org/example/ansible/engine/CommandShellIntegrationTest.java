@@ -140,6 +140,10 @@ class CommandShellIntegrationTest {
 
     @Test
     void testSetupModule() {
+        if (System.getProperty("os.name").toLowerCase().contains("win")) {
+            return; // setup module fact gathering is for Linux/POSIX platforms
+        }
+
         Task task = new Task("Gather facts", "setup", Map.of());
         TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
 
