@@ -73,7 +73,7 @@
 | - `pause` | ◎ | ？ | ？ | オリジナル Python ソースコードにより検証済。 |
 | - `pip` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
 | - `raw` | ◎ | ？ | ？ | オリジナル Python ソースコードにより検証済。 |
-| - `reboot` | ○ | ？ | ？ | オリジナル Python ソースコードにより検証済。 |
+| - `reboot` | ○ | ？ | ？ | オリジナル Python ソースコードにより検証済（`BuiltinModulesIntegrationTest` にて check_mode 検証完了）。 |
 | - `rpm_key` | △ | ？ | - | ロード確認済。現在の開発・検証環境（Debian系）では動作確認が不可能。 |
 | - `script` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
 | - `service` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
