@@ -94,7 +94,7 @@ public class PlaybookCli implements Callable<Integer> {
     @Option(names = {"--vault-id"}, description = "Vault ID and password source")
     private String vaultId;
 
-    private String getVaultPassword() {
+    String getVaultPassword() {
         String passwordFilePath = null;
         if (vaultPasswordFile != null) {
             passwordFilePath = vaultPasswordFile.getAbsolutePath();
