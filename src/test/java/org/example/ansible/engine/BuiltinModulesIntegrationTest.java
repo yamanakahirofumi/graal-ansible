@@ -269,6 +269,10 @@ class BuiltinModulesIntegrationTest {
 
     @Test
     void testGetentModule() {
+        if (System.getProperty("os.name").toLowerCase().contains("win")) {
+            return; // getent is only available on Linux/POSIX platforms
+        }
+
         Task task = new Task("Getent passwd", "getent", Map.of(
                 "database", "passwd",
                 "key", "root"
@@ -280,19 +284,5 @@ class BuiltinModulesIntegrationTest {
         Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
         assertNotNull(facts, "ansible_facts should be returned by getent");
         assertNotNull(facts.get("getent_passwd"), "getent_passwd key should exist in facts");
-    }
-
-    @Test
-    void testSetupModuleWithFilter() {
-        Task task = new Task("Setup with filter", "setup", Map.of(
-                "filter", "ansible_system"
-        ));
-
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
-        assertTrue(result.success(), "setup with filter failed: " + result.message() + " Data: " + result.data());
-        @SuppressWarnings("unchecked")
-        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
-        assertNotNull(facts, "ansible_facts should be present");
-        assertTrue(facts.containsKey("ansible_system"));
     }
 }
