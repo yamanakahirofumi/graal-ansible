@@ -288,6 +288,14 @@
 - **解決策**:
     - `MoreFiltersTest.java` を追加し、各種カスタムフィルターの正常系、空文字/未定義変数の評価結果、例外/エスケープ処理のテストを網羅。
 
+### 1.42 [✓] FileLookup errors オプション実装および setup モジュール filter テスト拡充
+- **完了日**: 2026-10-24
+- **概要**: [Variables-Templating.md](implementation/Variables-Templating.md) の仕様に基づき `FileLookup` における `errors` オプション (`strict`, `ignore`, `warn`) の対応と、[Test-Expansion-Strategy.md](tech/Test-Expansion-Strategy.md) に基づく `setup` モジュールの `filter` パラメータ検証テストの拡充。
+- **解決策**:
+    - `FileLookup.java` にて `kwargs` 内の `errors` 引数処理を追加。`errors='ignore'` および `errors='warn'` 指定時に存在しないファイルの読み込み失敗例外を抑制・スキップする動作を実装。
+    - `FileLookupTest.java` にて `errors='ignore'`, `errors='warn'`, `errors='strict'` の各動作テストを追加。
+    - `BuiltinModulesIntegrationTest.java` にて `setup` モジュールに対する `filter` パラメータ (`ansible_system` 等) のファクト絞り込み動作を検証する統合テスト `testSetupModuleWithFilter` を追加。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築
