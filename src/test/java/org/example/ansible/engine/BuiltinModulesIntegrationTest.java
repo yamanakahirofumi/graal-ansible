@@ -285,4 +285,5 @@ class BuiltinModulesIntegrationTest {
         assertNotNull(facts, "ansible_facts should be returned by getent");
         assertNotNull(facts.get("getent_passwd"), "getent_passwd key should exist in facts");
     }
+
 }
