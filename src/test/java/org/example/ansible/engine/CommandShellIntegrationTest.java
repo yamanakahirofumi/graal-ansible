@@ -35,7 +35,7 @@ class CommandShellIntegrationTest {
         taskExecutor = new TaskExecutor();
         host = new Host("localhost", Collections.emptyMap());
         Inventory inventory = new Inventory(new Group("all", List.of(host), List.of(), Map.of()));
-        variableManager = new VariableManager(inventory, Map.of());
+        variableManager = new VariableManager(inventory, Map.of(), tempDir);
         play = new Play("Test Play", "all", List.of(), Map.of(), List.of(), List.of(), null, null, null, null, null, Map.of());
     }
 
