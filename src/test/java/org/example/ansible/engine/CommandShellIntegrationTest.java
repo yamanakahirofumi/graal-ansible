@@ -144,15 +144,15 @@ class CommandShellIntegrationTest {
             return; // setup module fact gathering is for Linux/POSIX platforms
         }
 
-        Task task = new Task("Gather facts", "setup", Map.of("filter", "ansible_*"));
+        Task task = new Task("Gather facts", "setup", Map.of("filter", "ansible_system"));
         TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
 
         assertTrue(result.success(), "Execution failed: " + result.message() + " Data: " + result.data());
         @SuppressWarnings("unchecked")
         Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
         assertNotNull(facts, "ansible_facts should not be null");
-        assertTrue(facts.containsKey("ansible_system") || facts.containsKey("ansible_architecture") || facts.containsKey("ansible_python_version"),
-            "ansible_facts should contain system/architecture/python information");
+        assertTrue(facts.containsKey("ansible_system"),
+            "ansible_facts should contain ansible_system information");
     }
 
     @Test
