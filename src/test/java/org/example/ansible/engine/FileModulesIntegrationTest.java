@@ -487,4 +487,47 @@ class FileModulesIntegrationTest {
         assertTrue(resultAbsentCheck.changed());
         assertTrue(Files.exists(checkFile), "File should not be deleted in check mode");
     }
+
+    @Test
+    void testBlockInFileCheckMode() throws IOException {
+        Path targetFile = tempDir.resolve("block-check.txt");
+        Files.writeString(targetFile, "line 1\n");
+
+        Task taskCheck = new Task("Add block check mode", "blockinfile", Map.of(
+                "path", targetFile.toString(),
+                "block", "line 2\nline 3"
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult resultCheck = taskExecutor.execute(play, host, taskCheck, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertTrue(resultCheck.success(), resultCheck.message());
+        assertTrue(resultCheck.changed(), "Check mode should report changed = true");
+
+        String contentCheck = Files.readString(targetFile);
+        assertFalse(contentCheck.contains("line 2"), "Target file should not be modified in check mode");
+    }
+
+    @Test
+    void testLineInFileWithValidate() throws IOException {
+        Path targetFile = tempDir.resolve("validate-test.txt");
+        Files.writeString(targetFile, "setting=off\n");
+
+        boolean isWindows = System.getProperty("os.name").toLowerCase().contains("win");
+        // Simple validation command that succeeds
+        String validateCmd = isWindows ? "type %s" : "cat %s";
+
+        Task task = new Task("Update with validate", "lineinfile", Map.of(
+                "path", targetFile.toString(),
+                "regexp", "^setting=",
+                "line", "setting=on",
+                "validate", validateCmd
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertTrue(result.success(), result.message());
+        assertTrue(result.changed());
+        assertTrue(Files.readString(targetFile).contains("setting=on"));
+    }
 }

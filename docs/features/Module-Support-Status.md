@@ -25,8 +25,8 @@
 | - `stat` | ◎ | ○ | - | オリジナル Python ソースコードにより検証済。 |
 | - `command` | ◎ | ○ | - | オリジナル Python ソースコードにより検証済。 |
 | - `shell` | ◎ | ○ | - | オリジナル Python ソースコードにより検証済。 |
-| - `setup` | ◎ | ○ | - | オリジナル Python ソースコードにより検証済。 |
-| - `lineinfile` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
+| - `setup` | ◎ | ○ | - | オリジナル Python ソースコードにより検証済（`filter` パラメータ検証完了）。 |
+| - `lineinfile` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済（`validate`, `check_mode` 等のパラメータ検証完了）。 |
 | - `replace` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
 | - `user` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
 | - `group` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
@@ -45,8 +45,8 @@
 | - `assemble` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
 | - `async_status` | ● | ？ | ？ | Java エンジン (AsyncJobManager) によるステータス管理と連携。 |
 | - `async_wrapper` | ● | ？ | ？ | Java エンジンによる非同期実行基盤と連携。 |
-| - `blockinfile` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `cron` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
+| - `blockinfile` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済（`check_mode` 検証完了）。 |
+| - `cron` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済（`check_mode` 検証完了）。 |
 | - `deb822_repository` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
 | - `debconf` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
 | - `dnf` | △ | ？ | - | ロード確認済。現在の開発・検証環境（Debian系）では動作確認が不可能。 |

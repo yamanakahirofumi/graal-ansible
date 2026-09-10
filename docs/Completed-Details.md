@@ -288,6 +288,15 @@
 - **解決策**:
     - `MoreFiltersTest.java` を追加し、各種カスタムフィルターの正常系、空文字/未定義変数の評価結果、例外/エスケープ処理のテストを網羅。
 
+### 1.42 [✓] 主要モジュールの機能網羅・check_mode 統合テストの拡充
+- **完了日**: 2026-10-24
+- **概要**: `docs/tech/Test-Expansion-Strategy.md` Section 2.2 に基づき、`setup` (filter パラメータ), `cron` (check_mode), `blockinfile` (check_mode), `lineinfile` (validate パラメータ) 等の主要モジュールの機能網羅およびオプションバリエーションの自動テストを拡張。
+- **解決策**:
+    - `BuiltinModulesIntegrationTest.java` にて `testCronModuleCheckMode` を追加。
+    - `CommandShellIntegrationTest.java` にて `testSetupModuleWithFilter` (gather_subset/filter) を追加。
+    - `FileModulesIntegrationTest.java` にて `testBlockInFileCheckMode` および `testLineInFileWithValidate` (validate 引数) を追加。
+    - `ansible_bridge.py` の `run_command` において Python `bytes` 型引数を UTF-8 に自動デコードする修正を実施。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築
