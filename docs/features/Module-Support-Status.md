@@ -16,7 +16,7 @@
 
 | コレクション / モジュール | Target: Linux | Target: macOS | Target: Windows | 備考 |
 | :--- | :---: | :---: | :---: | :--- |
-| **ansible.builtin** | △ | ？ | ？ | Linux で全 72 モジュールを一覧化。うち 68 モジュールの動作確認済。 |
+| **ansible.builtin** | △ | △ | △ | 全 72 モジュールのロード確認済（Linux, macOS, Windows）。うち 68 モジュールの動作確認済。 |
 | - `debug` | ◎ | ○ | ○ | オリジナル Python ソースコードにより検証済。 |
 | - `ping` | ◎ | ○ | - | オリジナル Python ソースコードにより検証済。 |
 | - `copy` | ◎ | ○ | - | オリジナル Python ソースコードにより検証済。 |
@@ -25,70 +25,70 @@
 | - `stat` | ◎ | ○ | - | オリジナル Python ソースコードにより検証済。 |
 | - `command` | ◎ | ○ | - | オリジナル Python ソースコードにより検証済。 |
 | - `shell` | ◎ | ○ | - | オリジナル Python ソースコードにより検証済。 |
-| - `setup` | ◎ | ○ | - | オリジナル Python ソースコードにより検証済（`filter` パラメータ検証完了）。 |
-| - `lineinfile` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済（`validate`, `check_mode` 等のパラメータ検証完了）。 |
-| - `replace` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `user` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `group` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `find` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `tempfile` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `hostname` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `slurp` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
+| - `setup` | ◎ | ○ | - | オリジナル Python ソースコードにより検証済。 |
+| - `lineinfile` | ◎ | △ | - | オリジナル Python ソースコードにより検証済。 |
+| - `replace` | ◎ | △ | - | オリジナル Python ソースコードにより検証済。 |
+| - `user` | ◎ | △ | - | オリジナル Python ソースコードにより検証済。 |
+| - `group` | ◎ | △ | - | オリジナル Python ソースコードにより検証済。 |
+| - `find` | ◎ | △ | - | オリジナル Python ソースコードにより検証済。 |
+| - `tempfile` | ◎ | △ | - | オリジナル Python ソースコードにより検証済。 |
+| - `hostname` | ◎ | △ | - | オリジナル Python ソースコードにより検証済。 |
+| - `slurp` | ◎ | △ | - | オリジナル Python ソースコードにより検証済。 |
 | - `set_fact` | ◎ | ○ | ○ | オリジナル Python ソースコードにより検証済。 |
 | - `assert` | ◎ | ○ | ○ | オリジナル Python ソースコードにより検証済。 |
 | - `fail` | ◎ | ○ | ○ | オリジナル Python ソースコードにより検証済。 |
 | - `gather_facts` | ◎ | ○ | - | オリジナル Python ソースコードにより検証済。 |
-| - `add_host` | ◎ | ？ | ？ | オリジナル Python ソースコードにより検証済。 |
-| - `apt` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `apt_key` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `apt_repository` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `assemble` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `async_status` | ● | ？ | ？ | Java エンジン (AsyncJobManager) によるステータス管理と連携。 |
-| - `async_wrapper` | ● | ？ | ？ | Java エンジンによる非同期実行基盤と連携。 |
-| - `blockinfile` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済（`check_mode` 検証完了）。 |
-| - `cron` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済（`check_mode` 検証完了）。 |
-| - `deb822_repository` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `debconf` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `dnf` | △ | ？ | - | ロード確認済。現在の開発・検証環境（Debian系）では動作確認が不可能。 |
-| - `dnf5` | △ | ？ | - | ロード確認済。現在の開発・検証環境（Debian系）では動作確認が不可能。 |
-| - `dpkg_selections` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `expect` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `fetch` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `get_url` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `getent` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `git` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `group_by` | ◎ | ？ | ？ | オリジナル Python ソースコードにより検証済。 |
-| - `import_playbook` | ○ | ？ | ？ | Java エンジンによるエミュレーション実行により検証済。 |
-| - `import_role` | ○ | ？ | ？ | Java エンジンによるエミュレーション実行により検証済。 |
-| - `import_tasks` | ◎ | ？ | ？ | オリジナル Python ソースコードにより検証済。 |
-| - `include_role` | ○ | ？ | ？ | Java エンジンによるエミュレーション実行により検証済。 |
-| - `include_tasks` | ◎ | ？ | ？ | オリジナル Python ソースコードにより検証済。 |
+| - `add_host` | ◎ | △ | △ | オリジナル Python ソースコードにより検証済。 |
+| - `apt` | ◎ | △ | - | オリジナル Python ソースコードにより検証済。 |
+| - `apt_key` | ◎ | △ | - | オリジナル Python ソースコードにより検証済。 |
+| - `apt_repository` | ◎ | △ | - | オリジナル Python ソースコードにより検証済。 |
+| - `assemble` | ◎ | △ | - | オリジナル Python ソースコードにより検証済。 |
+| - `async_status` | ● | △ | △ | Java エンジン (AsyncJobManager) によるステータス管理と連携。 |
+| - `async_wrapper` | ● | △ | △ | Java エンジンによる非同期実行基盤と連携。 |
+| - `blockinfile` | ◎ | △ | - | オリジナル Python ソースコードにより検証済。 |
+| - `cron` | ◎ | △ | - | オリジナル Python ソースコードにより検証済。 |
+| - `deb822_repository` | ◎ | △ | - | オリジナル Python ソースコードにより検証済。 |
+| - `debconf` | ◎ | △ | - | オリジナル Python ソースコードにより検証済。 |
+| - `dnf` | △ | △ | - | ロード確認済。現在の開発・検証環境（Debian系）では動作確認が不可能。 |
+| - `dnf5` | △ | △ | - | ロード確認済。現在の開発・検証環境（Debian系）では動作確認が不可能。 |
+| - `dpkg_selections` | ◎ | △ | - | オリジナル Python ソースコードにより検証済。 |
+| - `expect` | ◎ | △ | - | オリジナル Python ソースコードにより検証済。 |
+| - `fetch` | ◎ | △ | - | オリジナル Python ソースコードにより検証済。 |
+| - `get_url` | ◎ | △ | - | オリジナル Python ソースコードにより検証済。 |
+| - `getent` | ◎ | △ | - | オリジナル Python ソースコードにより検証済。 |
+| - `git` | ◎ | △ | - | オリジナル Python ソースコードにより検証済。 |
+| - `group_by` | ◎ | △ | △ | オリジナル Python ソースコードにより検証済。 |
+| - `import_playbook` | ○ | △ | △ | Java エンジンによるエミュレーション実行により検証済。 |
+| - `import_role` | ○ | △ | △ | Java エンジンによるエミュレーション実行により検証済。 |
+| - `import_tasks` | ◎ | △ | △ | オリジナル Python ソースコードにより検証済。 |
+| - `include_role` | ○ | △ | △ | Java エンジンによるエミュレーション実行により検証済。 |
+| - `include_tasks` | ◎ | △ | △ | オリジナル Python ソースコードにより検証済。 |
 | - `include_vars` | ◎ | ○ | ○ | オリジナル Python ソースコードにより検証済。 |
-| - `iptables` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `known_hosts` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `meta` | ○ | ？ | ？ | Java エンジンによるエミュレーション実行（`flush_handlers`, `noop`等）により検証済。 |
-| - `mount_facts` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `package` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `package_facts` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `pause` | ◎ | ？ | ？ | オリジナル Python ソースコードにより検証済。 |
-| - `pip` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `raw` | ◎ | ？ | ？ | オリジナル Python ソースコードにより検証済。 |
-| - `reboot` | ○ | ？ | ？ | オリジナル Python ソースコードにより検証済（`BuiltinModulesIntegrationTest` にて check_mode 検証完了）。 |
-| - `rpm_key` | △ | ？ | - | ロード確認済。現在の開発・検証環境（Debian系）では動作確認が不可能。 |
-| - `script` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `service` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `service_facts` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `set_stats` | ◎ | ？ | ？ | オリジナル Python ソースコードにより検証済。 |
-| - `subversion` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `systemd` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `systemd_service` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `sysvinit` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `unarchive` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `uri` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `validate_argument_spec` | ◎ | ？ | ？ | オリジナル Python ソースコードにより検証済。 |
-| - `wait_for` | ◎ | ？ | - | オリジナル Python ソースコードにより検証済。 |
-| - `wait_for_connection` | ◎ | ？ | ？ | オリジナル Python ソースコードにより検証済。 |
-| - `yum_repository` | △ | ？ | - | ロード確認済。現在の開発・検証環境（Debian系）では動作確認が不可能。 |
+| - `iptables` | ◎ | △ | - | オリジナル Python ソースコードにより検証済。 |
+| - `known_hosts` | ◎ | △ | - | オリジナル Python ソースコードにより検証済。 |
+| - `meta` | ○ | △ | △ | Java エンジンによるエミュレーション実行（`flush_handlers`, `noop`等）により検証済。 |
+| - `mount_facts` | ◎ | △ | - | オリジナル Python ソースコードにより検証済。 |
+| - `package` | ◎ | △ | - | オリジナル Python ソースコードにより検証済。 |
+| - `package_facts` | ◎ | △ | - | オリジナル Python ソースコードにより検証済。 |
+| - `pause` | ◎ | △ | △ | オリジナル Python ソースコードにより検証済。 |
+| - `pip` | ◎ | △ | - | オリジナル Python ソースコードにより検証済。 |
+| - `raw` | ◎ | △ | △ | オリジナル Python ソースコードにより検証済。 |
+| - `reboot` | ○ | △ | △ | オリジナル Python ソースコードにより検証済（`BuiltinModulesIntegrationTest` にて check_mode 検証完了）。 |
+| - `rpm_key` | △ | △ | - | ロード確認済。現在の開発・検証環境（Debian系）では動作確認が不可能。 |
+| - `script` | ◎ | △ | - | オリジナル Python ソースコードにより検証済。 |
+| - `service` | ◎ | △ | - | オリジナル Python ソースコードにより検証済。 |
+| - `service_facts` | ◎ | △ | - | オリジナル Python ソースコードにより検証済。 |
+| - `set_stats` | ◎ | △ | △ | オリジナル Python ソースコードにより検証済。 |
+| - `subversion` | ◎ | △ | - | オリジナル Python ソースコードにより検証済。 |
+| - `systemd` | ◎ | △ | - | オリジナル Python ソースコードにより検証済。 |
+| - `systemd_service` | ◎ | △ | - | オリジナル Python ソースコードにより検証済。 |
+| - `sysvinit` | ◎ | △ | - | オリジナル Python ソースコードにより検証済。 |
+| - `unarchive` | ◎ | △ | - | オリジナル Python ソースコードにより検証済。 |
+| - `uri` | ◎ | △ | - | オリジナル Python ソースコードにより検証済。 |
+| - `validate_argument_spec` | ◎ | △ | △ | オリジナル Python ソースコードにより検証済。 |
+| - `wait_for` | ◎ | △ | - | オリジナル Python ソースコードにより検証済。 |
+| - `wait_for_connection` | ◎ | △ | △ | オリジナル Python ソースコードにより検証済。 |
+| - `yum_repository` | △ | △ | - | ロード確認済。現在の開発・検証環境（Debian系）では動作確認が不可能。 |
 | **ansible.posix** | ？ | ？ | - | コレクション全体のロードを検証中。 |
 | **ansible.utils** | ？ | ？ | ？ | 基本的なフィルタの動作を確認中。 |
 | **community.general** | ？ | ？ | × | 依存ライブラリの解決を順次実施中。 |
