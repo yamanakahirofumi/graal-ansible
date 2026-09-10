@@ -286,4 +286,34 @@ class BuiltinModulesIntegrationTest {
         assertNotNull(facts.get("getent_passwd"), "getent_passwd key should exist in facts");
     }
 
+    @Test
+    void testCronModuleCheckMode() {
+        if (System.getProperty("os.name").toLowerCase().contains("win")) {
+            return;
+        }
+
+        // Skip if crontab binary is not present in the system environment
+        boolean hasCrontab = false;
+        try {
+            Process p = new ProcessBuilder("which", "crontab").start();
+            hasCrontab = (p.waitFor() == 0);
+        } catch (Exception ignored) {}
+
+        if (!hasCrontab) {
+            return;
+        }
+
+        Task taskCheck = new Task("Add cron job in check mode", "cron", Map.of(
+                "name", "check_mode_test_job",
+                "job", "echo hello",
+                "minute", "0",
+                "hour", "12"
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult resultCheck = taskExecutor.execute(play, host, taskCheck, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(resultCheck.success(), "cron check mode failed: " + resultCheck.message() + " Data: " + resultCheck.data());
+    }
+
 }

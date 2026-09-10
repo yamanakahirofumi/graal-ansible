@@ -476,8 +476,14 @@ class AnsibleModule:
     def fail_json(self, **kwargs: Any) -> None:
         self._java_mock.fail_json(_deep_convert(kwargs))
 
-    def run_command(self, args: Union[str, List[str]], **kwargs: Any) -> Tuple[int, str, str]:
+    def run_command(self, args: Union[str, bytes, List[Any]], **kwargs: Any) -> Tuple[int, str, str]:
+        if isinstance(args, bytes):
+            args = args.decode('utf-8', errors='replace')
+        elif isinstance(args, list):
+            args = [a.decode('utf-8', errors='replace') if isinstance(a, bytes) else a for a in args]
         cwd = kwargs.get('cwd') or kwargs.get('chdir')
+        if isinstance(cwd, bytes):
+            cwd = cwd.decode('utf-8', errors='replace')
         res = self._java_mock.run_command(args, _to_java_str(cwd))
         return (int(res[0]), str(res[1]), str(res[2]))
 
