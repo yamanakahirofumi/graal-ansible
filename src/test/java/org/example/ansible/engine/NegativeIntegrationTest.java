@@ -334,4 +334,51 @@ class NegativeIntegrationTest {
         assertFalse(result.success(), "file module should fail for invalid state choice");
         assertTrue(result.data().containsKey("msg"));
     }
+
+    @Test
+    void testFetchNonExistentSourceFile() {
+        Path nonExistentSrc = tempDir.resolve("non_existent_fetch_src.txt");
+        Path localDest = tempDir.resolve("fetched_dest.txt");
+
+        Task task = new Task("Fetch non-existent source", "fetch", Map.of(
+                "src", nonExistentSrc.toString(),
+                "dest", localDest.toString()
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertFalse(result.success(), "fetch should fail when source file does not exist");
+        assertTrue(result.data().containsKey("msg") || result.data().containsKey("exception"),
+                "Result data should contain error information: " + result.data());
+    }
+
+    @Test
+    void testUnarchiveNonExistentSourceFile() {
+        Path nonExistentArchive = tempDir.resolve("non_existent_archive.tar.gz");
+        Path destDir = tempDir.resolve("unarchive_dest");
+
+        Task task = new Task("Unarchive non-existent source", "unarchive", Map.of(
+                "src", nonExistentArchive.toString(),
+                "dest", destDir.toString()
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertFalse(result.success(), "unarchive should fail when source archive file does not exist");
+        assertTrue(result.data().containsKey("msg") || result.data().containsKey("exception"),
+                "Result data should contain error information: " + result.data());
+    }
+
+    @Test
+    void testGetUrlInvalidDestination() {
+        Path nonExistentDestDir = tempDir.resolve("no_such_dir").resolve("file.txt");
+
+        Task task = new Task("Get_url invalid destination", "get_url", Map.of(
+                "url", "http://localhost:9999/test.txt",
+                "dest", nonExistentDestDir.toString()
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertFalse(result.success(), "get_url should fail when destination parent directory does not exist or download fails");
+        assertTrue(result.data().containsKey("msg") || result.data().containsKey("exception"),
+                "Result data should contain error information: " + result.data());
+    }
 }
