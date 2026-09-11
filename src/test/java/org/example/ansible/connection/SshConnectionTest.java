@@ -375,6 +375,48 @@ class SshConnectionTest {
     }
 
     @Test
+    void testSshJumpHostParserJOption() {
+        Map<String, Object> variables = Map.of(
+            "ansible_ssh_common_args", "-J jumpuser@jumphost:3333",
+            "ansible_user", "targetuser",
+            "ansible_password", "targetpass",
+            "ansible_ssh_private_key_file", "/path/to/targetkey"
+        );
+
+        List<BastionConfig> configs = SshJumpHostParser.getBastionConfigs(variables);
+        assertEquals(1, configs.size());
+        BastionConfig cfg = configs.get(0);
+        assertEquals("jumphost", cfg.host());
+        assertEquals(3333, cfg.port());
+        assertEquals("jumpuser", cfg.user());
+        assertEquals("targetpass", cfg.password());
+        assertEquals("/path/to/targetkey", cfg.privateKeyFile());
+    }
+
+    @Test
+    void testSshJumpHostParserJOptionMultiHop() {
+        Map<String, Object> variables = Map.of(
+            "ansible_ssh_extra_args", "-J \"user1@hop1:1001,user2@hop2:1002\"",
+            "ansible_user", "targetuser",
+            "ansible_password", "targetpass",
+            "ansible_ssh_private_key_file", "/path/to/targetkey"
+        );
+
+        List<BastionConfig> configs = SshJumpHostParser.getBastionConfigs(variables);
+        assertEquals(2, configs.size());
+
+        BastionConfig cfg1 = configs.get(0);
+        assertEquals("hop1", cfg1.host());
+        assertEquals(1001, cfg1.port());
+        assertEquals("user1", cfg1.user());
+
+        BastionConfig cfg2 = configs.get(1);
+        assertEquals("hop2", cfg2.host());
+        assertEquals(1002, cfg2.port());
+        assertEquals("user2", cfg2.user());
+    }
+
+    @Test
     void testSshJumpHostParserProxyJumpMultiHop() {
         Map<String, Object> variables = Map.of(
             "ansible_ssh_extra_args", "-o ProxyJump=\"user1@hop1:1001,user2@hop2:1002\"",
