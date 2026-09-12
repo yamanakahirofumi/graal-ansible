@@ -90,17 +90,33 @@ public class VaultDecrypter {
 }
 ```
 
-### 3.2 YAML 解析への統合 (`YamlParser` & `VaultConstructor`)
+### 3.2 SnakeYAML AST 独自タグ処理 (`YamlUtil.java` / `VaultDecryptedValue.java`)
 SnakeYAML の解析フェーズにおいて、`!vault` タグが検出された際に、自動的に `VaultDecryptedValue` オブジェクトへマッピングする仕組みが `YamlUtil.java` に実装されています。
 
 - 参照リンク：[YAML解析エンジン](../implementation/YAML-Parser.md)
-- `VaultConstructor` を SnakeYAML のカスタムコンストラクタとして追加し、`!vault` タグの値（ScalarNode）を保持します。
+- **タグ登録とコンストラクタ構造**:
+  - `YamlUtil.createYaml()` 内で、SnakeYAML の `Yaml` インスタンス構築時に `new Tag("!vault")` に対するカスタムコンストラクタ `ConstructVault` (`Construct` インターフェース) を登録します。
+  - SnakeYAML が `!vault` タグ付きのスカラノード（`ScalarNode`）を解析すると、`ConstructVault.construct(Node node)` が呼び出され、ノード内の生の暗号化テキスト（`$ANSIBLE_VAULT...`）を抽出します。
+- **遅延評価オブジェクト (`VaultDecryptedValue`)**:
+  - YAML 解析時点では復号を実行せず、生の暗号化文字列を保持する値オブジェクト `VaultDecryptedValue` インスタンスとしてデータモデル（Map や List）内に格納します。これにより、YAML 解析段階でのパスワード要求を不要にし、実際の変数評価フェーズまで復号を遅延させる Lazy Evaluation パターンを実現しています。
 
-### 3.3 変数解決時の動的復号 (`VariableResolver`)
-暗号化された変数は、タスク実行直前の変数解決（Jinja2 テンプレート展開）フェーズで、提供されたパスワードを用いて動的に復号・文字列展開されます。
+### 3.3 実行コンテキストにおけるパスワード伝播フロー (Password Propagation Flow)
+CLI レイヤーで取得された復号パスワードは、以下の順序で実行エンジンの各コンポーネントへ透過的に伝播されます。
+
+1. **CLI 処理**: `PlaybookCli.getVaultPassword()` で解決されたパスワード文字列を取得。
+2. **PlaybookExecutor**: `executor.setVaultPassword(vaultPassword)` により、実行エンジンのメインコンテキストへパスワードを設定。
+3. **TaskQueueManager & TaskExecutor**: Playbook 実行開始時、`TaskQueueManager` および各タスク実行用の `TaskExecutor` 内に保持されている `VariableResolver` へパスワードを設定 (`variableResolver.setVaultPassword(vaultPassword)`)。
+
+### 3.4 変数評価時の遅延復号ライフサイクル (`VariableResolver.java`)
+暗号化された変数は、タスク実行直前の変数解決（Jinja2 テンプレート展開および変数マージ）フェーズで、設定されたパスワードを用いて動的に復号・文字列展開されます。
 
 - 参照リンク：[変数とテンプレート](../implementation/Variables-Templating.md)
-- `VariableResolver` は、解決対象の値が `VaultDecryptedValue` である場合、`VaultDecrypter` を呼び出してプレーンテキストに置換します。
+- **復号ハンドリング手順**:
+  1. `VariableResolver.resolve(Object value)` は、解決対象のオブジェクトが `VaultDecryptedValue` のインスタンスであるか判定します。
+  2. 対象が `VaultDecryptedValue` の場合、`VariableResolver` に設定された Vault パスワードを取得します。
+  3. パスワードが未設定（`null`）の場合、`RuntimeException("Vault password is required for decryption")` をスローして実行を中断します。
+  4. パスワードが存在する場合、`VaultDecrypter` のインスタンスを生成し、`decrypt(vaultValue.getEncryptedRawText(), vaultPassword)` を実行します。
+  5. 復号結果のバイト配列を UTF-8 文字列に変換し、元の `VaultDecryptedValue` オブジェクトと置換して Jinja2 レンダリングやタスク引数に提供します。
 
 ## 4. パスワード管理とコマンドライン仕様 (CLI Specifications)
 
@@ -109,14 +125,64 @@ SnakeYAML の解析フェーズにおいて、`!vault` タグが検出された�
 
 - 参照リンク：[CLI仕様](CLI-Specification.md)
 
-### 4.1 CLI 引数
-- **`--vault-id`**: Vault ID とパスワードソースを指定します (例: `prod@/path/to/password_file` または `prompt`)。
-- **`--vault-password-file`**: パスワードが記述されたファイルのパスを指定します。
+### 4.1 パスワードソースの解決優先順位 (Password Resolution Precedence)
+複数のパスワード指定オプションが存在する場合、`PlaybookCli.getVaultPassword()` は以下の優先順位に従って使用するパスワードソースを決定します（1 が最優先）。
 
-### 4.2 環境変数
-- **`ANSIBLE_VAULT_PASSWORD_FILE`**: パスワードファイルのパスを環境変数から取得します。
+| 順位 | パスワードソース | CLI 引数 / 環境変数 | 例 / 形式 |
+| :---: | :--- | :--- | :--- |
+| 1 | ファイルパス引数 | `--vault-password-file <path>` | `--vault-password-file /path/to/vault.key` |
+| 2 | Vault ID 引数 | `--vault-id <label@source>` | `--vault-id dev@/path/to/vault.key` または `--vault-id dev@prompt` |
+| 3 | 環境変数 | `ANSIBLE_VAULT_PASSWORD_FILE` | `export ANSIBLE_VAULT_PASSWORD_FILE=/path/to/vault.key` |
 
-## 5. エラーハンドリング方針 (Error Handling Policy)
+### 4.2 Vault ID とソース抽出仕様
+`--vault-id` オプションが指定された場合、`PlaybookCli` は以下のルールでパスワードソース（ファイルパスまたは `prompt` キーワード）を解析します。
+
+- **`@` 記号が含まれる場合**:
+  - `@` 以降の文字列をパスワードソースとして抽出します（例: `prod@/etc/ansible/vault.key` -> `/etc/ansible/vault.key`）。
+- **`@` 記号が含まれない場合**:
+  - 指定された文字列全体をパスワードソースとして扱います（例: `/etc/ansible/vault.key` -> `/etc/ansible/vault.key`）。
+
+### 4.3 `prompt` キーワードによる対話型入力仕様
+パスワードソースとして `prompt` キーワードが指定された場合（例: `--vault-id dev@prompt` または `--vault-password-file prompt`）、以下の動作となります。
+
+1. `PlaybookCli` は `System.console()` を使用してインタラクティブコンソールを取得します。
+2. コンソールが存在する場合（`System.console() != null`）、`console.readPassword("Vault password: ")` を呼び出し、ターミナル上で入力文字を非表示にしながらパスワードを取得します。
+3. コンソールが存在しない場合（CI/CD 環境や標準入力のリダイレクト時等）、`RuntimeException("Vault password source 'prompt' specified but no console available.")` をスローして即座に実行を失敗させます。
+
+### 4.4 パスワードファイルの読み込みとトリミング処理
+ファイルパスが解決された場合、`PlaybookCli` は以下の手順でパスワードを取得します。
+
+1. 指定されたパスのファイルが存在し、通常ファイルであるか検証します (`file.exists() && file.isFile()`)。
+2. `java.nio.file.Files.readString(file.toPath()).trim()` を用いてファイル内容を読み込み、末尾の改行コード（`\n`, `\r\n`）および前後の空白文字を除去します。
+3. ファイルが存在しない場合や読み込み権限がない場合は、`RuntimeException("Vault password file not found: " + passwordFilePath)` をスローします。
+
+## 5. エンドツーエンド処理フロー (End-to-End Processing Flow)
+
+Vault 暗号化変数の CLI 入力から最終的なタスク実行までの全体処理シーケンスは以下の通りです。
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant CLI as PlaybookCli
+    participant Parser as YamlParser / YamlUtil
+    participant Exec as PlaybookExecutor
+    participant VR as VariableResolver
+    participant VD as VaultDecrypter
+
+    CLI->>CLI: getVaultPassword() (優先順位解析 & ファイル/Prompt読み込み)
+    CLI->>Parser: parse(playbookFile)
+    Parser->>Parser: !vault タグを検知し VaultDecryptedValue として保持
+    CLI->>Exec: setVaultPassword(vaultPassword)
+    Exec->>VR: setVaultPassword(vaultPassword)
+    Exec->>VR: resolveVariables(taskVars)
+    VR->>VR: VaultDecryptedValue を検出
+    VR->>VD: decrypt(rawEncryptedText, vaultPassword)
+    VD->>VD: PBKDF2 鍵導出 & HMAC 検証 & AES-CTR 復号
+    VD-->>VR: 平文プレーンテキスト (UTF-8 String)
+    VR-->>Exec: 展開済みタスク変数セット
+```
+
+## 6. エラーハンドリング方針 (Error Handling Policy)
 
 - 参照リンク：[エラーハンドリング方針](../tech/Error-Handling-Policy.md)
 
