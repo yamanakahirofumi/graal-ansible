@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
 public class SshJumpHostParser {
 
     private static final Pattern PROXY_JUMP_PATTERN = Pattern.compile(
-        "-o\\s+ProxyJump\\s*=\\s*(?:\"([^\"]+)\"|'([^']+)'|([^\\s\\n\\r]+))",
+        "(?:-o\\s+ProxyJump\\s*=\\s*|-J\\s+)(?:\"([^\"]+)\"|'([^']+)'|([^\\s\\n\\r]+))",
         Pattern.CASE_INSENSITIVE
     );
 
