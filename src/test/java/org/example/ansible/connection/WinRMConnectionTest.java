@@ -99,6 +99,56 @@ class WinRMConnectionTest {
     }
 
     @Test
+    void testExecCommandFailureExitCode() {
+        WinRmToolResponse response = new WinRmToolResponse("", "Command failed with error", 1);
+        when(mockTool.executePs(anyString())).thenReturn(response);
+
+        ConnectionResult result = connection.execCommand("invalid-ps-command", BecomeContext.empty(), null);
+
+        assertNotNull(result);
+        assertEquals(1, result.exitCode());
+        assertEquals("", result.stdout());
+        assertEquals("Command failed with error", result.stderr());
+    }
+
+    @Test
+    void testExecCommandException() {
+        when(mockTool.executePs(anyString())).thenThrow(new RuntimeException("WinRM timeout occurred"));
+
+        ConnectionResult result = connection.execCommand("Get-Process", BecomeContext.empty(), null);
+
+        assertNotNull(result);
+        assertEquals(1, result.exitCode());
+        assertTrue(result.stderr().contains("WinRM timeout occurred"));
+    }
+
+    @Test
+    void testPutFileChunkFailure(@TempDir Path tempDir) throws IOException {
+        Path localFile = tempDir.resolve("test_fail.txt");
+        Files.write(localFile, "Test content".getBytes(StandardCharsets.UTF_8));
+
+        WinRmToolResponse okResponse = new WinRmToolResponse("", "", 0);
+        WinRmToolResponse failResponse = new WinRmToolResponse("", "Disk full on remote host", 1);
+        when(mockTool.executePs(anyString()))
+                .thenReturn(okResponse) // Clear cmd
+                .thenReturn(failResponse); // Append chunk cmd fails
+
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> connection.putFile(localFile, "C:\\remote\\path.txt"));
+        assertTrue(ex.getMessage().contains("Failed to upload file chunk: Disk full on remote host"));
+    }
+
+    @Test
+    void testFetchFileFailureStatusCode(@TempDir Path tempDir) {
+        Path localDest = tempDir.resolve("dest.txt");
+
+        WinRmToolResponse failResponse = new WinRmToolResponse("", "File not found", 1);
+        when(mockTool.executePs(anyString())).thenReturn(failResponse);
+
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> connection.fetchFile("C:\\remote\\nonexistent.txt", localDest));
+        assertTrue(ex.getMessage().contains("Failed to fetch remote file: File not found"));
+    }
+
+    @Test
     void testExecCommandWithEnvironment() {
         WinRmToolResponse response = new WinRmToolResponse("env_value", "", 0);
         when(mockTool.executePs(anyString())).thenReturn(response);

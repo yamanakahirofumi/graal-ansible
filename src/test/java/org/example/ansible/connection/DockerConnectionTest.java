@@ -103,6 +103,55 @@ class DockerConnectionTest {
     }
 
     @Test
+    void testExecCommandFailureOutput() throws Exception {
+        Process mockProcess = createMockProcess(1, "", "command not found: xyz");
+        TestableDockerConnection connection = new TestableDockerConnection("my-container", "my-user", mockProcess);
+
+        ConnectionResult result = connection.execCommand("xyz", BecomeContext.empty(), null);
+
+        assertEquals(1, result.exitCode());
+        assertTrue(result.stdout().isEmpty());
+        assertEquals("command not found: xyz", result.stderr().trim());
+    }
+
+    @Test
+    void testExecCommandIOException() throws Exception {
+        TestableDockerConnection connection = new TestableDockerConnection("my-container", "my-user", null) {
+            @Override
+            Process startProcess(ProcessBuilder pb) throws IOException {
+                throw new IOException("Process start failed");
+            }
+        };
+
+        ConnectionResult result = connection.execCommand("echo test", BecomeContext.empty(), null);
+
+        assertEquals(1, result.exitCode());
+        assertTrue(result.stderr().contains("Process start failed"));
+    }
+
+    @Test
+    void testPutFileFailure() throws Exception {
+        Process mockProcess = createMockProcess(1, "", "Permission denied");
+        TestableDockerConnection connection = new TestableDockerConnection("my-container", "my-user", mockProcess);
+
+        Path localPath = Path.of("local_file.txt");
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> connection.putFile(localPath, "/remote/path.txt"));
+
+        assertTrue(ex.getMessage().contains("Docker putFile failed with exit code 1: Permission denied"));
+    }
+
+    @Test
+    void testFetchFileFailure() throws Exception {
+        Process mockProcess = createMockProcess(1, "", "No such file");
+        TestableDockerConnection connection = new TestableDockerConnection("my-container", "my-user", mockProcess);
+
+        Path localPath = Path.of("local_dest.txt");
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> connection.fetchFile("/remote/path.txt", localPath));
+
+        assertTrue(ex.getMessage().contains("Docker fetchFile failed with exit code 1: No such file"));
+    }
+
+    @Test
     void testExecCommandWithEnvironment() throws Exception {
         Process mockProcess = createMockProcess(0, "hello container\n", "");
         TestableDockerConnection connection = new TestableDockerConnection("my-container", "my-user", mockProcess);

@@ -381,3 +381,11 @@
 - **解決策**:
     - `ModuleLoadVerificationTest.java` を実装し、LinuxContext、macOSContext (`MacOSHandler`)、WindowsContext (`WindowsHandler`) のそれぞれで全 72 モジュールが GraalPy 上でコンパイル・インポートエラーなく正常にロードできることを検証。
     - `docs/features/Module-Support-Status.md` および `docs/tech/Test-Expansion-Strategy.md` のモジュールロードテストステータスを同期・整理。
+
+### 2.13 [✓] コネクションプラグイン (SSH, Docker, WinRM) 単体テストスイートの拡充
+- **完了日**: 2026-10-24
+- **概要**: `SshConnectionTest.java`, `DockerConnectionTest.java`, `WinRMConnectionTest.java` における異常系・境界値テストおよび引数・エラーレスポンスアサーションの機能拡張。
+- **解決策**:
+    - `SshConnectionTest.java` において、`execCommand` の stdout/stderr 混合出力および非ゼロ終了コード時のレスポンス構造体アサーション、SSH 認証失敗時の例外メッセージフォーマット検証テストを追加。
+    - `DockerConnectionTest.java` において、`execCommand` のコマンド未検出/エラー出力、プロセス起動失敗（`IOException`）、ファイル転送（`putFile`/`fetchFile`）失敗時の例外ハンドリングテストを追加。
+    - `WinRMConnectionTest.java` において、PowerShell コマンド実行失敗、タイムアウト例外、Base64 チャンク転送失敗（リモート容量不足等）、リモートファイル未検出時の例外ハンドリングテストを追加。
