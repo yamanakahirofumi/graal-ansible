@@ -145,6 +145,50 @@ class SshConnectionTest {
     }
 
     @Test
+    void testExecCommandMixedStdoutStderrNonZero() throws IOException {
+        connection.connect();
+        when(mockSession.isOpen()).thenReturn(true);
+
+        ChannelExec mockChannel = mock(ChannelExec.class);
+        when(mockSession.createExecChannel(anyString())).thenReturn(mockChannel);
+
+        OpenFuture mockOpenFuture = mock(OpenFuture.class);
+        when(mockChannel.open()).thenReturn(mockOpenFuture);
+        when(mockOpenFuture.verify(any(Duration.class))).thenReturn(mockOpenFuture);
+
+        when(mockChannel.getExitStatus()).thenReturn(1);
+
+        doAnswer(invocation -> {
+            ByteArrayOutputStream out = invocation.getArgument(0);
+            out.write("partial standard output\n".getBytes());
+            return null;
+        }).when(mockChannel).setOut(any(ByteArrayOutputStream.class));
+
+        doAnswer(invocation -> {
+            ByteArrayOutputStream err = invocation.getArgument(0);
+            err.write("partial error output\n".getBytes());
+            return null;
+        }).when(mockChannel).setErr(any(ByteArrayOutputStream.class));
+
+        ConnectionResult result = connection.execCommand("failing_cmd", BecomeContext.empty(), null);
+
+        assertNotNull(result);
+        assertEquals(1, result.exitCode());
+        assertEquals("partial standard output", result.stdout().trim());
+        assertEquals("partial error output", result.stderr().trim());
+    }
+
+    @Test
+    void testConnectAuthFailureErrorMessage() throws IOException {
+        AuthFuture mockAuthFuture = mock(AuthFuture.class);
+        when(mockSession.auth()).thenReturn(mockAuthFuture);
+        when(mockAuthFuture.verify(any(Duration.class))).thenThrow(new IOException("Authentication failed for user"));
+
+        UnreachableException ex = assertThrows(UnreachableException.class, () -> connection.connect());
+        assertTrue(ex.getMessage().contains("Failed to authenticate to localhost:22"));
+    }
+
+    @Test
     void testExecCommandBecomeSudo() throws IOException {
         connection.connect();
         when(mockSession.isOpen()).thenReturn(true);
