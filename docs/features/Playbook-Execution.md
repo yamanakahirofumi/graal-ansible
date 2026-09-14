@@ -102,7 +102,7 @@ Playbook の実行範囲を制御するためのフィルタリング機能を�
 - **継承とブロック構造での評価**:
     - **Play / Block 継承**: Play レベルのタグは、その Play 内のすべてのタスクに継承されます。Block レベルのタグも同様に、その Block 内（`block`, `rescue`, `always` 内のタスク）へ透過的に継承されます。
     - **再帰的評価**: ブロック構造（`block`, `rescue`, `always`）が含まれるタスクでは、ブロック内の配下タスク（`task.block()`, `task.rescue()`, `task.always()`）に対して再帰的にタグ評価が適用されます。`rescue` および `always` セクション内のタスクにおいても個別フィルタリングが行われ、指定条件に一致するタスクのみが実行されます。
-    - **実装詳細**: タグの具体的な判定アルゴリズム（`isTaskToBeExecuted`）やマッチング優先順位については、[タスク制御の実装詳細](../implementation/Task-Control.md#14-タグ評価とブロック継承仕様-tags-and-block-inheritance) を参照してください。
+    - **実装詳細**: タグの具体的な判定アルゴリズム（`isTaskToBeExecuted`）やマッチング優先順位については、[タスク制御の実装詳細](../implementation/Task-Control.md#14-タグ-tags-と-実行制限-limit) を参照してください。
 
 ### 3.2 ホストによる実行制限 (Limit)
 - **実行ホストの制限**: CLI オプション `--limit` (または `-l`) を使用して、Play で定義された `hosts` の中からさらに実行対象を絞り込むことができます。
