@@ -65,7 +65,7 @@ _current_task_context: Dict[str, Any] = {
 def _normalize_path(p: Any) -> str:
     return str(os_java.normalizePath(_to_java_str(p)))
 
-def mock_get_bin_path(arg: str, required: bool = True, opt_dirs: Optional[List[str]] = None) -> Optional[str]:
+def mock_get_bin_path(arg: str, required: bool = False, opt_dirs: Optional[List[str]] = None) -> Optional[str]:
     if arg == 'python': return sys.executable
     if opt_dirs:
         for d in opt_dirs:
@@ -487,7 +487,7 @@ class AnsibleModule:
         res = self._java_mock.run_command(args, _to_java_str(cwd))
         return (int(res[0]), str(res[1]), str(res[2]))
 
-    def get_bin_path(self, arg: str, required: bool = True, opt_dirs: Optional[List[str]] = None) -> Optional[str]:
+    def get_bin_path(self, arg: str, required: bool = False, opt_dirs: Optional[List[str]] = None) -> Optional[str]:
         return mock_get_bin_path(arg, required, opt_dirs)
 
     def sha1(self, path: str) -> str: return str(self._java_mock.sha1(_to_java_str(path)))
@@ -934,6 +934,8 @@ def apply_mocks() -> None:
         'sanitize_keys': lambda x, *a, **kw: x,
         'get_bin_path': mock_get_bin_path,
         'get_distribution': mock_get_distribution,
+        'get_distribution_version': lambda: 'Any',
+        'get_distribution_codename': lambda: 'Any',
         'is_executable': lambda x: True
     })
 

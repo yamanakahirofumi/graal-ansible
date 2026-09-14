@@ -316,4 +316,77 @@ class BuiltinModulesIntegrationTest {
         assertTrue(resultCheck.success(), "cron check mode failed: " + resultCheck.message() + " Data: " + resultCheck.data());
     }
 
+    @Test
+    void testPackageFactsModule() {
+        if (System.getProperty("os.name").toLowerCase().contains("win")) {
+            return;
+        }
+
+        Task task = new Task("Gather package facts", "package_facts", Map.of());
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        if (result.success()) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
+            assertNotNull(facts, "ansible_facts should be returned by package_facts");
+            assertTrue(facts.containsKey("packages"), "packages key should exist in facts");
+        } else {
+            String msg = result.data().getOrDefault("msg", "").toString();
+            assertTrue(msg.contains("package manager") || msg.contains("Python library"),
+                    "Expected package manager error message, got: " + result.message());
+        }
+    }
+
+    @Test
+    void testServiceFactsModule() {
+        if (System.getProperty("os.name").toLowerCase().contains("win")) {
+            return;
+        }
+
+        Task task = new Task("Gather service facts", "service_facts", Map.of());
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "service_facts failed: " + result.message() + " Data: " + result.data());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
+        assertNotNull(facts, "ansible_facts should be returned by service_facts");
+        assertTrue(facts.containsKey("services"), "services key should exist in facts");
+    }
+
+    @Test
+    void testHostnameModuleCheckMode() {
+        Task taskCheck = new Task("Set hostname check mode", "hostname", Map.of(
+                "name", "test-hostname"
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult resultCheck = taskExecutor.execute(play, host, taskCheck, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(resultCheck.success(), "hostname check mode failed: " + resultCheck.message() + " Data: " + resultCheck.data());
+    }
+
+    @Test
+    void testKnownHostsModuleCheckMode() {
+        Task taskCheck = new Task("Add known_hosts check mode", "known_hosts", Map.of(
+                "name", "example.com",
+                "key", "example.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ3",
+                "state", "present"
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult resultCheck = taskExecutor.execute(play, host, taskCheck, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(resultCheck.success(), "known_hosts check mode failed: " + resultCheck.message() + " Data: " + resultCheck.data());
+    }
+
+    @Test
+    void testWaitForConnectionModuleCheckMode() {
+        Task taskCheck = new Task("Wait for connection check mode", "wait_for_connection", Map.of(
+                "timeout", 5
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult resultCheck = taskExecutor.execute(play, host, taskCheck, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(resultCheck.success(), "wait_for_connection check mode failed: " + resultCheck.message() + " Data: " + resultCheck.data());
+    }
+
 }
