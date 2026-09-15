@@ -40,21 +40,92 @@ Ansible と同様に、ターゲットノードに対する実行環境（ロー
 - **コネクションの再利用**:
     - 同一プレイ内で同じターゲットノードに対する接続は、可能な限り再利用（キャッシュ）し、オーバーヘッドを削減します。
 
-## 5. SSH コネクションの詳細設計
+## 5. SSH コネクションの詳細設計 (SshConnection Implementation)
 
-### 5.1 ライブラリ選定
-GraalVM Native Image との相性を考慮し、純粋な Java 実装である **Apache MINA SSHD** を第一候補とします。外部の `ssh` バイナリに依存しないことで、配布サイズとポータビリティを向上させます。
+`SshConnection` は、ターゲットノードに対して Apache MINA SSHD ライブラリを用いたネイティブ Java による SSH 接続を行い、リモートコマンド実行やファイル転送を透過的に行うコネクションプラグインです。
 
-### 5.2 認証方式
-以下の認証方式をサポートします。
-- 公開鍵認証 (`~/.ssh/id_rsa` 等、および `ssh-agent`)
-- パスワード認証 (インタラクティブな入力または変数経由)
+### 5.1 ライブラリ選定とクライアント初期化
 
-### 5.3 SSH 踏み台サーバー（Bastion / Jump Host）経由の接続
-プライベートネットワーク等に配置されたターゲットホストに対して、踏み台サーバー経由で多段 SSH トンネリング接続を確立する仕様をサポートしています。
-- **ProxyJump / ProxyCommand パース**: `ansible_ssh_common_args` や `ansible_ssh_extra_args` 内の `-J` / `ProxyJump` オプションおよび `ProxyCommand` 記述の自動解決。
-- **ローカルポートフォワード**: Apache MINA SSHD の `startLocalPortForwarding` を使用したネイティブ Java トンネル処理。
-- **詳細設計**: クラス設計、資格情報解決、リソースリークを防ぐカスケードクローズ等については [SSH 踏み台サーバー経由接続の実装詳細](Ssh-Jump-Host-Support.md) を参照してください。
+GraalVM Native Image との相性を考慮し、外部の `ssh` バイナリに依存しない純粋な Java SSH ライブラリである **Apache MINA SSHD** (`org.apache.sshd.client.SshClient`) を採用しています。
+
+- **`SshClient` のライフサイクル**:
+  - `connect()` 呼び出し時に `SshClient.setUpDefaultClient()` を生成し、`client.start()` によりクライアントサービスを起動します。
+  - セッション接続タイムアウトはデフォルトで 30 秒（`Duration.ofSeconds(30)`）に設定されています。
+
+### 5.2 認証メカニズム (パスワード認証および公開鍵認証)
+
+ターゲットホスト（および踏み台サーバー）への認証として、以下の認証方式をサポートします。
+
+- **パスワード認証**:
+  - `ansible_password`（または踏み台用 `ansible_bastion_password`）が指定されている場合、`ClientSession.addPasswordIdentity(password)` によりセッションにパスワードを登録します。
+- **公開鍵認証 (`FileKeyPairProvider`)**:
+  - `ansible_ssh_private_key_file`（または `ansible_bastion_private_key_file`）が指定されている場合、指定されたパスの存在を確認した上で `FileKeyPairProvider(path)` を初期化し、`loadKeys(null)` で取得した `KeyPair` を `ClientSession.addPublicKeyIdentity(keyPair)` へ登録します。
+- **認証の確定**:
+  - 資格情報設定後、`session.auth().verify(timeout)` を呼び出して認証を完了させます。
+
+### 5.3 コマンド実行メカニズム (`ChannelExec`)
+
+リモートコマンドの実行は、Apache MINA SSHD の `ClientSession.createExecChannel` を使用して行われます。
+
+- **権限昇格 (Become) コマンドラッピング**:
+  - `BecomeContext` が有効な場合、`become_method` に応じたコマンドラインラッパーを構築します：
+    - **`sudo` モード**: `sudo -H -S -n -p BECOME-PROMPT [-u <user>] [become_flags] /bin/sh -c '<command>'`
+    - **`su` モード**: `su [<user>] -c '<command>'`
+- **パスワード入力ストリーム自動注入**:
+  - `become` 設定時にパスワード（`becomePassword`）が存在する場合、`channel.getInvertedIn()` 経由で UTF-8 エンコードされたパスワード文字列（`becomePassword + "\n"`）を標準入力へ書き込み、`flush()` を実行します。
+- **環境変数の伝播**:
+  - タスク固有の環境変数 (`Map<String, String> environment`) は、`channel.setEnv(key, value)` を通じて SSH チャンネルへ登録されます。
+- **実行とステータス取得**:
+  - `ByteArrayOutputStream` を用いて `stdout` および `stderr` をキャプチャし、`channel.waitFor(ClientChannelEvent.CLOSED, timeout)` で実行終了を待機します。
+  - 終了コード (`channel.getExitStatus()`) を取得し、`ConnectionResult(stdout, stderr, exitStatus)` を返却します。
+
+### 5.4 ファイル転送 (`ScpClient` による `putFile` / `fetchFile`)
+
+SSH 接続におけるファイル転送は、Apache MINA SSHD の SCP モジュール (`org.apache.sshd.scp.client.ScpClient`) を利用して行われます。
+
+- **SCP クライアントの生成**:
+  - `ScpClientCreator.instance().createScpClient(session)` により、既存の SSH セッション上で SCP クライアントを作成します。
+- **`putFile(localPath, remotePath)`**:
+  - `scpClient.upload(localPath, remotePath, ScpClient.Option.PreserveAttributes)` を用いて、ファイル属性（パーミッション等）を維持したままアップロードします。
+- **`fetchFile(remotePath, localPath)`**:
+  - `scpClient.download(remotePath, localPath, ScpClient.Option.PreserveAttributes)` を用いて、リモートファイルをローカルへダウンロードします。
+
+### 5.5 多段 SSH 踏み台サーバー (Cascading Jump Hosts / Bastions) サポート
+
+`SshConnection` は、単一の踏み台サーバーだけでなく、複数段に及ぶカスケード踏み台サーバー（`List<BastionConfig>`）を経由した多段 SSH トンネリングをサポートしています。
+
+- **多段トンネル構築フロー**:
+  1. 最初の踏み台サーバーに対して `client.connect` および認証を行います。
+  2. 1 段目のセッション上で `startLocalPortForwarding` を使用し、ローカル動的ポート（ポート `0` 指定による OS 自動割り当て）から 2 段目の踏み台（または最終ターゲットホスト）へのローカルポートフォワードをバインドします。
+  3. 2 段目以降の踏み台には、1 段前で開いたローカルポート（`localhost:prevLocalPort`）宛てに接続し、同様にローカルポートフォワードをバインドしてカスケード接続を確立します。
+  4. 最終ターゲットホストへは、最後のローカルポートフォワードポートを介して `localhost` 宛てに SSH 接続・認証を行います。
+- **逆順カスケードクローズ (Reverse Teardown)**:
+  - 切断時（`close()`）は、ターゲットセッション -> 各踏み台のローカルポートフォワード停止 -> 各踏み台セッションの順で、構築時の逆順（`activeBastions` の末尾から）に安全にリソースを解放します。
+
+### 5.6 例外マッピング規則
+
+SSH 接続やコマンド実行時の失敗シナリオを以下の例外型へ安全にマッピングします。
+
+- **`UnreachableException` へのマッピング**:
+  - 踏み台またはターゲットホストへの接続タイムアウト・ネットワーク障害。
+  - 踏み台またはターゲットホストへの認証失敗（パスワード間違い・鍵不一致）。
+  - ローカルポートフォワードのバインド拒否。
+  - SSH セッション未確立状態での `execCommand` 呼び出しやネットワーク切断。
+- **`RuntimeException` へのマッピング**:
+  - SCP ファイルアップロード/ダウンロードの I/O 失敗（`putFile` / `fetchFile`）。
+
+### 5.7 Mockito による単体テスト・モッキング戦略 (`SshConnectionTest.java`)
+
+外部 SSH サーバーが存在しない環境でも、継続的インテグレーション（CI）環境で 100% 一貫したテストを実行するため、`SshConnectionTest.java` では Mockito を活用したモックテストスイートが構築されています。
+
+- **モック化コンポーネント**:
+  - `SshClient`, `ClientSession`, `ChannelExec`, `ScpClientCreator`, `ScpClient`
+- **テスト検証範囲**:
+  - パスワード認証および鍵ファイル認証の指定検証。
+  - `sudo` / `su` 各モードにおける `execCommand` CLI 引数構文および stdin パスワード書き込みの検証。
+  - 1 段および多段 (`-J bastion1,bastion2`) SSH ジャンプホストにおける `startLocalPortForwarding` とターゲット接続ポートのアサーション。
+  - 非ゼロ終了コードや `stderr` 混在時の `ConnectionResult` 構造体アサーション。
+  - 例外発生時の安全な逆順カスケードクローズ動作の検証。
 
 ## 6. ローカルコネクションの詳細設計 (LocalConnection Implementation)
 
