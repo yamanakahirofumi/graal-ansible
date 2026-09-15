@@ -353,6 +353,10 @@ class BuiltinModulesIntegrationTest {
 
     @Test
     void testHostnameModuleCheckMode() {
+        if (System.getProperty("os.name").toLowerCase().contains("win")) {
+            return; // hostname module is not supported on Windows
+        }
+
         Task taskCheck = new Task("Set hostname check mode", "hostname", Map.of(
                 "name", "test-hostname"
         ), Map.of(), null, null, null, List.of(), null, null, false,
@@ -365,6 +369,10 @@ class BuiltinModulesIntegrationTest {
 
     @Test
     void testKnownHostsModuleCheckMode() {
+        if (System.getProperty("os.name").toLowerCase().contains("win")) {
+            return; // known_hosts module requires ssh-keygen which is POSIX specific
+        }
+
         Task taskCheck = new Task("Add known_hosts check mode", "known_hosts", Map.of(
                 "name", "example.com",
                 "key", "example.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ3",
