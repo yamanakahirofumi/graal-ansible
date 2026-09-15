@@ -316,4 +316,86 @@ class BuiltinModulesIntegrationTest {
         assertTrue(resultCheck.success(), "cron check mode failed: " + resultCheck.message() + " Data: " + resultCheck.data());
     }
 
+    @Test
+    void testPackageFactsModule() {
+        if (System.getProperty("os.name").toLowerCase().contains("win")) {
+            return;
+        }
+
+        Task task = new Task("Gather package facts", "package_facts", Map.of());
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertTrue(result.success(), "package_facts failed: " + result.message() + " Data: " + result.data());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
+        assertNotNull(facts, "ansible_facts should be returned by package_facts");
+        assertTrue(facts.containsKey("packages"), "ansible_facts should contain packages key");
+    }
+
+    @Test
+    void testServiceFactsModule() {
+        if (System.getProperty("os.name").toLowerCase().contains("win")) {
+            return;
+        }
+
+        Task task = new Task("Gather service facts", "service_facts", Map.of());
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertTrue(result.success(), "service_facts failed: " + result.message() + " Data: " + result.data());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
+        assertNotNull(facts, "ansible_facts should be returned by service_facts");
+        assertTrue(facts.containsKey("services"), "ansible_facts should contain services key");
+    }
+
+    @Test
+    void testHostnameModuleCheckMode() {
+        if (System.getProperty("os.name").toLowerCase().contains("win")) {
+            return;
+        }
+
+        Task task = new Task("Set hostname in check mode", "hostname", Map.of(
+                "name", "test-hostname"
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "hostname check mode failed: " + result.message() + " Data: " + result.data());
+    }
+
+    @Test
+    void testKnownHostsModuleCheckMode() throws IOException {
+        if (System.getProperty("os.name").toLowerCase().contains("win")) {
+            return;
+        }
+
+        Path knownHostsFile = tempDir.resolve("known_hosts");
+        Files.writeString(knownHostsFile, "example.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC...\n");
+
+        Task task = new Task("Manage known_hosts in check mode", "known_hosts", Map.of(
+                "name", "example.com",
+                "key", "example.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC...",
+                "path", knownHostsFile.toString(),
+                "state", "present"
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "known_hosts check mode failed: " + result.message() + " Data: " + result.data());
+    }
+
+    @Test
+    void testWaitForConnectionModuleCheckMode() {
+        Task task = new Task("Wait for connection check mode", "wait_for_connection", Map.of(
+                "timeout", 5
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "wait_for_connection check mode failed: " + result.message() + " Data: " + result.data());
+    }
+
 }
