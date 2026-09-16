@@ -8,6 +8,8 @@ import org.example.ansible.inventory.Inventory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
@@ -139,11 +141,8 @@ class CommandShellIntegrationTest {
     }
 
     @Test
+    @DisabledOnOs(OS.WINDOWS)
     void testSetupModule() {
-        if (System.getProperty("os.name").toLowerCase().contains("win")) {
-            return; // setup module fact gathering is for Linux/POSIX platforms
-        }
-
         Task task = new Task("Gather facts with filter", "setup", Map.of(
                 "gather_subset", List.of("min"),
                 "filter", List.of("ansible_system")

@@ -23,13 +23,7 @@ class InventoryIntegrationTest {
         Files.writeString(iniFile, "[web]\nweb1 ansible_host=127.0.0.1\n[web:vars]\nfoo=bar");
 
         FileInventoryProvider provider = new FileInventoryProvider();
-        // On Windows, canExecute() might be true for any file, making supports() return false.
-        // For testing purposes, we might need to be careful, but let's see.
-        // Actually, on Linux/macOS, we want to ensure it works.
-        boolean isWindows = System.getProperty("os.name").toLowerCase().contains("win");
-        if (!isWindows) {
-            assertTrue(provider.supports(iniFile.toString()));
-        }
+        assertTrue(provider.supports(iniFile.toString()));
 
         Inventory inventory = new Inventory(new Group("all"));
         provider.load(iniFile.toString(), inventory);

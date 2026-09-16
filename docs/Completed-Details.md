@@ -396,3 +396,11 @@
     - `SshConnectionTest.java` において、`execCommand` の stdout/stderr 混合出力および非ゼロ終了コード時のレスポンス構造体アサーション、SSH 認証失敗時の例外メッセージフォーマット検証テストを追加。
     - `DockerConnectionTest.java` において、`execCommand` のコマンド未検出/エラー出力、プロセス起動失敗（`IOException`）、ファイル転送（`putFile`/`fetchFile`）失敗時の例外ハンドリングテストを追加。
     - `WinRMConnectionTest.java` において、PowerShell コマンド実行失敗、タイムアウト例外、Base64 チャンク転送失敗（リモート容量不足等）、リモートファイル未検出時の例外ハンドリングテストを追加。
+
+### 2.14 [✓] OS 依存テストの評価と JUnit 5 アノテーション (@DisabledOnOs) への置き換え
+- **完了日**: 2026-10-24
+- **概要**: テストクラス内に存在したプログラムによる `if (System.getProperty("os.name").contains("win")) return;` スキップ処理を撤廃し、各テストの OS 依存性を厳密に評価した上で JUnit 5 アノテーションに置き換え。
+- **解決策**:
+    - `BuiltinModulesIntegrationTest`, `FileModulesIntegrationTest`, `CommandShellIntegrationTest` の POSIX 依存ユーティリティ/ファクト検証テスト（`getent`, `cron`, `package_facts`, `service_facts`, `hostname`, `known_hosts`, `dpkg_selections`, `setup`）に `@DisabledOnOs(OS.WINDOWS)` アノテーションを付与。
+    - `InventoryIntegrationTest` における無条件の `isWindows` スキップロジックを削除（`FileInventoryProvider` の正当性を検証）。
+    - `docs/tech/Test-Rule.md` にプログラムによる無条件スキップの禁止とアノテーションによる明示的宣言ルールを追加。

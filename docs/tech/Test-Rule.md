@@ -43,7 +43,7 @@ assertTrue(result.isSuccess());
 - **エンジン・コア機能**: Playbook 解析、変数展開、タスク実行制御などは、全 OS (Linux, macOS, Windows) でテストを実施します。
 - **モジュール・コレクション**:
   - `ansible.builtin` などの実際のモジュールを用いたテストは、そのモジュールが本家 Ansible でサポートしている OS 環境でのみ実施します。
-  - JUnit の `@EnabledOnOs` を使用して、非対応 OS でのテスト実行を適切にスキップしてください。
+  - **OS 依存テストの評価とアノテーション化**: テストメソッド内で `if (System.getProperty("os.name").contains("win")) return;` のようなプログラムによる無条件のスキップ判定を行うことは禁止します。本当に OS 依存のテストであるか（例: POSIX 固有のユーティリティやファイルシステム仕様への依存）を十分に吟味した上で、JUnit 5 の `@EnabledOnOs` または `@DisabledOnOs` アノテーションを使用して明示的にスキップを宣言してください。
 
 ## 5. SSH 接続のテスト (Testing SSH Connections)
 SSH を介した接続（`SshConnection` 等）をテストする場合は、**Testcontainers** の SSH モジュールを使用して、一時的な SSH サーバーコンテナを起動して検証を行います。

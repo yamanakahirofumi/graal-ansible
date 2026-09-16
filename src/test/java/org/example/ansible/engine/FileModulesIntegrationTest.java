@@ -8,6 +8,8 @@ import org.example.ansible.inventory.Inventory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
@@ -322,12 +324,8 @@ class FileModulesIntegrationTest {
     }
 
     @Test
+    @DisabledOnOs(OS.WINDOWS)
     void testGetentModule() {
-        // Skip getent test on Windows because the getent utility is typically missing
-        if (System.getProperty("os.name").toLowerCase().contains("win")) {
-            return;
-        }
-
         Task task = new Task("Getent passwd", "getent", Map.of(
                 "database", "passwd",
                 "key", "root"
@@ -388,12 +386,8 @@ class FileModulesIntegrationTest {
     }
 
     @Test
+    @DisabledOnOs(OS.WINDOWS)
     void testDpkgSelectionsModule() {
-        // Skip dpkg_selections test on Windows because the dpkg utility is typically missing
-        if (System.getProperty("os.name").toLowerCase().contains("win")) {
-            return;
-        }
-
         // dpkg_selections is for setting selections, let's use it in check_mode
         Task task = new Task("Set dpkg selections", "dpkg_selections", Map.of(
                 "name", "sed",

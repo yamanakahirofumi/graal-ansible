@@ -7,6 +7,8 @@ import org.example.ansible.inventory.Inventory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
@@ -268,11 +270,8 @@ class BuiltinModulesIntegrationTest {
     }
 
     @Test
+    @DisabledOnOs(OS.WINDOWS)
     void testGetentModule() {
-        if (System.getProperty("os.name").toLowerCase().contains("win")) {
-            return; // getent is only available on Linux/POSIX platforms
-        }
-
         Task task = new Task("Getent passwd", "getent", Map.of(
                 "database", "passwd",
                 "key", "root"
@@ -287,11 +286,8 @@ class BuiltinModulesIntegrationTest {
     }
 
     @Test
+    @DisabledOnOs(OS.WINDOWS)
     void testCronModuleCheckMode() {
-        if (System.getProperty("os.name").toLowerCase().contains("win")) {
-            return;
-        }
-
         // Skip if crontab binary is not present in the system environment
         boolean hasCrontab = false;
         try {
@@ -317,11 +313,8 @@ class BuiltinModulesIntegrationTest {
     }
 
     @Test
+    @DisabledOnOs(OS.WINDOWS)
     void testPackageFactsModule() {
-        if (System.getProperty("os.name").toLowerCase().contains("win")) {
-            return;
-        }
-
         Task task = new Task("Gather package facts", "package_facts", Map.of());
         TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
 
@@ -333,11 +326,8 @@ class BuiltinModulesIntegrationTest {
     }
 
     @Test
+    @DisabledOnOs(OS.WINDOWS)
     void testServiceFactsModule() {
-        if (System.getProperty("os.name").toLowerCase().contains("win")) {
-            return;
-        }
-
         Task task = new Task("Gather service facts", "service_facts", Map.of());
         TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
 
@@ -349,11 +339,8 @@ class BuiltinModulesIntegrationTest {
     }
 
     @Test
+    @DisabledOnOs(OS.WINDOWS)
     void testHostnameModuleCheckMode() {
-        if (System.getProperty("os.name").toLowerCase().contains("win")) {
-            return;
-        }
-
         Task task = new Task("Set hostname in check mode", "hostname", Map.of(
                 "name", "test-hostname"
         ), Map.of(), null, null, null, List.of(), null, null, false,
@@ -365,11 +352,8 @@ class BuiltinModulesIntegrationTest {
     }
 
     @Test
+    @DisabledOnOs(OS.WINDOWS)
     void testKnownHostsModuleCheckMode() throws IOException {
-        if (System.getProperty("os.name").toLowerCase().contains("win")) {
-            return;
-        }
-
         Path knownHostsFile = tempDir.resolve("known_hosts");
         Files.writeString(knownHostsFile, "example.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC...\n");
 
