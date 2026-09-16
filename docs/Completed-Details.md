@@ -397,10 +397,11 @@
     - `DockerConnectionTest.java` において、`execCommand` のコマンド未検出/エラー出力、プロセス起動失敗（`IOException`）、ファイル転送（`putFile`/`fetchFile`）失敗時の例外ハンドリングテストを追加。
     - `WinRMConnectionTest.java` において、PowerShell コマンド実行失敗、タイムアウト例外、Base64 チャンク転送失敗（リモート容量不足等）、リモートファイル未検出時の例外ハンドリングテストを追加。
 
-### 2.14 [✓] OS 依存テストの評価と JUnit 5 アノテーション (@DisabledOnOs) への置き換え
+### 2.14 [✓] OS 依存テストの評価と JUnit 5 クラスレベルアノテーション (@DisabledOnOs) への集約
 - **完了日**: 2026-10-24
-- **概要**: テストクラス内に存在したプログラムによる `if (System.getProperty("os.name").contains("win")) return;` スキップ処理を撤廃し、各テストの OS 依存性を厳密に評価した上で JUnit 5 アノテーションに置き換え。
+- **概要**: テストクラス内に存在したプログラムによる `if (System.getProperty("os.name").contains("win")) return;` スキップ処理を撤廃し、各テストの OS 依存性を厳密に評価した上で、専用のクラス `PosixModulesIntegrationTest` に集約してクラスレベルの JUnit 5 アノテーションを付与。
 - **解決策**:
-    - `BuiltinModulesIntegrationTest`, `FileModulesIntegrationTest`, `CommandShellIntegrationTest` の POSIX 依存ユーティリティ/ファクト検証テスト（`getent`, `cron`, `package_facts`, `service_facts`, `hostname`, `known_hosts`, `dpkg_selections`, `setup`）に `@DisabledOnOs(OS.WINDOWS)` アノテーションを付与。
+    - `BuiltinModulesIntegrationTest`, `FileModulesIntegrationTest`, `CommandShellIntegrationTest`, `ActionPluginTest` の POSIX 依存ユーティリティ/ファクト検証テスト（`getent`, `cron`, `package_facts`, `service_facts`, `hostname`, `known_hosts`, `dpkg_selections`, `setup`, `script`）を削除し、新規作成した `PosixModulesIntegrationTest.java` に一括移送。
+    - `PosixModulesIntegrationTest` クラス自体に `@DisabledOnOs(OS.WINDOWS)` を付与し、クラス単位での除外制御を確立。
     - `InventoryIntegrationTest` における無条件の `isWindows` スキップロジックを削除（`FileInventoryProvider` の正当性を検証）。
-    - `docs/tech/Test-Rule.md` にプログラムによる無条件スキップの禁止とアノテーションによる明示的宣言ルールを追加。
+    - `docs/tech/Test-Rule.md` にプログラムによる無条件スキップの禁止と、OS 依存テストのクラス単位集約・クラスレベルアノテーション宣言ルールを追加。

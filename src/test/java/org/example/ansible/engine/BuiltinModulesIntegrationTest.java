@@ -7,8 +7,6 @@ import org.example.ansible.inventory.Inventory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.DisabledOnOs;
-import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
@@ -269,106 +267,6 @@ class BuiltinModulesIntegrationTest {
         assertTrue(result.success(), "set_stats failed: " + result.message() + " Data: " + result.data());
     }
 
-    @Test
-    @DisabledOnOs(OS.WINDOWS)
-    void testGetentModule() {
-        Task task = new Task("Getent passwd", "getent", Map.of(
-                "database", "passwd",
-                "key", "root"
-        ));
-
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
-        assertTrue(result.success(), "getent failed: " + result.message() + " Data: " + result.data());
-        @SuppressWarnings("unchecked")
-        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
-        assertNotNull(facts, "ansible_facts should be returned by getent");
-        assertNotNull(facts.get("getent_passwd"), "getent_passwd key should exist in facts");
-    }
-
-    @Test
-    @DisabledOnOs(OS.WINDOWS)
-    void testCronModuleCheckMode() {
-        // Skip if crontab binary is not present in the system environment
-        boolean hasCrontab = false;
-        try {
-            Process p = new ProcessBuilder("which", "crontab").start();
-            hasCrontab = (p.waitFor() == 0);
-        } catch (Exception ignored) {}
-
-        if (!hasCrontab) {
-            return;
-        }
-
-        Task taskCheck = new Task("Add cron job in check mode", "cron", Map.of(
-                "name", "check_mode_test_job",
-                "job", "echo hello",
-                "minute", "0",
-                "hour", "12"
-        ), Map.of(), null, null, null, List.of(), null, null, false,
-                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
-                null, null, null, null, true, null);
-
-        TaskResult resultCheck = taskExecutor.execute(play, host, taskCheck, variableManager, false, null, null, new LocalConnection(), null);
-        assertTrue(resultCheck.success(), "cron check mode failed: " + resultCheck.message() + " Data: " + resultCheck.data());
-    }
-
-    @Test
-    @DisabledOnOs(OS.WINDOWS)
-    void testPackageFactsModule() {
-        Task task = new Task("Gather package facts", "package_facts", Map.of());
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
-
-        assertTrue(result.success(), "package_facts failed: " + result.message() + " Data: " + result.data());
-        @SuppressWarnings("unchecked")
-        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
-        assertNotNull(facts, "ansible_facts should be returned by package_facts");
-        assertTrue(facts.containsKey("packages"), "ansible_facts should contain packages key");
-    }
-
-    @Test
-    @DisabledOnOs(OS.WINDOWS)
-    void testServiceFactsModule() {
-        Task task = new Task("Gather service facts", "service_facts", Map.of());
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
-
-        assertTrue(result.success(), "service_facts failed: " + result.message() + " Data: " + result.data());
-        @SuppressWarnings("unchecked")
-        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
-        assertNotNull(facts, "ansible_facts should be returned by service_facts");
-        assertTrue(facts.containsKey("services"), "ansible_facts should contain services key");
-    }
-
-    @Test
-    @DisabledOnOs(OS.WINDOWS)
-    void testHostnameModuleCheckMode() {
-        Task task = new Task("Set hostname in check mode", "hostname", Map.of(
-                "name", "test-hostname"
-        ), Map.of(), null, null, null, List.of(), null, null, false,
-                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
-                null, null, null, null, true, null);
-
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
-        assertTrue(result.success(), "hostname check mode failed: " + result.message() + " Data: " + result.data());
-    }
-
-    @Test
-    @DisabledOnOs(OS.WINDOWS)
-    void testKnownHostsModuleCheckMode() throws IOException {
-        Path knownHostsFile = tempDir.resolve("known_hosts");
-        Files.writeString(knownHostsFile, "example.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC...\n");
-
-        Task task = new Task("Manage known_hosts in check mode", "known_hosts", Map.of(
-                "name", "example.com",
-                "key", "example.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC...",
-                "path", knownHostsFile.toString(),
-                "state", "present"
-        ), Map.of(), null, null, null, List.of(), null, null, false,
-                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
-                null, null, null, null, true, null);
-
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
-        assertTrue(result.success(), "known_hosts check mode failed: " + result.message() + " Data: " + result.data());
-    }
 
     @Test
     void testWaitForConnectionModuleCheckMode() {

@@ -8,8 +8,6 @@ import org.example.ansible.inventory.Inventory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.DisabledOnOs;
-import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
@@ -138,22 +136,6 @@ class CommandShellIntegrationTest {
         String stdout = (String) result.data().get("stdout");
         assertNotNull(stdout, "stdout should not be null");
         assertEquals("my_value", stdout.trim());
-    }
-
-    @Test
-    @DisabledOnOs(OS.WINDOWS)
-    void testSetupModule() {
-        Task task = new Task("Gather facts with filter", "setup", Map.of(
-                "gather_subset", List.of("min"),
-                "filter", List.of("ansible_system")
-        ));
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
-
-        assertTrue(result.success(), "Execution failed: " + result.message() + " Data: " + result.data());
-        @SuppressWarnings("unchecked")
-        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
-        assertNotNull(facts, "ansible_facts should not be null");
-        assertTrue(facts.containsKey("ansible_system"), "ansible_facts should contain ansible_system when filtered");
     }
 
     @Test
