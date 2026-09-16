@@ -297,6 +297,13 @@
     - `FileModulesIntegrationTest.java` にて `testBlockInFileCheckMode` および `testLineInFileWithValidate` (validate 引数) を追加。
     - `ansible_bridge.py` の `run_command` において Python `bytes` 型引数を UTF-8 に自動デコードする修正を実施。
 
+### 1.43 [✓] コアモジュールの統合テスト拡充と Python ブリッジ機能調整
+- **完了日**: 2026-10-24
+- **概要**: `docs/tech/Test-Expansion-Strategy.md` Section 2.2 に基づき、`package_facts`, `service_facts`, `hostname` (check_mode), `known_hosts` (check_mode), `wait_for_connection` (check_mode) の統合テストを追加。
+- **解決策**:
+    - `BuiltinModulesIntegrationTest.java` にて `testPackageFactsModule`, `testServiceFactsModule`, `testHostnameModuleCheckMode`, `testKnownHostsModuleCheckMode`, `testWaitForConnectionModuleCheckMode` の自動テストを統合。
+    - `ansible_bridge.py` の `get_bin_path` においてデフォルト引数 `required=False` を適用し、`apt` / `apt_pkg` モックおよび `sys_info` の `get_distribution_version` / `get_distribution_codename` 関数を追加。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築
