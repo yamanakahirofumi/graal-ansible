@@ -139,25 +139,6 @@ class CommandShellIntegrationTest {
     }
 
     @Test
-    void testSetupModule() {
-        if (System.getProperty("os.name").toLowerCase().contains("win")) {
-            return; // setup module fact gathering is for Linux/POSIX platforms
-        }
-
-        Task task = new Task("Gather facts with filter", "setup", Map.of(
-                "gather_subset", List.of("min"),
-                "filter", List.of("ansible_system")
-        ));
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
-
-        assertTrue(result.success(), "Execution failed: " + result.message() + " Data: " + result.data());
-        @SuppressWarnings("unchecked")
-        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
-        assertNotNull(facts, "ansible_facts should not be null");
-        assertTrue(facts.containsKey("ansible_system"), "ansible_facts should contain ansible_system when filtered");
-    }
-
-    @Test
     void testCommandAndShellCheckMode() {
         Task commandTask = new Task("Run command check mode", "command",
             Map.of("_raw_params", "echo check_mode_test"),

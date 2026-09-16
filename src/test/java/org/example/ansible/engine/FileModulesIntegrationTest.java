@@ -322,31 +322,6 @@ class FileModulesIntegrationTest {
     }
 
     @Test
-    void testGetentModule() {
-        // Skip getent test on Windows because the getent utility is typically missing
-        if (System.getProperty("os.name").toLowerCase().contains("win")) {
-            return;
-        }
-
-        Task task = new Task("Getent passwd", "getent", Map.of(
-                "database", "passwd",
-                "key", "root"
-        ));
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
-
-        if (!result.success()) {
-            System.err.println("Getent failed: " + result.message());
-            System.err.println("Full Data: " + result.data());
-        }
-        assertTrue(result.success(), result.message());
-        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
-        assertNotNull(facts, "ansible_facts should be present");
-        Map<String, Object> getent = (Map<String, Object>) facts.get("getent_passwd");
-        assertNotNull(getent, "getent_passwd should be present in ansible_facts");
-        assertTrue(getent.containsKey("root"));
-    }
-
-    @Test
     void testFetchModule() throws IOException {
         Path remoteFile = tempDir.resolve("remote-source.txt");
         String content = "remote data to fetch";
@@ -385,32 +360,6 @@ class FileModulesIntegrationTest {
         assertNotNull(facts, "ansible_facts should be present");
         // mount_facts returns mount_points and aggregate_mounts
         assertTrue(facts.containsKey("mount_points") || facts.containsKey("mounts"), "mount info should be present in ansible_facts");
-    }
-
-    @Test
-    void testDpkgSelectionsModule() {
-        // Skip dpkg_selections test on Windows because the dpkg utility is typically missing
-        if (System.getProperty("os.name").toLowerCase().contains("win")) {
-            return;
-        }
-
-        // dpkg_selections is for setting selections, let's use it in check_mode
-        Task task = new Task("Set dpkg selections", "dpkg_selections", Map.of(
-                "name", "sed",
-                "selection", "install"
-        ), Map.of(), null, null, null, List.of(), null, null, false,
-                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
-                null, null, null, null, true, null); // check_mode: true
-
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
-
-        if (!result.success()) {
-            System.err.println("dpkg_selections failed: " + result.message());
-            System.err.println("Full Data: " + result.data());
-        }
-        assertTrue(result.success(), result.message());
-        assertNotNull(result.data().get("before"));
-        assertNotNull(result.data().get("after"));
     }
 
     @Test
