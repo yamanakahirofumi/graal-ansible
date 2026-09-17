@@ -304,6 +304,13 @@
     - `BuiltinModulesIntegrationTest.java` にて `testPackageFactsModule`, `testServiceFactsModule`, `testHostnameModuleCheckMode`, `testKnownHostsModuleCheckMode`, `testWaitForConnectionModuleCheckMode` の自動テストを統合。
     - `ansible_bridge.py` の `get_bin_path` においてデフォルト引数 `required=False` を適用し、`apt` / `apt_pkg` モックおよび `sys_info` の `get_distribution_version` / `get_distribution_codename` 関数を追加。
 
+### 1.44 [✓] template ルックアッププラグインにおける convert_data オプションのサポート
+- **完了日**: 2026-10-24
+- **概要**: `docs/implementation/Variables-Templating.md` Section 7.2 に基づき、`template` ルックアッププラグインにおける `convert_data` パラメータの動的構造解析を実装。
+- **解決策**:
+    - `TemplateLookup.java` にて `convert_data` パラメータ（デフォルト: `true`）の解釈を追加し、レンダリング結果の YAML/JSON テキストを `YamlUtil` 経由で Java オブジェクト（`Map`/`List`）へ自動展開する処理を統合。
+    - `TemplateLookupTest.java` にて `convert_data=true` および `convert_data=false` の単体テストスイートを拡張。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築

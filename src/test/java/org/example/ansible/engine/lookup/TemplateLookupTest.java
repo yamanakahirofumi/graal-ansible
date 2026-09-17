@@ -59,4 +59,57 @@ class TemplateLookupTest {
         String template = "{{ lookup('template', 'missing_template_file_abc.j2') }}";
         assertThrows(RuntimeException.class, () -> resolver.resolveValue(template, variables));
     }
+
+    @Test
+    void testTemplateLookupConvertDataTrue() throws IOException {
+        Path tempFile = Files.createTempFile("tpl_data", ".j2");
+        Files.writeString(tempFile, "key: {{ app_name }}\nport: {{ app_port }}");
+
+        try {
+            VariableResolver resolver = new VariableResolver();
+            Map<String, Object> variables = new HashMap<>();
+            variables.put("app_name", "webserver");
+            variables.put("app_port", 8080);
+
+            String path = tempFile.toAbsolutePath().toString().replace("\\", "/");
+            String template = "{{ query('template', '" + path + "', convert_data=true) }}";
+            Object result = resolver.resolveValue(template, variables);
+
+            assertTrue(result instanceof java.util.List<?>, "query result should be a list");
+            java.util.List<?> list = (java.util.List<?>) result;
+            assertEquals(1, list.size());
+            assertTrue(list.get(0) instanceof Map<?, ?>, "element should be converted to a Map");
+            @SuppressWarnings("unchecked")
+            Map<String, Object> map = (Map<String, Object>) list.get(0);
+            assertEquals("webserver", map.get("key"));
+            assertEquals(8080, map.get("port"));
+        } finally {
+            Files.deleteIfExists(tempFile);
+        }
+    }
+
+    @Test
+    void testTemplateLookupConvertDataFalse() throws IOException {
+        Path tempFile = Files.createTempFile("tpl_data_raw", ".j2");
+        Files.writeString(tempFile, "key: {{ app_name }}\nport: {{ app_port }}");
+
+        try {
+            VariableResolver resolver = new VariableResolver();
+            Map<String, Object> variables = new HashMap<>();
+            variables.put("app_name", "webserver");
+            variables.put("app_port", 8080);
+
+            String path = tempFile.toAbsolutePath().toString().replace("\\", "/");
+            String template = "{{ query('template', '" + path + "', convert_data=false) }}";
+            Object result = resolver.resolveValue(template, variables);
+
+            assertTrue(result instanceof java.util.List<?>, "query result should be a list");
+            java.util.List<?> list = (java.util.List<?>) result;
+            assertEquals(1, list.size());
+            assertTrue(list.get(0) instanceof String, "element should remain raw String when convert_data=false");
+            assertEquals("key: webserver\nport: 8080", list.get(0));
+        } finally {
+            Files.deleteIfExists(tempFile);
+        }
+    }
 }

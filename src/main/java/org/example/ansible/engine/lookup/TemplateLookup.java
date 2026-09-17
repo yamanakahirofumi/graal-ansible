@@ -25,6 +25,16 @@ public class TemplateLookup implements Lookup {
             throw new IllegalStateException("VariableResolver not found in Jinjava context");
         }
 
+        boolean convertData = true;
+        if (kwargs != null && kwargs.containsKey("convert_data")) {
+            Object cd = kwargs.get("convert_data");
+            if (cd instanceof Boolean b) {
+                convertData = b;
+            } else if (cd != null) {
+                convertData = Boolean.parseBoolean(cd.toString());
+            }
+        }
+
         for (Object termObj : terms) {
             String term = termObj != null ? termObj.toString() : "";
             Path path = Paths.get(term);
@@ -36,7 +46,17 @@ public class TemplateLookup implements Lookup {
                 String templateContent = Files.readString(path);
                 // We use resolveValue which handles templating
                 Object rendered = resolver.resolveValue(templateContent, interpreter.getContext());
-                results.add(rendered != null ? rendered.toString() : "");
+                if (convertData && rendered instanceof String str) {
+                    try {
+                        Object parsed = org.example.ansible.util.YamlUtil.createYaml().load(str);
+                        if (parsed instanceof Map || parsed instanceof List) {
+                            results.add(parsed);
+                            continue;
+                        }
+                    } catch (Exception ignored) {
+                    }
+                }
+                results.add(rendered != null ? rendered : "");
             } catch (IOException e) {
                 throw new RuntimeException("Template lookup failed for file: " + path + ". " + e.getMessage(), e);
             }
