@@ -311,6 +311,13 @@
     - `TemplateLookup.java` にて `convert_data` パラメータ（デフォルト: `true`）の解釈を追加し、レンダリング結果の YAML/JSON テキストを `YamlUtil` 経由で Java オブジェクト（`Map`/`List`）へ自動展開する処理を統合。
     - `TemplateLookupTest.java` にて `convert_data=true` および `convert_data=false` の単体テストスイートを拡張。
 
+### 1.45 [✓] ホストパターン範囲展開 (HostPatternParser) 仕様の詳細化 [追加]
+- **完了日**: 2026-10-24
+- **概要**: `HostPatternParser` に実装されている範囲パターン展開（Range Pattern Expansion）およびブラケット区切り文字処理の仕様をドキュメントに明記。
+- **解決策**:
+    - `docs/implementation/Inventory-System.md` Section 7.2 および `docs/features/Inventory-System.md` Section 2.2 を更新。
+    - 範囲区切り文字（`:` および `-`）、数値/アルファベット範囲正規表現ルール、ゼロパディング左詰めフォーマット、リバース展開、複数ブラケット再帰展開（直積 Cartesian Product 生成）、および非範囲ブラケットのフォールバック仕様を追加・明記。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築
