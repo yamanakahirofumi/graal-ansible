@@ -35,6 +35,8 @@ public class TemplateLookup implements Lookup {
             }
         }
 
+        String errors = kwargs != null && kwargs.containsKey("errors") ? kwargs.get("errors").toString() : "strict";
+
         for (Object termObj : terms) {
             String term = termObj != null ? termObj.toString() : "";
             Path path = Paths.get(term);
@@ -57,7 +59,10 @@ public class TemplateLookup implements Lookup {
                     }
                 }
                 results.add(rendered != null ? rendered : "");
-            } catch (IOException e) {
+            } catch (Exception e) {
+                if ("warn".equalsIgnoreCase(errors) || "ignore".equalsIgnoreCase(errors)) {
+                    continue;
+                }
                 throw new RuntimeException("Template lookup failed for file: " + path + ". " + e.getMessage(), e);
             }
         }

@@ -29,4 +29,14 @@ class PipeLookupTest {
         String template = "{{ lookup('pipe', 'exit 1') }}";
         assertThrows(RuntimeException.class, () -> resolver.resolveValue(template, variables));
     }
+
+    @Test
+    void testPipeLookupErrorsIgnore() {
+        VariableResolver resolver = new VariableResolver();
+        Map<String, Object> variables = new HashMap<>();
+
+        String template = "{{ lookup('pipe', 'exit 1', errors='ignore') }}";
+        Object result = resolver.resolveValue(template, variables);
+        assertEquals("", result);
+    }
 }

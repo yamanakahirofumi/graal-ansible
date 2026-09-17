@@ -18,6 +18,7 @@ public class PipeLookup implements Lookup {
         List<Object> results = new ArrayList<>();
         OSHandler osHandler = OSHandlerFactory.getHandler();
         List<String> shell = osHandler.getShellExecutable();
+        String errors = kwargs != null && kwargs.containsKey("errors") ? kwargs.get("errors").toString() : "strict";
 
         for (Object termObj : terms) {
             String command = termObj != null ? termObj.toString() : "";
@@ -29,10 +30,16 @@ public class PipeLookup implements Lookup {
                 String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
                 int exitCode = process.waitFor();
                 if (exitCode != 0) {
+                    if ("warn".equalsIgnoreCase(errors) || "ignore".equalsIgnoreCase(errors)) {
+                        continue;
+                    }
                     throw new RuntimeException("Pipe lookup command failed with exit code " + exitCode + ": " + command);
                 }
                 results.add(output);
             } catch (Exception e) {
+                if ("warn".equalsIgnoreCase(errors) || "ignore".equalsIgnoreCase(errors)) {
+                    continue;
+                }
                 throw new RuntimeException("Pipe lookup failed for command: " + command, e);
             }
         }

@@ -57,4 +57,13 @@ class FileLookupTest {
         String template = "{{ lookup('file', 'non_existent_file_xyz.txt') }}";
         assertThrows(RuntimeException.class, () -> resolver.resolveValue(template, variables));
     }
+
+    @Test
+    void testFileLookupNonExistentWithErrorsIgnore() {
+        VariableResolver resolver = new VariableResolver();
+        Map<String, Object> variables = new HashMap<>();
+        String template = "{{ lookup('file', 'non_existent_file_xyz.txt', errors='ignore') }}";
+        Object result = resolver.resolveValue(template, variables);
+        assertEquals("", result);
+    }
 }
