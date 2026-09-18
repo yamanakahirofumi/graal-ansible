@@ -48,6 +48,29 @@ class LookupIntegrationTest {
     }
 
     @Test
+    void testLookupWithWantlistTrue() throws IOException {
+        Path tempFile1 = Files.createTempFile("ansible_wl1", ".txt");
+        Path tempFile2 = Files.createTempFile("ansible_wl2", ".txt");
+        Files.writeString(tempFile1, "Content A");
+        Files.writeString(tempFile2, "Content B");
+        try {
+            Map<String, Object> variables = new HashMap<>();
+            String path1 = tempFile1.toAbsolutePath().toString().replace("\\", "/");
+            String path2 = tempFile2.toAbsolutePath().toString().replace("\\", "/");
+            String template = "{{ lookup('file', '" + path1 + "', '" + path2 + "', wantlist=true) }}";
+            Object result = resolver.resolveValue(template, variables);
+            assertTrue(result instanceof List);
+            List<?> list = (List<?>) result;
+            assertEquals(2, list.size());
+            assertEquals("Content A", list.get(0));
+            assertEquals("Content B", list.get(1));
+        } finally {
+            Files.deleteIfExists(tempFile1);
+            Files.deleteIfExists(tempFile2);
+        }
+    }
+
+    @Test
     void testQuery() throws IOException {
         Path tempFile1 = Files.createTempFile("ansible_test1", ".txt");
         Path tempFile2 = Files.createTempFile("ansible_test2", ".txt");

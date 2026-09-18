@@ -61,6 +61,15 @@ class TemplateLookupTest {
     }
 
     @Test
+    void testTemplateLookupNonExistentWithErrorsIgnore() {
+        VariableResolver resolver = new VariableResolver();
+        Map<String, Object> variables = new HashMap<>();
+        String template = "{{ lookup('template', 'missing_template_file_abc.j2', errors='ignore') }}";
+        Object result = resolver.resolveValue(template, variables);
+        assertEquals("", result);
+    }
+
+    @Test
     void testTemplateLookupConvertDataTrue() throws IOException {
         Path tempFile = Files.createTempFile("tpl_data", ".j2");
         Files.writeString(tempFile, "key: {{ app_name }}\nport: {{ app_port }}");

@@ -126,6 +126,15 @@ public class VariableResolver {
      */
     public static Object lookupFunc(String name, Object... args) {
         List<Object> results = queryFunc(name, args);
+        boolean wantlist = false;
+        for (Object arg : args) {
+            if (arg instanceof NamedParameter np && "wantlist".equalsIgnoreCase(np.getName())) {
+                wantlist = Truthiness.isTrue(np.getValue());
+            }
+        }
+        if (wantlist) {
+            return results;
+        }
         return results.stream()
                 .map(Object::toString)
                 .collect(Collectors.joining(","));

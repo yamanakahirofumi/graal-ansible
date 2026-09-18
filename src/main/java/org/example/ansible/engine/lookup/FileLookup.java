@@ -17,6 +17,7 @@ public class FileLookup implements Lookup {
     public List<Object> execute(JinjavaInterpreter interpreter, List<Object> terms, Map<String, Object> kwargs) {
         List<Object> results = new ArrayList<>();
         String playbookDir = (String) interpreter.getContext().get("playbook_dir");
+        String errors = kwargs != null && kwargs.containsKey("errors") ? kwargs.get("errors").toString() : "strict";
 
         for (Object termObj : terms) {
             String term = termObj != null ? termObj.toString() : "";
@@ -28,6 +29,9 @@ public class FileLookup implements Lookup {
             try {
                 results.add(Files.readString(path));
             } catch (IOException e) {
+                if ("warn".equalsIgnoreCase(errors) || "ignore".equalsIgnoreCase(errors)) {
+                    continue;
+                }
                 throw new RuntimeException("File lookup failed for file: " + path + ". " + e.getMessage(), e);
             }
         }
