@@ -12,7 +12,8 @@ public class EnvLookup implements Lookup {
     @Override
     public List<Object> execute(JinjavaInterpreter interpreter, List<Object> terms, Map<String, Object> kwargs) {
         List<Object> results = new ArrayList<>();
-        Object defaultValue = kwargs.get("default");
+        Object defaultValue = kwargs != null ? kwargs.get("default") : null;
+        String errors = kwargs != null && kwargs.containsKey("errors") ? kwargs.get("errors").toString() : "strict";
 
         for (Object term : terms) {
             String value = System.getenv(term.toString());
@@ -20,6 +21,10 @@ public class EnvLookup implements Lookup {
                 results.add(value);
             } else if (defaultValue != null) {
                 results.add(defaultValue);
+            } else if ("warn".equalsIgnoreCase(errors) || "ignore".equalsIgnoreCase(errors)) {
+                continue;
+            } else {
+                results.add("");
             }
         }
         return results;

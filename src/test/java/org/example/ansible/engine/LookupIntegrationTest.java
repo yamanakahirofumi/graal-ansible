@@ -141,4 +141,21 @@ class LookupIntegrationTest {
             Files.deleteIfExists(tempFile);
         }
     }
+
+    @Test
+    void testLookupErrorsHandling() {
+        Map<String, Object> variables = new HashMap<>();
+
+        // Non-existent file with errors='ignore'
+        String templateFileIgnore = "{{ query('file', '/non/existent/file.txt', errors='ignore') }}";
+        Object resultFileIgnore = resolver.resolveValue(templateFileIgnore, variables);
+        assertTrue(resultFileIgnore instanceof List);
+        assertTrue(((List<?>) resultFileIgnore).isEmpty());
+
+        // Non-existent vars with errors='warn'
+        String templateVarsWarn = "{{ query('vars', 'undefined_variable_xyz', errors='warn') }}";
+        Object resultVarsWarn = resolver.resolveValue(templateVarsWarn, variables);
+        assertTrue(resultVarsWarn instanceof List);
+        assertTrue(((List<?>) resultVarsWarn).isEmpty());
+    }
 }

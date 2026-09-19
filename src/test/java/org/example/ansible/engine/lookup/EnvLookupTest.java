@@ -49,10 +49,31 @@ class EnvLookupTest {
         VariableResolver resolver = new VariableResolver();
         Map<String, Object> variables = new HashMap<>();
 
-        String template = "{{ query('env', 'NON_EXISTENT_VAR_ABC_987') }}";
+        String template = "{{ lookup('env', 'NON_EXISTENT_VAR_ABC_987') }}";
         Object result = resolver.resolveValue(template, variables);
-        assertTrue(result instanceof List);
-        List<?> list = (List<?>) result;
-        assertTrue(list.isEmpty());
+        assertEquals("", result);
+
+        String queryTemplate = "{{ query('env', 'NON_EXISTENT_VAR_ABC_987') }}";
+        Object queryResult = resolver.resolveValue(queryTemplate, variables);
+        assertTrue(queryResult instanceof List);
+        List<?> list = (List<?>) queryResult;
+        assertEquals(1, list.size());
+        assertEquals("", list.get(0));
+    }
+
+    @Test
+    void testEnvLookupWithErrorsKwarg() {
+        VariableResolver resolver = new VariableResolver();
+        Map<String, Object> variables = new HashMap<>();
+
+        String queryIgnore = "{{ query('env', 'NON_EXISTENT_VAR_ABC_987', errors='ignore') }}";
+        Object resultIgnore = resolver.resolveValue(queryIgnore, variables);
+        assertTrue(resultIgnore instanceof List);
+        assertTrue(((List<?>) resultIgnore).isEmpty());
+
+        String queryWarn = "{{ query('env', 'NON_EXISTENT_VAR_ABC_987', errors='warn') }}";
+        Object resultWarn = resolver.resolveValue(queryWarn, variables);
+        assertTrue(resultWarn instanceof List);
+        assertTrue(((List<?>) resultWarn).isEmpty());
     }
 }
