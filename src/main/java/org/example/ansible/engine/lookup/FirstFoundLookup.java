@@ -94,7 +94,12 @@ public class FirstFoundLookup implements Lookup {
             }
         }
 
+        String errors = kwargs != null && kwargs.containsKey("errors") ? kwargs.get("errors").toString() : "strict";
+
         if (results.isEmpty() && !skip) {
+            if ("warn".equalsIgnoreCase(errors) || "ignore".equalsIgnoreCase(errors)) {
+                return results;
+            }
             throw new RuntimeException("No file was found for first_found lookup. Candidates: " + files);
         }
 

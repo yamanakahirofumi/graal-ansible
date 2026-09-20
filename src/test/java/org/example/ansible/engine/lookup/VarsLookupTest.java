@@ -48,4 +48,13 @@ class VarsLookupTest {
         String template2 = "{{ lookup('vars', 'my_var', default='fallback') }}";
         assertEquals("hello", resolver.resolveValue(template2, variables));
     }
+
+    @Test
+    void testVarsLookupWithErrorsIgnore() {
+        VariableResolver resolver = new VariableResolver();
+        Map<String, Object> variables = new HashMap<>();
+
+        String template = "{{ lookup('vars', 'non_existent', errors='ignore') }}";
+        assertEquals("", resolver.resolveValue(template, variables));
+    }
 }

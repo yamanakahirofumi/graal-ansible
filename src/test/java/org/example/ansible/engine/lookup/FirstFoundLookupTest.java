@@ -131,4 +131,16 @@ class FirstFoundLookupTest {
 
         assertEquals(fileY.toAbsolutePath().toString(), result);
     }
+
+    @Test
+    void testFirstFoundWithErrorsIgnore(@TempDir Path tempDir) {
+        final VariableResolver resolver = new VariableResolver();
+        final Map<String, Object> variables = new HashMap<>();
+        variables.put("playbook_dir", tempDir.toAbsolutePath().toString());
+
+        final String template = "{{ lookup('first_found', 'nonexistent.txt', errors='ignore') }}";
+        final Object result = resolver.resolveValue(template, variables);
+
+        assertEquals("", result);
+    }
 }

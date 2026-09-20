@@ -141,4 +141,26 @@ class LookupIntegrationTest {
             Files.deleteIfExists(tempFile);
         }
     }
+
+    @Test
+    void testLookupErrorsIgnoreIntegration() {
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("not_a_dict", "string_value");
+
+        // Dict lookup with errors='ignore' on non-dict input
+        String templateDict = "{{ query('dict', not_a_dict, errors='ignore') }}";
+        Object resultDict = resolver.resolveValue(templateDict, variables);
+        assertTrue(resultDict instanceof List);
+        assertTrue(((List<?>) resultDict).isEmpty());
+
+        // File lookup with errors='ignore' on non-existent file
+        String templateFile = "{{ lookup('file', 'non_existent_file_12345.txt', errors='ignore') }}";
+        Object resultFile = resolver.resolveValue(templateFile, variables);
+        assertEquals("", resultFile);
+
+        // Vars lookup with errors='ignore' on undefined variable
+        String templateVars = "{{ lookup('vars', 'undefined_var_xyz', errors='ignore') }}";
+        Object resultVars = resolver.resolveValue(templateVars, variables);
+        assertEquals("", resultVars);
+    }
 }
