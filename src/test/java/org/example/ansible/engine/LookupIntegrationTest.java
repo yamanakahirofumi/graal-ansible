@@ -16,7 +16,6 @@ class LookupIntegrationTest {
     @Test
     void testEnvLookup() {
         Map<String, Object> variables = new HashMap<>();
-        // PATH is usually available in most environments
         String template = "{{ lookup('env', 'PATH') }}";
         Object result = resolver.resolveValue(template, variables);
         assertNotNull(result);
@@ -37,7 +36,6 @@ class LookupIntegrationTest {
         Files.writeString(tempFile, "Hello World Lookup");
         try {
             Map<String, Object> variables = new HashMap<>();
-            // Use forward slashes for Jinja2 template to avoid lexical errors on Windows
             String path = tempFile.toAbsolutePath().toString().replace("\\", "/");
             String template = "{{ lookup('file', '" + path + "') }}";
             Object result = resolver.resolveValue(template, variables);
@@ -45,6 +43,14 @@ class LookupIntegrationTest {
         } finally {
             Files.deleteIfExists(tempFile);
         }
+    }
+
+    @Test
+    void testFileLookupWithErrorsIgnore() {
+        Map<String, Object> variables = new HashMap<>();
+        String template = "{{ lookup('file', 'non_existent_file_xyz_999.txt', errors='ignore') }}";
+        Object result = resolver.resolveValue(template, variables);
+        assertEquals("", result);
     }
 
     @Test
@@ -78,7 +84,6 @@ class LookupIntegrationTest {
         Files.writeString(tempFile2, "Content 2");
         try {
             Map<String, Object> variables = new HashMap<>();
-            // Use forward slashes for Jinja2 template to avoid lexical errors on Windows
             String path1 = tempFile1.toAbsolutePath().toString().replace("\\", "/");
             String path2 = tempFile2.toAbsolutePath().toString().replace("\\", "/");
             String template = "{{ query('file', '" + path1 + "', '" + path2 + "') }}";
@@ -109,10 +114,7 @@ class LookupIntegrationTest {
         List<?> list = (List<?>) result;
         assertEquals(2, list.size());
 
-        // Items are Map with 'key' and 'value'
         Map<?, ?> item1 = (Map<?, ?>) list.get(0);
-        Map<?, ?> item2 = (Map<?, ?>) list.get(1);
-
         assertTrue(item1.containsKey("key"));
         assertTrue(item1.containsKey("value"));
     }
@@ -120,10 +122,36 @@ class LookupIntegrationTest {
     @Test
     void testPipeLookup() {
         Map<String, Object> variables = new HashMap<>();
-        // Use a simple echo that works across platforms (Windows 'echo' includes arguments as-is)
         String template = "{{ lookup('pipe', 'echo HelloPipe') }}";
         Object result = resolver.resolveValue(template, variables);
         assertEquals("HelloPipe", result);
+    }
+
+    @Test
+    void testPipeLookupWithErrorsIgnore() {
+        Map<String, Object> variables = new HashMap<>();
+        String template = "{{ lookup('pipe', 'non_existent_cmd_xyz_123', errors='ignore') }}";
+        Object result = resolver.resolveValue(template, variables);
+        assertEquals("", result);
+    }
+
+    @Test
+    void testVarsLookupWithDefault() {
+        Map<String, Object> variables = Map.of("env_type", "prod", "ansible_prod_host", "10.0.0.1");
+
+        String template1 = "{{ lookup('vars', 'ansible_' + env_type + '_host') }}";
+        assertEquals("10.0.0.1", resolver.resolveValue(template1, variables));
+
+        String template2 = "{{ lookup('vars', 'non_existent_var', default='fallback') }}";
+        assertEquals("fallback", resolver.resolveValue(template2, variables));
+    }
+
+    @Test
+    void testFirstFoundLookupWithSkip() {
+        Map<String, Object> variables = new HashMap<>();
+        String template = "{{ lookup('first_found', 'missing1.txt', 'missing2.txt', skip=true) }}";
+        Object result = resolver.resolveValue(template, variables);
+        assertEquals("", result);
     }
 
     @Test
@@ -137,6 +165,30 @@ class LookupIntegrationTest {
             String template = "{{ lookup('template', '" + path + "') }}";
             Object result = resolver.resolveValue(template, variables);
             assertEquals("Hello World", result);
+        } finally {
+            Files.deleteIfExists(tempFile);
+        }
+    }
+
+    @Test
+    void testTemplateLookupConvertData() throws IOException {
+        Path tempFile = Files.createTempFile("tpl_data", ".j2");
+        Files.writeString(tempFile, "key: {{ app_name }}\nport: {{ app_port }}");
+
+        try {
+            Map<String, Object> variables = Map.of("app_name", "webserver", "app_port", 8080);
+            String path = tempFile.toAbsolutePath().toString().replace("\\", "/");
+
+            String queryTemplate = "{{ query('template', '" + path + "', convert_data=true) }}";
+            Object result = resolver.resolveValue(queryTemplate, variables);
+            assertTrue(result instanceof List);
+            List<?> list = (List<?>) result;
+            assertEquals(1, list.size());
+            assertTrue(list.get(0) instanceof Map);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> map = (Map<String, Object>) list.get(0);
+            assertEquals("webserver", map.get("key"));
+            assertEquals(8080, map.get("port"));
         } finally {
             Files.deleteIfExists(tempFile);
         }
