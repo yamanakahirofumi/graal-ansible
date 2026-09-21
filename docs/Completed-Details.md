@@ -318,6 +318,16 @@
     - `docs/implementation/Inventory-System.md` Section 7.2 および `docs/features/Inventory-System.md` Section 2.2 を更新。
     - 範囲区切り文字（`:` および `-`）、数値/アルファベット範囲正規表現ルール、ゼロパディング左詰めフォーマット、リバース展開、複数ブラケット再帰展開（直積 Cartesian Product 生成）、および非範囲ブラケットのフォールバック仕様を追加・明記。
 
+### 1.46 [✓] 権限昇格 (Privilege Escalation / become) 仕様の詳細化 [追加]
+- **完了日**: 2026-10-24
+- **概要**: `docs/implementation/Privilege-Escalation.md` における権限昇格（`become`）の仕様・データモデル・パラメータ優先順位・CLI連携・接続プラグイン統合および認証エラーハンドリングを網羅的に詳細化。
+- **解決策**:
+    - `BecomeContext` Java Record の設計と `empty()` ファクトリメソッドを明記。
+    - パスワード変数の解決優先順位（`ansible_become_password` > `ansible_become_pass` > `ansible_sudo_pass`）および `Truthiness` 真偽評価規則を追加。
+    - CLI オプション（`-b`, `--become-method`, `--become-user`, `--become-flags`, `-K` / `--ask-become-pass`）および `ConsolePromptProvider` による暗号化対話入力を明記。
+    - `sudo` (`BECOME-PROMPT` プロンプトマーカー / stdin 注入), `su`, `runas`, `doas`, および Native Docker ユーザー切替 (`docker exec -u`) のコマンド構築構文と実行メカニズムを追加。
+    - 各接続プラグイン（`LocalConnection`, `SshConnection`, `DockerConnection`, `WinRMConnection`）における昇格統合仕様および認証失敗エラー検知（`sudo: a password is required`, `su: Authentication failure` 等）と `UnreachableException` マッピング規則を明記。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築
