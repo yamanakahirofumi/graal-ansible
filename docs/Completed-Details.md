@@ -325,6 +325,15 @@
     - `EnvLookup.java` にて未定義環境変数に対してデフォルト引数が未指定の場合に空文字列 `""` を返却するようロジックを修正。
     - `EnvLookup.java`, `VarsLookup.java`, `DictLookup.java`, `FirstFoundLookup.java` にて `errors` 引数（`"warn"`, `"ignore"`）の評価を追加し、エラー発生時に例外を発生させず安全にスキップ/空結果を返却する処理を統合。
     - `EnvLookupTest.java`, `VarsLookupTest.java`, `DictLookupTest.java`, `FirstFoundLookupTest.java`, `LookupIntegrationTest.java` にて単体テスト・統合テストを拡張し、`errors='ignore'` / `errors='warn'` および `env` 未定義変数の評価を網羅。
+### 1.46 [✓] 権限昇格 (Privilege Escalation / become) 仕様の詳細化 [追加]
+- **完了日**: 2026-10-24
+- **概要**: `docs/implementation/Privilege-Escalation.md` における権限昇格（`become`）の仕様・データモデル・パラメータ優先順位・CLI連携・接続プラグイン統合および認証エラーハンドリングを網羅的に詳細化。
+- **解決策**:
+    - `BecomeContext` Java Record の設計と `empty()` ファクトリメソッドを明記。
+    - パスワード変数の解決優先順位（`ansible_become_password` > `ansible_become_pass` > `ansible_sudo_pass`）および `Truthiness` 真偽評価規則を追加。
+    - CLI オプション（`-b`, `--become-method`, `--become-user`, `--become-flags`, `-K` / `--ask-become-pass`）および `ConsolePromptProvider` による暗号化対話入力を明記。
+    - `sudo` (`BECOME-PROMPT` プロンプトマーカー / stdin 注入), `su`, `runas`, `doas`, および Native Docker ユーザー切替 (`docker exec -u`) のコマンド構築構文と実行メカニズムを追加。
+    - 各接続プラグイン（`LocalConnection`, `SshConnection`, `DockerConnection`, `WinRMConnection`）における昇格統合仕様および認証失敗エラー検知（`sudo: a password is required`, `su: Authentication failure` 等）と `UnreachableException` マッピング規則を明記。
 
 ## 2. 整理・調整済み (Refactored/Adjusted)
 

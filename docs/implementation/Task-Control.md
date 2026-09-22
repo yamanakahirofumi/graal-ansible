@@ -304,6 +304,19 @@ Play レベルで `roles` キーを用いて直接定義されたロールの解
     - `TaskQueueManager` および `TaskExecutor` は、ロール実行中に現在アクティブなロール情報を `List<Role> activeRoles` スタックとしてコンテキストに保持します。
     - `VariableManager.getAllVariables` において、`activeRoles` スタック上の各ロールから Level 2 (defaults), Level 15 (vars), および Level 20 (Role parameters) の変数が自動的に集約・配置され、Ansible 互換の変数オーバーライドが保証されます。
 
+### 13.6 動的変数ファイルの読み込み (`include_vars`) と Play 静的変数 (`vars_files`)
+
+タスク実行時に動的に変数ファイル / ディレクトリをロードする `include_vars` Action Plugin および Play レベルの `vars_files` の実行制御仕様です。
+
+- **`include_vars` の動的タスク制御とホスト変数注入 (Level 18)**:
+  - `ansible.builtin.include_vars` タスクが実行されると、指定された `file` や `dir` ディレクトリの解析・スキャン（アルファベット順ファイルソート、`depth`, `files_matching`, `extensions` フィルタリング等）が行われます。
+  - 評価された変数は `VariableManager.addIncludedVars(hostName, vars)` を通じて直ちに現在のホストの Level 18 スコープへ登録されます。
+  - **実行コンテキスト伝播**: 登録された変数は同一 Play 内の**以降のすべてのタスク**（およびハンドラーやループ処理）で即座に参照可能となります。
+  - **詳細なパラメータ仕様**: `file`, `dir`, `depth`, `files_matching`, `ignore_files`, `extensions`, `ignore_unknown_extensions`, `name`, `hash_behaviour` 等の全 9 パラメータおよび設計仕様については、[変数とテンプレートの実装詳細](Variables-Templating.md#8-動的静的変数ファイルのロード仕様-vars_files-および-include_vars) を参照してください。
+- **`vars_files` の Play 初期化ライフサイクル (Level 14)**:
+  - `PlaybookExecutor` は Play の開始直後（タスク実行前）に `vars_files` リスト内のパスを評価・読み込み（`varsFileCache` によるキャッシュ付き）、Play スコープにロードします。
+  - `include_vars`（Level 18）は `vars_files`（Level 14）よりも高い優先順位を持つため、同一キーが再定義された場合は `include_vars` の値で正しく上書き更新されます。
+
 ## 14. タグ (`tags`) と 実行制限 (`limit`)
 
 Playbook の実行対象を動的に制御する仕組みの実装について。
