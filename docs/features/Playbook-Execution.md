@@ -88,6 +88,13 @@
     - **コンテキスト伝播**: `activeRoles` スタックを介して実行エンジンへロール文脈が伝播され、Ansible 互換の変数優先順位が適用されます。
     - **実装詳細**: ディレクトリ解決や構造の詳細は、[タスク制御の実装詳細](../implementation/Task-Control.md#135-play-レベルでのロール定義と実行構造-roles) を参照してください。
 
+### 2.12 変数ファイルのロード機能 (`vars_files` / `include_vars`)
+- **状況**: 実装済み。
+- **詳細**: Play レベルでの静的変数ファイル読み込み（`vars_files`: Level 14）およびタスクレベルでの動的変数ファイル/ディレクトリの再帰スキャン読み込み（`include_vars`: Level 18）をサポートしています。
+    - **vars_files**: `.yml`, `.yaml`, `.json` 形式をロードし、`varsFileCache` によるキャッシュ付きで Play 変数として統合します。
+    - **include_vars**: `file`, `dir`, `depth`, `files_matching`, `ignore_files`, `extensions`, `ignore_unknown_extensions`, `name`, `hash_behaviour` の全 9 パラメータをサポートし、アルファベット順ファイルソートで変数をホスト別スコープ（`addIncludedVars`）へ注入します。
+    - **実装詳細**: パラメータ一覧およびディレクトリ走査仕様の詳細は、[変数とテンプレートの実装詳細](../implementation/Variables-Templating.md#8-動的静的変数ファイルのロード仕様-vars_files-および-include_vars) を参照してください。
+
 ## 3. タスクのフィルタリング (Tags and Limit)
 
 Playbook の実行範囲を制御するためのフィルタリング機能を提供します。

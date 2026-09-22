@@ -805,3 +805,93 @@ Lookup プラグインは、外部ソース（ファイル、環境変数、コ�
 
 3.  **動作確認**:
     - Playbook 内で `{{ lookup('my_lookup', 'arg1') }}` や `{{ query('my_lookup', 'arg1') }}` のように記述し、期待通りに動作することを確認します。
+
+## 8. 動的・静的変数ファイルのロード仕様 (`vars_files` および `include_vars`)
+
+`graal-ansible` において Play レベルで静的に読み込まれる `vars_files`（優先度 Level 14）およびタスクレベルで動的に読み込まれる `include_vars`（優先度 Level 18）のパラメータ仕様、読み込み順序、キャッシュ機構、およびスコープ管理仕様を定義します。
+
+### 8.1 vars_files (Level 14: Play レベルでの静的変数ファイル読み込み)
+
+Playbook の `Play` レコード内で定義された外部 YAML / JSON 変数ファイルを静的に読み込み、Play スコープの変数として保持する機能です。
+
+#### 1. パス解決とロード順序
+- **相対パスの基準**: 指定されたパスが相対パスの場合、実行中の Playbook が配置されているディレクトリ（`playbook_dir` / `baseDir`）を基準として絶対パス（`baseDir.resolve(varsFile)`）を解決します。
+- **ファイルリストのシーケンシャル読み込み**: `vars_files` に複数のファイルが指定された場合、リストの先頭から順番に読み込みが行われ、上位（リストの後ろ）のファイルで同名の変数が存在する場合は上書き更新（`putAll`）されます。
+- **サポートフォーマット**: `.yml`, `.yaml`, および `.json` 形式のファイルをサポートします。
+
+#### 2. キャッシュ機構 (`varsFileCache`)
+- `VariableManager` は内部的に `Map<Path, Map<String, Object>> varsFileCache` を保持します。
+- 同一 Playbook 実行セッション内で同じパスの変数ファイルが再度読み込まれる場合、ディスク I/O をスキップしてキャッシュされた解析済み変数マップを返却します。
+
+#### 3. Jinja2 テンプレート評価
+- `vars_files` の要素（ファイルパス文字列）自体に Jinja2 テンプレート（例: `vars/{{ ansible_os_family }}.yml`）が含まれている場合、ファクト等から事前に解決された変数を用いて動的にパスが評価された上でロードされます。
+
+#### 4. 使用例
+```yaml
+- name: Web server setup play
+  hosts: webservers
+  vars_files:
+    - vars/common.yml
+    - "vars/{{ ansible_os_family }}.yml"
+  tasks:
+    - name: Ensure service is running
+      ansible.builtin.service:
+        name: "{{ web_service_name }}"
+        state: started
+```
+
+### 8.2 include_vars (Level 18: タスクレベルでの動的変数ファイル / ディレクトリ読み込み)
+
+タスク実行フェーズにおいて、動的に単一ファイルまたはディレクトリ配下の変数を読み込み、`VariableManager.addIncludedVars(hostName, vars)` を通じて指定ホストの Level 18 変数スコープへ動的に注入する Action Plugin です。
+
+#### 1. サポートパラメータ一覧
+
+| パラメータ名 | 型 | デフォルト値 | 説明 |
+| :--- | :--- | :--- | :--- |
+| `file` | `String` | なし | 読み込み対象の特定ファイルパス（`playbook_dir` 相対または絶対パス）。 |
+| `dir` | `String` | なし | 再帰走査対象のディレクトリパス（`playbook_dir` 相対または絶対パス）。 |
+| `depth` | `Integer` | `0` | `dir` 指定時の再帰検索の最大階層深度（`0` は指定ディレクトリ直下のみ）。 |
+| `files_matching` | `String` | なし | 検索対象ファイルを絞り込むための正規表現パターン。 |
+| `ignore_files` | `List<String>` / `String` | なし | 読み込み対象から除外するファイル名パターン（またはリスト）。 |
+| `extensions` | `List<String>` | `['yaml', 'yml', 'json']` | 読み込み対象とする拡張子のリスト。 |
+| `ignore_unknown_extensions` | `Boolean` | `false` | 未知の拡張子を持つファイル検出時のエラー抑止（`true`: スキップ, `false`: エラー）。 |
+| `name` | `String` | なし | 指定された場合、読み込んだ全変数をトップレベルの変数名 `name` 配下の辞書構造としてラップして登録。 |
+| `hash_behaviour` | `String` | `ANSIBLE_HASH_BEHAVIOUR` | 個別タスクでのマージ戦略（`replace` または `merge`）。 |
+
+#### 2. ディレクトリ再帰スキャンとアルファベット順ソート
+- `dir` パラメータが指定された場合、`depth` に応じて対象ディレクトリ配下のファイルを探索します。
+- 検出されたファイルは、**アルファベット順（ファイルパス名の自然順序）** にソートされた上で順次パースされます。
+- 後から読み込まれたファイル内の同名変数は、それまでに読み込まれた変数を上書き（または `hash_behaviour` に従ってマージ）します。
+
+#### 3. ホスト別変数スコープ (`addIncludedVars`)
+- 読み込まれた変数は `VariableManager.addIncludedVars(hostName, vars)` に登録されます。
+- タスク変数（Level 17）より優先度が高く、`set_fact` / `register` 変数（Level 19）よりは低い Ansible 互換の Level 18 スコープとして管理されます。
+
+#### 4. 使用例
+
+- **単一ファイルの動的読み込み**:
+  ```yaml
+  - name: Load OS specific variables
+    ansible.builtin.include_vars:
+      file: "vars/{{ ansible_distribution }}.yml"
+  ```
+
+- **ディレクトリ配下の全変数ファイルを再帰的に読み込み**:
+  ```yaml
+  - name: Load all configuration variables from directory
+    ansible.builtin.include_vars:
+      dir: "vars/configs"
+      depth: 2
+      extensions:
+        - "yml"
+        - "yaml"
+      files_matching: "^app_.*"
+  ```
+
+- **特定の変数名キー配下に辞書構造として登録**:
+  ```yaml
+  - name: Load database credentials into db_config variable
+    ansible.builtin.include_vars:
+      file: "vars/db_credentials.yml"
+      name: "db_config"
+  ```
