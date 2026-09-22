@@ -14,6 +14,7 @@ public class VarsLookup implements Lookup {
         List<Object> results = new ArrayList<>();
         boolean hasDefault = kwargs != null && kwargs.containsKey("default");
         Object defaultValue = hasDefault ? kwargs.get("default") : null;
+        String errors = kwargs != null && kwargs.containsKey("errors") ? kwargs.get("errors").toString() : "strict";
 
         for (Object term : terms) {
             String varName = term != null ? term.toString() : "";
@@ -22,6 +23,8 @@ public class VarsLookup implements Lookup {
                 results.add(value);
             } else if (hasDefault) {
                 results.add(defaultValue);
+            } else if ("warn".equalsIgnoreCase(errors) || "ignore".equalsIgnoreCase(errors)) {
+                continue;
             } else {
                 throw new RuntimeException("vars lookup failed: variable '" + varName + "' not found");
             }

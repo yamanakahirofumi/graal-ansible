@@ -64,4 +64,21 @@ class DictLookupTest {
         String template = "{{ query('dict', invalid_var) }}";
         assertThrows(RuntimeException.class, () -> resolver.resolveValue(template, variables));
     }
+
+    @Test
+    void testDictLookupWithErrorsKwarg() {
+        VariableResolver resolver = new VariableResolver();
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("invalid_var", "this is a string, not a map");
+
+        String templateIgnore = "{{ query('dict', invalid_var, errors='ignore') }}";
+        Object resultIgnore = resolver.resolveValue(templateIgnore, variables);
+        assertTrue(resultIgnore instanceof List);
+        assertTrue(((List<?>) resultIgnore).isEmpty());
+
+        String templateWarn = "{{ query('dict', invalid_var, errors='warn') }}";
+        Object resultWarn = resolver.resolveValue(templateWarn, variables);
+        assertTrue(resultWarn instanceof List);
+        assertTrue(((List<?>) resultWarn).isEmpty());
+    }
 }

@@ -1,9 +1,9 @@
 package org.example.ansible.engine.lookup;
 
-import com.hubspot.jinjava.interpret.JinjavaInterpreter;
 import org.example.ansible.engine.VariableResolver;
 import org.junit.jupiter.api.Test;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -47,5 +47,21 @@ class VarsLookupTest {
         // Test existing variable with default argument (should return variable value)
         String template2 = "{{ lookup('vars', 'my_var', default='fallback') }}";
         assertEquals("hello", resolver.resolveValue(template2, variables));
+    }
+
+    @Test
+    void testVarsLookupWithErrorsKwarg() {
+        VariableResolver resolver = new VariableResolver();
+        Map<String, Object> variables = new HashMap<>();
+
+        String templateIgnore = "{{ query('vars', 'non_existent', errors='ignore') }}";
+        Object resultIgnore = resolver.resolveValue(templateIgnore, variables);
+        assertTrue(resultIgnore instanceof List);
+        assertTrue(((List<?>) resultIgnore).isEmpty());
+
+        String templateWarn = "{{ query('vars', 'non_existent', errors='warn') }}";
+        Object resultWarn = resolver.resolveValue(templateWarn, variables);
+        assertTrue(resultWarn instanceof List);
+        assertTrue(((List<?>) resultWarn).isEmpty());
     }
 }

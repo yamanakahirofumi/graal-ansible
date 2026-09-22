@@ -131,4 +131,21 @@ class FirstFoundLookupTest {
 
         assertEquals(fileY.toAbsolutePath().toString(), result);
     }
+
+    @Test
+    void testFirstFoundWithErrorsKwarg(@TempDir Path tempDir) {
+        final VariableResolver resolver = new VariableResolver();
+        final Map<String, Object> variables = new HashMap<>();
+        variables.put("playbook_dir", tempDir.toAbsolutePath().toString());
+
+        final String templateIgnore = "{{ query('first_found', 'nonexistent.txt', errors='ignore') }}";
+        final Object resultIgnore = resolver.resolveValue(templateIgnore, variables);
+        assertTrue(resultIgnore instanceof List);
+        assertTrue(((List<?>) resultIgnore).isEmpty());
+
+        final String templateWarn = "{{ query('first_found', 'nonexistent.txt', errors='warn') }}";
+        final Object resultWarn = resolver.resolveValue(templateWarn, variables);
+        assertTrue(resultWarn instanceof List);
+        assertTrue(((List<?>) resultWarn).isEmpty());
+    }
 }

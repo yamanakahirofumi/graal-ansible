@@ -13,6 +13,8 @@ public class DictLookup implements Lookup {
     @Override
     public List<Object> execute(JinjavaInterpreter interpreter, List<Object> terms, Map<String, Object> kwargs) {
         List<Object> results = new ArrayList<>();
+        String errors = kwargs != null && kwargs.containsKey("errors") ? kwargs.get("errors").toString() : "strict";
+
         for (Object term : terms) {
             if (term instanceof Map<?, ?> map) {
                 for (Map.Entry<?, ?> entry : map.entrySet()) {
@@ -22,6 +24,9 @@ public class DictLookup implements Lookup {
                     results.add(item);
                 }
             } else {
+                if ("warn".equalsIgnoreCase(errors) || "ignore".equalsIgnoreCase(errors)) {
+                    continue;
+                }
                 throw new RuntimeException("dict lookup requires a dictionary (Map), but got: " + (term == null ? "null" : term.getClass().getName()));
             }
         }

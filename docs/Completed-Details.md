@@ -318,6 +318,13 @@
     - `docs/implementation/Inventory-System.md` Section 7.2 および `docs/features/Inventory-System.md` Section 2.2 を更新。
     - 範囲区切り文字（`:` および `-`）、数値/アルファベット範囲正規表現ルール、ゼロパディング左詰めフォーマット、リバース展開、複数ブラケット再帰展開（直積 Cartesian Product 生成）、および非範囲ブラケットのフォールバック仕様を追加・明記。
 
+### 1.46 [✓] Lookup プラグインの未定義変数挙動修正と共通エラー制御パラメータ (errors) サポート [追加]
+- **完了日**: 2026-10-24
+- **概要**: `docs/implementation/Variables-Templating.md` Section 7.2 および 7.4 に基づき、`EnvLookup` における未定義環境変数の空文字返却挙動を修正し、`EnvLookup`, `VarsLookup`, `DictLookup`, `FirstFoundLookup` における共通パラメータ `errors='ignore'` / `errors='warn'` をサポート。
+- **解決策**:
+    - `EnvLookup.java` にて未定義環境変数に対してデフォルト引数が未指定の場合に空文字列 `""` を返却するようロジックを修正。
+    - `EnvLookup.java`, `VarsLookup.java`, `DictLookup.java`, `FirstFoundLookup.java` にて `errors` 引数（`"warn"`, `"ignore"`）の評価を追加し、エラー発生時に例外を発生させず安全にスキップ/空結果を返却する処理を統合。
+    - `EnvLookupTest.java`, `VarsLookupTest.java`, `DictLookupTest.java`, `FirstFoundLookupTest.java`, `LookupIntegrationTest.java` にて単体テスト・統合テストを拡張し、`errors='ignore'` / `errors='warn'` および `env` 未定義変数の評価を網羅。
 ### 1.46 [✓] 権限昇格 (Privilege Escalation / become) 仕様の詳細化 [追加]
 - **完了日**: 2026-10-24
 - **概要**: `docs/implementation/Privilege-Escalation.md` における権限昇格（`become`）の仕様・データモデル・パラメータ優先順位・CLI連携・接続プラグイン統合および認証エラーハンドリングを網羅的に詳細化。
