@@ -335,6 +335,13 @@
     - `sudo` (`BECOME-PROMPT` プロンプトマーカー / stdin 注入), `su`, `runas`, `doas`, および Native Docker ユーザー切替 (`docker exec -u`) のコマンド構築構文と実行メカニズムを追加。
     - 各接続プラグイン（`LocalConnection`, `SshConnection`, `DockerConnection`, `WinRMConnection`）における昇格統合仕様および認証失敗エラー検知（`sudo: a password is required`, `su: Authentication failure` 等）と `UnreachableException` マッピング規則を明記。
 
+### 1.47 [✓] dict2items フィルターにおける位置引数のサポートと単体テスト拡充
+- **完了日**: 2026-10-24
+- **概要**: `dict2items` Jinja2 フィルターにおいて、キーワード引数 (`key_name=...`, `value_name=...`) や `kwargs` に加え、位置引数 (`args[0]` を `key_name`、`args[1]` を `value_name`) でのフィールド名指定をサポート。
+- **解決策**:
+    - `Dict2ItemsFilter.java` において `Items2DictFilter.java` と同等の引数解析ロジックを導入し、位置引数によるカスタムキー/値フィールド名の抽出を実装。
+    - `Dict2ItemsFilterTest.java` において、位置引数指定、非 Map 入力、null 入力等の単体テストを追加。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築

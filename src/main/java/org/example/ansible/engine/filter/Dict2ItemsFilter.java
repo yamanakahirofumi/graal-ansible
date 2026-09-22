@@ -34,13 +34,24 @@ public class Dict2ItemsFilter implements Filter {
         }
 
         if (args != null && args.length > 0) {
-            for (Object arg : args) {
-                if (arg != null) {
-                    String argStr = arg.toString();
-                    if (argStr.startsWith("key_name=")) {
-                        keyName = argStr.substring("key_name=".length()).trim().replace("'", "").replace("\"", "");
-                    } else if (argStr.startsWith("value_name=")) {
-                        valueName = argStr.substring("value_name=".length()).trim().replace("'", "").replace("\"", "");
+            for (int i = 0; i < args.length; i++) {
+                Object argObj = args[i];
+                if (argObj == null) continue;
+                String argStr = argObj.toString();
+                if (argStr.contains("=")) {
+                    String[] parts = argStr.split("=", 2);
+                    String k = parts[0].trim();
+                    String v = parts[1].trim().replace("'", "").replace("\"", "");
+                    if ("key_name".equals(k)) {
+                        keyName = v;
+                    } else if ("value_name".equals(k)) {
+                        valueName = v;
+                    }
+                } else {
+                    if (i == 0) {
+                        keyName = argStr.replace("'", "").replace("\"", "");
+                    } else if (i == 1) {
+                        valueName = argStr.replace("'", "").replace("\"", "");
                     }
                 }
             }

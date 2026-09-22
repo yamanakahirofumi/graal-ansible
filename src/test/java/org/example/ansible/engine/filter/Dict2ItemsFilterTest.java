@@ -74,4 +74,31 @@ class Dict2ItemsFilterTest {
         assertEquals("k", entry.get("custom_key"));
         assertEquals("v", entry.get("custom_val"));
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void testDict2ItemsPositionalArguments() {
+        VariableResolver resolver = new VariableResolver();
+        Map<String, Object> variables = Map.of(
+            "my_dict", Map.of("pos_k", "pos_v")
+        );
+
+        String template = "{{ my_dict | dict2items('my_key', 'my_val') }}";
+        Object result = resolver.resolveValue(template, variables);
+
+        assertTrue(result instanceof List);
+        List<Map<String, Object>> list = (List<Map<String, Object>>) result;
+        assertEquals(1, list.size());
+
+        Map<String, Object> entry = list.get(0);
+        assertEquals("pos_k", entry.get("my_key"));
+        assertEquals("pos_v", entry.get("my_val"));
+    }
+
+    @Test
+    void testDict2ItemsNonMapAndNullInput() {
+        Dict2ItemsFilter filter = new Dict2ItemsFilter();
+        assertEquals("not-a-map", filter.filter("not-a-map", null));
+        assertNull(filter.filter(null, null));
+    }
 }
