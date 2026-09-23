@@ -89,8 +89,8 @@
 | - `wait_for` | ◎ | △ | - | オリジナル Python ソースコードにより検証済。 |
 | - `wait_for_connection` | ◎ | △ | △ | オリジナル Python ソースコードにより検証済。 |
 | - `yum_repository` | △ | △ | - | ロード確認済。現在の開発・検証環境（Debian系）では動作確認が不可能。 |
-| **ansible.posix** | ？ | ？ | - | コレクション全体のロードを検証中。 |
-| **ansible.utils** | ？ | ？ | ？ | 基本的なフィルタの動作を確認中。 |
+| **ansible.posix** | ○ | △ | - | `getent`, `cron`, `package_facts`, `service_facts`, `hostname`, `known_hosts` 等、`PosixModulesIntegrationTest` にて動作検証完了。 |
+| **ansible.utils** | ○ | ○ | ○ | `ipaddr` 等のユーティリティフィルタが FQCN 形式 (`ansible.utils.ipaddr`) 含め動作検証完了。 |
 | **community.general** | ？ | ？ | × | 依存ライブラリの解決を順次実施中。 |
 
 ## 2. 自動テストの実施状況 (Automated Testing Status)

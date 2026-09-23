@@ -2,6 +2,7 @@ package org.example.ansible.engine;
 
 import com.hubspot.jinjava.Jinjava;
 import com.hubspot.jinjava.el.ext.NamedParameter;
+import com.hubspot.jinjava.lib.filter.Filter;
 import com.hubspot.jinjava.lib.fn.ELFunctionDefinition;
 import com.hubspot.jinjava.interpret.JinjavaInterpreter;
 import com.hubspot.jinjava.interpret.TemplateError;
@@ -96,29 +97,74 @@ public class VariableResolver {
     }
 
     private void registerFilters() {
-        jinjava.getGlobalContext().registerFilter(new DefaultFilter());
-        jinjava.getGlobalContext().registerFilter(new IpAddrFilter());
-        jinjava.getGlobalContext().registerFilter(new Dict2ItemsFilter());
-        jinjava.getGlobalContext().registerFilter(new BoolFilter());
-        jinjava.getGlobalContext().registerFilter(new ToJsonFilter());
-        jinjava.getGlobalContext().registerFilter(new ToNiceJsonFilter());
-        jinjava.getGlobalContext().registerFilter(new ToYamlFilter());
-        jinjava.getGlobalContext().registerFilter(new ToNiceYamlFilter());
-        jinjava.getGlobalContext().registerFilter(new CombineFilter());
-        jinjava.getGlobalContext().registerFilter(new RegexReplaceFilter());
-        jinjava.getGlobalContext().registerFilter(new QuoteFilter());
-        jinjava.getGlobalContext().registerFilter(new B64EncodeFilter());
-        jinjava.getGlobalContext().registerFilter(new B64DecodeFilter());
-        jinjava.getGlobalContext().registerFilter(new MandatoryFilter());
-        jinjava.getGlobalContext().registerFilter(new BasenameFilter());
-        jinjava.getGlobalContext().registerFilter(new DirnameFilter());
-        jinjava.getGlobalContext().registerFilter(new SplitextFilter());
-        jinjava.getGlobalContext().registerFilter(new RealpathFilter());
-        jinjava.getGlobalContext().registerFilter(new TernaryFilter());
-        jinjava.getGlobalContext().registerFilter(new FlattenFilter());
-        jinjava.getGlobalContext().registerFilter(new Items2DictFilter());
-        jinjava.getGlobalContext().registerFilter(new UniqueFilter());
-        jinjava.getGlobalContext().registerFilter(new UrlencodeFilter());
+        registerFilter(new DefaultFilter());
+        registerFilter(new IpAddrFilter());
+        registerFilter(new Dict2ItemsFilter());
+        registerFilter(new BoolFilter());
+        registerFilter(new ToJsonFilter());
+        registerFilter(new ToNiceJsonFilter());
+        registerFilter(new ToYamlFilter());
+        registerFilter(new ToNiceYamlFilter());
+        registerFilter(new CombineFilter());
+        registerFilter(new RegexReplaceFilter());
+        registerFilter(new QuoteFilter());
+        registerFilter(new B64EncodeFilter());
+        registerFilter(new B64DecodeFilter());
+        registerFilter(new MandatoryFilter());
+        registerFilter(new BasenameFilter());
+        registerFilter(new DirnameFilter());
+        registerFilter(new SplitextFilter());
+        registerFilter(new RealpathFilter());
+        registerFilter(new TernaryFilter());
+        registerFilter(new FlattenFilter());
+        registerFilter(new Items2DictFilter());
+        registerFilter(new UniqueFilter());
+        registerFilter(new UrlencodeFilter());
+    }
+
+    private static final java.util.regex.Pattern FQCN_FILTER_PATTERN =
+            java.util.regex.Pattern.compile("\\|\\s*([a-zA-Z0-9_]+)\\.([a-zA-Z0-9_]+)\\.([a-zA-Z0-9_]+)");
+
+    private String preprocessFqcnFilters(String input) {
+        if (input == null || !input.contains(".")) return input;
+        java.util.regex.Matcher matcher = FQCN_FILTER_PATTERN.matcher(input);
+        StringBuffer sb = new StringBuffer();
+        while (matcher.find()) {
+            String replacement = "| " + matcher.group(1) + "_" + matcher.group(2) + "_" + matcher.group(3);
+            matcher.appendReplacement(sb, java.util.regex.Matcher.quoteReplacement(replacement));
+        }
+        matcher.appendTail(sb);
+        return sb.toString();
+    }
+
+    private void registerFilter(Filter filter) {
+        jinjava.getGlobalContext().registerFilter(filter);
+        jinjava.getGlobalContext().registerFilter(new FqcnFilterWrapper(filter, "ansible.builtin." + filter.getName()));
+        jinjava.getGlobalContext().registerFilter(new FqcnFilterWrapper(filter, "ansible_builtin_" + filter.getName()));
+        if ("ipaddr".equals(filter.getName())) {
+            jinjava.getGlobalContext().registerFilter(new FqcnFilterWrapper(filter, "ansible.utils.ipaddr"));
+            jinjava.getGlobalContext().registerFilter(new FqcnFilterWrapper(filter, "ansible_utils_ipaddr"));
+        }
+    }
+
+    private static class FqcnFilterWrapper implements Filter {
+        private final Filter delegate;
+        private final String name;
+
+        public FqcnFilterWrapper(Filter delegate, String fqcnName) {
+            this.delegate = delegate;
+            this.name = fqcnName;
+        }
+
+        @Override
+        public Object filter(Object var, JinjavaInterpreter interpreter, String... args) {
+            return delegate.filter(var, interpreter, args);
+        }
+
+        @Override
+        public String getName() {
+            return name;
+        }
     }
 
     /**
@@ -236,13 +282,15 @@ public class VariableResolver {
             return input;
         }
 
+        String processedInput = preprocessFqcnFilters(input);
+
         JinjavaInterpreter interpreter = jinjava.newInterpreter();
         interpreter.getContext().putAll(variables);
         interpreter.getContext().put("__ansible_resolver", this);
 
         try {
             JinjavaInterpreter.pushCurrent(interpreter);
-            Object resolved = doResolveString(input, interpreter, variables);
+            Object resolved = doResolveString(processedInput, interpreter, variables);
             // Ansible resolves variables recursively.
             if (resolved instanceof String str && str.contains("{{") && !str.equals(input)) {
                 return resolveString(str, variables, depth + 1);
