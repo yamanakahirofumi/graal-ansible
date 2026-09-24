@@ -165,4 +165,18 @@ class FilterIntegrationTest {
         String yamlStr = (String) yamlResult;
         assertTrue(yamlStr.contains("a:") || yamlStr.contains("a :"));
     }
+
+    @Test
+    void testFqcnFilterAliases() {
+        assertEquals("aGVsbG8=", resolver.resolveValue("{{ 'hello' | ansible.builtin.b64encode }}", Map.of()));
+        assertEquals("hello", resolver.resolveValue("{{ 'aGVsbG8=' | ansible.builtin.b64decode }}", Map.of()));
+        assertEquals(true, resolver.resolveValue("{{ 'yes' | ansible.builtin.bool }}", Map.of()));
+        assertEquals("fallback", resolver.resolveValue("{{ missing_var | ansible.builtin.default('fallback') }}", Map.of()));
+        assertEquals("192.168.1.1", resolver.resolveValue("{{ '192.168.1.1' | ansible.utils.ipaddr }}", Map.of()));
+        assertEquals("10.0.0.1", resolver.resolveValue("{{ '10.0.0.1' | ansible.builtin.ipaddr }}", Map.of()));
+
+        Map<String, Object> vars = Map.of("data", Map.of("key", "val"));
+        String jsonResult = (String) resolver.resolveValue("{{ data | ansible.builtin.to_json }}", vars);
+        assertTrue(jsonResult.contains("\"key\":\"val\""));
+    }
 }

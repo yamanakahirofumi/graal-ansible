@@ -340,7 +340,15 @@
 - **概要**: `dict2items` Jinja2 フィルターにおいて、キーワード引数 (`key_name=...`, `value_name=...`) や `kwargs` に加え、位置引数 (`args[0]` を `key_name`、`args[1]` を `value_name`) でのフィールド名指定をサポート。
 - **解決策**:
     - `Dict2ItemsFilter.java` において `Items2DictFilter.java` と同等の引数解析ロジックを導入し、位置引数によるカスタムキー/値フィールド名の抽出を実装。
-    - `Dict2ItemsFilterTest.java` において、位置引数指定、非 Map 入力、null 入力等の単体テストを追加。
+    - `Dict2ItemsFilterTest.java` において, 位置引数指定、非 Map 入力、null 入力等の単体テストを追加。
+
+### 1.48 [✓] FQCN Jinja2 フィルターエイリアスサポートとテスト拡充 [追加]
+- **完了日**: 2026-10-24
+- **概要**: Playbook 内での FQCN 形式 (`ansible.builtin.<filter>`, `ansible.utils.<filter>`) による Jinja2 フィルター呼び出しを Java テンプレートエンジン (`VariableResolver`) にて透過的にサポート。
+- **解決策**:
+    - `VariableResolver.java` において、`FqcnFilterWrapper` ラッパーおよび `preprocessFqcnFilters` パイプライン前処理を導入し、`ansible.builtin.<name>` および `ansible.utils.ipaddr` 形式の FQCN フィルターエイリアス登録を自動化。
+    - `FilterIntegrationTest.java` において `testFqcnFilterAliases` を追加し、`ansible.builtin.b64encode`, `ansible.builtin.b64decode`, `ansible.builtin.bool`, `ansible.builtin.default`, `ansible.utils.ipaddr`, `ansible.builtin.to_json` などの呼び出しを検証。
+    - `docs/features/Module-Support-Status.md` の `ansible.posix` および `ansible.utils` サポートステータスを更新・同期。
 
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
