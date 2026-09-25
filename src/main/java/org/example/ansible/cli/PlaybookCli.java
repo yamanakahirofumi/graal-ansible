@@ -12,10 +12,12 @@ import org.example.ansible.connection.LocalConnection;
 import org.example.ansible.connection.BecomeContext;
 import org.example.ansible.module.Module;
 import org.example.ansible.module.python.PythonModule;
+import org.example.ansible.engine.ExecutionReport;
 import org.example.ansible.engine.PlaybookExecutor;
 import org.example.ansible.engine.TaskExecutor;
 import org.example.ansible.engine.TaskResult;
 import org.example.ansible.engine.VariableManager;
+import org.yaml.snakeyaml.error.YAMLException;
 import org.example.ansible.inventory.FileInventoryProvider;
 import org.example.ansible.inventory.Inventory;
 import org.example.ansible.inventory.InventoryManager;
@@ -240,10 +242,19 @@ public class PlaybookCli implements Callable<Integer> {
                 cliVars.put("ansible_skip_tags", skipTags);
 
                 VariableManager variableManager = new VariableManager(inventory, cliVars, parsedExtraVars, baseDir, inventoryDirPath);
-                executor.execute(playbook, inventory, variableManager, check, tags, skipTags, limit);
+                ExecutionReport report = executor.executeAndReport(playbook, inventory, variableManager, check, tags, skipTags, limit);
 
+                if (report != null && !report.isSuccess()) {
+                    return 2;
+                }
                 return 0;
             }
+        } catch (YAMLException | IllegalArgumentException e) {
+            System.err.println("Syntax Error: " + e.getMessage());
+            if (verbosity > 1) {
+                e.printStackTrace();
+            }
+            return 4;
         } catch (Exception e) {
             System.err.println("Error: " + e.getMessage());
             if (verbosity > 1) {

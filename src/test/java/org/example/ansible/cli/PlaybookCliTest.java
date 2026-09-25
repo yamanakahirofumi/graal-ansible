@@ -112,4 +112,76 @@ class PlaybookCliTest {
         RuntimeException ex = assertThrows(RuntimeException.class, app::getVaultPassword);
         assertTrue(ex.getMessage().contains("Vault password file not found"));
     }
+
+    @Test
+    void testExecutionExitCodeSuccess(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir) throws Exception {
+        java.nio.file.Path invFile = tempDir.resolve("hosts");
+        java.nio.file.Files.writeString(invFile, "localhost ansible_connection=local\n");
+
+        java.nio.file.Path pbFile = tempDir.resolve("playbook.yml");
+        java.nio.file.Files.writeString(pbFile, """
+                - name: Test Play
+                  hosts: localhost
+                  tasks:
+                    - name: Echo task
+                      command: echo hello
+                """);
+
+        PlaybookCli app = new PlaybookCli();
+        CommandLine cmd = new CommandLine(app);
+        int exitCode = cmd.execute(pbFile.toString(), "-i", invFile.toString());
+
+        assertEquals(0, exitCode);
+    }
+
+    @Test
+    void testExecutionExitCodeFailure(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir) throws Exception {
+        java.nio.file.Path invFile = tempDir.resolve("hosts");
+        java.nio.file.Files.writeString(invFile, "localhost ansible_connection=local\n");
+
+        java.nio.file.Path pbFile = tempDir.resolve("playbook.yml");
+        java.nio.file.Files.writeString(pbFile, """
+                - name: Test Fail Play
+                  hosts: localhost
+                  tasks:
+                    - name: Fail task
+                      command: false
+                """);
+
+        PlaybookCli app = new PlaybookCli();
+        CommandLine cmd = new CommandLine(app);
+        int exitCode = cmd.execute(pbFile.toString(), "-i", invFile.toString());
+
+        assertEquals(2, exitCode);
+    }
+
+    @Test
+    void testExecutionExitCodeSyntaxError(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir) throws Exception {
+        java.nio.file.Path pbFile = tempDir.resolve("invalid.yml");
+        java.nio.file.Files.writeString(pbFile, "invalid_yaml: [ unclosed list");
+
+        PlaybookCli app = new PlaybookCli();
+        CommandLine cmd = new CommandLine(app);
+        int exitCode = cmd.execute(pbFile.toString(), "-i", "hosts");
+
+        assertEquals(4, exitCode);
+    }
+
+    @Test
+    void testExecutionExitCodeMissingInventory(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir) throws Exception {
+        java.nio.file.Path pbFile = tempDir.resolve("playbook.yml");
+        java.nio.file.Files.writeString(pbFile, """
+                - name: Test Play
+                  hosts: all
+                  tasks:
+                    - name: Echo task
+                      command: echo hello
+                """);
+
+        PlaybookCli app = new PlaybookCli();
+        CommandLine cmd = new CommandLine(app);
+        int exitCode = cmd.execute(pbFile.toString());
+
+        assertEquals(1, exitCode);
+    }
 }
