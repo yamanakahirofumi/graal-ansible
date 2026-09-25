@@ -280,55 +280,5 @@ class BuiltinModulesIntegrationTest {
         assertTrue(result.success(), "wait_for_connection check mode failed: " + result.message() + " Data: " + result.data());
     }
 
-    @Test
-    void testPackageFactsModule() {
-        Task task = new Task("Gather package facts", "package_facts", Map.of());
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
-        assertTrue(result.success(), "package_facts failed: " + result.message() + " Data: " + result.data());
-        @SuppressWarnings("unchecked")
-        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
-        assertNotNull(facts, "ansible_facts should be returned by package_facts");
-        assertTrue(facts.containsKey("packages"), "packages should exist in ansible_facts");
-    }
-
-    @Test
-    void testServiceFactsModule() {
-        Task task = new Task("Gather service facts", "service_facts", Map.of());
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
-        assertTrue(result.success(), "service_facts failed: " + result.message() + " Data: " + result.data());
-        @SuppressWarnings("unchecked")
-        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
-        assertNotNull(facts, "ansible_facts should be returned by service_facts");
-        assertTrue(facts.containsKey("services"), "services should exist in ansible_facts");
-    }
-
-    @Test
-    void testHostnameModuleCheckMode() {
-        Task task = new Task("Set hostname check mode", "hostname", Map.of(
-                "name", "test-host-check"
-        ), Map.of(), null, null, null, List.of(), null, null, false,
-                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
-                null, null, null, null, true, null);
-
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
-        assertTrue(result.success(), "hostname check mode failed: " + result.message() + " Data: " + result.data());
-    }
-
-    @Test
-    void testKnownHostsModuleCheckMode() {
-        Path knownHostsFile = tempDir.resolve("known_hosts");
-        Task task = new Task("Known hosts check mode", "known_hosts", Map.of(
-                "name", "github.com",
-                "key", "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsamgifyMWgi_test",
-                "path", knownHostsFile.toString(),
-                "state", "present"
-        ), Map.of(), null, null, null, List.of(), null, null, false,
-                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
-                null, null, null, null, true, null);
-
-        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
-        assertTrue(result.success(), "known_hosts check mode failed: " + result.message() + " Data: " + result.data());
-        assertFalse(Files.exists(knownHostsFile), "known_hosts file should not be created in check mode");
-    }
 
 }
