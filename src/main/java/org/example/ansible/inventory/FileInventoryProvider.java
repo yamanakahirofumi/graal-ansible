@@ -21,7 +21,7 @@ public class FileInventoryProvider implements InventoryProvider {
         // We rely more on file extensions for static files if on Windows.
         boolean isWindows = System.getProperty("os.name").toLowerCase().contains("win");
         if (isWindows) {
-            return source.endsWith(".ini") || source.endsWith(".yml") || source.endsWith(".yaml") || source.endsWith(".txt");
+            return !source.endsWith(".py") && !source.endsWith(".bat") && !source.endsWith(".ps1") && !source.endsWith(".exe") && !source.endsWith(".cmd");
         }
 
         return !file.canExecute();
