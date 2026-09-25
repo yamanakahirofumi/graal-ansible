@@ -280,4 +280,58 @@ class BuiltinModulesIntegrationTest {
         assertTrue(result.success(), "wait_for_connection check mode failed: " + result.message() + " Data: " + result.data());
     }
 
+    @Test
+    void testDebugModule() {
+        Task taskMsg = new Task("Debug msg", "debug", Map.of(
+                "msg", "Hello Debug"
+        ));
+        TaskResult resultMsg = taskExecutor.execute(play, host, taskMsg, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(resultMsg.success(), "debug msg failed: " + resultMsg.message() + " Data: " + resultMsg.data());
+        assertEquals("Hello Debug", resultMsg.data().get("msg"));
+
+        variableManager.addFacts("localhost", Map.of("test_var", "var_value"));
+        Task taskVar = new Task("Debug var", "debug", Map.of(
+                "var", "test_var"
+        ));
+        TaskResult resultVar = taskExecutor.execute(play, host, taskVar, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(resultVar.success(), "debug var failed: " + resultVar.message() + " Data: " + resultVar.data());
+        assertNotNull(resultVar.data().get("test_var"));
+    }
+
+    @Test
+    void testPingModule() {
+        Task task = new Task("Ping host", "ping", Map.of());
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "ping failed: " + result.message() + " Data: " + result.data());
+        assertEquals("pong", result.data().get("ping"));
+    }
+
+    @Test
+    void testTempfileModule() {
+        Task taskFile = new Task("Tempfile file", "tempfile", Map.of(
+                "state", "file",
+                "prefix", "ansible_test_",
+                "suffix", ".tmp"
+        ));
+        TaskResult resultFile = taskExecutor.execute(play, host, taskFile, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(resultFile.success(), "tempfile file failed: " + resultFile.message() + " Data: " + resultFile.data());
+        String pathStr = (String) resultFile.data().get("path");
+        assertNotNull(pathStr);
+        Path path = Path.of(pathStr);
+        assertTrue(Files.exists(path));
+        assertTrue(path.getFileName().toString().startsWith("ansible_test_"));
+        assertTrue(path.getFileName().toString().endsWith(".tmp"));
+
+        Task taskDir = new Task("Tempfile directory", "tempfile", Map.of(
+                "state", "directory",
+                "prefix", "ansible_dir_"
+        ));
+        TaskResult resultDir = taskExecutor.execute(play, host, taskDir, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(resultDir.success(), "tempfile directory failed: " + resultDir.message() + " Data: " + resultDir.data());
+        String dirPathStr = (String) resultDir.data().get("path");
+        assertNotNull(dirPathStr);
+        Path dirPath = Path.of(dirPathStr);
+        assertTrue(Files.isDirectory(dirPath));
+    }
+
 }
