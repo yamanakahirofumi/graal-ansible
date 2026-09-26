@@ -57,31 +57,110 @@
     - `Task` レコードに `String register` フィールドを保持します。
     - 登録される変数は Map 形式とし、Ansible 互換のフィールド名（`rc`, `stdout`, `stderr`, `changed`, `failed` 等）を保持します。
 
-## 4. ハンドラーと通知 (`handlers`, `notify`)
+## 4. ハンドラーと通知 (`handlers`, `notify`, `listen`, `force_handlers`)
 
-タスクによって状態が変更された（`changed=true`）場合にのみ実行される特別なタスクを制御します。
+タスクによってシステム状態が変更された（`changed=true`）場合にのみ通知を受けて実行される、イベント駆動型の特殊タスク制御機構の実装詳細です。
 
-- **実装方針**:
-    - **通知 (Notify)**: タスクが実行され、結果が `changed=true` かつ `notify` 句がある場合、指定されたハンドラー名またはトピックを「実行待ちキュー」に登録します。
-    - **トピックの購読 (Listen)**: ハンドラーは `listen` キーワードを使用して、特定のトピックを購読できます。通知された名前がハンドラー名と一致するか、`listen` に指定されたトピックと一致する場合に、そのハンドラーが実行対象となります。
-    - **実行タイミング**: プレイ（Play）内のすべての通常タスクが完了した直後、または `flush_handlers` タスクが実行されたタイミングで、キューに溜まったハンドラーを順次実行します。
-    - **冪等性・重複排除**: 同一のハンドラー（`Task` オブジェクト）は、一つのハンドラーフラッシュサイクル内において、複数の通知（名前またはトピック）によってトリガーされたとしても、一度だけ実行されます。
+- **通知 (`notify`) とトピック購読 (`listen`) のマッチング**:
+    - **通知のトリガー**: タスクの実行結果が `changed=true` かつ `notify` 指示句が定義されている場合、`notify` に指定された通知名（文字列または文字列リスト）がホストごとの「通知済みハンドラーキュー（`notifiedHandlers`）」へ追加されます。
+    - **直接名マッチング**: 通知された文字列が、Play 内のハンドラータスクの `name` と完全一致する場合、該当ハンドラーが実行対象としてマークされます。
+    - **トピック購読 (`listen`)**: ハンドラータスクは `listen` キーワードにより任意のトピック名を購読できます。通知された文字列がハンドラーの `listen` リスト（または単一文字列）に含まれている場合、該当ハンドラーが実行対象としてマークされます。同一トピックを購読する複数のハンドラーが存在する場合、定義順に従ってすべてがキューイングされます。
+- **実行タイミングとフラッシュ境界 (Flush Boundaries)**:
+    - ハンドラーは通知された瞬間に即時実行されるのではなく、実行ライフサイクル上の以下の **フラッシュ境界** に達した時点で一括実行されます：
+        1. **`pre_tasks` セクションの終了直後**: `pre_tasks` 内で通知されたハンドラーをフラッシュ。
+        2. **`roles` およびメイン `tasks` セクションの終了直後**: メインタスク実行完了時に通知済みハンドラーをフラッシュ。
+        3. **`post_tasks` セクションの終了直後**: Play の最終クリーンアップ前にハンドラーをフラッシュ。
+        4. **明示的メタタスク (`meta: flush_handlers`)**: プレイ内の任意の場所で `ansible.builtin.meta: flush_handlers`（または `meta: flush_handlers`）タスクが実行された際、`TaskQueueManager` は即座にそれまでの通知済みハンドラーをその場で同期実行（フラッシュ）し、完了後に後続タスクへ進みます。
+- **強制実行 (`force_handlers`)**:
+    - **デフォルト挙動**: 通常、プレイ途中のタスクでエラー（`failed=true`）が発生してホストが失敗状態となった場合、それまでに通知されていたハンドラーは実行されずに破棄されます。
+    - **強制フラッシュ**: Play レベルで `force_handlers: true` が設定されている場合、または CLI オプション `--force-handlers` が指定されている場合、途中のタスクが失敗した場合であっても、それまでに通知済みとなっていたハンドラーを強制的にフラッシュ実行します。
+- **冪等性・重複排除とエラー制御**:
+    - **重複排除 (Deduplication)**: 1 つのフラッシュサイクル内において、同一のハンドラータスクは、複数回のタスク変更や複数のトピック（`listen`）によって何度通知されたとしても、**ホストごとに最大 1 回** のみ実行されます。
+    - **ハンドラー間の連鎖通知**: ハンドラー自身が実行されて `changed=true` となり、かつ `notify` を持っている場合、その通知は *次回の* フラッシュ境界（または後続の `meta: flush_handlers`）で評価されます。
+    - **ハンドラー内エラー**: ハンドラー実行中にエラーが発生した場合、該当ホストは失敗状態となり、そのフラッシュサイクル内で未実行の残りのハンドラーはスキップされます。
 - **データ構造**:
-    - `Task` レコードに `List<String> notifications` (YAMLでは `notify`) および `List<String> listen` フィールドを保持します。
-    - `Play` レコードに `List<Task> handlers` フィールドを保持します。
+    - `Task` レコードに `List<String> notifications` (YAML では `notify`) および `List<String> listen` フィールドを保持します。
+    - `Play` レコードに `List<Task> handlers` および `Boolean forceHandlers` (YAML では `force_handlers`) フィールドを保持します。
+- **使用例**:
+    ```yaml
+    - name: Web server setup play with handler notification and explicit flush
+      hosts: webservers
+      force_handlers: true
+      tasks:
+        - name: Update HTTPD configuration
+          ansible.builtin.template:
+            src: httpd.conf.j2
+            dest: /etc/httpd/conf/httpd.conf
+          notify:
+            - restart web service
+            - audit config change
+
+        - name: Flush handlers immediately before service check
+          ansible.builtin.meta: flush_handlers
+
+        - name: Verify HTTP service responsiveness
+          ansible.builtin.uri:
+            url: http://localhost/health
+            status_code: 200
+
+      handlers:
+        - name: Restart Apache HTTPD
+          ansible.builtin.service:
+            name: httpd
+            state: restarted
+          listen: restart web service
+
+        - name: Log configuration audit
+          ansible.builtin.command: /usr/bin/logger "HTTPD config reloaded"
+          listen:
+            - restart web service
+            - audit config change
+    ```
 
 ## 5. ブロック (`block`, `rescue`, `always`)
 
-複数のタスクを論理的にグループ化し、エラーハンドリング（例外処理）を行います。
+複数のタスクを論理的にグループ化し、エラーハンドリング（例外処理）およびクリーンアップ処理を行う仕組みの実装詳細です。
 
-- **実装方針**:
-    - **block**: グループ化された一連のタスクを順次実行します。
-    - **rescue**: `block` 内のタスクでエラー（failed）が発生した場合にのみ実行されるタスク群です。
-    - **always**: `block` の成否に関わらず、最後に必ず実行されるタスク群です。
-- **留意点**:
-    - ブロック自体も `when` 句による条件分岐が可能です。
+- **構成要素と役割**:
+    - **`block`**: グループ化された主処理タスク群を順次実行します。
+    - **`rescue`**: `block` 内のタスクでエラー（`failed=true`）が発生した場合にのみ呼び出される回復・例外処理タスク群です。
+    - **`always`**: `block` の成功・失敗、および `rescue` の実行有無に関わらず、最後に必ず実行されるクリーンアップタスク群です。
+- **自動変数注入 (`ansible_failed_task` および `ansible_failed_result`)**:
+    - `block` 内のタスクが失敗して `rescue` セクションへ遷移する際、実行エンジンは自動的に以下の 2 つの特殊変数を該当ホストの変数スコープへ注入します：
+        - **`ansible_failed_task`**: 失敗したタスクの定義情報（タスク名 `name` や使用モジュール `action` 等を含む Map）。
+        - **`ansible_failed_result`**: 失敗したタスクの実行結果データ（`rc`, `stdout`, `stderr`, `msg` 等を含む Map）。
+    - これにより、`rescue` 内のタスクにおいて、失敗したタスクの詳細情報を動的に参照・ログ出力することが可能です。
+- **エラーリカバリとステータス遷移ライフサイクル**:
+    1. **`block` タスクの順次実行**: `block` 内のタスクを順番に実行します。全タスクが正常終了した場合、`rescue` をスキップして `always` セクションへ進行します。
+    2. **失敗検知と `rescue` 遷移**: `block` 内のタスクが失敗（`failed=true`）した場合、`block` 内の以降のタスク実行を即座に中断し、`ansible_failed_task` / `ansible_failed_result` 変数をセットした上で `rescue` セクションへ遷移します。
+    3. **ステータスリカバリ**:
+        - **`rescue` 全タスク成功時**: `rescue` 内のタスクがすべて正常完了した場合、それまで失敗状態であったブロック全体の実行ステータスが **リカバリ完了（`failed=false`）** に上書き補正されます。これにより、後続のタスクや Playbook はエラー中断されず正常に続行されます。
+        - **`rescue` 内タスク失敗時**: `rescue` 内で新たなタスクが失敗した場合、リカバリは失敗とみなされ、ブロック全体のステータスは **失敗（`failed=true`）** のまま保持されます。
+    4. **`always` の無条件実行**: `block` および `rescue` の実行完了後（または失敗後）、常に `always` セクション内のタスクを実行します。`always` 内のタスクが失敗した場合は、最終的なブロック全体のステータスは失敗として決定されます。
+- **ディレクティブの継承と伝播**:
+    - ブロックレベルで定義された設定（`when`, `vars`, `become`, `environment`, `tags`, `ignore_errors`, `delegate_to`）は、配下の `block`, `rescue`, `always` 内のすべてのタスクへ自動的に継承・適用されます。
+    - **`when` 条件評価**: ブロックレベルの `when` 条件はブロック全体の実行前に 1 回評価されます。偽（`false`）と評価された場合、`block`, `rescue`, `always` 全体が一括してスキップされます。
 - **データ構造**:
-    - `Task` またはそれに準ずる `Block` レコードとして定義し、タスクのリストを保持します。
+    - `Task` レコードは `List<Task> block`, `List<Task> rescue`, `List<Task> always` フィールドを保持し、再帰的なネスト構造をサポートします。
+- **使用例**:
+    ```yaml
+    - name: Transaction block with failure recovery and cleanup
+      block:
+        - name: Perform critical operation
+          ansible.builtin.command: /usr/local/bin/process_data.sh
+          register: op_result
+      rescue:
+        - name: Log failure details
+          ansible.builtin.debug:
+            msg: "Task '{{ ansible_failed_task.name }}' failed with error: {{ ansible_failed_result.msg }}"
+        - name: Rollback changes
+          ansible.builtin.command: /usr/local/bin/rollback.sh
+      always:
+        - name: Ensure temporary files are removed
+          ansible.builtin.file:
+            path: /tmp/data.tmp
+            state: absent
+    ```
 
 ## 6. 結果のカスタマイズ (`failed_when`, `changed_when`)
 

@@ -95,6 +95,23 @@
     - **include_vars**: `file`, `dir`, `depth`, `files_matching`, `ignore_files`, `extensions`, `ignore_unknown_extensions`, `name`, `hash_behaviour` の全 9 パラメータをサポートし、アルファベット順ファイルソートで変数をホスト別スコープ（`addIncludedVars`）へ注入します。
     - **実装詳細**: パラメータ一覧およびディレクトリ走査仕様の詳細は、[変数とテンプレートの実装詳細](../implementation/Variables-Templating.md#8-動的静的変数ファイルのロード仕様-vars_files-および-include_vars) を参照してください。
 
+### 2.13 ブロック例外処理とリカバリ (`block` / `rescue` / `always`)
+- **状況**: 実装済み。
+- **詳細**: タスク群の論理グループ化と例外リカバリ、クリーンアップ実行をサポートしています。
+    - **`block`**: メインタスク群の順次実行。失敗時に後続 `block` タスクを即座に中断し `rescue` へ移行。
+    - **`rescue`**: 失敗時にのみ実行される回復タスク群。失敗タスクのメタデータ（`ansible_failed_task`）および実行結果（`ansible_failed_result`）が自動注入されます。全 `rescue` タスクの成功によりブロック全体がリカバリ完了（`failed=false`）として解決されます。
+    - **`always`**: `block` の成否に関わらず必ず最後に実行されるクリーンアップセクション。
+    - **実装詳細**: ステータス補正、自動変数注入、ディレクティブ継承の詳細は、[タスク制御の実装詳細](../implementation/Task-Control.md#5-ブロック-block-rescue-always) を参照してください。
+
+### 2.14 イベント駆動型ハンドラーと通知制御 (`handlers` / `notify` / `listen` / `force_handlers`)
+- **状況**: 実装済み。
+- **詳細**: タスク変更（`changed=true`）に基づく通知とフラッシュ境界におけるイベント駆動実行をサポートしています。
+    - **通知と購読**: 直接名一致および `listen` キーワードによるトピック購読（同一トピック配下の複数ハンドラー起動）をサポート。
+    - **フラッシュ境界**: `pre_tasks`, `roles`/`tasks`, `post_tasks` の各セクション終了時の暗黙的フラッシュ、および `ansible.builtin.meta: flush_handlers` による即時明示的フラッシュを統合。
+    - **強制フラッシュ (`force_handlers`)**: Play レベルの `force_handlers: true` や CLI オプション `--force-handlers` 指定時、Play 途中でエラーが発生した場合でも通知済みハンドラーを強制実行。
+    - **重複排除**: ホストごとの通知済みハンドラーは、1 フラッシュサイクルにつき最大 1 回のみ実行される重複排除を保証。
+    - **実装詳細**: フラッシュ境界、トピックマッチング、重複排除ロジックの詳細は、[タスク制御の実装詳細](../implementation/Task-Control.md#4-ハンドラーと通知-handlers-notify-listen-force_handlers) を参照してください。
+
 ## 3. タスクのフィルタリング (Tags and Limit)
 
 Playbook の実行範囲を制御するためのフィルタリング機能を提供します。
