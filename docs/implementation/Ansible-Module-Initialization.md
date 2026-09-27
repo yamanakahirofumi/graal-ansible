@@ -94,7 +94,79 @@ GraalPy の制限や、Ansible 内部の複雑な依存関係を回避するた�
 -   **モジュールの動作**: `AnsibleModule` インスタンスは、自身に渡された `_ansible_check_mode` 引数を参照し、実際の変更を伴う処理をスキップするかどうかを判断します（これは Ansible 本来の動作と同じです）。
 -   **一貫性の維持**: Java 側でチェックモードの判定（テンプレート評価等）を完結させ、Python 側には最終的な真偽値のみを渡すことで、複雑な条件分岐の二重実装を防いでいます。
 
-## 8. 関連ドキュメント
+## 8. Polyglot 実行ライフサイクルのシーケンス構造 (Execution Flow)
+
+Java `TaskExecutor` から GraalPy `Polyglot Context`、`ansible_bridge.py`、およびモジュール実行コードに至る一連の呼び出し・応答シーケンス構造です。
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant TE as Java TaskExecutor
+    participant Poly as GraalPy Context
+    participant Bridge as ansible_bridge.py
+    participant Mod as Module Code (__main__)
+    participant Conn as Java Connection
+
+    TE->>Poly: putMember("complex_args_java", args)
+    TE->>Poly: putMember("connection_java", conn)
+    TE->>Poly: eval("ansible_launcher.py")
+    Poly->>Bridge: initialize()
+    Bridge->>Bridge: patch_ansible() & mock_sys_modules()
+    Poly->>Mod: exec(module_code, globals)
+    Mod->>Bridge: AnsibleModule.exit_json() / fail_json()
+    Bridge->>Bridge: _record_module_result(result_dict)
+    Bridge-->>Poly: SystemExit(0 or 1)
+    Poly-->>TE: Output JSON / PolyglotValue
+    TE->>TE: parseModuleOutput() -> TaskResult
+```
+
+## 9. Python ブリッジの例外・終了コード制御仕様 (`SystemExit` / `parseModuleOutput`)
+
+Python モジュールの実行終了および例外発生時のキャプチャ・レスポンス解析仕様です。
+
+- **`SystemExit` の捕捉と終了コード解析**:
+  - Python モジュールは処理完了時に `AnsibleModule.exit_json()` または `fail_json()` を呼び出し、内部で `sys.exit(0)` または `sys.exit(1)` (例外 `SystemExit`) を発起します。
+  - `ansible_bridge.py` 内の `execute_module()` は `try...except SystemExit` ブロックでこれを捉え、正常終了コード `0` の場合は `_record_module_result` でシリアライズされた JSON 辞書を標準出力/戻り値として保持します。
+  - `SystemExit(1)` または非ゼロ終了コードの場合は、`failed: true` フラグをセットした結果辞書を構築します。
+- **未補足例外 (Unhandled Exception) の構造化変換**:
+  - Python ランタイム上で未補足の `Exception` や `ImportError` が発生した場合、Python ブリッジはスタックトレース文字列を抽出・整形し、`{"failed": true, "msg": traceback_str, "exception": traceback_str}` 形式の JSON オブジェクトへ自動変換します。
+- **Java 側 `parseModuleOutput` による復元**:
+  - Java 側の `TaskExecutor.parseModuleOutput` は、返却された JSON 文字列を Jackson `ObjectMapper` により `Map<String, Object>` へデコードし、`TaskResult` インスタンスへ格納します。
+  - JSON パースに失敗した場合は、生テキスト出力を `msg` フィールドに保持したフォールバック `TaskResult.failure(rawOutput)` オブジェクトを安全に作成します。
+
+## 10. マルチスレッド並列実行時 (`FreeStrategy`) のコンテキスト隔離とクリーンアップ
+
+`FreeStrategy` やマルチスレッド環境において、単一の GraalPy Context またはスレッド間での状態汚染（State Pollution）を防止するための分離仕様です。
+
+- **スレッドローカル探索パス・コンテキスト管理**:
+  - `TaskExecutor` は、スレッドごとのコレクション検索パスを ThreadLocal 変数（`setCurrentCollectionPaths`）として分離管理します。
+- **`sys.modules['__main__']` の各タスク前後の初期化**:
+  - 各タスク実行直前に `sys.modules['__main__']` の属性（`complex_args`, `module`, `_module_fqn`）をクリア・上書きバインドします。
+- **Polyglot Bindings の明示的クリーンアップ**:
+  - タスク実行完了（`finally` ブロック）時に、`context.getBindings("python").removeMember(...)` を呼び出し、前タスクの `complex_args_java` や `connection_java` オブジェクト参照を破棄してメモリリークおよび誤参照を防止します。
+
+## 11. Action Plugin ランチャー連携仕様 (`ansible_action_launcher.py`)
+
+制御ノード（管理ノード）側で動作する Action Plugin を GraalPy 上で実行するためのバインディング引数マトリクスおよびメソッドエミュレーション仕様です。
+
+- **Java-Python バインディング引数マトリクス**:
+
+| 変数名 | Java 型 | 説明 |
+| :--- | :--- | :--- |
+| `task_vars_java` | `Map<String, Object>` | タスクレベルで評価済みの全変数マップ。 |
+| `connection_java` | `Connection` | ターゲット接続オブジェクト（`execCommand`, `putFile`, `fetchFile`）。 |
+| `task_executor_java` | `ITaskExecutor` | Action Plugin 内からの低レベルモジュール呼び出し（`_execute_module`）用プロキシ。 |
+| `task_args_java` | `Map<String, Object>` | Action Plugin に渡されたタスク引数（`args`）。 |
+| `play_context_java` | `PlayContext` / `BecomeContext` | チェックモード、権限昇格情報等の実行コンテキスト。 |
+
+- **`ActionBase` のメソッド・モンキーパッチ仕様**:
+  - Python 側の `ansible.plugins.action.ActionBase` に対して以下のパッチを適用し、Java 側のインフラを直接呼び出せるよう構成します。
+    - **`_execute_module(...)`**: `task_executor_java.executeModuleFromAction(...)` へ委譲し、ターゲットノードでのモジュール実行結果を Python 辞書として返却。
+    - **`_low_level_execute_command(...)`**: `connection_java.execCommand(...)` へ委譲し、シェルコマンド実行結果（rc, stdout, stderr）を返却。
+    - **`_transfer_file(...)`**: `connection_java.putFile(...)` へ委譲し、ローカルファイルをリモート一時パスへ転送。
+
+## 12. 関連ドキュメント
 - [タスク実行エンジン](Task-Executor.md)
 - [タスク制御の実装詳細](Task-Control.md)
+- [Action Plugin 実装仕様](Action-Plugins.md)
 - [GraalPy 統合の詳細](../tech/GraalPy-Integration.md)
