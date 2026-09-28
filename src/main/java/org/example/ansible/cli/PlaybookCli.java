@@ -183,21 +183,10 @@ public class PlaybookCli implements Callable<Integer> {
                     executor.setVaultPassword(vaultPassword);
                 }
 
-                // Select Callback Plugin
-                String callbackName = System.getenv("ANSIBLE_STDOUT_CALLBACK");
-                if ("json".equalsIgnoreCase(callbackName)) {
-                    executor.clearCallbacks();
-                    executor.addCallback(new org.example.ansible.engine.JsonCallback());
-                } else if (callbackName != null && !"default".equalsIgnoreCase(callbackName)) {
-                    try {
-                        executor.clearCallbacks();
-                        executor.addCallback(new org.example.ansible.engine.PythonCallback(callbackName, taskExecutor.getCollectionPaths()));
-                    } catch (Exception e) {
-                        System.err.println("Warning: Failed to load callback plugin '" + callbackName + "': " + e.getMessage());
-                        System.err.println("Falling back to 'default'.");
-                        executor.addCallback(new org.example.ansible.engine.DefaultCallback());
-                    }
-                }
+                // Select Callback Plugin via CallbackFactory
+                org.example.ansible.engine.Callback stdoutCallback = org.example.ansible.engine.CallbackFactory.createStdoutCallback(null, taskExecutor.getCollectionPaths());
+                executor.clearCallbacks();
+                executor.addCallback(stdoutCallback);
 
                 java.nio.file.Path baseDir = playbookFile.getAbsoluteFile().getParentFile().toPath();
 

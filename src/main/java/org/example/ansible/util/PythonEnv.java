@@ -81,6 +81,59 @@ public class PythonEnv {
         return cfgPaths;
     }
 
+    public static String getStdoutCallbackFromCfg() {
+        List<File> candidates = new ArrayList<>();
+        candidates.add(new File("ansible.cfg"));
+        String userHome = System.getProperty("user.home");
+        if (userHome != null) {
+            candidates.add(new File(userHome, ".ansible.cfg"));
+        }
+        candidates.add(new File("/etc/ansible/ansible.cfg"));
+
+        for (File cfgFile : candidates) {
+            if (cfgFile.exists() && cfgFile.isFile()) {
+                String callback = parseAnsibleCfgStdoutCallback(cfgFile);
+                if (callback != null && !callback.isEmpty()) {
+                    return callback;
+                }
+            }
+        }
+        return null;
+    }
+
+    public static String parseAnsibleCfgStdoutCallback(File cfgFile) {
+        if (cfgFile == null || !cfgFile.exists() || !cfgFile.isFile()) {
+            return null;
+        }
+
+        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(cfgFile, java.nio.charset.StandardCharsets.UTF_8))) {
+            String line;
+            boolean inDefaultsSection = false;
+            while ((line = reader.readLine()) != null) {
+                String trimmed = line.trim();
+                if (trimmed.isEmpty() || trimmed.startsWith("#") || trimmed.startsWith(";")) {
+                    continue;
+                }
+                if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+                    String sectionName = trimmed.substring(1, trimmed.length() - 1).trim();
+                    inDefaultsSection = "defaults".equalsIgnoreCase(sectionName);
+                    continue;
+                }
+                if (inDefaultsSection && trimmed.contains("=")) {
+                    String[] parts = trimmed.split("=", 2);
+                    String key = parts[0].trim();
+                    String val = parts[1].trim();
+                    if ("stdout_callback".equalsIgnoreCase(key)) {
+                        return val;
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+            // Ignore errors reading config
+        }
+        return null;
+    }
+
     public static List<String> parseAnsibleCfgCollectionsPath(File cfgFile) {
         List<String> paths = new ArrayList<>();
         if (cfgFile == null || !cfgFile.exists() || !cfgFile.isFile()) {
