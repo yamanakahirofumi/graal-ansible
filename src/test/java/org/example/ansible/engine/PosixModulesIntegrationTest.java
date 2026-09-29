@@ -194,4 +194,5 @@ class PosixModulesIntegrationTest {
             System.clearProperty("ansible.action_plugins.enabled");
         }
     }
+
 }

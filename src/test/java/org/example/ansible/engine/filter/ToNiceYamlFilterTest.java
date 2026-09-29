@@ -53,4 +53,20 @@ class ToNiceYamlFilterTest {
         assertNotNull(result);
         assertTrue(result.contains("long_text:"));
     }
+
+    @Test
+    void testToNiceYamlBoundaryAndNullCases() {
+        // Empty map
+        String emptyResult = (String) resolver.resolveValue("{{ empty_data | to_nice_yaml }}", Map.of("empty_data", Map.of()));
+        assertNotNull(emptyResult);
+        assertEquals("{}", emptyResult.trim());
+
+        // Primitive string
+        String stringResult = (String) resolver.resolveValue("{{ 'sample string' | to_nice_yaml }}", Map.of());
+        assertEquals("sample string", stringResult.trim());
+
+        // Primitive integer
+        String intResult = (String) resolver.resolveValue("{{ 100 | to_nice_yaml }}", Map.of());
+        assertEquals("100", intResult.trim());
+    }
 }
