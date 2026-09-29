@@ -334,4 +334,69 @@ class BuiltinModulesIntegrationTest {
         assertTrue(Files.isDirectory(dirPath));
     }
 
+    @Test
+    void testCopyModuleCheckMode() throws IOException {
+        Path srcFile = tempDir.resolve("copy_src.txt");
+        Files.writeString(srcFile, "copy content");
+        Path destFile = tempDir.resolve("copy_dest.txt");
+
+        Task task = new Task("Copy check mode", "copy", Map.of(
+                "src", srcFile.toString(),
+                "dest", destFile.toString()
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "copy check mode failed: " + result.message() + " Data: " + result.data());
+        assertTrue(result.changed(), "copy check mode should report changed = true");
+        assertFalse(Files.exists(destFile), "Destination file should not be created in check mode");
+    }
+
+    @Test
+    void testAssembleModuleCheckMode() throws IOException {
+        Path srcDir = tempDir.resolve("assemble_src");
+        Files.createDirectories(srcDir);
+        Files.writeString(srcDir.resolve("01_fragment.txt"), "part 1\n");
+        Files.writeString(srcDir.resolve("02_fragment.txt"), "part 2\n");
+        Path destFile = tempDir.resolve("assembled_out.txt");
+
+        Task task = new Task("Assemble check mode", "assemble", Map.of(
+                "src", srcDir.toString(),
+                "dest", destFile.toString()
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "assemble check mode failed: " + result.message() + " Data: " + result.data());
+        assertFalse(Files.exists(destFile), "Destination file should not be created in check mode");
+    }
+
+    @Test
+    void testUnarchiveModuleCheckMode() throws Exception {
+        Path srcDir = tempDir.resolve("unarchive_src");
+        Files.createDirectories(srcDir);
+        Path sampleFile = srcDir.resolve("sample.txt");
+        Files.writeString(sampleFile, "hello archive");
+
+        Path tarFile = tempDir.resolve("test.tar");
+        Process p = new ProcessBuilder("tar", "-cf", tarFile.toString(), "-C", srcDir.toString(), "sample.txt").start();
+        p.waitFor();
+
+        Path destDir = tempDir.resolve("unarchive_dest");
+        Files.createDirectories(destDir);
+
+        Task task = new Task("Unarchive check mode", "unarchive", Map.of(
+                "src", tarFile.toString(),
+                "dest", destDir.toString()
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "unarchive check mode failed: " + result.message() + " Data: " + result.data());
+        assertFalse(Files.exists(destDir.resolve("sample.txt")), "Extracted file should not exist in check mode");
+    }
+
 }

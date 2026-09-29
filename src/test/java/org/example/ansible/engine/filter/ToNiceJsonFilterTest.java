@@ -63,4 +63,19 @@ class ToNiceJsonFilterTest {
         int indexA2 = resultKeyword.indexOf("\"a\"");
         assertTrue(indexZ2 < indexA2, "Keys should remain unsorted (original insertion order)");
     }
+
+    @Test
+    void testToNiceJsonBoundaryAndNullCases() {
+        // Empty map
+        String emptyResult = (String) resolver.resolveValue("{{ empty_data | to_nice_json }}", Map.of("empty_data", Map.of()));
+        assertNotNull(emptyResult);
+        assertEquals("{ }", emptyResult.trim());
+
+        // Primitive values
+        String stringResult = (String) resolver.resolveValue("{{ 'hello' | to_nice_json }}", Map.of());
+        assertEquals("\"hello\"", stringResult.trim());
+
+        String intResult = (String) resolver.resolveValue("{{ 42 | to_nice_json }}", Map.of());
+        assertEquals("42", intResult.trim());
+    }
 }
