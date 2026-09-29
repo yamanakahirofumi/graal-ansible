@@ -350,6 +350,15 @@
     - `FilterIntegrationTest.java` において `testFqcnFilterAliases` を追加し、`ansible.builtin.b64encode`, `ansible.builtin.b64decode`, `ansible.builtin.bool`, `ansible.builtin.default`, `ansible.utils.ipaddr`, `ansible.builtin.to_json` などの呼び出しを検証。
     - `docs/features/Module-Support-Status.md` の `ansible.posix` および `ansible.utils` サポートステータスを更新・同期。
 
+### 1.49 [✓] Jinja2 フィルター機能拡張と kwargs/Object[] 対応単体・統合テスト拡充 [追加]
+- **完了日**: 2026-10-24
+- **概要**: `docs/implementation/Variables-Templating.md` Section 4.1 & 4.3 に基づき、`CombineFilter`, `TernaryFilter`, `FlattenFilter`, `UniqueFilter` における `Object[]` および `kwargs` 引数処理、`combine` の再帰的マージ (`recursive=true`) および `list_merge` 各戦略、`ternary` の Object 型保持処理を実装・テスト拡充。
+- **解決策**:
+    - `CombineFilter.java` にて `recursive=true` (階層構造 Map マージ) および `list_merge` (`replace`, `append`, `prepend`, `append_rp`, `keep`) オプション処理を実装。
+    - `TernaryFilter.java` にて `filter(Object, JinjavaInterpreter, Object[], Map)` をオーバーライドし、返却値の Object 型 (Integer, Boolean, List, Map 等) 保持を向上。
+    - `FlattenFilter.java` および `UniqueFilter.java` にて `filter(Object, JinjavaInterpreter, Object[], Map)` をオーバーライドし、`levels` / `attribute` パラメータの `kwargs` / `Object[]` 評価を追加。
+    - `CombineFilterTest.java`, `TernaryFilterTest.java`, `FlattenFilterTest.java`, `UniqueFilterTest.java`, `FilterIntegrationTest.java` において計38件の単体・統合テストスイートを構築・検証。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築
