@@ -359,6 +359,16 @@
     - `FlattenFilter.java` および `UniqueFilter.java` にて `filter(Object, JinjavaInterpreter, Object[], Map)` をオーバーライドし、`levels` / `attribute` パラメータの `kwargs` / `Object[]` 評価を追加。
     - `CombineFilterTest.java`, `TernaryFilterTest.java`, `FlattenFilterTest.java`, `UniqueFilterTest.java`, `FilterIntegrationTest.java` において計38件の単体・統合テストスイートを構築・検証。
 
+### 1.50 [✓] コレクション管理・名前解決仕様の詳細化 [追加]
+- **完了日**: 2026-10-24
+- **概要**: `docs/features/Collection-Management.md` におけるコレクション取得・構造・探索パス優先順位、FQCN 解析ルール、`collections` スコープ検索階層、`galaxy.yml` 解析および GraalPy パッケージバインディング仕様を拡張・詳細化。
+- **解決策**:
+    - FQCN (Fully Qualified Collection Name) の構文構造 (`<namespace>.<collection_name>.<plugin_name>`) および短縮名プレフィックス補完ルールを追加。
+    - Play, Block, Task レベルにおける `collections` スコープの継承・多層優先順位および名前解決アルゴリズムを明記。
+    - コレクション内部プラグイン階層構造 (`plugins/modules`, `plugins/action`, `plugins/lookup`, `plugins/filter` 等) と探索ルールを追加。
+    - `galaxy.yml` メタデータ解析と依存関係バリデーション仕様を明記。
+    - GraalPy `sys.path` 注入および `ansible_collections` PEP 420 ネームスペースパッケージ初期化シーケンス、ならびに例外ハンドリングマッピングを定義。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築
