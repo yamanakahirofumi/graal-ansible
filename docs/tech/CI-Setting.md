@@ -8,17 +8,16 @@
 GitHub へのプッシュ（Push）またはプルリクエスト（Pull Request）が作成された際に、以下のプロセスが自動的に実行されます。
 
 1. **チェックアウト**：リポジトリのソースコードを取得します。
-2. **GraalVM のセットアップ**：ネイティブビルドに必要な GraalVM JDK をセットアップします。GraalVM Java 21 との互換性確保のため、`python` コンポーネントおよび明示的なバージョン（`version: '25.0.2'`など）の指定は行いません。
-3. **マルチプラットフォーム・マトリックス**：Ubuntu, Windows の各環境でテストを実行し、OS非依存性を検証します。
-4. **ビルドとテスト**：`mvn verify` を実行し、ユニットテストおよび結合テストを実施します。
-5. **テスト結果の送信**: JUnit 形式のテスト結果（XML）を Codecov へ転送します（Ubuntu 環境のみ）。
-6. **Native Image ビルド**：各OS向けのネイティブバイナリを生成し、動作確認を行います。
+2. **テスト用 Docker イメージのビルド (Linux のみ)**：`src/test/docker/` 配下の Dockerfile から `test-python-sshd` イメージを自動ビルドします。
+3. **GraalVM のセットアップ**：`graalvm/setup-graalvm@v1` アクションを使用し、Java 21 対応の GraalVM JDK ディストリビューションをセットアップします。
+4. **マルチプラットフォーム・マトリックス**：`ubuntu-latest` および `windows-latest` の各環境でテストを実行し、OS 非依存性を検証します。
+5. **ビルドとテスト**：`mvn -B verify` を実行し、ユニットテストおよび結合テストを実施します。
+6. **テスト結果の送信 (Linux のみ)**：`codecov/codecov-action@v5` を用いて、`./target/surefire-reports/` 内の XML レポートを Codecov サービスへ転送します。
+7. **Native Image ビルド**：`mvn -Pnative native:compile` を実行し、各 OS 向けのネイティブバイナリのコンパイルおよび動作確認を行います。
 
-### 1.2 設定ファイルの例 (`.github/workflows/build.yml`)
-以下は、GraalVM の Maven を使用した標準的なワークフロー構成の例です。
+### 1.2 設定ファイルの構成 (`.github/workflows/build.yml`)
 
-> [!IMPORTANT]
-> 以下の例で使用されている各アクションやツールのバージョン（`actions/checkout@v4` や `java-version: '21'`, `codecov-action@v5` など）は、ドキュメント作成時のものです。実際の設定にあたっては、最新の安定バージョンを確認して使用してください。
+リポジトリで運用されている実際の設定ファイルの内容です。
 
 ```yaml
 name: Java CI with Maven
@@ -32,7 +31,6 @@ on:
     branches: [ main ]
     paths:
       - 'src/**'
-  workflow_dispatch: {}
 
 jobs:
   build:
@@ -67,16 +65,17 @@ jobs:
 ```
 
 ## 2. テスト結果の可視化
+
 本プロジェクトでは、JUnit 形式のテスト結果を Codecov に送信することで、テストの実行状況を可視化しています。
 
 ### 2.1 測定と転送の仕組み
-1. `mvn verify` 実行時に Maven Surefire Plugin がテストを実行し、`target/surefire-reports/` に XML レポートを生成します。
+1. `mvn -B verify` 実行時に Maven Surefire Plugin がテストを実行し、`target/surefire-reports/` に XML レポートを生成します。
 2. GitHub Actions 上で、これらの XML レポートを Codecov サービスにアップロードします。
 3. Codecov 上でテストの成功率、失敗数、実行時間などを確認し、品質管理に役立てます。
 
 ## 3. CI の目的
-- **OS非依存性の検証**：マルチプラットフォーム・マトリックスにより、全サポートOSでの動作を毎コミットごとに保証します。
-- **Native Imageの継続的検証**：AOTコンパイル特有の問題を早期に発見します。
+- **OS 非依存性の検証**：マルチプラットフォーム・マトリックスにより、全サポート OS での動作を毎コミットごとに保証します。
+- **Native Image の継続的検証**：AOT コンパイル特有の問題を早期に発見します。
 - **自動テスト**：JUnit によるテストを自動実行し、ロジックの正しさを検証します。
 
 ## 4. バージョン管理の遵守

@@ -40,10 +40,10 @@ graal-ansible [options] playbook.yml
 
 | CLI オプション    | 内部変数名              | 説明                                                           |
 | :---------------- | :---------------------- | :------------------------------------------------------------- |
-| `-b`, `--become`  | `ansible_become`        | `true` の場合、全タスクでデフォルトで権限昇格を有効にします。 |
+| `-b`, `--become`  | `ansible_become`        | `true` の場合、全タスクでデフォルトで権限昇格を有効にします。  |
 | `--become-method` | `ansible_become_method` | `sudo`, `su` 等のメソッドを指定します。                        |
 | `--become-user`   | `ansible_become_user`   | 昇格後のユーザーを指定します。                                 |
-| `--become-flags`  | `ansible_become_flags`  | 昇格コマンドに渡す追加フラグを指定します。                       |
+| `--become-flags`  | `ansible_become_flags`  | 昇格コマンドに渡す追加フラグを指定します。                     |
 
 これらの変数は、`VariableManager` において「CLI変数 (Level 1)」として保持され、Play や Task で明示的に `become: no` 等が指定されない限り、実行コンテキストに適用されます。
 
@@ -73,21 +73,21 @@ Ansible Vault で暗号化された変数の動的復号に使用するパスワ
 
 `graal-ansible` は、以下の環境変数をサポートしています。
 
-| 環境変数                   | 説明                                                                         | 実装状況 |
-| :------------------------- | :--------------------------------------------------------------------------- | :------: |
-| `ANSIBLE_STDOUT_CALLBACK`     | 使用するコールバックプラグインを指定（例: `default`, `json`）                |    ◎     |
-| `ANSIBLE_COLLECTIONS_PATH`    | コレクションの探索パスをコロン区切りで指定                                   |    ◎     |
-| `ANSIBLE_HASH_BEHAVIOUR`      | 辞書型変数のマージ戦略を指定 (`replace` または `merge`)                      |    ◎     |
-| `ANSIBLE_SITE_PACKAGES`       | Python の `site-packages` （依存ライブラリの探索パス）をコロン区切りで指定   |    ◎     |
-| `ANSIBLE_VAULT_PASSWORD_FILE` | デフォルトの Vault パスワードファイルパスを指定                               |    ◎     |
+| 環境変数                      | 説明                                                                       | 実装状況 |
+| :---------------------------- | :------------------------------------------------------------------------- | :------: |
+| `ANSIBLE_STDOUT_CALLBACK`     | 使用するコールバックプラグインを指定（例: `default`, `json`）              |    ◎     |
+| `ANSIBLE_COLLECTIONS_PATH`    | コレクションの探索パスをコロン区切りで指定                                 |    ◎     |
+| `ANSIBLE_HASH_BEHAVIOUR`      | 辞書型変数のマージ戦略を指定 (`replace` または `merge`)                    |    ◎     |
+| `ANSIBLE_SITE_PACKAGES`       | Python の `site-packages` （依存ライブラリの探索パス）をコロン区切りで指定 |    ◎     |
+| `ANSIBLE_VAULT_PASSWORD_FILE` | デフォルトの Vault パスワードファイルパスを指定                             |    ◎     |
 
 ### 5.1 Java システムプロパティ (Java System Properties)
 
 Java の起動時オプション（`-Dproperty=value`）として、以下の設定をサポートしています。
 
-| プロパティ名            | 説明                                                                         | 実装状況 |
-| :---------------------- | :--------------------------------------------------------------------------- | :------: |
-| `ansible.site.packages` | Python の `site-packages` （依存ライブラリの探索パス）をコロン区切りで指定   |    ◎     |
+| プロパティ名            | 説明                                                                       | 実装状況 |
+| :---------------------- | :------------------------------------------------------------------------- | :------: |
+| `ansible.site.packages` | Python の `site-packages` （依存ライブラリの探索パス）をコロン区切りで指定 |    ◎     |
 
 ## 6. コレクション探索パスの優先順位
 

@@ -451,3 +451,12 @@
     - `PosixModulesIntegrationTest` クラス自体に `@DisabledOnOs(OS.WINDOWS)` を付与し、クラス単位での除外制御を確立。
     - `InventoryIntegrationTest` における無条件の `isWindows` スキップロジックを削除（`FileInventoryProvider` の正当性を検証）。
     - `docs/tech/Test-Rule.md` にプログラムによる無条件スキップの禁止と、OS 依存テストのクラス単位集約・クラスレベルアノテーション宣言ルールを追加。
+
+### 2.15 [✓] 仕様書ドキュメント群の最新情報整理とフォーマット統一 [整理]
+- **完了日**: 2026-10-24
+- **概要**: `docs/tech/Tech-Stack.md`, `docs/README.md`, `docs/tech/CI-Setting.md`, `docs/features/CLI-Specification.md` 等の仕様書群において、技術ライブラリバージョン（`Picocli` 4.7.5, `Jackson` 2.17.0, `Mockito` 5.11.0, `GraalPy` 25.0.2 等）の最新同期、`Specification-Rule.md` に準拠した Markdown テーブル列幅補正、および CI ワークフロー説明の同期・整理を実施。
+- **解決策**:
+    - `Tech-Stack.md` の技術スタック一覧テーブルに Picocli, Jackson, Mockito, GraalPy を追加し、列幅を整理。
+    - `CI-Setting.md` の GitHub Actions ワークフロー構成説明およびコード例を `.github/workflows/build.yml` と完全同期。
+    - `CLI-Specification.md` の各種設定テーブル（CLI オプション、become 変数、環境変数）の列幅を整頓。
+    - `README.md` のモジュールステータス表記およびドキュメント一覧の整合性を再確認・統一。
