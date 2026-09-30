@@ -1,6 +1,9 @@
 package org.example.ansible.util;
 
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class OSHandlerTest {
@@ -12,6 +15,8 @@ class OSHandlerTest {
         assertEquals("/", handler.getSeparator());
         assertEquals("a/b/c", handler.getJoinPath("a", "b", "c"));
         assertEquals("Linux", handler.getOSFamily());
+        assertEquals(List.of("/bin/sh", "-c"), handler.getShellExecutable());
+        assertTrue(handler.supportsSudo());
     }
 
     @Test
@@ -20,6 +25,8 @@ class OSHandlerTest {
         assertEquals("/tmp", handler.getTempDir());
         assertEquals("/", handler.getSeparator());
         assertEquals("Darwin", handler.getOSFamily());
+        assertEquals(List.of("/bin/sh", "-c"), handler.getShellExecutable());
+        assertTrue(handler.supportsSudo());
     }
 
     @Test
@@ -29,6 +36,23 @@ class OSHandlerTest {
         assertEquals("\\", handler.getSeparator());
         assertEquals("a\\b\\c", handler.getJoinPath("a", "b", "c"));
         assertEquals("Windows", handler.getOSFamily());
+        assertEquals(List.of("cmd.exe", "/c"), handler.getShellExecutable());
+        assertFalse(handler.supportsSudo());
+    }
+
+    @Test
+    void testGetJoinPathEdgeCases() {
+        OSHandler linuxHandler = new LinuxHandler();
+        assertEquals("", linuxHandler.getJoinPath((String[]) null));
+        assertEquals("", linuxHandler.getJoinPath());
+        assertEquals("single", linuxHandler.getJoinPath("single"));
+        assertEquals("part1/part2", linuxHandler.getJoinPath("part1", "part2"));
+
+        OSHandler windowsHandler = new WindowsHandler();
+        assertEquals("", windowsHandler.getJoinPath((String[]) null));
+        assertEquals("", windowsHandler.getJoinPath());
+        assertEquals("single", windowsHandler.getJoinPath("single"));
+        assertEquals("part1\\part2", windowsHandler.getJoinPath("part1", "part2"));
     }
 
     @Test
