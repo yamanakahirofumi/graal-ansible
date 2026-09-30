@@ -13,27 +13,34 @@ import java.util.Set;
 
 /**
  * Filter that returns a list of unique elements from a list.
- * This is compatible with Ansible's unique filter.
+ * Usage: {{ list | unique }} or {{ list | unique(attribute='id') }}
  */
 public class UniqueFilter implements Filter {
+
     @Override
-    public Object filter(Object var, JinjavaInterpreter interpreter, String... args) {
+    public Object filter(Object var, JinjavaInterpreter interpreter, Object[] args, Map<String, Object> kwargs) {
         if (!(var instanceof Collection<?> collection)) {
             return var;
         }
 
         String attribute = null;
-        if (args.length > 0) {
+
+        if (kwargs != null && kwargs.containsKey("attribute") && kwargs.get("attribute") != null) {
+            attribute = String.valueOf(kwargs.get("attribute"));
+        }
+
+        if (attribute == null && args != null && args.length > 0) {
             for (int i = 0; i < args.length; i++) {
-                String arg = args[i];
-                if (arg == null) continue;
-                if (arg.contains("=")) {
-                    String[] parts = arg.split("=", 2);
+                Object argObj = args[i];
+                if (argObj == null) continue;
+                String argStr = argObj.toString();
+                if (argStr.contains("=")) {
+                    String[] parts = argStr.split("=", 2);
                     String k = parts[0].trim();
                     String v = parts[1].trim().replace("'", "").replace("\"", "");
                     if ("attribute".equals(k)) attribute = v;
                 } else {
-                    if (i == 0) attribute = arg.replace("'", "").replace("\"", "");
+                    if (i == 0) attribute = argStr.replace("'", "").replace("\"", "");
                 }
             }
         }
@@ -58,6 +65,11 @@ public class UniqueFilter implements Filter {
             }
             return result;
         }
+    }
+
+    @Override
+    public Object filter(Object var, JinjavaInterpreter interpreter, String... args) {
+        return filter(var, interpreter, (Object[]) args, Map.of());
     }
 
     @Override
