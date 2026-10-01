@@ -47,14 +47,47 @@ class AdditionalFiltersTest {
         assertEquals("file.txt", resolver.resolveValue("{{ '" + winPath.replace("\\", "\\\\") + "' | basename }}", Map.of()));
         assertEquals("C:\\path\\to", resolver.resolveValue("{{ '" + winPath.replace("\\", "\\\\") + "' | dirname }}", Map.of()));
 
-        // Edge case: single slash
+        // Edge case: single slash and no separator
         assertEquals("/", resolver.resolveValue("{{ '/' | dirname }}", Map.of()));
         assertEquals("\\", resolver.resolveValue("{{ '\\\\' | dirname }}", Map.of()));
+        assertEquals(".", resolver.resolveValue("{{ 'filename_only.txt' | dirname }}", Map.of()));
+        assertEquals("filename_only.txt", resolver.resolveValue("{{ 'filename_only.txt' | basename }}", Map.of()));
+
+        // Splitext without extension
+        Object noExtResult = resolver.resolveValue("{{ 'filename_no_ext' | splitext }}", Map.of());
+        assertTrue(noExtResult instanceof List);
+        List<?> noExtList = (List<?>) noExtResult;
+        assertEquals("filename_no_ext", noExtList.get(0));
+        assertEquals("", noExtList.get(1));
 
         // Realpath should return absolute path with normalized separators
         String realpathResult = (String) resolver.resolveValue("{{ 'pom.xml' | realpath }}", Map.of());
         assertTrue(new File(realpathResult).isAbsolute());
         assertFalse(realpathResult.contains("\\"));
+
+        // Undefined variable resolves to empty string in Jinjava template evaluation
+        assertEquals("", resolver.resolveValue("{{ undefined_var | basename }}", Map.of()));
+        assertEquals("", resolver.resolveValue("{{ undefined_var | dirname }}", Map.of()));
+        assertEquals("", resolver.resolveValue("{{ undefined_var | splitext }}", Map.of()));
+        assertEquals("", resolver.resolveValue("{{ undefined_var | realpath }}", Map.of()));
+    }
+
+    @Test
+    void testQuoteFilter() {
+        assertEquals("''", resolver.resolveValue("{{ '' | quote }}", Map.of()));
+        assertEquals("''", resolver.resolveValue("{{ undefined_var | quote }}", Map.of()));
+        assertEquals("'hello'", resolver.resolveValue("{{ 'hello' | quote }}", Map.of()));
+        assertEquals("'hello '\\''world'\\'''", resolver.resolveValue("{{ \"hello 'world'\" | quote }}", Map.of()));
+    }
+
+    @Test
+    void testRegexReplaceFilterEdgeCases() {
+        // No match returns original
+        assertEquals("hello world", resolver.resolveValue("{{ 'hello world' | regex_replace('xyz', '123') }}", Map.of()));
+        // Empty replacement deletes match
+        assertEquals("helloworld", resolver.resolveValue("{{ 'hello 123 world' | regex_replace('[0-9 ]+') }}", Map.of()));
+        // Undefined variable returns empty string
+        assertEquals("", resolver.resolveValue("{{ undefined_var | regex_replace('a', 'b') }}", Map.of()));
     }
 
     @Test

@@ -283,6 +283,27 @@ class NegativeIntegrationTest {
     }
 
     @Test
+    void testLineInFileValidationFailure() throws IOException {
+        Path targetFile = tempDir.resolve("validate_fail.txt");
+        Files.writeString(targetFile, "initial_content\n");
+
+        boolean isWindows = System.getProperty("os.name").toLowerCase().contains("win");
+        // Validation command that fails (non-zero return code)
+        String validateCmd = isWindows ? "cmd.exe /c exit 1" : "false %s";
+
+        Task task = new Task("Lineinfile validate fail", "lineinfile", Map.of(
+                "path", targetFile.toString(),
+                "line", "new_content",
+                "validate", validateCmd
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertFalse(result.success(), "lineinfile should fail when validation command fails");
+        assertTrue(result.data().containsKey("msg") || result.data().containsKey("exception"),
+                "Result data should contain error information: " + result.data());
+    }
+
+    @Test
     void testReplaceNonExistentPath() {
         Path nonExistent = tempDir.resolve("non_existent_replace.txt");
         Task task = new Task("Replace non-existent path", "replace", Map.of(
@@ -294,6 +315,23 @@ class NegativeIntegrationTest {
 
         assertFalse(result.success(), "replace should fail when target file does not exist");
         assertTrue(result.data().containsKey("msg"));
+    }
+
+    @Test
+    void testReplaceInvalidRegexPattern() throws IOException {
+        Path targetFile = tempDir.resolve("invalid_regex.txt");
+        Files.writeString(targetFile, "sample content\n");
+
+        Task task = new Task("Replace invalid regex", "replace", Map.of(
+                "path", targetFile.toString(),
+                "regexp", "(?invalid_pattern",
+                "replace", "replacement"
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertFalse(result.success(), "replace should fail when regexp pattern is invalid");
+        assertTrue(result.data().containsKey("msg") || result.data().containsKey("exception"),
+                "Result data should contain error information: " + result.data());
     }
 
     @Test
