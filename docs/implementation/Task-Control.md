@@ -170,6 +170,7 @@
     - **failed_when**: 指定された条件式が `true` の場合、モジュールが成功していても `failed=true` とみなします。リストで指定された場合は、すべての条件が `true` の場合に失敗とみなされます（暗黙の AND）。
     - **changed_when**: 指定された条件式が `true` の場合、モジュールに変更がなくても `changed=true` とみなします。逆に `false` を指定して常に変更なしにすることも可能です。リストで指定された場合は、すべての条件が `true` の場合に変更とみなされます（暗黙の AND）。
 - **実行タイミング**: モジュール実行完了直後、`register` や `notify` の処理前に行います。
+- **機能概要参照**: 詳細な判定ルールおよびコンテキスト統合については、[Playbook 実行仕様](../features/Playbook-Execution.md#216-実行結果のカスタマイズ-failed_when--changed_when) を参照してください。
 
 ## 7. リトライ処理 (`until`, `retries`, `delay`)
 
@@ -186,6 +187,7 @@
     - 各イテレーションにおいて、`until` 条件のチェック前に結果のカスタマイズが適用される点に留意してください。
 - **留意点**:
     - 各試行の結果は `register` された変数（`results` リスト）に蓄積される必要があります。
+- **機能概要参照**: 詳細なイテレーション制御およびデータ構造については、[Playbook 実行仕様](../features/Playbook-Execution.md#215-リトライループ制御-until--retries--delay) を参照してください。
 
 ## 8. 委譲と実行制御 (`delegate_to`, `run_once`, `ignore_errors`, `ignore_unreachable`, `delegate_facts`)
 
@@ -224,6 +226,7 @@
 - **データ構造**:
     - `Play`, `Task` レコードに `Object environment` フィールドを保持します。
     - 評価後のデータ型は `Map<String, String>` となります。
+- **機能概要参照**: 詳細な優先順位マージおよびプロセス環境伝播については、[Playbook 実行仕様](../features/Playbook-Execution.md#218-動的環境変数の伝播-environment) を参照してください。
 
 ## 10. インタラクティブ・プロンプト (`vars_prompt`)
 
@@ -249,6 +252,7 @@
     - チェックモードで実行されるモジュールは、システムに変更を加えずに、変更が発生するかどうかのみを報告します。
 - **データ構造**:
     - `Task` レコードおよび `Play` レコードに `Object check_mode` フィールドを保持します。
+- **機能概要参照**: 詳細な解決優先順位およびモジュール引数への `_ansible_check_mode` 注入については、[Playbook 実行仕様](../features/Playbook-Execution.md#217-チェックモード動的制御-check_mode) を参照してください。
 
 ## 12. 実行エンジンにおける処理の分離と順序
 
