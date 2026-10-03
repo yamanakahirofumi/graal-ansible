@@ -149,3 +149,96 @@
   - `summary.put("success", isSuccess())`, `summary.put("overall", overallStats)`, `summary.put("hosts", hostStats)` を含む Map 構造を出力し、JSON 等へのシリアライズや外部システム連携を容易にします。
 - **`PlaybookExecutor` との連携**:
   - `PlaybookExecutor.executeAndReport` オーバーロードメソッドを介して、実行完了と同時に `ExecutionReport` インスタンスを取得可能です。
+
+## 13. モジュール引数検証エミュレーション (`argument_spec` Validation)
+
+Ansible モジュール（`ansible.module_utils.basic.AnsibleModule`）および `validate_argument_spec` モジュールにおける引数型チェック、必須属性検証、デフォルト値補填の実装詳細および Java-Python データ交換仕様です。
+
+- **`argument_spec` 解析と型変換**:
+  - Java 側からバインドされた `complex_args_java` は、`ansible_bridge.py` の `_load_params` モンキーパッチ経由で `AnsibleModule` へ渡されます。
+  - `AnsibleModule` の初期化時、`argument_spec` 辞書（例: `type='str'`, `type='int'`, `type='bool'`, `type='list'`, `type='dict'`, `type='path'`）に基づき自動キャストが適用されます。
+  - **`path` 型の正規化**: `type='path'` が指定された引数については、`_normalize_path` ヘルパーが自動適用され、Windows 環境における `/C:\...` 先頭スラッシュ問題やパス区切り文字の正規化が行われます。
+- **必須チェック (`required`) とデフォルト値 (`default`)**:
+  - `required=True` のキーが `complex_args` 内に存在せず、かつデフォルト値も未定義の場合、`AnsibleModule.fail_json(msg="missing required arguments: ...")` が呼び出され、即座にタスク失敗レスポンスが生成されます。
+  - `default` 値が定義されており、タスク引数で未指定の場合は、デフォルト値が自動挿入されてモジュールロジックへ渡されます。
+- **`validate_argument_spec` モジュールとの連携**:
+  - モジュール引数として渡された `argument_spec` 仕様辞書に対して入力引数データ (`provided_arguments`) の検証を行い、型不一致や範囲外エラーを `validate_args_context` エラーメッセージとして返却します。
+
+## 14. `TaskResult` フィールドマッピングマトリクスと構造化変換 (Field Mapping Matrix)
+
+モジュールまたは Action Plugin の返却辞書（JSON）から Java の `TaskResult` オブジェクトへマッピングされる各フィールドの優先順位、補正ルール、および追加構造化仕様です。
+
+| モジュール JSON キー | Java TaskResult レコード構成 | 抽出・補正ロジック |
+| :--- | :--- | :--- |
+| `rc` | `Map<String, Object> data` | プロセス終了コード（非ゼロの場合は `failed` 判定の補助情報）。未指定時は `0`。 |
+| `stdout` | `Map<String, Object> data` | 標準出力テキスト。`stdout_lines`（改行分割リスト）の抽出にも使用。 |
+| `stderr` | `Map<String, Object> data` | 標準エラー出力テキスト。`stderr_lines`（改行分割リスト）の抽出にも使用。 |
+| `msg` | `String message()` | 概要メッセージ。`failed_when` や例外発生時のエラーメッセージとして最優先抽出。 |
+| `changed` | `boolean changed()` | システム変更有無。`Truthiness.isTrue(data.get("changed"))` により抽出。 |
+| `failed` | `boolean success()` | タスク成否。`failed` キーが `true` または `rc != 0` の場合に `success = false` と決定。 |
+| `skipped` | `boolean skipped()` | `when` 条件不成立時に `true` をセット。 |
+| `unreachable` | `boolean unreachable()` | ターゲットノード接続不能時に `true` をセット（`UnreachableException` キャッチ時）。 |
+| `results` | `Map<String, Object> data` | ループ (`loop`) またはポーリング時のイテレーション結果リストを格納。 |
+| `ansible_facts` | `VariableManager` | `ansible_facts` キーが存在する場合、`VariableManager.addFacts(host, facts)` へ自動注入。 |
+
+- **`stdout_lines` / `stderr_lines` 自動抽出**:
+  - モジュール返却データに `stdout`（または `stderr`）文字列が含まれ、`stdout_lines` キーが存在しない場合、`TaskExecutor` は改行コード（`\n`）で分割した `List<String>` を生成して `data` Map へ自動補填します。
+
+## 15. 非同期ジョブマネージャーの内部設計仕様 (`DefaultAsyncJobManager`)
+
+`DefaultAsyncJobManager` における非同期タスクのタイムアウト監視スレッドプール、状態管理、および永続化の内部構造仕様です。
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant TE as TaskExecutor
+    participant AM as DefaultAsyncJobManager
+    participant TP as ScheduledExecutorService
+    participant Disk as File (~/.ansible_async/<jid>)
+
+    TE->>AM: submit(jid, timeout, taskCallable)
+    AM->>Disk: 初回の AsyncJob (finished=0) を JSON 保存
+    AM->>TP: executorService.submit(taskCallable)
+    AM->>TP: executorService.schedule(timeoutCheck, timeout, SECONDS)
+    alt タスク時間内完了
+        TP-->>AM: TaskResult 返却
+        AM->>AM: updateJob(jid, result, finished=1)
+        AM->>Disk: 更新後の AsyncJob を JSON 永続化
+    else タイムアウト超過
+        TP->>AM: timeoutCheck 起動 (future.isDone() == false)
+        AM->>AM: TaskResult.failure("Async task timed out...") 生成
+        AM->>Disk: タイムアウト失敗 AsyncJob (finished=1) を JSON 永続化
+    end
+```
+
+- **`ScheduledExecutorService` による二重タスク管理**:
+  - `Executors.newScheduledThreadPool(10)` を保持し、1 つの非同期タスクに対して「実行用ワーカー」と「指定秒数後にタイムアウト判定を行うスケジューラー」の 2 つのタスクを投入します。
+- **`~/.ansible_async/` 永続化ファイルフォーマット**:
+  - ジョブ ID（`jid`）をファイル名とする JSON ファイルを `~/.ansible_async/<jid>` へ書き出します。
+  - **JSON 構造仕様**:
+    ```json
+    {
+      "started": "2026-10-24T10:00:00Z",
+      "finished": 1,
+      "ansible_job_id": "31b6a7e0-410e-4a6c-a81d-8b024bd32b91",
+      "results_file": "/home/user/.ansible_async/31b6a7e0-410e-4a6c-a81d-8b024bd32b91",
+      "ansible_async_watchdata": {
+        "changed": true,
+        "failed": false,
+        "finished": 1,
+        "rc": 0,
+        "stdout": "Task completed successfully"
+      }
+    }
+    ```
+
+## 16. `OMIT` センチネル処理と動的引数クリーニング (Omit Sentinel Cleaning)
+
+Jinja2 テンプレート展開後に評価される特殊センチネルオブジェクト `VariableManager.OMIT` の自動除去ライフサイクルです。
+
+- **`OMIT` 検出と定義**:
+  - `VariableManager.OMIT` は内部的に専用の匿名オブジェクトとして定義されており、`toString()` は `"__ansible_omit__"` を返します。
+- **再帰的クリーニングアルゴリズム (`cleanOmitValues`)**:
+  - モジュールに引数 Map を渡す直前、`TaskExecutor` は引数 Map を再帰的に走査します。
+  - **Map 走査**: 値が `VariableManager.OMIT` または文字列 `"__ansible_omit__"` であるキーを発見した場合、そのキーごと Map から完全に削除（`remove`）します。値がネストされた Map の場合は再帰的にクリーニングを適用します。
+  - **List 走査**: リスト内の要素が `OMIT` センチネルである場合、その要素をリストから除去します。
