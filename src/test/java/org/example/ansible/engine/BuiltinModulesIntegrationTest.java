@@ -399,4 +399,24 @@ class BuiltinModulesIntegrationTest {
         assertFalse(Files.exists(destDir.resolve("sample.txt")), "Extracted file should not exist in check mode");
     }
 
+    @Test
+    void testFindModuleCheckMode() throws IOException {
+        Path f1 = tempDir.resolve("find_check_1.txt");
+        Files.writeString(f1, "data");
+
+        Task task = new Task("Find files check mode", "find", Map.of(
+                "paths", List.of(tempDir.toAbsolutePath().toString()),
+                "patterns", List.of("find_check_*.txt")
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "find check mode failed: " + result.message() + " Data: " + result.data());
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> files = (List<Map<String, Object>>) result.data().get("files");
+        assertNotNull(files, "files should not be null");
+        assertEquals(1, files.size());
+    }
+
 }

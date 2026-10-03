@@ -150,4 +150,74 @@ class IncludeVarsIntegrationTest {
         assertEquals("value_a and value_b", results.get("host1").get(1).data().get("msg"));
     }
 
+    @Test
+    void testIncludeVarsWithName() throws IOException {
+        Path varsFile = tempDir.resolve("db_credentials.yml");
+        Files.writeString(varsFile, "username: admin\npassword: secret_pass\nport: 5432");
+
+        String inventoryIni = "host1";
+        Inventory inventory = new IniInventoryParser().parse(new ByteArrayInputStream(inventoryIni.getBytes(StandardCharsets.UTF_8)));
+
+        String playbookYaml = String.format("""
+                - name: play
+                  hosts: all
+                  tasks:
+                    - name: include vars into db_config
+                      include_vars:
+                        file: %s
+                        name: db_config
+                    - name: check wrapped vars
+                      debug:
+                        msg: "{{ db_config.username }}:{{ db_config.port }}"
+                """, varsFile.toAbsolutePath().toString().replace("\\", "/"));
+
+        Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
+
+        // Act
+        Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory, Map.of(), tempDir, tempDir, false);
+
+        // Assert
+        assertEquals("admin:5432", results.get("host1").get(1).data().get("msg"));
+    }
+
+    @Test
+    void testIncludeVarsWithDirAndFiltering() throws IOException {
+        Path varsDir = tempDir.resolve("filtered_vars_dir");
+        Files.createDirectories(varsDir);
+        Files.writeString(varsDir.resolve("app_web.yml"), "web_port: 8080");
+        Files.writeString(varsDir.resolve("app_db.yaml"), "db_name: main_db");
+        Files.writeString(varsDir.resolve("ignore_me.yml"), "ignored_var: 1");
+        Files.writeString(varsDir.resolve("app_other.txt"), "text_var: hello");
+
+        String inventoryIni = "host1";
+        Inventory inventory = new IniInventoryParser().parse(new ByteArrayInputStream(inventoryIni.getBytes(StandardCharsets.UTF_8)));
+
+        String playbookYaml = String.format("""
+                - name: play
+                  hosts: all
+                  tasks:
+                    - name: include vars with filtering
+                      include_vars:
+                        dir: %s
+                        files_matching: "^app_.*"
+                        ignore_files:
+                          - "ignore_me.yml"
+                        extensions:
+                          - "yml"
+                          - "yaml"
+                        ignore_unknown_extensions: true
+                    - name: check filtered vars
+                      debug:
+                        msg: "{{ web_port }} and {{ db_name }}"
+                """, varsDir.toAbsolutePath().toString().replace("\\", "/"));
+
+        Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
+
+        // Act
+        Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory, Map.of(), tempDir, tempDir, false);
+
+        // Assert
+        assertEquals("8080 and main_db", results.get("host1").get(1).data().get("msg"));
+    }
+
 }
