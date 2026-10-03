@@ -5,9 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.ByteArrayInputStream;
-import java.io.File;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 
@@ -40,6 +38,38 @@ class VaultDecryptionTest {
         assertThrows(RuntimeException.class, () -> {
             decrypter.decrypt(ENCRYPTED_VAULT_STRING, "wrongpassword");
         }, "HMAC validation should fail and throw an exception");
+    }
+
+    @Test
+    void testDecryptionNullInputs() {
+        VaultDecrypter decrypter = new VaultDecrypter();
+        assertThrows(IllegalArgumentException.class, () -> decrypter.decrypt(null, PASSWORD));
+        assertThrows(IllegalArgumentException.class, () -> decrypter.decrypt(ENCRYPTED_VAULT_STRING, null));
+    }
+
+    @Test
+    void testDecryptionMissingHeader() {
+        VaultDecrypter decrypter = new VaultDecrypter();
+        String invalidVault = "NOT_A_VAULT_HEADER\n383861326666";
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> decrypter.decrypt(invalidVault, PASSWORD));
+        assertTrue(ex.getMessage().contains("missing $ANSIBLE_VAULT header"));
+    }
+
+    @Test
+    void testDecryptionInvalidPayloadFormat() {
+        VaultDecrypter decrypter = new VaultDecrypter();
+        // Encoded payload that only contains "salt\nhmac" (less than 3 newline-separated parts)
+        // "73616c740a686d6163" is hex for "salt\nhmac"
+        String invalidPayloadVault = "$ANSIBLE_VAULT;1.1;AES256\n73616c740a686d6163";
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> decrypter.decrypt(invalidPayloadVault, PASSWORD));
+        assertTrue(ex.getMessage().contains("expected salt, hmac, and ciphertext"));
+    }
+
+    @Test
+    void testDecryptionOddHexLength() {
+        VaultDecrypter decrypter = new VaultDecrypter();
+        String oddHexVault = "$ANSIBLE_VAULT;1.1;AES256\n12345";
+        assertThrows(IllegalArgumentException.class, () -> decrypter.decrypt(oddHexVault, PASSWORD));
     }
 
     @Test
