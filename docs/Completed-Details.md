@@ -369,6 +369,15 @@
     - `galaxy.yml` メタデータ解析と依存関係バリデーション仕様を明記。
     - GraalPy `sys.path` 注入および `ansible_collections` PEP 420 ネームスペースパッケージ初期化シーケンス、ならびに例外ハンドリングマッピングを定義。
 
+### 1.51 [✓] タスク実行エンジン（Worker Process）仕様の詳細化 [追加]
+- **完了日**: 2026-10-24
+- **概要**: `docs/implementation/Task-Executor.md` におけるモジュール引数検証 (`argument_spec`) エミュレーション、`TaskResult` フィールドマッピングマトリクス、`DefaultAsyncJobManager` 非同期ジョブ永続化構造、および `OMIT` センチネル再帰的クリーニング仕様を追加・詳細化。
+- **解決策**:
+    - `AnsibleModule` の `argument_spec` 型変換、必須属性チェック、デフォルト値挿入、および `validate_argument_spec` の検証データフローを明記。
+    - モジュール出力（JSON）から `TaskResult` への全フィールドマッピング優先順位マトリクスおよび `stdout_lines` / `stderr_lines` 自動生成ロジックを追加。
+    - `DefaultAsyncJobManager` の `ScheduledExecutorService` 二重タスク管理、`~/.ansible_async/` JSON ファイルフォーマット、および Mermaid シーケンス図を追加。
+    - `VariableManager.OMIT` センチネルの自動検出と再帰的クリーニングアルゴリズムを追加。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築
