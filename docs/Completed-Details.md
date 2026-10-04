@@ -488,3 +488,10 @@
     - `CI-Setting.md` の GitHub Actions ワークフロー構成説明およびコード例を `.github/workflows/build.yml` と完全同期。
     - `CLI-Specification.md` の各種設定テーブル（CLI オプション、become 変数、環境変数）の列幅を整頓。
     - `README.md` のモジュールステータス表記およびドキュメント一覧の整合性を再確認・統一。
+
+### 2.16 [✓] SSH 踏み台サーバー (Jump Host / Bastion) 仕様および実装詳細の最新情報整理 [整理]
+- **完了日**: 2026-10-24
+- **概要**: `docs/features/Ssh-Jump-Host-Support.md` および `docs/implementation/Ssh-Jump-Host-Support.md` において、多段（マルチホップ）踏み台接続（`bastion1,bastion2`）、`ProxyCommand` および `-J` フラグのパース、`SshConnection` 内での `ActiveBastion` ループ処理および確立時と逆順でのカスケード解放仕様を最新実装と完全同期・整理。
+- **解決策**:
+    - `docs/features/Ssh-Jump-Host-Support.md` において、多段 Jump Host 接続モデル（`List<BastionConfig>`）、`-J` / `ProxyCommand` 解析、および逆順での接続クローズ仕様を明記し、テーブルフォーマットを整理。
+    - `docs/implementation/Ssh-Jump-Host-Support.md` において、`SshJumpHostParser` の `ProxyJump` (カンマ区切り多段ホスト) / `ProxyCommand` 正規表現パターン、`SshConnection` の `ActiveBastion` カスケードトンネリングコード例、逆順リソース解放処理、およびエラー例外マッピングテーブルを最新化。
