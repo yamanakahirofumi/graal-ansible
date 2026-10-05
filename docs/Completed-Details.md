@@ -380,9 +380,9 @@
 
 ### 1.52 [✓] 組み込みおよび POSIX モジュールの機能網羅・check_mode 統合テストの拡充 [追加]
 - **完了日**: 2026-10-24
-- **概要**: `docs/tech/Test-Expansion-Strategy.md` Section 2.2 に基づき、`raw`, `get_url` (check_mode), `pip` (check_mode), `group` (check_mode), `lineinfile` (check_mode), `replace` (check_mode) モジュールの機能網羅およびドライラン検証テストを追加・統合。
+- **概要**: `docs/tech/Test-Expansion-Strategy.md` Section 2.2 に基づき、`raw`, `template` (check_mode), `pip` (check_mode), `group` (check_mode), `lineinfile` (check_mode), `replace` (check_mode) モジュールの機能網羅およびドライラン検証テストを追加・統合。
 - **解決策**:
-    - `BuiltinModulesIntegrationTest.java` にて `testRawModule` および `testGetUrlModuleCheckMode` を追加し、ローカルコマンド実行および file URI を用いたドライラン動作を検証。
+    - `BuiltinModulesIntegrationTest.java` にて `testRawModule` および `testTemplateModuleCheckMode` を追加し、ローカルコマンド実行およびテンプレート展開のドライラン動作を検証。
     - `PosixModulesIntegrationTest.java` にて `testPipModuleCheckMode`, `testGroupModuleCheckMode`, `testLineInFileModuleCheckMode`, `testReplaceModuleCheckMode` を追加し、POSIX 環境におけるチェックモード実行の安定性を検証。
 
 ## 2. 整理・調整済み (Refactored/Adjusted)
