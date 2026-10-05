@@ -419,4 +419,34 @@ class BuiltinModulesIntegrationTest {
         assertEquals(1, files.size());
     }
 
+    @Test
+    void testRawModule() {
+        Task task = new Task("Raw command", "raw", Map.of(
+                "_raw_params", "echo hello_raw_builtin"
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "raw module failed: " + result.message() + " Data: " + result.data());
+        String stdout = (String) result.data().get("stdout");
+        assertNotNull(stdout);
+        assertTrue(stdout.contains("hello_raw_builtin"));
+    }
+
+    @Test
+    void testGetUrlModuleCheckMode() throws IOException {
+        Path srcFile = tempDir.resolve("source_get_url.txt");
+        Files.writeString(srcFile, "get_url check content");
+        Path destFile = tempDir.resolve("downloaded_check_mode.txt");
+
+        Task task = new Task("Get URL check mode", "get_url", Map.of(
+                "url", srcFile.toUri().toString(),
+                "dest", destFile.toString()
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "get_url check mode failed: " + result.message() + " Data: " + result.data());
+        assertFalse(Files.exists(destFile), "Destination file should not be created in check mode");
+    }
+
 }
