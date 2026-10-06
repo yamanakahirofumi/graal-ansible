@@ -419,4 +419,37 @@ class BuiltinModulesIntegrationTest {
         assertEquals(1, files.size());
     }
 
+    @Test
+    void testRawModule() {
+        Task task = new Task("Raw command", "raw", Map.of(
+                "_raw_params", "echo hello_raw_builtin"
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "raw module failed: " + result.message() + " Data: " + result.data());
+        String stdout = (String) result.data().get("stdout");
+        assertNotNull(stdout);
+        assertTrue(stdout.contains("hello_raw_builtin"));
+    }
+
+    @Test
+    void testTemplateModuleCheckMode() throws IOException {
+        Path srcFile = tempDir.resolve("template_src.j2");
+        Files.writeString(srcFile, "Hello {{ user_name }}");
+        Path destFile = tempDir.resolve("template_dest.txt");
+
+        variableManager.addFacts("localhost", Map.of("user_name", "World"));
+
+        Task task = new Task("Template check mode", "template", Map.of(
+                "src", srcFile.toString(),
+                "dest", destFile.toString()
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "template check mode failed: " + result.message() + " Data: " + result.data());
+        assertTrue(result.changed(), "template check mode should report changed = true");
+        assertFalse(Files.exists(destFile), "Destination file should not be created in check mode");
+    }
+
 }

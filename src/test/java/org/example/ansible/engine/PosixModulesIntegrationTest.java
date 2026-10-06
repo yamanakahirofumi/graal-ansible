@@ -195,5 +195,68 @@ class PosixModulesIntegrationTest {
         }
     }
 
+    @Test
+    void testPipModuleCheckMode() {
+        Task task = new Task("Pip check mode", "pip", Map.of(
+                "name", "setuptools",
+                "state", "present"
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "pip check mode failed: " + result.message() + " Data: " + result.data());
+    }
+
+    @Test
+    void testGroupModuleCheckMode() {
+        Task task = new Task("Group module check mode", "group", Map.of(
+                "name", "root",
+                "state", "present"
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "group check mode failed: " + result.message() + " Data: " + result.data());
+        assertFalse(result.changed(), "group check mode for existing group should report changed = false");
+    }
+
+    @Test
+    void testLineInFileModuleCheckMode() throws IOException {
+        Path targetFile = tempDir.resolve("lineinfile_check.txt");
+        Files.writeString(targetFile, "line 1\nline 2\n");
+
+        Task task = new Task("Lineinfile check mode", "lineinfile", Map.of(
+                "path", targetFile.toString(),
+                "line", "line 3 added"
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "lineinfile check mode failed: " + result.message() + " Data: " + result.data());
+        assertTrue(result.changed(), "lineinfile check mode should report changed = true");
+        assertFalse(Files.readString(targetFile).contains("line 3 added"), "File should not be modified in check mode");
+    }
+
+    @Test
+    void testReplaceModuleCheckMode() throws IOException {
+        Path targetFile = tempDir.resolve("replace_check.txt");
+        Files.writeString(targetFile, "Hello World\n");
+
+        Task task = new Task("Replace check mode", "replace", Map.of(
+                "path", targetFile.toString(),
+                "regexp", "World",
+                "replace", "Ansible"
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "replace check mode failed: " + result.message() + " Data: " + result.data());
+        assertTrue(result.changed(), "replace check mode should report changed = true");
+        assertEquals("Hello World\n", Files.readString(targetFile), "File should not be modified in check mode");
+    }
 
 }
