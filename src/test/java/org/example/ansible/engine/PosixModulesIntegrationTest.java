@@ -259,4 +259,23 @@ class PosixModulesIntegrationTest {
         assertEquals("Hello World\n", Files.readString(targetFile), "File should not be modified in check mode");
     }
 
+    @Test
+    void testGetUrlModuleCheckMode() throws IOException {
+        Path srcFile = tempDir.resolve("get_url_src.txt");
+        Files.writeString(srcFile, "get_url content");
+
+        Path destFile = tempDir.resolve("get_url_dest.txt");
+        Task task = new Task("Get url check mode", "get_url", Map.of(
+                "url", srcFile.toUri().toString(),
+                "dest", destFile.toString()
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "get_url check mode failed: " + result.message() + " Data: " + result.data());
+        assertTrue(result.changed(), "get_url check mode should report changed = true");
+        assertFalse(Files.exists(destFile), "Destination file should not be created in check mode");
+    }
+
 }
