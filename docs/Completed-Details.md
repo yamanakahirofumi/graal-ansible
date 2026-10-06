@@ -385,6 +385,16 @@
     - `BuiltinModulesIntegrationTest.java` にて `testRawModule` および `testTemplateModuleCheckMode` を追加し、ローカルコマンド実行およびテンプレート展開のドライラン動作を検証。
     - `PosixModulesIntegrationTest.java` にて `testPipModuleCheckMode`, `testGroupModuleCheckMode`, `testLineInFileModuleCheckMode`, `testReplaceModuleCheckMode` を追加し、POSIX 環境におけるチェックモード実行の安定性を検証。
 
+### 1.53 [✓] ロギング方針仕様の詳細化 [追加]
+- **完了日**: 2026-10-24
+- **概要**: `docs/tech/Logging-Policy.md` におけるロギング仕様・初期化定型句・JUL ログレベルと Ansible 冗長性オプション (`-v`) のマッピング・フォーマットパターン・GraalPy Python ログブリッジ・例外ログ規約・スレッドセーフおよびパフォーマンス最適化を拡張・詳細化。
+- **解決策**:
+    - `Logger` 初期化の定型句 (`private static final Logger LOGGER`) および名前付け規則を明記。
+    - CLI Verbosity フラグ (`-v`, `-vv`, `-vvv`, `-vvvv`) と Java `Level` (`INFO`, `FINE`, `FINER`, `FINEST`) のマッピングマトリクスを追加。
+    - `ConsoleHandler` および `ANSIBLE_LOG_PATH` による `FileHandler` / `SimpleFormatter` フォーマットパターンを明記。
+    - GraalPy Python `logging` モジュールから Java JUL への `JavaJULHandler` ブリッジ構成を追加。
+    - 例外スタックトレース出力規約および `isLoggable` ガードによるパフォーマンス最適化ルールを追加。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築
