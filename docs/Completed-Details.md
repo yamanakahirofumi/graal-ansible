@@ -385,6 +385,14 @@
     - `BuiltinModulesIntegrationTest.java` にて `testRawModule` および `testTemplateModuleCheckMode` を追加し、ローカルコマンド実行およびテンプレート展開のドライラン動作を検証。
     - `PosixModulesIntegrationTest.java` にて `testPipModuleCheckMode`, `testGroupModuleCheckMode`, `testLineInFileModuleCheckMode`, `testReplaceModuleCheckMode` を追加し、POSIX 環境におけるチェックモード実行の安定性を検証。
 
+### 1.53 [✓] VariableResolver 変数テンプレート評価・FQCN フィルターエイリアス・評価 API 仕様の詳細化 [追加]
+- **完了日**: 2026-10-24
+- **概要**: `docs/implementation/Variables-Templating.md` における生データ型保持評価 (Raw Type Preservation), FQCN フィルターエイリアス解決メカニズム, および `VariableResolver` 評価ヘルパー API 仕様を追加・詳細化。
+- **解決策**:
+    - `doResolveString` における単一 `{{ expr }}` 式検出とナノ秒一時変数 (`__ansible_temp_var_<nanos>`) 注入による Java 生データ型 (`Map`, `List`, `Boolean`, `Integer`) 保持メカニズムを追加。
+    - `FqcnFilterWrapper` によるマルチネーム自動登録 (`ansible.builtin.<filter>`, `ansible_builtin_<filter>`, `ansible.utils.ipaddr`) および `preprocessFqcnFilters` 正規表現前処理パイプライン仕様を追加。
+    - `VariableResolver` の各種評価ヘルパー API (`isWhenConditionMet`, `resolveBecomeContext`, `resolveEnvironment`, `resolveLoopItems`, `resolveCheckMode`, `resolveAnyErrorsFatal`, `resolveThrottle`) の一覧および仕様定義テーブルを追加。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築
