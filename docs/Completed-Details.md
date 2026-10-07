@@ -385,6 +385,13 @@
     - `BuiltinModulesIntegrationTest.java` にて `testRawModule` および `testTemplateModuleCheckMode` を追加し、ローカルコマンド実行およびテンプレート展開のドライラン動作を検証。
     - `PosixModulesIntegrationTest.java` にて `testPipModuleCheckMode`, `testGroupModuleCheckMode`, `testLineInFileModuleCheckMode`, `testReplaceModuleCheckMode` を追加し、POSIX 環境におけるチェックモード実行の安定性を検証。
 
+### 1.53 [✓] ブロック失敗時の自動変数注入 (ansible_failed_task / ansible_failed_result) の実装とテスト拡充 [追加]
+- **完了日**: 2026-10-24
+- **概要**: `docs/implementation/Task-Control.md` Section 5 に基づき、`block` 内のタスク失敗時に `ansible_failed_task` および `ansible_failed_result` 特殊変数を自動注入し、`rescue` および `always` ブロックから動的参照可能な機能を実装・テスト化。
+- **解決策**:
+    - `TaskQueueManager.java` の `executeBlock` において、`block` 内のタスク失敗時に失敗タスクメタデータ（`name`, `action`）および実行結果データ（`msg`, `failed`, `changed` 等）を抽出し、`combinedBlockVars` 内へ `ansible_failed_task` および `ansible_failed_result` として登録。
+    - `TaskControlAdvancedTest.java` にて `testAnsibleFailedTaskAndResultInjectionInRescue` 統合テストを追加し、`rescue` ブロックから Jinja2 テンプレート経由で失敗タスク名・アクション名・エラーメッセージが正確に解決・評価されることを検証。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築

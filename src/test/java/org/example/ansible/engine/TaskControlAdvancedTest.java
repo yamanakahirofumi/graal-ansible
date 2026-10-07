@@ -342,4 +342,32 @@ class TaskControlAdvancedTest {
         assertTrue(maxConcurrentExecutions.get() <= 2, "Max concurrent executions was " + maxConcurrentExecutions.get() + ", expected <= 2");
         assertTrue(maxConcurrentExecutions.get() > 0);
     }
+
+    @Test
+    void testAnsibleFailedTaskAndResultInjectionInRescue() {
+        Task failTask = new Task("critical operation", "fail_module", Map.of());
+        Task rescueTask = new Task(
+                "log failure",
+                "debug",
+                Map.of("msg", "Failed task '{{ ansible_failed_task.name }}' (action: {{ ansible_failed_task.action }}) with error: {{ ansible_failed_result.msg }}")
+        );
+
+        Task block = new Task("transaction block", null, Map.of(), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(failTask), List.of(rescueTask), List.of(),
+                null, null, null, null, null, null);
+
+        Play play = new Play("Ansible Failed Task Test Play", "all", List.of(block));
+        Map<String, List<TaskResult>> results = new HashMap<>();
+
+        tqm.executePlay(play, inventory, vm, results, false);
+
+        List<TaskResult> hostResults = results.get("localhost");
+        assertEquals(2, hostResults.size(), "Block failed task and rescue task should be in results");
+        assertFalse(hostResults.get(0).success(), "First task should fail");
+        assertTrue(hostResults.get(1).success(), "Rescue task should succeed");
+        assertEquals(
+                "Failed task 'critical operation' (action: fail_module) with error: Intentional failure",
+                hostResults.get(1).data().get("msg")
+        );
+    }
 }
