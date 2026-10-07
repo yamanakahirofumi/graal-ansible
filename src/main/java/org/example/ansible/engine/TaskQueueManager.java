@@ -386,6 +386,9 @@ public class TaskQueueManager {
         if (inheritedBlockVars != null) combinedBlockVars.putAll(inheritedBlockVars);
         combinedBlockVars.putAll(blockTask.vars());
 
+        Task failedTask = null;
+        TaskResult failedResult = null;
+
         for (Task task : blockTask.block()) {
             if (this.playFatalError) break;
             if (blockFailedHosts.contains(host.name())) {
@@ -396,7 +399,17 @@ public class TaskQueueManager {
                 results.computeIfAbsent(host.name(), k -> new ArrayList<>()).add(TaskResult.skipped("Skipped due to tags"));
                 continue;
             }
+            int initialCount = results.getOrDefault(host.name(), List.of()).size();
             executeTaskOnHost(play, host, task, variableManager, results, blockFailedHosts, hostNotifications, blockCheckMode, effectiveBlockEnvs, combinedBlockVars, activeRoles, includeParams, connection, runTags, skipTags);
+            if (blockFailedHosts.contains(host.name())) {
+                blockFailed = true;
+                failedTask = task;
+                List<TaskResult> hostResultsList = results.get(host.name());
+                if (hostResultsList != null && hostResultsList.size() > initialCount) {
+                    failedResult = hostResultsList.get(hostResultsList.size() - 1);
+                }
+                break;
+            }
         }
 
         if (blockFailedHosts.contains(host.name())) {
@@ -404,6 +417,25 @@ public class TaskQueueManager {
         }
 
         if (blockFailed) {
+            if (failedTask != null) {
+                Map<String, Object> taskInfo = new HashMap<>();
+                taskInfo.put("name", failedTask.name());
+                taskInfo.put("action", failedTask.action());
+                combinedBlockVars.put("ansible_failed_task", taskInfo);
+            }
+            if (failedResult != null) {
+                Map<String, Object> resultInfo = new HashMap<>();
+                if (failedResult.data() != null) {
+                    resultInfo.putAll(failedResult.data());
+                }
+                resultInfo.put("failed", !failedResult.success());
+                resultInfo.put("changed", failedResult.changed());
+                if (failedResult.message() != null) {
+                    resultInfo.put("msg", failedResult.message());
+                }
+                combinedBlockVars.put("ansible_failed_result", resultInfo);
+            }
+
             for (Task task : blockTask.rescue()) {
                 if (this.playFatalError) break;
                 if (!isTaskToBeExecuted(task, runTags, skipTags)) {
