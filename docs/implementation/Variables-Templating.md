@@ -67,6 +67,10 @@ Ansible と同様に、変数は定義時ではなく、実際に使用される
 - **再帰的解決 (Recursive Resolution)**:
     - 文字列テンプレートの結果がさらに別のテンプレートを含む場合（例: `var_a: "{{ var_b }}"`, `var_b: "Hello {{ user }}"`）、`VariableResolver` は最終的な値が得られるまで再帰的に評価を継続します。
     - 無限ループを防止するため、デフォルトで**最大 20 段階**までの再帰深度制限を設けています。
+- **生データ型保持評価 (Raw Type Preservation)**:
+    - 式全体が単一の Jinja2 式（例: `"{{ my_dict }}"` または `"{{ my_list }}"`）で構成されている場合、文字列として展開・レンダリングされると Java の型情報（Map や List）が消失します。
+    - `VariableResolver.doResolveString` では、文字列トリム後に単一の `{{ expr }}` 式であるかを検出し、Jinjava コンテキスト内にナノ秒タイムスタンプ付きの受渡し用一時変数（`__ansible_temp_var_<nanos>`）を挿入して `{% set __ansible_temp_var = expr %}` を実行します。
+    - これにより、評価後の Java オブジェクト（`Map`, `List`, `Boolean`, `Integer` 等）を元の型情報のまま直接取得・保持します。
 
 ## 4. 独自フィルターとテストの拡張
 
@@ -550,7 +554,21 @@ Base64 エンコードされた文字列を UTF-8 テキスト文字列にデコ
     {# 返り値: [1, 2, 5, 6] #}
     ```
 
-### 4.4 独自フィルターの追加手順
+### 4.5 FQCN フィルターエイリアス解決メカニズム (FQCN Filter Aliases)
+
+Ansible コレクションで用いられる FQCN (Fully Qualified Collection Name) 形式のフィルター指定（例: `ansible.builtin.default`, `ansible.builtin.b64encode`, `ansible.utils.ipaddr`）を Java テンプレートエンジン上で透過的に解決するメカニズムを提供します。
+
+#### 1. FqcnFilterWrapper によるマルチネーム登録
+- `VariableResolver.registerFilter` において、カスタムフィルター（例: `default`）の登録時に `FqcnFilterWrapper` ラッパーを介して以下のエイリアス名を自動登録します：
+  - `ansible.builtin.<filter_name>` (例: `ansible.builtin.default`)
+  - `ansible_builtin_<filter_name>` (例: `ansible_builtin_default`)
+  - `ipaddr` フィルターの場合は `ansible.utils.ipaddr` および `ansible_utils_ipaddr` も追加登録。
+
+#### 2. ドット区切りフィルター構文の前処理 (`preprocessFqcnFilters`)
+- Jinjava のパーサー構文制限（ドット区切りのフィルター名がオブジェクトプロパティ参照と誤認される問題）を回避するため、`VariableResolver` はテンプレート評価直前に正規表現パターン `\|\\s*([a-zA-Z0-9_]+)\.([a-zA-Z0-9_]+)\.([a-zA-Z0-9_]+)` による前処理パイプラインを実施します。
+- パイプラインにより、`| ansible.builtin.b64encode` は `| ansible_builtin_b64encode` へ内部変換された上で評価され、`FqcnFilterWrapper` 経由で元の Java フィルター実装クラスへ安全に委譲されます。
+
+### 4.6 独自フィルターの追加手順
 
 新しい Jinja2 フィルターを Java で実装してエンジンに追加する手順は以下の通りです。
 
@@ -954,3 +972,17 @@ Playbook の `Play` レコード内で定義された外部 YAML / JSON 変数�
       file: "vars/db_credentials.yml"
       name: "db_config"
   ```
+
+## 9. VariableResolver 評価ヘルパー API (VariableResolver Helper APIs)
+
+`VariableResolver` は、タスク制御・実行条件・権限昇格・環境変数の解決を行うための各種ヘルパー API を提供します。
+
+| メソッド名 | 引数 | 返り値 | 説明 |
+| :--- | :--- | :--- | :--- |
+| `isWhenConditionMet` | `Object when, Map<String, Object> variables` | `boolean` | `when` 条件（単一文字列またはリスト）を展開・評価し、`Truthiness.isTrue` に基づき条件を満たしているかを判定。 |
+| `resolveBecomeContext` | `Play play, Task task, Map<String, Object> variables` | `BecomeContext` | Play/Task/Variables の階層から `become`, `become_method`, `become_user`, `become_flags`, `become_password` を順次解決し、`BecomeContext` レコードを構築。 |
+| `resolveEnvironment` | `Play play, Task task, Map<String, Object> variables, List<Object> inheritedEnvironments` | `Map<String, String>` | Play/Task/継承スコープの `environment` 辞書をマージ・テンプレート展開し、環境変数マップを返却。 |
+| `resolveLoopItems` | `Object loop, Map<String, Object> variables` | `List<?>` | `loop` 式（リスト、テンプレート文字列、フィルタパイプライン）を展開し、ループ対象アイテムリストを抽出。 |
+| `resolveCheckMode` | `Object checkMode, Map<String, Object> variables, boolean inheritedValue` | `boolean` | `check_mode` の設定（テンプレート含む）を評価し、親スコープからの継承値を考慮してブール値を決定。 |
+| `resolveAnyErrorsFatal` | `Object anyErrorsFatal, Map<String, Object> variables, boolean inheritedValue` | `boolean` | `any_errors_fatal` 設定を評価・解決。 |
+| `resolveThrottle` | `Object throttle, Map<String, Object> variables, Integer inheritedValue` | `Integer` | `throttle` （数値またはテンプレート）を評価し、同時実行可能ホスト制限数を算出。 |
