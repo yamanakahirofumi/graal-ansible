@@ -385,6 +385,16 @@
     - `BuiltinModulesIntegrationTest.java` にて `testRawModule` および `testTemplateModuleCheckMode` を追加し、ローカルコマンド実行およびテンプレート展開のドライラン動作を検証。
     - `PosixModulesIntegrationTest.java` にて `testPipModuleCheckMode`, `testGroupModuleCheckMode`, `testLineInFileModuleCheckMode`, `testReplaceModuleCheckMode` を追加し、POSIX 環境におけるチェックモード実行の安定性を検証。
 
+### 1.53 [✓] CLI 仕様ドキュメントの詳細化と実装同期 [追加]
+- **完了日**: 2026-10-24
+- **概要**: `docs/features/CLI-Specification.md` における CLI オプション・エクストラ変数解釈・Vault パスワード解決・昇格プロンプト・コールバックプラグイン選択および終了コードマッピング仕様を詳細化・拡張。
+- **解決策**:
+    - `PlaybookCli.java` に実装されている Picocli オプション一覧テーブルの記述・デフォルト値を追記・拡張。
+    - エクストラ変数 (`--extra-vars` / `-e`) のパースロジック（`@file`, `{...}`, `key=value`, SnakeYAML フォールバック）を明記。
+    - Vault パスワード解決優先順位 (`--vault-password-file` > `--vault-id` > `ANSIBLE_VAULT_PASSWORD_FILE`) および `prompt` キーワードの対話型入力を明記。
+    - 昇格プロンプト (`-K` / `--ask-become-pass`) の対話型処理およびコンソール未検出時の例外ハンドリングを明記。
+    - `CallbackFactory` による stdout コールバック選択優先順位および CLI 終了コード (`0`, `1`, `2`, `4`) と `ExecutionReport` 統合を明記。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築
