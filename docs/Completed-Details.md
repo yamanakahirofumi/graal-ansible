@@ -385,6 +385,16 @@
     - `BuiltinModulesIntegrationTest.java` にて `testRawModule` および `testTemplateModuleCheckMode` を追加し、ローカルコマンド実行およびテンプレート展開のドライラン動作を検証。
     - `PosixModulesIntegrationTest.java` にて `testPipModuleCheckMode`, `testGroupModuleCheckMode`, `testLineInFileModuleCheckMode`, `testReplaceModuleCheckMode` を追加し、POSIX 環境におけるチェックモード実行の安定性を検証。
 
+### 1.53 [✓] 強制ハンドラー実行 (force_handlers) 機能の実装とテスト拡充 [追加]
+- **完了日**: 2026-10-24
+- **概要**: `docs/implementation/Task-Control.md` Section 4 および `docs/features/Playbook-Execution.md` Section 2.14 に基づき、Play レベルおよび CLI オプション（`--force-handlers`）指定時の強制ハンドラー実行機能を実装。
+- **解決策**:
+    - `Play.java` レコードへ `forceHandlers` フィールドを追加し、`YamlParser.java` にて `force_handlers` のパースを統合。
+    - `PlaybookCli.java` へ `--force-handlers` CLI オプションを追加し、`ansible_force_handlers` 変数として伝播。
+    - `VariableResolver.java` にて `resolveForceHandlers` を追加し、ブール値および Jinja2 テンプレートの評価をサポート。
+    - `TaskQueueManager.java`, `LinearStrategy.java`, `FreeStrategy.java` のハンドラーフラッシュ処理において、`force_handlers` 有効時に失敗ホストに対しても通知済みハンドラーの実行をスキップせずフラッシュする処理を実装。
+    - `TaskControlTest.java` および `PlaybookCliTest.java` にて `force_handlers` の無効/有効/テンプレート評価/CLIオプション指定時の動作を検証する単体・統合テストを追加。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築

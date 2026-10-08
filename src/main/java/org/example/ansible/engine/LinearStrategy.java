@@ -94,10 +94,11 @@ public class LinearStrategy implements Strategy {
     private void flushHandlers(Play play, List<Host> batch, TaskQueueManager tqm, VariableManager variableManager, Map<String, List<TaskResult>> results, Set<String> failedHosts, Map<String, Set<String>> hostNotifications, boolean globalCheckMode, List<String> runTags, List<String> skipTags) {
         if (!tqm.isPlayFatalError()) {
             for (Host host : batch) {
-                if (failedHosts.contains(host.name())) {
+                Map<String, Object> vars = variableManager.getAllVariables(play, host, null, null, (List<Role>) null, null);
+                boolean isForceHandlers = tqm.getVariableResolver().resolveForceHandlers(play.forceHandlers(), vars);
+                if (failedHosts.contains(host.name()) && !isForceHandlers) {
                     continue;
                 }
-                Map<String, Object> vars = variableManager.getAllVariables(play, host, null, null, (List<Role>) null, null);
                 boolean playCheckMode = tqm.getVariableResolver().resolveCheckMode(play.checkMode(), vars, globalCheckMode);
                 try {
                     Connection connection = tqm.getOrCreateConnection(host, vars);
