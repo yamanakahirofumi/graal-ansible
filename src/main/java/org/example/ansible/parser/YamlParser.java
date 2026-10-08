@@ -109,7 +109,8 @@ public class YamlParser {
                                     play.strategy(),
                                     play.serial(),
                                     play.throttle(),
-                                    play.maxFailPercentage()
+                                    play.maxFailPercentage(),
+                                    play.forceHandlers()
                             );
                         }
                         plays.add(play);
@@ -261,8 +262,9 @@ public class YamlParser {
         Object serial = map.get("serial");
         Object throttle = map.get("throttle");
         Object maxFailPercentage = map.get("max_fail_percentage");
+        Object forceHandlers = map.get("force_handlers");
 
-        return new Play(name, hosts, tasks, vars, varsFiles, varsPrompt, roles, handlers, preTasks, postTasks, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, playTags, anyErrorsFatal, strategy, serial, throttle, maxFailPercentage);
+        return new Play(name, hosts, tasks, vars, varsFiles, varsPrompt, roles, handlers, preTasks, postTasks, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, playTags, anyErrorsFatal, strategy, serial, throttle, maxFailPercentage, forceHandlers);
     }
 
     @SuppressWarnings("unchecked")
