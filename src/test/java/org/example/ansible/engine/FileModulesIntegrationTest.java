@@ -479,4 +479,5 @@ class FileModulesIntegrationTest {
         assertTrue(result.changed());
         assertTrue(Files.readString(targetFile).contains("setting=on"));
     }
+
 }
