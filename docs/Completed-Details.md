@@ -385,6 +385,15 @@
     - `BuiltinModulesIntegrationTest.java` にて `testRawModule` および `testTemplateModuleCheckMode` を追加し、ローカルコマンド実行およびテンプレート展開のドライラン動作を検証。
     - `PosixModulesIntegrationTest.java` にて `testPipModuleCheckMode`, `testGroupModuleCheckMode`, `testLineInFileModuleCheckMode`, `testReplaceModuleCheckMode` を追加し、POSIX 環境におけるチェックモード実行の安定性を検証。
 
+### 1.53 [✓] YAML解析エンジン (YamlParser) 仕様の詳細化 [追加]
+- **完了日**: 2026-10-24
+- **概要**: `docs/implementation/YAML-Parser.md` における単独タスクリスト YAML 解析 API (`parseTasks`), キーワードの正規化処理規則 (`notify`, `listen`, `tags`), および Record オブジェクト属性のマッピングマトリクスとデフォルト値設定ルールを詳細化。
+- **解決策**:
+    - 単独タスクリストパース `parseTasks(InputStream, List<String> inheritedTags)` の動作および親タグ継承メカニズムを明記。
+    - `notify` / `listen` 単一文字列から `List<String>` への変換および空リスト生成規則を明記。
+    - `tags` (`parseTags`) のプリミティブ型 `toString()` 標準化ルールを追加。
+    - `Play` Record (name, strategy, serial, throttle, max_fail_percentage 等) および `Task` Record (async, poll, retries, delay, ignore_errors 等) の属性マッピングとデフォルト値指定テーブルを追加。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築
