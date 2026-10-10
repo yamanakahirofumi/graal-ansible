@@ -394,6 +394,14 @@
     - `VariableResolver.java` にて `resolveForceHandlers` を追加し、ブール値および Jinja2 テンプレートの評価をサポート。
     - `TaskQueueManager.java`, `LinearStrategy.java`, `FreeStrategy.java` のハンドラーフラッシュ処理において、`force_handlers` 有効時に失敗ホストに対しても通知済みハンドラーの実行をスキップせずフラッシュする処理を実装。
     - `TaskControlTest.java` および `PlaybookCliTest.java` にて `force_handlers` の無効/有効/テンプレート評価/CLIオプション指定時の動作を検証する単体・統合テストを追加。
+### 1.53 [✓] YAML解析エンジン (YamlParser) 仕様の詳細化 [追加]
+- **完了日**: 2026-10-24
+- **概要**: `docs/implementation/YAML-Parser.md` における単独タスクリスト YAML 解析 API (`parseTasks`), キーワードの正規化処理規則 (`notify`, `listen`, `tags`), および Record オブジェクト属性のマッピングマトリクスとデフォルト値設定ルールを詳細化。
+- **解決策**:
+    - 単独タスクリストパース `parseTasks(InputStream, List<String> inheritedTags)` の動作および親タグ継承メカニズムを明記。
+    - `notify` / `listen` 単一文字列から `List<String>` への変換および空リスト生成規則を明記。
+    - `tags` (`parseTags`) のプリミティブ型 `toString()` 標準化ルールを追加。
+    - `Play` Record (name, strategy, serial, throttle, max_fail_percentage 等) および `Task` Record (async, poll, retries, delay, ignore_errors 等) の属性マッピングとデフォルト値指定テーブルを追加。
 
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
