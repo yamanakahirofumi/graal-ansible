@@ -120,3 +120,44 @@ Ansible 特有のカスタム YAML タグおよび未知タグを安全に処理
     - `scalar` Node -> `Tag.STR` (文字列)
     - `sequence` Node -> `Tag.SEQ` (リスト)
     - `mapping` Node -> `Tag.MAP` (マップ)
+
+## 12. 単独タスクリスト YAML の解析 (`parseTasks` / `parseTaskList`)
+
+Playbook 全体ではなく、外部タスクファイル（ロール内の `tasks/main.yml` や `include_tasks` / `import_tasks` で読み込まれるタスクファイル）を個別にパースするための API 仕様です。
+
+- **`parseTasks(InputStream, List<String> inheritedTags)`**:
+  - 入力ストリームから YAML データを読み込み、最上位がリスト構造（`List<Map<String, Object>>`）であるとみなして走査します。
+  - 親コンテキスト（Play または呼び出し元タスク）から渡された `inheritedTags` を各タスクへ伝播させ、`parseTask` を適用して `List<Task>` オブジェクトとして出力します。
+
+## 13. 属性マッピングおよびデータ正規化ルール (Attribute Mapping & Normalization)
+
+YAML ファイルから `Play` および `Task` Record オブジェクトを構築する際のデータ正規化およびデフォルト値設定ルールです。
+
+### 13.1 キーワードの自動正規化ルール
+
+- **`notify` / `listen` 正規化**:
+  - 入力値が単一文字列 (`String`) の場合: 要素数 1 のリスト `[str]` へ自動変換。
+  - 入力値がリスト (`List<?>`) の場合: 文字列要素のみを抽出して `List<String>` を構成。
+  - 未指定 (`null`) の場合: 空リスト `List.of()` を格納。
+- **`tags` 正規化 (`parseTags`)**:
+  - 単一文字列またはリストで指定可能。数値や真偽値などのプリミティブ型が指定された場合は `toString()` を呼び出して `List<String>` へ標準化。
+
+### 13.2 Record 構成フィールドとデフォルト値一覧
+
+| 対象 | キー | デフォルト値 | 型・変換ルール |
+| :--- | :--- | :--- | :--- |
+| **Play** | `name` | `"Unnamed Play"` | `String` |
+| | `hosts` | `null` | `String` |
+| | `strategy` | `"linear"` | `String` |
+| | `serial` | `null` | `Object` (Integer, String, または List) |
+| | `throttle` | `null` | `Object` (Integer または テンプレート String) |
+| | `max_fail_percentage` | `null` | `Object` (Integer, Float, または テンプレート String) |
+| **Task** | `name` | `"Unnamed Task"` | `String` |
+| | `async` | `0` | `Integer` |
+| | `poll` | `10` | `Integer` |
+| | `retries` | `3` | `Integer` |
+| | `delay` | `5` | `Integer` |
+| | `ignore_errors` | `false` | `Boolean` (`Boolean.TRUE.equals`) |
+| | `ignore_unreachable` | `false` | `Boolean` (`Boolean.TRUE.equals`) |
+| | `delegate_facts` | `false` | `Boolean` (`Boolean.TRUE.equals`) |
+| | `run_once` | `false` | `Boolean` (`Boolean.TRUE.equals`) |
