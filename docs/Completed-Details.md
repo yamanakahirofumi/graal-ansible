@@ -394,6 +394,15 @@
     - `tags` (`parseTags`) のプリミティブ型 `toString()` 標準化ルールを追加。
     - `Play` Record (name, strategy, serial, throttle, max_fail_percentage 等) および `Task` Record (async, poll, retries, delay, ignore_errors 等) の属性マッピングとデフォルト値指定テーブルを追加。
 
+### 1.54 [✓] 単一ネイティブバイナリ構築・配布仕様の詳細化 [追加]
+- **完了日**: 2026-10-24
+- **概要**: `docs/tech/Distribution-Method.md` における GraalVM Native Image による単一ネイティブバイナリパッケージ構築・配布仕様、OS別アセット命名規則、リリースアーカイブ構成、GitHub Releases 自動化リリースパイプライン、チェックサム検証、および動作確認仕様を追加・詳細化。
+- **解決策**:
+    - OS/アーキテクチャ別ネイティブバイナリ名およびアーカイブファイル名 (`graal-ansible-v<version>-<os>-<arch>.tar.gz` / `.zip`) 命名テーブルを追加。
+    - リリースアーカイブ内の内部ファイル構成レイアウト（バイナリ、`ansible.cfg.example`、`LICENSE`、`README.md`、`VERSION`）を定義。
+    - GitHub Actions による Tag トリガーからのビルド、マトリックスコンパイル、`SHA256SUMS` チェックサム作成、および Draft/Release 自動作成パイプライン仕様を明記。
+    - 配布パッケージのスタンドアロン動作確認手順および `SHA256SUMS` 検証コマンドを定義。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築
