@@ -365,6 +365,24 @@ public class VariableResolver {
     }
 
     /**
+     * Resolves force_handlers status.
+     *
+     * @param forceHandlers The force_handlers setting from play.
+     * @param variables     The variable map.
+     * @return Resolved force_handlers status.
+     */
+    public boolean resolveForceHandlers(Object forceHandlers, Map<String, Object> variables) {
+        if (forceHandlers != null) {
+            Object resolved = resolveValue(forceHandlers, variables);
+            return Truthiness.isTrue(resolved);
+        }
+        if (variables != null && variables.containsKey("ansible_force_handlers")) {
+            return Truthiness.isTrue(resolveValue(variables.get("ansible_force_handlers"), variables));
+        }
+        return false;
+    }
+
+    /**
      * Resolves check mode status.
      *
      * @param checkMode      The check_mode setting.
