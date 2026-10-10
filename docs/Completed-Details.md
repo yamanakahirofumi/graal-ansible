@@ -392,6 +392,32 @@
     - `doResolveString` における単一 `{{ expr }}` 式検出とナノ秒一時変数 (`__ansible_temp_var_<nanos>`) 注入による Java 生データ型 (`Map`, `List`, `Boolean`, `Integer`) 保持メカニズムを追加。
     - `FqcnFilterWrapper` によるマルチネーム自動登録 (`ansible.builtin.<filter>`, `ansible_builtin_<filter>`, `ansible.utils.ipaddr`) および `preprocessFqcnFilters` 正規表現前処理パイプライン仕様を追加。
     - `VariableResolver` の各種評価ヘルパー API (`isWhenConditionMet`, `resolveBecomeContext`, `resolveEnvironment`, `resolveLoopItems`, `resolveCheckMode`, `resolveAnyErrorsFatal`, `resolveThrottle`) の一覧および仕様定義テーブルを追加。
+### 1.53 [✓] 強制ハンドラー実行 (force_handlers) 機能の実装とテスト拡充 [追加]
+- **完了日**: 2026-10-24
+- **概要**: `docs/implementation/Task-Control.md` Section 4 および `docs/features/Playbook-Execution.md` Section 2.14 に基づき、Play レベルおよび CLI オプション（`--force-handlers`）指定時の強制ハンドラー実行機能を実装。
+- **解決策**:
+    - `Play.java` レコードへ `forceHandlers` フィールドを追加し、`YamlParser.java` にて `force_handlers` のパースを統合。
+    - `PlaybookCli.java` へ `--force-handlers` CLI オプションを追加し、`ansible_force_handlers` 変数として伝播。
+    - `VariableResolver.java` にて `resolveForceHandlers` を追加し、ブール値および Jinja2 テンプレートの評価をサポート。
+    - `TaskQueueManager.java`, `LinearStrategy.java`, `FreeStrategy.java` のハンドラーフラッシュ処理において、`force_handlers` 有効時に失敗ホストに対しても通知済みハンドラーの実行をスキップせずフラッシュする処理を実装。
+    - `TaskControlTest.java` および `PlaybookCliTest.java` にて `force_handlers` の無効/有効/テンプレート評価/CLIオプション指定時の動作を検証する単体・統合テストを追加。
+### 1.53 [✓] YAML解析エンジン (YamlParser) 仕様の詳細化 [追加]
+- **完了日**: 2026-10-24
+- **概要**: `docs/implementation/YAML-Parser.md` における単独タスクリスト YAML 解析 API (`parseTasks`), キーワードの正規化処理規則 (`notify`, `listen`, `tags`), および Record オブジェクト属性のマッピングマトリクスとデフォルト値設定ルールを詳細化。
+- **解決策**:
+    - 単独タスクリストパース `parseTasks(InputStream, List<String> inheritedTags)` の動作および親タグ継承メカニズムを明記。
+    - `notify` / `listen` 単一文字列から `List<String>` への変換および空リスト生成規則を明記。
+    - `tags` (`parseTags`) のプリミティブ型 `toString()` 標準化ルールを追加。
+    - `Play` Record (name, strategy, serial, throttle, max_fail_percentage 等) および `Task` Record (async, poll, retries, delay, ignore_errors 等) の属性マッピングとデフォルト値指定テーブルを追加。
+
+### 1.54 [✓] 単一ネイティブバイナリ構築・配布仕様の詳細化 [追加]
+- **完了日**: 2026-10-24
+- **概要**: `docs/tech/Distribution-Method.md` における GraalVM Native Image による単一ネイティブバイナリパッケージ構築・配布仕様、OS別アセット命名規則、リリースアーカイブ構成、GitHub Releases 自動化リリースパイプライン、チェックサム検証、および動作確認仕様を追加・詳細化。
+- **解決策**:
+    - OS/アーキテクチャ別ネイティブバイナリ名およびアーカイブファイル名 (`graal-ansible-v<version>-<os>-<arch>.tar.gz` / `.zip`) 命名テーブルを追加。
+    - リリースアーカイブ内の内部ファイル構成レイアウト（バイナリ、`ansible.cfg.example`、`LICENSE`、`README.md`、`VERSION`）を定義。
+    - GitHub Actions による Tag トリガーからのビルド、マトリックスコンパイル、`SHA256SUMS` チェックサム作成、および Draft/Release 自動作成パイプライン仕様を明記。
+    - 配布パッケージのスタンドアロン動作確認手順および `SHA256SUMS` 検証コマンドを定義。
 
 ## 2. 整理・調整済み (Refactored/Adjusted)
 

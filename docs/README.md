@@ -53,7 +53,7 @@
 - [テストケース拡充戦略](tech/Test-Expansion-Strategy.md)：フェーズ 1 におけるテストの網羅性向上計画
 - [テストルール](tech/Test-Rule.md)：テストケース作成の一般的なガイドライン
 - [品質方針](tech/Quality-Policy.md)：フェーズ（仕様未確定/確定）に応じた品質の考え方と到達目標
-- [配布方法](tech/Distribution-Method.md)：カスタム JRE による配布パッケージの作成について
+- [ビルド・配布方法](tech/Distribution-Method.md)：GraalVM Native Image による単一ネイティブバイナリの構築・配布仕様
 - [コーディング規約](tech/Coding-Convention.md)：クラス作成基準（record, final の使用等）について
 - [仕様書の書き方ルール](tech/Specification-Rule.md)：本プロジェクトにおけるドキュメント作成基準
 - [TODOリストの書き方ルール](tech/TODO-Rule.md)：検討事項の追加・更新ルール

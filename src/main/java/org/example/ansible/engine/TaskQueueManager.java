@@ -195,7 +195,9 @@ public class TaskQueueManager {
                     }
 
                     if (isNotified && allExecutedHandlers.add(handler)) {
-                        if (failedHosts.contains(host.name())) continue;
+                        Map<String, Object> vars = variableManager.getAllVariables(play, host, handler, null, (List<Role>) null, null);
+                        boolean isForceHandlers = variableResolver.resolveForceHandlers(play.forceHandlers(), vars);
+                        if (failedHosts.contains(host.name()) && !isForceHandlers) continue;
                         if (!isTaskToBeExecuted(handler, runTags, skipTags)) continue;
                         callbacks.forEach(c -> c.v2_playbook_on_handler_stats(handler.name()));
                         executeTaskOnHost(play, host, handler, variableManager, results, failedHosts, hostNotifications, inheritedCheckMode, new ArrayList<>(), null, null, null, connection, runTags, skipTags);

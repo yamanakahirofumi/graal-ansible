@@ -28,6 +28,7 @@ import java.util.Map;
  * @param serial             The number or percentage of hosts to execute at once.
  * @param throttle           The maximum number of hosts to execute tasks on in parallel.
  * @param maxFailPercentage  The maximum percentage of host failures allowed before halting.
+ * @param forceHandlers      Whether to force handler execution even if a task fails.
  */
 public record Play(
         String name,
@@ -51,14 +52,15 @@ public record Play(
         String strategy,
         Object serial,
         Object throttle,
-        Object maxFailPercentage
+        Object maxFailPercentage,
+        Object forceHandlers
 ) {
     public Play(String name, String hosts, List<Task> tasks) {
-        this(name, hosts, tasks, Map.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), null, null, null, null, null, null, List.of(), null, "linear", null, null, null);
+        this(name, hosts, tasks, Map.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), null, null, null, null, null, null, List.of(), null, "linear", null, null, null, null);
     }
 
     public Play(String name, String hosts, List<Task> tasks, Map<String, Object> vars) {
-        this(name, hosts, tasks, vars, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), null, null, null, null, null, null, List.of(), null, "linear", null, null, null);
+        this(name, hosts, tasks, vars, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), null, null, null, null, null, null, List.of(), null, "linear", null, null, null, null);
     }
 
     public Play(
@@ -75,7 +77,7 @@ public record Play(
             Object checkMode,
             Object environment
     ) {
-        this(name, hosts, tasks, vars, varsFiles, List.of(), List.of(), handlers, List.of(), List.of(), become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, List.of(), null, "linear", null, null, null);
+        this(name, hosts, tasks, vars, varsFiles, List.of(), List.of(), handlers, List.of(), List.of(), become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, List.of(), null, "linear", null, null, null, null);
     }
 
     public Play(
@@ -93,7 +95,7 @@ public record Play(
             Object environment,
             List<String> tags
     ) {
-        this(name, hosts, tasks, vars, varsFiles, List.of(), List.of(), handlers, List.of(), List.of(), become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, null, "linear", null, null, null);
+        this(name, hosts, tasks, vars, varsFiles, List.of(), List.of(), handlers, List.of(), List.of(), become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, null, "linear", null, null, null, null);
     }
 
     public Play(
@@ -112,7 +114,7 @@ public record Play(
             Object environment,
             List<String> tags
     ) {
-        this(name, hosts, tasks, vars, varsFiles, List.of(), roles, handlers, List.of(), List.of(), become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, null, "linear", null, null, null);
+        this(name, hosts, tasks, vars, varsFiles, List.of(), roles, handlers, List.of(), List.of(), become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, null, "linear", null, null, null, null);
     }
 
     public Play(
@@ -132,7 +134,7 @@ public record Play(
             Object environment,
             List<String> tags
     ) {
-        this(name, hosts, tasks, vars, varsFiles, varsPrompt, roles, handlers, List.of(), List.of(), become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, null, "linear", null, null, null);
+        this(name, hosts, tasks, vars, varsFiles, varsPrompt, roles, handlers, List.of(), List.of(), become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, null, "linear", null, null, null, null);
     }
 
     public Play(
@@ -153,7 +155,7 @@ public record Play(
             List<String> tags,
             Object anyErrorsFatal
     ) {
-        this(name, hosts, tasks, vars, varsFiles, varsPrompt, roles, handlers, List.of(), List.of(), become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, anyErrorsFatal, "linear", null, null, null);
+        this(name, hosts, tasks, vars, varsFiles, varsPrompt, roles, handlers, List.of(), List.of(), become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, anyErrorsFatal, "linear", null, null, null, null);
     }
 
     public Play(
@@ -175,7 +177,7 @@ public record Play(
             Object anyErrorsFatal,
             String strategy
     ) {
-        this(name, hosts, tasks, vars, varsFiles, varsPrompt, roles, handlers, List.of(), List.of(), become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, anyErrorsFatal, strategy, null, null, null);
+        this(name, hosts, tasks, vars, varsFiles, varsPrompt, roles, handlers, List.of(), List.of(), become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, anyErrorsFatal, strategy, null, null, null, null);
     }
 
     public Play(
@@ -198,7 +200,7 @@ public record Play(
             String strategy,
             Object serial
     ) {
-        this(name, hosts, tasks, vars, varsFiles, varsPrompt, roles, handlers, List.of(), List.of(), become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, anyErrorsFatal, strategy, serial, null, null);
+        this(name, hosts, tasks, vars, varsFiles, varsPrompt, roles, handlers, List.of(), List.of(), become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, anyErrorsFatal, strategy, serial, null, null, null);
     }
 
     public Play(
@@ -222,6 +224,33 @@ public record Play(
             Object serial,
             Object throttle
     ) {
-        this(name, hosts, tasks, vars, varsFiles, varsPrompt, roles, handlers, List.of(), List.of(), become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, anyErrorsFatal, strategy, serial, throttle, null);
+        this(name, hosts, tasks, vars, varsFiles, varsPrompt, roles, handlers, List.of(), List.of(), become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, anyErrorsFatal, strategy, serial, throttle, null, null);
+    }
+
+    public Play(
+            String name,
+            String hosts,
+            List<Task> tasks,
+            Map<String, Object> vars,
+            List<String> varsFiles,
+            List<Map<String, Object>> varsPrompt,
+            List<Role> roles,
+            List<Task> handlers,
+            List<Task> preTasks,
+            List<Task> postTasks,
+            Object become,
+            String becomeMethod,
+            String becomeUser,
+            String becomeFlags,
+            Object checkMode,
+            Object environment,
+            List<String> tags,
+            Object anyErrorsFatal,
+            String strategy,
+            Object serial,
+            Object throttle,
+            Object maxFailPercentage
+    ) {
+        this(name, hosts, tasks, vars, varsFiles, varsPrompt, roles, handlers, preTasks, postTasks, become, becomeMethod, becomeUser, becomeFlags, checkMode, environment, tags, anyErrorsFatal, strategy, serial, throttle, maxFailPercentage, null);
     }
 }

@@ -70,6 +70,9 @@ public class PlaybookCli implements Callable<Integer> {
     @Option(names = {"-C", "--check"}, description = "Don't make any changes; instead, try to predict some of the changes that may occur.")
     private boolean check;
 
+    @Option(names = {"--force-handlers"}, description = "Run handlers even if a task fails.")
+    private boolean forceHandlers;
+
     @Option(names = {"-D", "--diff"}, description = "When changing (small) files and templates, show the differences in those files; works great with --check.")
     private boolean diff;
 
@@ -206,6 +209,7 @@ public class PlaybookCli implements Callable<Integer> {
                 Map<String, Object> cliVars = new HashMap<>();
                 cliVars.put("ansible_check_mode", check);
                 cliVars.put("ansible_diff_mode", diff);
+                cliVars.put("ansible_force_handlers", forceHandlers);
                 cliVars.put("ansible_become", become);
                 cliVars.put("ansible_become_method", becomeMethod);
                 cliVars.put("ansible_become_user", becomeUser);
@@ -303,4 +307,5 @@ public class PlaybookCli implements Callable<Integer> {
     public String getLimit() { return limit; }
     public List<String> getTags() { return tags; }
     public boolean isCheck() { return check; }
+    public boolean isForceHandlers() { return forceHandlers; }
 }
