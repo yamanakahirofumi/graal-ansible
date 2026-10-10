@@ -53,6 +53,16 @@ class PlaybookCliTest {
     }
 
     @Test
+    void testParseForceHandlers() {
+        PlaybookCli app = new PlaybookCli();
+        CommandLine cmd = new CommandLine(app);
+
+        cmd.parseArgs("playbook.yml", "--force-handlers");
+
+        assertTrue(app.isForceHandlers());
+    }
+
+    @Test
     void testParseTags() {
         PlaybookCli app = new PlaybookCli();
         CommandLine cmd = new CommandLine(app);
