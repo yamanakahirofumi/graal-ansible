@@ -428,6 +428,12 @@
     - GitHub Actions による Tag トリガーからのビルド、マトリックスコンパイル、`SHA256SUMS` チェックサム作成、および Draft/Release 自動作成パイプライン仕様を明記。
     - 配布パッケージのスタンドアロン動作確認手順および `SHA256SUMS` 検証コマンドを定義。
 
+### 1.55 [✓] 組み込みモジュールの機能網羅・check_mode 統合テストの拡充 [追加]
+- **完了日**: 2026-10-24
+- **概要**: `docs/tech/Test-Expansion-Strategy.md` Section 2.2 および `docs/features/Module-Support-Status.md` に基づき、`slurp` モジュールの `check_mode: true` における機能およびドライラン動作を検証する統合テストを拡充。
+- **解決策**:
+    - `BuiltinModulesIntegrationTest.java` にて `testSlurpModuleCheckMode` を追加・統合し、マルチ OS（Windows を含む）環境において `slurp` がチェックモードで正常にコンテンツを返却することを検証。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築
