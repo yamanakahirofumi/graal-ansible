@@ -602,6 +602,110 @@ class TaskControlTest {
     }
 
     @Test
+    void testForceHandlersDisabled() {
+        String inventoryIni = "host1";
+        Inventory inventory = new IniInventoryParser().parse(new ByteArrayInputStream(inventoryIni.getBytes(StandardCharsets.UTF_8)));
+
+        String playbookYaml = """
+                - name: test force_handlers disabled
+                  hosts: all
+                  force_handlers: false
+                  tasks:
+                    - name: trigger handler
+                      debug:
+                        msg: "trigger"
+                      changed_when: true
+                      notify: my handler
+                    - name: failing task
+                      debug:
+                        msg: "fail"
+                      failed_when: true
+                  handlers:
+                    - name: my handler
+                      debug:
+                        msg: "handled"
+                """;
+        Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
+
+        Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
+
+        List<TaskResult> host1Results = results.get("host1");
+        // Expected: trigger handler, failing task. Handler should NOT be run.
+        assertEquals(2, host1Results.size(), "Handler should not be executed when force_handlers is false and task fails");
+        assertFalse(host1Results.get(1).success());
+    }
+
+    @Test
+    void testForceHandlersEnabled() {
+        String inventoryIni = "host1";
+        Inventory inventory = new IniInventoryParser().parse(new ByteArrayInputStream(inventoryIni.getBytes(StandardCharsets.UTF_8)));
+
+        String playbookYaml = """
+                - name: test force_handlers enabled
+                  hosts: all
+                  force_handlers: true
+                  tasks:
+                    - name: trigger handler
+                      debug:
+                        msg: "trigger"
+                      changed_when: true
+                      notify: my handler
+                    - name: failing task
+                      debug:
+                        msg: "fail"
+                      failed_when: true
+                  handlers:
+                    - name: my handler
+                      debug:
+                        msg: "handled"
+                """;
+        Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
+
+        Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
+
+        List<TaskResult> host1Results = results.get("host1");
+        // Expected: trigger handler, failing task, and flushed handler
+        assertEquals(3, host1Results.size(), "Handler should be executed when force_handlers is true even if task fails");
+        assertFalse(host1Results.get(1).success());
+        assertEquals("handled", host1Results.get(2).data().get("msg"));
+    }
+
+    @Test
+    void testForceHandlersTemplated() {
+        String inventoryIni = "host1";
+        Inventory inventory = new IniInventoryParser().parse(new ByteArrayInputStream(inventoryIni.getBytes(StandardCharsets.UTF_8)));
+
+        String playbookYaml = """
+                - name: test force_handlers templated
+                  hosts: all
+                  vars:
+                    allow_force: true
+                  force_handlers: "{{ allow_force }}"
+                  tasks:
+                    - name: trigger handler
+                      debug:
+                        msg: "trigger"
+                      changed_when: true
+                      notify: my handler
+                    - name: failing task
+                      debug:
+                        msg: "fail"
+                      failed_when: true
+                  handlers:
+                    - name: my handler
+                      debug:
+                        msg: "handled"
+                """;
+        Playbook playbook = new YamlParser().parse(new ByteArrayInputStream(playbookYaml.getBytes(StandardCharsets.UTF_8)));
+
+        Map<String, List<TaskResult>> results = playbookExecutor.execute(playbook, inventory);
+
+        List<TaskResult> host1Results = results.get("host1");
+        assertEquals(3, host1Results.size(), "Handler should be executed when templated force_handlers evaluates to true");
+        assertEquals("handled", host1Results.get(2).data().get("msg"));
+    }
+
+    @Test
     void testHandlersListen() {
         String inventoryIni = "host1";
         Inventory inventory = new IniInventoryParser().parse(new ByteArrayInputStream(inventoryIni.getBytes(StandardCharsets.UTF_8)));
