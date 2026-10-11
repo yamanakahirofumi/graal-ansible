@@ -428,6 +428,17 @@
     - GitHub Actions による Tag トリガーからのビルド、マトリックスコンパイル、`SHA256SUMS` チェックサム作成、および Draft/Release 自動作成パイプライン仕様を明記。
     - 配布パッケージのスタンドアロン動作確認手順および `SHA256SUMS` 検証コマンドを定義。
 
+### 1.55 [✓] CLI 仕様の詳細化と Level 1 変数マッピング・Picocli オプション同期 [追加]
+- **完了日**: 2026-10-24
+- **概要**: `docs/features/CLI-Specification.md` における `ansible-playbook` 互換の CLI オプション一覧、Level 1 CLI 変数マッピング、`-e` / `--extra-vars` パース機構、Vault パスワード解決優先順位、`CallbackFactory` 動的コールバック解決、および Picocli 終了コードマッピング仕様を追加・詳細化。
+- **解決策**:
+    - Picocli CLI オプションデフォルト値テーブルおよび `--force-handlers` フラグをオプション一覧（Section 2）に追加。
+    - CLI フラグから `VariableManager` 最高優先度スコープ（Level 1: CLI Variables）へのマッピングルール（`ansible_become`, `ansible_check_mode`, `ansible_force_handlers`, `ansible_verbosity` 等）および `-K` 対話キープロンプト仕様を明記。
+    - `PlaybookCli.parseExtraVars` の `@file`, インライン JSON/YAML, `key=value`, SnakeYAML フォールバックの解析シーケンスを明記。
+    - Vault パスワード解決優先順位および `prompt` 指定時の `System.console()` 対話処理と非対話環境例外メッセージを定義。
+    - `CallbackFactory` による stdout コールバック優先順位解決メカニズムを定義。
+    - Picocli コマンドライン終了コードマトリクス (`0`, `1`, `2`, `4`) および `ExecutionReport` 統合ロジックを追加。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築
