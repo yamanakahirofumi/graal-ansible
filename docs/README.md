@@ -27,7 +27,7 @@
 ---
 
 ## 3. 機能・仕様 (`docs/features/`)
-- [CLI仕様](features/CLI-Specification.md)：ansible-playbook互換のコマンドライン引数
+- [CLI仕様](features/CLI-Specification.md)：ansible-playbook互換のコマンドライン引数、Picocli オプション解析、レベル1 CLI 変数マッピング、終了コード仕様
 - [処理フロー](features/Process-Flow.md)：管理ノードからターゲットノードまでの全体フロー（**本プロジェクトの基本設計方針**）
 - [動作環境](features/System-Requirements.md)：Java/GraalVMの実行環境とOS互換性
 - [インベントリ管理](features/Inventory-System.md)：静的・動的インベントリのサポート範囲
