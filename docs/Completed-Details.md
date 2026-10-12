@@ -428,6 +428,13 @@
     - GitHub Actions による Tag トリガーからのビルド、マトリックスコンパイル、`SHA256SUMS` チェックサム作成、および Draft/Release 自動作成パイプライン仕様を明記。
     - 配布パッケージのスタンドアロン動作確認手順および `SHA256SUMS` 検証コマンドを定義。
 
+### 1.55 [✓] Ansible Vault 復号・暗号化実装仕様の作成 [追加]
+- **完了日**: 2026-10-24
+- **概要**: `docs/implementation/Vault-Support.md` を作成し、Ansible Vault の復号・暗号化、PBKDF2 鍵誘導、AES-256-CTR、HMAC-SHA256、AST `!vault` タグパース、遅延評価、CLI パスワード解決優先順位、およびシーケンス図に関する詳細な実装仕様を定義。
+- **解決策**:
+    - `docs/implementation/Vault-Support.md` を新規追加し、`VaultDecrypter`, `VaultEncrypter`, `VaultSecretStore`, `VaultDecryptedValue`, `ConstructVault` の技術仕様を明記。
+    - `docs/README.md` のドキュメント一覧を同期。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築
