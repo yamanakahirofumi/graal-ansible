@@ -428,6 +428,13 @@
     - GitHub Actions による Tag トリガーからのビルド、マトリックスコンパイル、`SHA256SUMS` チェックサム作成、および Draft/Release 自動作成パイプライン仕様を明記。
     - 配布パッケージのスタンドアロン動作確認手順および `SHA256SUMS` 検証コマンドを定義。
 
+### 1.55 [✓] Jinja2 フィルターおよび組み込みモジュールの機能網羅・check_mode 単体・統合テストの拡充 [追加]
+- **完了日**: 2026-10-24
+- **概要**: `docs/implementation/Variables-Templating.md` Section 4.1 および `docs/tech/Test-Expansion-Strategy.md` Section 2.2 に基づき、`ToJsonFilter`, `ToYamlFilter` の専用単体テストクラスの構築と、`slurp`, `assert` モジュールの check_mode 統合テストを拡張。
+- **解決策**:
+    - `ToJsonFilterTest.java` および `ToYamlFilterTest.java` を追加し、Map, List, スカラー値, null, 未定義変数のシリアライズをテスト。
+    - `BuiltinModulesIntegrationTest.java` にて `testSlurpModuleCheckMode` および `testAssertModuleCheckMode` を追加し、check_mode 実行時の挙動を検証。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築

@@ -452,4 +452,33 @@ class BuiltinModulesIntegrationTest {
         assertFalse(Files.exists(destFile), "Destination file should not be created in check mode");
     }
 
+    @Test
+    void testSlurpModuleCheckMode() throws IOException {
+        Path targetFile = tempDir.resolve("slurp_check.txt");
+        Files.writeString(targetFile, "Check Slurp Content");
+
+        Task task = new Task("Slurp check mode", "slurp", Map.of(
+                "src", targetFile.toString()
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "slurp check mode failed: " + result.message() + " Data: " + result.data());
+        assertNotNull(result.data().get("content"), "slurp in check mode should return content");
+    }
+
+    @Test
+    void testAssertModuleCheckMode() {
+        Task task = new Task("Assert check mode", "assert", Map.of(
+                "that", List.of("2 + 2 == 4")
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "assert check mode failed: " + result.message() + " Data: " + result.data());
+    }
+
+
 }
