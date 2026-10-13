@@ -480,4 +480,24 @@ class FileModulesIntegrationTest {
         assertTrue(Files.readString(targetFile).contains("setting=on"));
     }
 
+    @Test
+    void testTempfileModuleCheckMode() {
+        Task task = new Task("Tempfile check mode", "tempfile", Map.of(
+                "state", "file",
+                "suffix", "check"
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertTrue(result.success(), "tempfile check mode failed: " + result.message() + " Data: " + result.data());
+        assertTrue(result.changed());
+        String pathStr = (String) result.data().get("path");
+        assertNotNull(pathStr);
+        try {
+            Files.deleteIfExists(Path.of(pathStr));
+        } catch (IOException ignored) {}
+    }
+
 }

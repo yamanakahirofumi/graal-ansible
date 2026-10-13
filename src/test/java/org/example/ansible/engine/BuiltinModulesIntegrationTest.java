@@ -452,4 +452,37 @@ class BuiltinModulesIntegrationTest {
         assertFalse(Files.exists(destFile), "Destination file should not be created in check mode");
     }
 
+    @Test
+    void testValidateArgumentSpecModuleCheckMode() {
+        Map<String, Object> argumentSpec = Map.of(
+                "name", Map.of("type", "str", "required", true)
+        );
+        Map<String, Object> providedArguments = Map.of(
+                "name", "check_item"
+        );
+
+        Task task = new Task("Validate spec check mode", "validate_argument_spec", Map.of(
+                "argument_spec", argumentSpec,
+                "provided_arguments", providedArguments
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "validate_argument_spec check mode failed: " + result.message() + " Data: " + result.data());
+    }
+
+    @Test
+    void testPauseModuleCheckMode() {
+        Task task = new Task("Pause task check mode", "pause", Map.of(
+                "seconds", 1
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "pause check mode failed: " + result.message() + " Data: " + result.data());
+        assertFalse(result.changed(), "pause module in check mode should report changed = false");
+    }
+
 }
