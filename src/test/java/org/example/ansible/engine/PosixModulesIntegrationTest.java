@@ -277,5 +277,4 @@ class PosixModulesIntegrationTest {
         assertFalse(Files.exists(destFile), "Destination file should not be created in check mode");
     }
 
-
 }
