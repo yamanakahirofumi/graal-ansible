@@ -33,7 +33,7 @@
 - [インベントリ管理](features/Inventory-System.md)：静的・動的インベントリのサポート範囲
 - [コレクションの管理と取得方法](features/Collection-Management.md)：実際のコレクションを取得・利用する手順
 - [Playbook実行仕様](features/Playbook-Execution.md)：タスク実行、ループ、条件分岐のサポート範囲
-- [Ansible Vault 復号仕様](features/Vault-Support.md)：Ansible Vaultのネイティブ復号仕様と実装アーキテクチャ
+- [Ansible Vault 復号・暗号化仕様](features/Vault-Support.md)：Ansible Vaultのネイティブ復号・暗号化仕様と実装アーキテクチャ
 - [SSH 踏み台サーバー経由接続仕様](features/Ssh-Jump-Host-Support.md)：踏み台サーバー（Bastion / Jump Host）経由で SSH 接続を行う仕様と実装アーキテクチャ
 - [Ansible用語集](features/Ansible-Terminology.md)：コレクション、モジュール、ロール等の用語定義
 - [モジュール互換性](features/Module-Compatibility.md)：モジュール互換性の目標と設計指針
