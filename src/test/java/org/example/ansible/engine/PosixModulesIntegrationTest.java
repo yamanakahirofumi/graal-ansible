@@ -277,4 +277,28 @@ class PosixModulesIntegrationTest {
         assertFalse(Files.exists(destFile), "Destination file should not be created in check mode");
     }
 
+    @Test
+    void testCommandModuleCheckMode() {
+        Task task = new Task("Command check mode", "command", Map.of(
+                "_raw_params", "echo test_check_mode"
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "command check mode failed: " + result.message() + " Data: " + result.data());
+    }
+
+    @Test
+    void testShellModuleCheckMode() {
+        Task task = new Task("Shell check mode", "shell", Map.of(
+                "_raw_params", "echo test_shell_check"
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "shell check mode failed: " + result.message() + " Data: " + result.data());
+    }
+
 }
