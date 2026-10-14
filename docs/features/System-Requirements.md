@@ -15,7 +15,16 @@
 | :--- | :--- | :--- |
 | **Linux** | Ubuntu 22.04 LTS+, RHEL 8/9+ | 第一優先 (Main) |
 | **macOS** | macOS 13 (Ventura) 以上 (x64/ARM) | 準優先 (Secondary) |
-| **Windows** | Windows 10/11 (PowerShell/WinRM) | 対応済 (Supported) |
+| **Windows** | Windows 10/11 (PowerShell/WinRM) | ターゲットノード対応済 (Target Supported) |
+
+### 2.1 Windows サポート範囲と方針 (Windows Support Scope)
+
+- **ターゲットノード（サーバー側）サポート**:
+  - Windows サーバー / クライアントをターゲットノードとして管理（WinRM または SSH 接続経由、PowerShell 実行）することを主たる目的としてサポートします。
+- **管理ノード（クライアント側）**:
+  - 管理ノード（制御ノード）としての動作環境は従来の設計通り（Linux / macOS 中心）とし、クライアント側の特別な構造変更は行いません。
+- **非サポートタスク・モジュールの挙動方針**:
+  - ターゲットノード上で OS 非互換のタスク（POSIX 固有のシステム操作等）や未サポートのモジュールが実行された場合は、本家 Ansible の仕様に準拠し、過度なエミュレーション等を行わずに失敗（エラー）として安全に検出・停止させる方針とします。
 
 ## 3. 依存ライブラリ・ツール
 

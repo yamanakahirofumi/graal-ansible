@@ -6,6 +6,8 @@
 
 Ansible モジュールやタスクが、実行対象 OS の違いを意識せずに動作できるよう、共通のインターフェースおよび OS ハンドラ実装を提供します。これにより、OS 非依存の実行制御と高い保守性を実現します。
 
+なお、本プロジェクトにおける **Windows サポートの主要ターゲットはサーバー側（ターゲットノード）の管理**であり、管理ノード（制御ノード/クライアント側）の動作構造は従来通り（Linux / macOS 中心）とします。また、ターゲットノード上で OS 非互換のタスク（POSIX 固有のシステム操作等）や未サポートのモジュールが実行された場合は、過度な無理のあるエミュレーションは行わず、本家 Ansible 仕様に準拠して失敗（エラー）として安全に検出・停止させる方針を採用しています。
+
 ## 2. 抽象化の対象
 
 以下の項目について、OS ごとの差異を抽象化します。
@@ -117,7 +119,9 @@ GraalPy 実行環境（`ansible_bridge.py`）において、Python の `os` モ�
 - **パス表現の統一と正規化**: 内部的には `java.nio.file.Path` や `Paths.get` を活用しつつ、ターゲット OS の違いに応じて `/` と `\` の自動置換を行います。
 - **権限昇格 (Become) との連携**: `LocalConnection` や `DockerConnection` は `OSHandler.supportsSudo()` の値を参照し、Windows 環境などで不要な `sudo` ラップ処理を行わないよう制御します。
 - **Native Image 対応**: システムプロパティ（`os.name`, `java.io.tmpdir` 等）の読み込みは GraalVM Native Image の実行時にも正しく評価されるように設計されています。
+- **ターゲットノード Windows サポート方針**: Windows ターゲットノード（サーバー）制御を主軸とし、タスク自体が Windows 未対応である場合はエミュレーションせず自然にエラー終了させます。
 - **関連ドキュメント**:
+  - [動作環境仕様](../features/System-Requirements.md)
   - [モジュールとモックの対応リファレンス](../features/Module-Mock-Reference.md)
   - [Mock 実装リファレンス](Mock-Implementation-Reference.md)
   - [GraalPy 統合の詳細](../tech/GraalPy-Integration.md)
