@@ -73,6 +73,7 @@
 - [SSH 踏み台サーバー経由接続の実装詳細](implementation/Ssh-Jump-Host-Support.md)：Apache MINA SSHD による踏み台経由 SSH 接続（多段トンネル）の実装詳細
 - [リモートノードでのモジュール実行仕様](implementation/Remote-Module-Execution.md)：ターゲットノードへモジュールを転送して実行する仕組み（モジュール転送型）
 - [権限昇格 (become)](implementation/Privilege-Escalation.md)：sudo, su等による実行ユーザーの切り替え
+- [Ansible Vault 復号・暗号化実装仕様](implementation/Vault-Support.md)：Ansible Vaultの復号・暗号化、!vaultタグ解析、遅延評価の実装
 - [変数とテンプレート](implementation/Variables-Templating.md)：Jinja2互換エンジンの統合
 - [OS非依存レイヤー](implementation/OS-Abstraction.md)：ファイル操作やプロセス実行のOS差分吸収
 - [Native Image最適化](implementation/Native-Image-Optimization.md)：GraalVMでのリフレクション設定と最適化
