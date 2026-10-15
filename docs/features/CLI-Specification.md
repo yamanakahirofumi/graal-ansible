@@ -18,6 +18,7 @@ graal-ansible [options] playbook.yml
 | `--tags`                |  `-t`  | 特定のタグが付いたタスクのみ実行                                       |    ◎     |
 | `--skip-tags`           |   -    | 特定のタグが付いたタスクをスキップ                                     |    ◎     |
 | `--check`               |  `-C`  | 変更を加えずに実行（ドライラン）                                       |    ◎     |
+| `--force-handlers`      |   -    | タスク失敗時でも通知済みハンドラーを強制実行                           |    ◎     |
 | `--diff`                |  `-D`  | ファイルの変更内容を表示                                               |    ◎     |
 | `--verbose`             |  `-v`  | 詳細ログを表示 (`-vvv` 等の複数指定をサポート)                         |    ◎     |
 | `--become`              |  `-b`  | 権限昇格を有効にする                                                   |    ◎     |
@@ -34,18 +35,21 @@ graal-ansible [options] playbook.yml
 
 ※ ◎: 実装済み、○: 計画中、△: 部分的/検討中
 
-## 3. 権限昇格 (become) オプションの詳細仕様
+## 3. CLI変数 (Level 1) マッピング仕様
 
-本家 Ansible との互換性を確保するため、CLI で指定された権限昇格フラグは以下の通り内部変数へマッピングされ、Playbook 内の定義よりも高い優先順位で扱われます。
+本家 Ansible との互換性を確保するため、CLI で指定されたフラグおよびオプションは以下の通り内部変数（「CLI変数」: Level 1）へマッピングされ、Playbook 内の定義よりも高い優先順位（`extra_vars` に次ぐレベル）で扱われます。
 
-| CLI オプション    | 内部変数名              | 説明                                                           |
-| :---------------- | :---------------------- | :------------------------------------------------------------- |
-| `-b`, `--become`  | `ansible_become`        | `true` の場合、全タスクでデフォルトで権限昇格を有効にします。  |
-| `--become-method` | `ansible_become_method` | `sudo`, `su` 等のメソッドを指定します。                        |
-| `--become-user`   | `ansible_become_user`   | 昇格後のユーザーを指定します。                                 |
-| `--become-flags`  | `ansible_become_flags`  | 昇格コマンドに渡す追加フラグを指定します。                     |
+| CLI オプション       | 内部変数名               | 説明                                                           |
+| :------------------- | :----------------------- | :------------------------------------------------------------- |
+| `-b`, `--become`     | `ansible_become`         | `true` の場合、全タスクでデフォルトで権限昇格を有効にします。  |
+| `--become-method`    | `ansible_become_method`  | `sudo`, `su` 等のメソッドを指定します。                        |
+| `--become-user`      | `ansible_become_user`    | 昇格後のユーザーを指定します。                                 |
+| `--become-flags`     | `ansible_become_flags`   | 昇格コマンドに渡す追加フラグを指定します。                     |
+| `-C`, `--check`      | `ansible_check_mode`     | `true` の場合、全タスクでドライランモードを適用します。        |
+| `-D`, `--diff`       | `ansible_diff_mode`      | `true` の場合、ファイルの変更差分表示モードを適用します。      |
+| `--force-handlers`   | `ansible_force_handlers` | `true` の場合、途中のタスク失敗時にもハンドラーを強制実行します。 |
 
-これらの変数は、`VariableManager` において「CLI変数 (Level 1)」として保持され、Play や Task で明示的に `become: no` 等が指定されない限り、実行コンテキストに適用されます。
+これらの変数は、`VariableManager` において「CLI変数 (Level 1)」として保持され、Play や Task での個別オーバーライド指定がない限り、実行コンテキスト全体へ透過的に適用されます。
 
 ## 4. エクストラ変数 (`--extra-vars`) のサポート状況
 
