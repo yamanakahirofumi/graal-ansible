@@ -435,6 +435,13 @@
     - `docs/implementation/Vault-Support.md` を新規追加し、`VaultDecrypter`, `VaultEncrypter`, `VaultSecretStore`, `VaultDecryptedValue`, `ConstructVault` の技術仕様を明記。
     - `docs/README.md` のドキュメント一覧を同期。
 
+### 1.56 [✓] CLI 仕様ドキュメントにおける --force-handlers および Level 1 CLI 変数マッピングの追記 [追加]
+- **完了日**: 2026-10-24
+- **概要**: `docs/features/CLI-Specification.md` において、`--force-handlers` CLI オプションを主要オプションテーブルに追加し、Section 3 を Level 1 CLI 変数マッピング（`ansible_become`, `ansible_become_method`, `ansible_become_user`, `ansible_become_flags`, `ansible_check_mode`, `ansible_diff_mode`, `ansible_force_handlers`）として拡張・明記。
+- **解決策**:
+    - `docs/features/CLI-Specification.md` Section 2 の主要オプション一覧テーブルに `--force-handlers` を追記。
+    - Section 3 を「CLI変数 (Level 1) マッピング仕様」へアップデートし、各 CLI フラグから `VariableManager` CLI 変数スコープへのバインディングルールをテーブル化・詳細化。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築
