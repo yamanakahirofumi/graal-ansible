@@ -211,4 +211,20 @@ class CommandShellIntegrationTest {
         Path actualPath = Path.of(stdout.trim()).toRealPath();
         assertEquals(expectedPath, actualPath, "Working directory should match chdir parameter");
     }
+
+    @Test
+    void testCommandCheckModeWithCreates() {
+        Path missingFile = tempDir.resolve("non_existent_check.txt");
+        Task task = new Task("Run command check mode with creates", "command", Map.of(
+                "_raw_params", "echo should_not_run",
+                "creates", missingFile.toAbsolutePath().toString()
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 0, 0, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, Map.of());
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, true, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "command check mode with creates failed: " + result.message());
+        assertTrue(result.changed(), "command in check mode when creates file is missing should report changed = true");
+        assertFalse(Files.exists(missingFile), "Missing file should not be created in check mode");
+    }
 }
