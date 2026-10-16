@@ -500,4 +500,52 @@ class FileModulesIntegrationTest {
         } catch (IOException ignored) {}
     }
 
+    @Test
+    void testFileModuleSymlink() throws IOException {
+        Path srcFile = tempDir.resolve("symlink-source.txt");
+        Files.writeString(srcFile, "symlink content");
+
+        Path linkFile = tempDir.resolve("symlink-target.txt");
+
+        Task taskLink = new Task("Create symlink", "file", Map.of(
+                "src", srcFile.toString(),
+                "path", linkFile.toString(),
+                "state", "link"
+        ));
+        TaskResult resultLink = taskExecutor.execute(play, host, taskLink, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertTrue(resultLink.success(), resultLink.message());
+        assertTrue(resultLink.changed());
+        assertTrue(Files.isSymbolicLink(linkFile));
+
+        Task taskAbsent = new Task("Remove symlink", "file", Map.of(
+                "path", linkFile.toString(),
+                "state", "absent"
+        ));
+        TaskResult resultAbsent = taskExecutor.execute(play, host, taskAbsent, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertTrue(resultAbsent.success(), resultAbsent.message());
+        assertFalse(Files.exists(linkFile, java.nio.file.LinkOption.NOFOLLOW_LINKS));
+    }
+
+    @Test
+    void testStatModuleWithChecksum() throws IOException {
+        Path targetFile = tempDir.resolve("stat-checksum.txt");
+        Files.writeString(targetFile, "stat checksum content");
+
+        Task task = new Task("Stat file with sha256 checksum", "stat", Map.of(
+                "path", targetFile.toString(),
+                "get_checksum", true,
+                "checksum_algorithm", "sha256"
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertTrue(result.success(), result.message());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> stat = (Map<String, Object>) result.data().get("stat");
+        assertNotNull(stat, "stat data should not be null. Full data: " + result.data());
+        assertTrue((Boolean) stat.get("exists"));
+        assertNotNull(stat.get("checksum"), "stat.checksum should be present when get_checksum=true");
+    }
+
 }

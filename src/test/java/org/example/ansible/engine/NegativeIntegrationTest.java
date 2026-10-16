@@ -419,4 +419,19 @@ class NegativeIntegrationTest {
         assertTrue(result.data().containsKey("msg") || result.data().containsKey("exception"),
                 "Result data should contain error information: " + result.data());
     }
+
+    @Test
+    void testFindModuleNonExistentPath() {
+        Path nonExistent = tempDir.resolve("no_such_find_dir");
+        Task task = new Task("Find non-existent directory", "find", Map.of(
+                "paths", List.of(nonExistent.toString())
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertTrue(result.success(), result.message());
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> files = (List<Map<String, Object>>) result.data().get("files");
+        assertNotNull(files, "files list should be returned");
+        assertTrue(files.isEmpty(), "files list should be empty for non-existent path");
+    }
 }
