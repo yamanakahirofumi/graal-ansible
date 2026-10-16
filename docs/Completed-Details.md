@@ -435,6 +435,14 @@
     - `docs/implementation/Vault-Support.md` を新規追加し、`VaultDecrypter`, `VaultEncrypter`, `VaultSecretStore`, `VaultDecryptedValue`, `ConstructVault` の技術仕様を明記。
     - `docs/README.md` のドキュメント一覧を同期。
 
+### 1.57 [✓] 全体処理フロー（Process Flow）仕様の詳細化 [追加]
+- **完了日**: 2026-10-24
+- **概要**: `docs/features/Process-Flow.md` における Playbook 読み込みから実行完了までの 7 段階の処理ライフサイクル仕様、コンポーネント間データ交換インターフェースマトリクス、各コンポーネントの役割、Ansiballz 実行モデル、および例外リカバリ・逆順リソース解放フローを追加・詳細化。
+- **解決策**:
+    - CLI 初期化・Vault 鍵解決・YAML パース・タグ/Limit フィルタリング・22 段階変数構築・Strategy 並列制御・Ansiballz 転送実行・Callback イベント伝播・ExecutionReport サマリー集計および Exit Code マッピング（0/1/2/4）を網羅する 7 段階ライフサイクル仕様を追加。
+    - コンポーネント間データ交換契約マトリクス（`PlaybookCli` -> `PlaybookExecutor` -> `TaskQueueManager` -> `Strategy` -> `TaskExecutor` -> `ActionPlugin` / `ConnectionPlugin` -> `Callback` -> `ExecutionReport`）を更新・整頓。
+    - `block`/`rescue`/`always` 例外リカバリ、多段 SSH トンネルの逆順クローズ（Reverse Teardown）、およびスレッドプールの解放仕様を定義。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築
