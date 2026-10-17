@@ -435,6 +435,13 @@
     - `docs/implementation/Vault-Support.md` を新規追加し、`VaultDecrypter`, `VaultEncrypter`, `VaultSecretStore`, `VaultDecryptedValue`, `ConstructVault` の技術仕様を明記。
     - `docs/README.md` のドキュメント一覧を同期。
 
+### 1.56 [✓] インベントリシステム仕様および実装詳細の詳細化 [追加]
+- **完了日**: 2026-10-24
+- **概要**: `docs/features/Inventory-System.md` および `docs/implementation/Inventory-System.md` におけるプロバイダー自動検出・OS別判定ルール、ディレクトリ自動走査・除外ルール、`group_vars` / `host_vars` 変数ディレクトリのロード仕様、Java Record データ構造と可変性設計、プロバイダー実装 (`FileInventoryProvider`, `ScriptInventoryProvider`, `PythonInventoryProvider`)、`VariableManager.loadDirectoryVars` アルゴリズム、および Mermaid シーケンス図を詳細化・同期。
+- **解決策**:
+    - `docs/features/Inventory-System.md` にてプロバイダー検出条件、OS別実行判定、ディレクトリ除外ルール、`group_vars`/`host_vars` 階層マッピング、およびブラケットパターン範囲展開仕様を追加。
+    - `docs/implementation/Inventory-System.md` にて Java Record データ構造、`FileInventoryProvider` ツリーマージ、`ScriptInventoryProvider` `ProcessBuilder` JSON 解析、`PythonInventoryProvider` GraalPy ランチャーブリッジ、`VariableManager.loadDirectoryVars` キャッシュ・サブフォルダ読み込みロジック、および Mermaid シーケンス図を明記。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築

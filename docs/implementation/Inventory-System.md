@@ -9,18 +9,18 @@
 ### 1.1 Host
 個々のターゲットノードを表します。
 - `name`: ホスト名または IP アドレス。
-- `variables`: ターゲットノード固有の変数。
+- `variables`: ターゲットノード固有の変数（`Map<String, Object>`）。
 
 ### 1.2 Group
 ターゲットノードの集合を表します。
 - `name`: グループ名。
-- `hosts`: グループに属するターゲットノードのリスト。
-- `children`: 子グループのリスト。
-- `variables`: グループ変数。
+- `hosts`: グループに属するターゲットノードのリスト（`List<Host>`）。
+- `children`: 子グループのリスト（`List<Group>`）。
+- `variables`: グループ変数（`Map<String, Object>`）。
 
 ### 1.3 Inventory
 インベントリ全体を管理します。
-- `all`: 全てのターゲットノードとグループを内包するルートグループ。
+- `all`: 全てのターゲットノードとグループを内包するルートグループ（`Group`）。
 
 ### 1.4 構造と可変性
 すべてのデータモデル（Host, Group, Inventory）は Java **Record** として実装されていますが、`add_host` や `group_by` モジュールによる実行時の動的なインベントリ更新をサポートするため、内部で保持するリスト（hosts, children）やマップ（variables）は可変（Mutable）なコレクション（`ArrayList`, `HashMap`）として保持されます。
@@ -29,19 +29,19 @@
 
 `IniInventoryParser` は以下の規則に従って INI ファイルを解析します。
 
-1.  **セクションなし**: ファイルの先頭にあるセクションに属さないホストは `all` グループに直接追加されます。
-2.  **グループセクション (`[group_name]`)**: その後に続くホストは、指定されたグループに属します。
-3.  **子グループセクション (`[group_name:children]`)**: 指定されたグループの子として登録されるグループ名を記述します。
-4.  **変数セクション (`[group_name:vars]`)**: グループ全体に適用される変数を `key=value` 形式で記述します。
+1. **セクションなし**: ファイルの先頭にあるセクションに属さないホストは `all` グループに直接追加されます。
+2. **グループセクション (`[group_name]`)**: その後に続くホストは、指定されたグループに属します。
+3. **子グループセクション (`[group_name:children]`)**: 指定されたグループの子として登録されるグループ名を記述します。
+4. **変数セクション (`[group_name:vars]`)**: グループ全体に適用される変数を `key=value` 形式で記述します。
 
 ## 3. 解析ロジック (YAML 形式)
 
 `YamlInventoryParser` は以下の規則に従って YAML ファイルを解析します。
 
-1.  **ルート要素**: 原則として `all` グループをルートとします。
-2.  **ホスト定義 (`hosts`)**: 各グループ配下の `hosts` キーにホスト名を記述します。ホスト個別の変数はその値として定義します。
-3.  **子グループ定義 (`children`)**: 各グループ配下の `children` キーに子グループを定義します。
-4.  **変数定義 (`vars`)**: 各グループ配下の `vars` キーにグループ変数を定義します。
+1. **ルート要素**: 原則として `all` グループをルートとします。
+2. **ホスト定義 (`hosts`)**: 各グループ配下の `hosts` キーにホスト名を記述します。ホスト個別の変数はその値として定義します。
+3. **子グループ定義 (`children`)**: 各グループ配下の `children` キーに子グループを定義します。
+4. **変数定義 (`vars`)**: 各グループ配下の `vars` キーにグループ変数を定義します。
 
 ## 4. 変数の解決順序
 
@@ -58,43 +58,12 @@
 ### 4.2 優先順位 3-10 の厳密な実装
 [変数とテンプレートの実装詳細](Variables-Templating.md#2-変数優先順位-variable-precedence) に基づく優先順位 3 から 10 を正確に実現するため、`Inventory.java` においてグループ変数（`getGroupVariablesForHost`）とホスト変数（`getHostVariables`）の取得メソッドを分離しています。これにより、`VariableManager` は以下の順序で変数をマージし、インベントリホスト変数（優先度 8）がプレイブックグループ変数（優先度 7）を正しく上書きすることを保証します。
 
-1.  優先度 3-7: `getGroupVariablesForHost` で取得されたインベントリ/プレイブックのグループ変数を順次マージ。
-2.  優先度 8-10: `getHostVariables` で取得されたインベントリホスト変数、および `host_vars/*` をマージ。
+1. 優先度 3-7: `getGroupVariablesForHost` で取得されたインベントリ/プレイブックのグループ変数を順次マージ。
+2. 優先度 8-10: `getHostVariables` で取得されたインベントリホスト変数、および `host_vars/*` をマージ。
 
-## 5. 外部インベントリの統合 (External Inventory Integration) {#5-外部インベントリの統合-external-inventory-integration}
+## 5. 外部インベントリおよびプロバイダーの実装詳細 (External Inventory Integration)
 
-Ansible 互換の外部インベントリ（スクリプトまたはプラグイン）を統合するための実装方針です。
-
-### 5.1 スクリプト方式 (Inventory Scripts)
-実行可能なプログラムから JSON 形式でインベントリ情報を取得します。
-
-- **実行メカニズム**:
-    - `ProcessBuilder` を使用して、指定されたスクリプトを `--list` 引数付きで実行します。
-    - スクリプトの標準出力をキャプチャし、Jackson を用いて JSON 解析を行います。
-- **データマッピング**:
-    - JSON の `_meta.hostvars` セクションからホスト個別の変数を取得します。
-    - 各グループ配下の `hosts`, `children`, `vars` を再帰的に解析し、内部の `Inventory` オブジェクトへマージします。
-
-### 5.2 プラグイン方式 (Inventory Plugins)
-YAML 設定ファイルに基づき、特定のソース（AWS, GCP, NetBox 等）から動的にホストを取得します。
-
-- **実装詳細 (Python-first アプローチ)**:
-    - `PythonInventoryProvider` を用いて、GraalPy 上でオリジナルの Python 製 Ansible Inventory Plugin を実行する仕組みを完全にサポートしています。
-    - **サポート判定 (`supports`)**:
-        - ファイルが存在し、拡張子が `.yml` または `.yaml` であるかを検証します。
-        - `YamlUtil.createYaml()` を用いてファイルをロードし、最上位に `plugin` キー（例: `test_ns.test_coll.test_plugin`）が定義されている場合に対象ファイルとして自動判定します。
-    - **GraalPy 統合とブリッジ**:
-        - `Context` API を介して Python 実行環境を構築します。この際、ネイティブモジュールの分離設定として `python.IsolateNativeModules` に `false` を指定して初期化します。
-        - Java 側で用意した OS 互換性ブリッジ（`PythonOSMock`）およびモジュールファクトリ（`PythonAnsibleModuleMock.Factory`）を Python の bindings に注入します。
-        - Python の共有ブリッジ `ansible_bridge.py` を事前ロードし、`ansible.plugins.inventory` などの名前空間や `BaseInventoryPlugin`、`BaseFileInventoryPlugin` のモック群を適用します。
-    - **プラグイン実行と変換 (`load`)**:
-        - 解決された Python パスやライブラリパスを sys.path に追加設定した上で、`ansible_inventory_launcher.py` を実行します。
-        - ランチャーは `ansible_bridge._create_inventory_plugin(plugin_name)` により本物の Python プラグインを動的に解決・インスタンス化し、`plugin.parse(inventory, loader, inventory_path)` を呼び出します。
-        - 解析結果を蓄積した `InventoryData` オブジェクトから `to_dict()` 経由で JSON 形式にシリアライズされ、Java の呼び出し元に返却されます。
-        - Java の `PythonInventoryProvider` は Jackson を用いてこの JSON をパースし、Java の `Inventory` レコード（Group、Host、変数、およびグループ間親子関係）へと動的にパージ・マージしてインベントリを再構築します。
-
-### 5.3 インベントリ・プロバイダー (InventoryProvider)
-インベントリのソース（静的ファイル、スクリプト、プラグイン）を抽象化するため、`InventoryProvider` インターフェースを導入し、以下の通り実装しています。
+インベントリのソース（静的ファイル、スクリプト、プラグイン）を抽象化するため、`InventoryProvider` インターフェースおよび具象クラスを実装しています。
 
 ```java
 public interface InventoryProvider {
@@ -112,69 +81,146 @@ public interface InventoryProvider {
 }
 ```
 
-### 5.4 インベントリ・マネージャー (InventoryManager)
-複数の `InventoryProvider` を管理し、複数のインベントリソースを一つの `Inventory` オブジェクトに透過的に統合（マージ）する役割を担います。
+### 5.1 静的ファイルプロバイダー (`FileInventoryProvider`)
+- **判定ロジック (`supports`)**:
+  - ファイルが存在しかつファイルであるかを検証。
+  - OS が Windows の場合は `.ini`, `.yml`, `.yaml`, `.txt` 拡張子で判定。
+  - POSIX OS の場合は `!file.canExecute()` で非実行ファイルであることを確認。
+- **再帰的ツリーマージ処理 (`mergeInventory` / `mergeGroup`)**:
+  - `load` 呼び出し時、拡張子に応じて `YamlInventoryParser` または `IniInventoryParser` を生成してパース。
+  - 読み込まれた `Inventory` ツリーを既存の `target` インベントリへ再帰的にマージ（`mergeGroup`）。
+  - 変数マップの結合（`target.variables().putAll(source.variables())`）、ホストの重複チェックと変数結合、および子グループ構造の再帰結合を実施。
 
-### 5.5 実行時の考慮事項
-- **キャッシュ**: 動的インベントリの取得はコストが高いため、同一実行セッション内でのキャッシュ機構を設けます。
-- **環境変数**: スクリプト実行時、管理ノードの環境変数を継承させつつ、必要に応じて `ANSIBLE_` 等の変数を追加注入します。
+### 5.2 スクリプト方式プロバイダー (`ScriptInventoryProvider`)
+実行可能なプログラムから JSON 形式でインベントリ情報を取得します。
 
-## 6. インベントリ・ディレクトリのサポート (Inventory Directory Support)
+- **判定ロジック (`supports`)**:
+  - POSIX OS: `file.canExecute()` が `true` のファイルをスクリプトとして判定。
+  - Windows: `.py`, `.bat`, `.ps1`, `.exe` 拡張子を持つファイルを判定。
+- **実行メカニズム (`load`)**:
+  - `ProcessBuilder` を用いて、指定されたスクリプトを `--list` 引数付きで実行。Windows 上の `.py` ファイルに対してはコマンドの先頭に `python` を追加。
+  - 標準エラー出力は `Inherit` 形式で親プロセスへ継承し、標準出力をキャプチャして Jackson (`ObjectMapper`) で JSON を解析。
+- **データマッピング (`parseJsonInventory`)**:
+  - JSON の `_meta.hostvars` から各ホストの変数を取得。
+  - 各グループ配下の `vars` マップ、`hosts` 配列（`all` や既存グループへの自動割り当て）、および `children` 配列を再帰的に解析して内部 `Inventory` オブジェクトへ挿入・マージ。
 
-単一のファイルだけでなく、ディレクトリをインベントリソースとして指定した場合の挙動を定義します。
+### 5.3 プラグイン方式プロバイダー (`PythonInventoryProvider`)
+YAML 設定ファイルに基づき、GraalPy 上で Python 製 Ansible Inventory Plugin を動的にロード・実行します。
 
-### 6.1 ディレクトリの再帰的走査
-- `InventoryManager` は、指定されたパスがディレクトリである場合、その配下を再帰的に走査してインベントリファイルを探索します。
-- 発見されたファイルは、ファイル名（パス全体ではなくベース名）に基づき、大文字小文字を区別しないアルファベット順にソートして処理されます。
+- **判定ロジック (`supports`)**:
+  - ファイル拡張子が `.yml` または `.yaml` であるかを検証。
+  - `YamlUtil.createYaml()` を用いてファイルをロードし、最上位に `plugin` キー（例: `amazon.aws.aws_ec2`）が定義されている場合に対象ファイルとして自動判定。
+- **GraalPy 統合とブリッジ**:
+  - `Context` API を介して GraalPy 実行環境を構築（`python.IsolateNativeModules` は `false`）。
+  - Java 側の `PythonOSMock` および `PythonAnsibleModuleMock.Factory` を Python ビンディングに注入し、`ansible_bridge.py` を事前ロード。
+- **プラグイン実行と変換 (`load`)**:
+  - `ansible_inventory_launcher.py` を呼び出し、`ansible_bridge._createinventory_plugin(plugin_name)` 経由で本物の Python プラグインを動的に解決・インスタンス化し `plugin.parse(...)` を呼び出し。
+  - `InventoryData` から `to_dict()` で JSON シリアライズされたデータを Jackson でパースし、Java の `Inventory` レコードへパージ・マージ。
 
-### 6.2 除外ルール
-走査時、以下のファイルおよびディレクトリは無視されます。
+## 6. インベントリ・マネージャーとディレクトリ走査 (`InventoryManager`)
 
-- **隠しファイル**: `.` で始まるファイル。
-- **バックアップ・一時ファイル**: `~`, `.bak`, `.old`, `.orig`, `.retry`, `.rpmnew`, `.rpmsave`, `.tmp` で終わるファイル。
-- **特定のディレクトリ**: `vars`, `group_vars`, `host_vars` という名前のディレクトリ（これらは変数定義として別途処理されるため）。
+`InventoryManager` は複数の `InventoryProvider` を保持し、1つ以上のインベントリソース（ファイルまたはディレクトリ）を統括・マージします。
 
-### 6.3 エラーハンドリングの差異
-- **明示的な指定**: ユーザーが CLI 等で明示的に指定したファイルが、どの `InventoryProvider` でもサポートされていない（または存在しない）場合は、`RuntimeException` をスローして実行を中断します。
-- **ディレクトリ走査時**: ディレクトリ走査中に発見されたファイルが、サポートされていない形式（例: バイナリファイルや未知の拡張子）である場合は、警告をログに出力した上でスキップし、他のファイルの処理を継続します。
+### 6.1 ディレクトリ走査とソートアルゴリズム
+1. 指定されたソースがディレクトリの場合、`collectFiles` メソッドで再帰的にファイルを収集。
+2. 収集されたファイルリストを `Comparator.comparing(f -> f.getName().toLowerCase())` で大文字小文字を無視したベース名順にソート。
+3. ソートされた順序で `loadSingleSource(..., isFromDirectory=true)` を順次実行。
 
-## 7. ホストパターンのマッチングと範囲パターン展開 (Bracket-Aware Splitting & Range Pattern Expansion)
+### 6.2 自動除外ルール
+`collectFiles` での走査時、以下を自動フィルタリング:
+- `name.startsWith(".")`: ドット開始の隠しファイル・ディレクトリ。
+- `IGNORED_DIRECTORIES`: `"vars"`, `"group_vars"`, `"host_vars"`。
+- `IGNORED_EXTENSIONS`: `"~"`, `".bak"`, `".old"`, `".orig"`, `".retry"`, `".rpmnew"`, `".rpmsave"`, `".tmp"`。
 
-ホストパターン（`hosts` キーや `--limit` オプション）に含まれる範囲指定や複数指定を正しく解析・展開するための詳細設計です。
+### 6.3 エラーハンドリングのハンドラー分け
+- `isFromDirectory == false`（明示的ファイル指定）: 対応する `InventoryProvider` が見つからない場合 `RuntimeException` をスロー。
+- `isFromDirectory == true`（ディレクトリ自動走査）: 未対応ファイルは警告ログ (`LOGGER.warning`) のみ出力しスキップ。
 
-### 7.1 Bracket-Aware Splitting（ブラケットを考慮した分割）
+## 7. group_vars / host_vars 変数ディレクトリのロード実装 (`VariableManager.loadDirectoryVars`)
 
-ホストパターン全体はカンマ（`,`）またはコロン（`:`）で分割されますが、範囲指定内のコロンやカンマ（例: `web[0:5]`）で誤分割されないよう、ブラケットのネストを考慮して分割を行います。
+`VariableManager` は、インベントリディレクトリ (`inventoryDir`) およびプレイブックディレクトリ (`baseDir`) 直下の `group_vars` / `host_vars` から変数を読み込みます。
 
-#### アルゴリズム
-1. 入力文字列を1文字ずつ走査します。
-2. 開きブラケット `[` が出現した場合は、ネストレベルをインクリメントします。
-3. 閉じブラケット `]` が出現した場合は、ネストレベルをデクリメントします。
-4. ネストレベルが `0` のときにカンマ（`,`）またはコロン（`:`）が出現した位置でのみ、文字列を分割します。
-5. 分割された各トークンに対して、不要な空白をトリミングします。
+### 7.1 ディレクトリ変数読込アルゴリズム
+`VariableManager.loadDirectoryVars(Path dir, String subDir, String name)`:
+1. キャッシュキー `dir:subDir:name` で `directoryVarsCache` を確認。存在すれば即返却。
+2. 対象ディレクトリ `dir.resolve(subDir)`（例: `<invDir>/group_vars`）が存在するか確認。
+3. **単一ファイルの探索**:
+   - `<name>.yml`, `<name>.yaml`, `<name>.json` を `loadVarsFileFromPath` でロードし、順次マージ。
+4. **サブディレクトリの探索**:
+   - ディレクトリ `<name>/`（例: `group_vars/webservers/`）が存在する場合、`Files.list` で直下のファイルを列挙。
+   - `.yml`, `.yaml`, `.json` 拡張子を持つファイルをソートし、順次ロードしてマージ。
+5. 読込結果を `directoryVarsCache` に保存してマージマップを返却。
 
-### 7.2 範囲パターンの展開（Range Pattern Expansion）
+## 8. ホストパターンのマッチングと範囲パターン展開 (Bracket-Aware Splitting & Range Pattern Expansion)
 
-`HostPatternParser.expandPattern` は、分割されたトークン（ホストパターン）に含まれるブラケット `[...]` を解析し、全パターンのリストへと再帰的に展開します。単一トークン内に複数のブラケットが存在する場合は、それらの直積（Cartesian Product）を自動的に生成します。
+### 8.1 Bracket-Aware Splitting（ブラケットを考慮した分割）
+入力パターン文字列を 1 文字ずつ走査し、ブラケットのネストレベル（`[` で `+1`、`]` で `-1`）を追跡。ネストレベルが `0` の位置でのみカンマ（`,`）またはコロン（`:`）でトークンに分割。
 
-#### ブラケット内パターンの解析と正規表現ルール
-ブラケット内部の文字列は、範囲区切り文字としてコロン（`:`）およびハイフン（`-`）の両方をサポートします。
+### 8.2 範囲パターンの展開（Range Pattern Expansion）
+`HostPatternParser.expandPattern`:
+- **数値範囲**: 正規表現 `^(\d+)([:-])(\d+)$` を用いて解析。開始文字列の先頭が `"0"` かつ長さが 2 以上の場合は桁数揃え（0 埋め）。
+- **アルファベット範囲**: 正規表現 `^([a-zA-Z])([:-])([a-zA-Z])$` を用いて解析。
+- **方向性**: `start > end` の場合は降順（`-1` ステップ）展開。
+- **直積展開（Cartesian Product）**: 1つの文字列内に複数ブラケットが含まれる場合、最初のブラケット展開後に各要素へ再帰適用し直積を算出。
 
-- **数値範囲 (Numeric Range)**:
-  - 正規表現 `^(\d+)([:-])(\d+)$` を用いて解析を行います。
-  - **ゼロ埋め (Zero-Padding)**: 開始文字列（`startStr`）の長さが 2 以上かつ先頭が `"0"` である場合（例: `"01"`）、`String.format("%0" + padLength + "d", current)` を用いて出力される全数値文字列の桁数を `startStr` の長さに揃えて左詰め（0 埋め）します。
-  - **範囲指定例**: `[1:5]`, `[1-5]`, `[01:05]`, `[01-05]`
-- **アルファベット範囲 (Alphabetical Range)**:
-  - 正規表現 `^([a-zA-Z])([:-])([a-zA-Z])$` を用いて解析を行います。
-  - `startChar` から `endChar` までの文字コード範囲を展開します。
-  - **範囲指定例**: `[a:e]`, `[a-e]`, `[A:E]`, `[A-E]`
-- **方向性（増加・減少 / リバース）**:
-  - `start` が `end` 以下の場合はステップ `+1` で順方向に展開（例: `1` から `5`）。
-  - `start` が `end` より大きい場合はステップ `-1` で逆方向に展開（例: `5` から `1` や `e` から `a`）。
+## 9. 処理フロー図 (Mermaid Diagrams)
 
-#### 複数ブラケットの直積展開（再帰展開）
-単一のホストパターン内に複数の `[...]` が含まれる場合（例: `node[1:2]-site[a:b]`）、最初のブラケットを展開した後に生成された各展開文字列に対して再帰的に `expandPattern` を呼び出すことで、全要素の直積（Cartesian Product）を安全に生成します。
-- 例: `node[1:2]-site[a:b]` -> `node1-sitea`, `node1-siteb`, `node2-sitea`, `node2-siteb`
+### 9.1 インベントリ構築とマージ処理フロー
 
-#### 範囲外・非範囲ブラケットのフォールバック動作
-ブラケット内の文字列が数値範囲またはアルファベット範囲の正規表現にマッチしない場合、あるいは閉じブラケットが存在しない場合は、ブラケット文字をそのままリテラル文字列として維持しつつ、後続の接尾辞（suffix）に対して再帰的にパターン展開を適用します。
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as PlaybookCli / Executor
+    participant IM as InventoryManager
+    participant FIP as FileInventoryProvider
+    participant SIP as ScriptInventoryProvider
+    participant PIP as PythonInventoryProvider
+    participant Inv as Inventory (Record)
+
+    User->>IM: loadInventory([sources])
+    IM->>Inv: create Root Inventory(Group("all"))
+    loop For each source path
+        alt Is Directory
+            IM->>IM: collectFiles & sort by base name
+        end
+        loop For each resolved file
+            alt FileInventoryProvider.supports()
+                IM->>FIP: load(source, inv)
+                FIP->>FIP: parse INI/YAML
+                FIP->>Inv: mergeInventory(target, loaded)
+            else ScriptInventoryProvider.supports()
+                IM->>SIP: load(source, inv)
+                SIP->>SIP: ProcessBuilder --list
+                SIP->>Inv: parseJsonInventory & merge
+            else PythonInventoryProvider.supports()
+                IM->>PIP: load(source, inv)
+                PIP->>PIP: GraalPy ansible_inventory_launcher
+                PIP->>Inv: parse JSON & merge
+            end
+        end
+    end
+    IM-->>User: Return merged Inventory
+```
+
+### 9.2 Python Inventory Plugin 実行シーケンス
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant PIP as PythonInventoryProvider
+    participant Poly as GraalPy Context
+    participant Launcher as ansible_inventory_launcher.py
+    participant Plugin as Python InventoryPlugin
+    participant Inv as Java Inventory
+
+    PIP->>Poly: Initialize Context & Bindings
+    PIP->>Poly: Preload ansible_bridge.py
+    PIP->>Poly: Execute ansible_inventory_launcher.py
+    Launcher->>Plugin: _create_inventory_plugin(plugin_name)
+    Launcher->>Plugin: plugin.parse(inventory, loader, path)
+    Plugin-->>Launcher: InventoryData populated
+    Launcher->>Launcher: inventory_data.to_dict() -> JSON string
+    Launcher-->>PIP: Return JSON Output
+    PIP->>PIP: Jackson ObjectMapper.readTree()
+    PIP->>Inv: Reconstruct Groups, Hosts & Variables
+```

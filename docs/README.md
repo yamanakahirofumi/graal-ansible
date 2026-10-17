@@ -30,7 +30,7 @@
 - [CLI仕様](features/CLI-Specification.md)：ansible-playbook互換のコマンドライン引数
 - [処理フロー](features/Process-Flow.md)：管理ノードからターゲットノードまでの全体フロー（**本プロジェクトの基本設計方針**）
 - [動作環境](features/System-Requirements.md)：Java/GraalVMの実行環境とOS互換性
-- [インベントリ管理](features/Inventory-System.md)：静的・動的インベントリのサポート範囲
+- [インベントリ管理](features/Inventory-System.md)：静的・動的インベントリ、プロバイダー自動検出、変数ディレクトリおよびパターン範囲展開仕様
 - [コレクションの管理と取得方法](features/Collection-Management.md)：実際のコレクションを取得・利用する手順
 - [Playbook実行仕様](features/Playbook-Execution.md)：タスク実行、ループ、条件分岐のサポート範囲
 - [Ansible Vault 復号仕様](features/Vault-Support.md)：Ansible Vaultのネイティブ復号仕様と実装アーキテクチャ
@@ -60,7 +60,7 @@
 
 ## 5. 実装詳細 (`docs/implementation/`)
 - [YAML解析エンジン](implementation/YAML-Parser.md)：SnakeYAML等を用いたPlaybook解析の実装
-- [インベントリシステム実装](implementation/Inventory-System.md)：静的インベントリの解析と管理
+- [インベントリシステム実装](implementation/Inventory-System.md)：インベントリ解析・プロバイダー・ディレクトリ変数ロードの実装詳細とシーケンス図
 - [タスク実行エンジン](implementation/Task-Executor.md)：マルチスレッド実行と順序制御
 - [ストラテジ・プラグインの実装仕様](implementation/Strategy-Plugins.md)：実行戦略（linear, free等）による実行制御
 - [Action Plugin 実装仕様](implementation/Action-Plugins.md)：制御ノード側で動作するプラグインの実行メカニズム (Python-first)
