@@ -500,4 +500,24 @@ class FileModulesIntegrationTest {
         } catch (IOException ignored) {}
     }
 
+    @Test
+    void testFileModuleSymlinkCheckMode() throws IOException {
+        Path srcFile = tempDir.resolve("symlink_src.txt");
+        Files.writeString(srcFile, "symlink content");
+        Path linkFile = tempDir.resolve("symlink_link.txt");
+
+        Task task = new Task("Create symlink check mode", "file", Map.of(
+                "src", srcFile.toString(),
+                "dest", linkFile.toString(),
+                "state", "link"
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "file symlink check mode failed: " + result.message() + " Data: " + result.data());
+        assertTrue(result.changed());
+        assertFalse(Files.exists(linkFile, java.nio.file.LinkOption.NOFOLLOW_LINKS), "Symlink should not be created in check mode");
+    }
+
 }
