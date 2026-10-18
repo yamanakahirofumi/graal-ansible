@@ -492,7 +492,7 @@ class BuiltinModulesIntegrationTest {
         Path destFile = tempDir.resolve("get_url_dest.txt");
 
         Task task = new Task("Get URL check mode", "get_url", Map.of(
-                "url", "file://" + srcFile.toAbsolutePath(),
+                "url", srcFile.toUri().toString(),
                 "dest", destFile.toString()
         ), Map.of(), null, null, null, List.of(), null, null, false,
                 null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
