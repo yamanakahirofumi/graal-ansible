@@ -485,4 +485,42 @@ class BuiltinModulesIntegrationTest {
         assertFalse(result.changed(), "pause module in check mode should report changed = false");
     }
 
+    @Test
+    void testGetUrlModuleCheckMode() throws IOException {
+        Path srcFile = tempDir.resolve("get_url_src.txt");
+        Files.writeString(srcFile, "downloadable content");
+        Path destFile = tempDir.resolve("get_url_dest.txt");
+
+        Task task = new Task("Get URL check mode", "get_url", Map.of(
+                "url", "file://" + srcFile.toAbsolutePath(),
+                "dest", destFile.toString()
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "get_url check mode failed: " + result.message() + " Data: " + result.data());
+        assertFalse(Files.exists(destFile), "Destination file should not be created in check mode");
+    }
+
+    @Test
+    void testFetchModule() throws IOException {
+        Path srcFile = tempDir.resolve("fetch_src.txt");
+        Files.writeString(srcFile, "remote file content");
+        Path destDir = tempDir.resolve("fetch_dest_dir");
+        Files.createDirectories(destDir);
+
+        Task task = new Task("Fetch file", "fetch", Map.of(
+                "src", srcFile.toString(),
+                "dest", destDir.toString() + "/",
+                "flat", "yes"
+        ));
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "fetch failed: " + result.message() + " Data: " + result.data());
+        Path expectedFetchFile = destDir.resolve(srcFile.getFileName().toString());
+        assertTrue(Files.exists(expectedFetchFile), "Fetched file should exist");
+        assertEquals("remote file content", Files.readString(expectedFetchFile));
+    }
+
 }
