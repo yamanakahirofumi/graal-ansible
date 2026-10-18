@@ -177,6 +177,33 @@ class PosixModulesIntegrationTest {
         assertTrue(facts.containsKey("ansible_system"), "ansible_facts should contain ansible_system when filtered");
     }
 
+
+    @Test
+    void testPipModuleCheckMode() {
+        Task task = new Task("Install pip package in check mode", "pip", Map.of(
+                "name", "wheel",
+                "state", "present"
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "pip check mode failed: " + result.message() + " Data: " + result.data());
+    }
+
+    @Test
+    void testGroupModuleCheckMode() {
+        Task task = new Task("Manage group in check mode", "group", Map.of(
+                "name", "nonexistent_check_group",
+                "state", "present"
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "group check mode failed: " + result.message() + " Data: " + result.data());
+    }
+
     @Test
     void testScriptActionPlugin() throws IOException {
         System.setProperty("ansible.action_plugins.enabled", "true");
