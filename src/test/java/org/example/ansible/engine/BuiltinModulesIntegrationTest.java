@@ -485,4 +485,40 @@ class BuiltinModulesIntegrationTest {
         assertFalse(result.changed(), "pause module in check mode should report changed = false");
     }
 
+    @Test
+    void testSetFactModuleCheckMode() {
+        Task task = new Task("Set fact check mode", "set_fact", Map.of(
+                "check_var", "check_value"
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "set_fact check mode failed: " + result.message() + " Data: " + result.data());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
+        assertNotNull(facts, "ansible_facts should be returned by set_fact in check mode");
+        assertEquals("check_value", facts.get("check_var"));
+    }
+
+    @Test
+    void testFetchModule() throws IOException {
+        Path srcFile = tempDir.resolve("fetch_src.txt");
+        Files.writeString(srcFile, "remote file content");
+        Path destDir = tempDir.resolve("fetch_dest_dir");
+        Files.createDirectories(destDir);
+
+        Task task = new Task("Fetch file", "fetch", Map.of(
+                "src", srcFile.toString(),
+                "dest", destDir.toString() + "/",
+                "flat", "yes"
+        ));
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "fetch failed: " + result.message() + " Data: " + result.data());
+        Path expectedFetchFile = destDir.resolve(srcFile.getFileName().toString());
+        assertTrue(Files.exists(expectedFetchFile), "Fetched file should exist");
+        assertEquals("remote file content", Files.readString(expectedFetchFile));
+    }
+
 }
