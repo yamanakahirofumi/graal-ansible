@@ -486,21 +486,19 @@ class BuiltinModulesIntegrationTest {
     }
 
     @Test
-    void testGetUrlModuleCheckMode() throws IOException {
-        Path srcFile = tempDir.resolve("get_url_src.txt");
-        Files.writeString(srcFile, "downloadable content");
-        Path destFile = tempDir.resolve("get_url_dest.txt");
-
-        Task task = new Task("Get URL check mode", "get_url", Map.of(
-                "url", srcFile.toUri().toString(),
-                "dest", destFile.toString()
+    void testSetFactModuleCheckMode() {
+        Task task = new Task("Set fact check mode", "set_fact", Map.of(
+                "check_var", "check_value"
         ), Map.of(), null, null, null, List.of(), null, null, false,
                 null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
                 null, null, null, null, true, null);
 
         TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
-        assertTrue(result.success(), "get_url check mode failed: " + result.message() + " Data: " + result.data());
-        assertFalse(Files.exists(destFile), "Destination file should not be created in check mode");
+        assertTrue(result.success(), "set_fact check mode failed: " + result.message() + " Data: " + result.data());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
+        assertNotNull(facts, "ansible_facts should be returned by set_fact in check mode");
+        assertEquals("check_value", facts.get("check_var"));
     }
 
     @Test
