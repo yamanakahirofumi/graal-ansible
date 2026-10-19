@@ -298,15 +298,77 @@
 
 ### 13.1 タスクの包含 (`include_tasks`, `import_tasks`)
 
-外部ファイルで定義されたタスクリストを現在の Play に取り込みます。
+外部ファイルで定義されたタスクリストを現在の Play に取り込む仕組みです。`graal-ansible` においては、解析時（Parse Time）に固定化される静的インポート（`import_tasks`）と、実行時（Runtime）に動的評価・ロードされる動的包含（`include_tasks`）の両方をサポートしています。
 
-- **実装方針**:
-    - `include_tasks` または `import_tasks` キーに指定されたファイルパス（テンプレート可）を解決します。
-    - ファイル内のタスクリストを読み込み、現在の実行コンテキスト（変数、タグ等）を継承させつつ実行します。
-- **ホストパターンの解決**:
-    - 取り込まれるタスクが特定のホストやグループを対象とする場合、`TaskQueueManager` はインベントリ全体の階層構造を再帰的に検索（`getAllHosts`）して、一致する全てのホストを正確に特定します。これにより、深い階層にあるグループに対しても漏れなくタスクが適用されます。
-- **パラメータの伝播**:
-    - `include_tasks` 時に渡された引数（Level 21 変数）は、取り込まれた子タスクに明示的に継承され、変数優先順位に従って解決されます。
+#### 1. 静的インポート (`import_tasks`) vs 動的包含 (`include_tasks`) の比較
+
+| 評価軸 | `import_tasks` (静的インポート) | `include_tasks` (動的包含) |
+| :--- | :--- | :--- |
+| **評価タイミング** | **Parse Time**（Playbook 読み込み・初期解析時） | **Runtime**（タスク実行順序に到達した実行時） |
+| **ファイル名変数参照** | 静的変数・ファクトのみ（Parse Time 確定可能変数） | 動的変数・テンプレート可（前タスクの `register` や `loop` の `item` 等） |
+| **ループ構造 (`loop`)** | 非サポート（解析時に展開不可能なため） | 完全サポート（ループの各イテレーションごとに動的にファイルをロード・実行） |
+| **条件式 (`when`)** | 解析時に展開された各子タスクへ `when` 条件を直接コピー | `include_tasks` 指示句自体で評価し、偽（`false`）の場合はファイル読み込み自体をスキップ |
+| **タグ (`tags`)** | 解析時にインポート先ファイル内の全子タスクに直接タグを付与 | `include_tasks` 指示句自体に付与され、実行時に動的にフィルタリング |
+| **パラメータ `apply`** | サポート（子タスクへ属性を一括適用） | サポート（動的ロードタスクへ属性を一括適用） |
+
+#### 2. サポートパラメータ仕様
+
+| パラメータ名 | 型 | デフォルト値 | 必須/任意 | 説明 |
+| :--- | :--- | :--- | :--- | :--- |
+| `file` / `free-form` | `String` | なし | 必須 | ロード対象のタスク YAML ファイルパス（`playbook_dir` 相対または絶対パス）。 |
+| `apply` | `Map<String, Object>` | なし | 任意 | 取り込まれる子タスク群へ一括適用する属性マップ（`tags`, `when`, `environment`, `become` 等）。 |
+
+#### 3. 処理データフローとシーケンス
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Parser as YamlParser
+    participant TQM as TaskQueueManager
+    participant Worker as TaskExecutor
+    participant Resolver as VariableResolver
+
+    alt import_tasks (Parse Time 静的処理)
+        Parser->>Parser: YAML 読み込み時に import_tasks を検知
+        Parser->>Parser: 外部タスクファイルを再帰的にパース
+        Parser->>Parser: 親の tags / when / apply 属性を全子タスクに一括適用
+        Parser-->>TQM: 単一の平坦化された Task リストとして登録
+    else include_tasks (Runtime 動的処理)
+        Parser-->>TQM: include_tasks タスク指示句をそのまま保持
+        TQM->>Worker: include_tasks をタスクとして実行依頼
+        Worker->>Resolver: ファイル名パス・パラメータテンプレートを展開
+        Worker->>Parser: 指定ファイルの内容を動的ロード・パース
+        Worker->>Worker: Level 21 Include 変数を生成
+        Worker-->>TQM: 動的に生成された Task リストを現在キューの先頭へ注入
+    end
+```
+
+#### 4. 使用例
+
+- **静的インポート (`import_tasks`)**:
+  ```yaml
+  - name: Import static setup tasks
+    ansible.builtin.import_tasks: common_setup.yml
+    vars:
+      package_state: present
+    tags:
+      - setup
+  ```
+
+- **動的包含 (`include_tasks`) と `apply` / リトライループ**:
+  ```yaml
+  - name: Include dynamic OS configuration
+    ansible.builtin.include_tasks:
+      file: "tasks/{{ ansible_distribution }}.yml"
+      apply:
+        tags:
+          - os_config
+        become: true
+    loop:
+      - app_config
+      - db_config
+    when: should_configure | default(true)
+  ```
 
 ### 13.2 プレイブックのインポート (`import_playbook`)
 
@@ -336,17 +398,67 @@
 
 ### 13.4 ロールの包含・インポート (`include_role`, `import_role`)
 
-定義済みのロールを動的（include）または静的（import）にタスクとして実行します。
+定義済みの Ansible ロールをタスクレベルで動的（`include_role`）または静的（`import_role`）にインポート・実行するアクションプラグインの実装詳細です。
 
-- **実装方針**:
-    - `TaskQueueManager` において Java によるエミュレーション実装を行っています。
-    - ロール名に基づき、標準的なディレクトリ構造（`roles/<role_name>/`）を検索し、`tasks/main.yml`（または `tasks_from` で指定されたファイル）を読み込みます。
-- **変数優先順位 (Level 15 および Level 20)**:
-    - ロール内の `vars/main.yml` で定義された変数は、**Level 15 (Role variables)** として登録されます。
-    - ロール呼び出し時に渡されたパラメータ（例: `vars:` 句）は、**Level 20 (Role parameters)** として登録されます。
-    - これにより、プレイ変数（Level 12）などを適切に上書きしつつ、`extra_vars`（Level 22）による上書きを許容する Ansible 互換の優先順位を実現しています。
-- **コンテキストの分離**:
-    - ロール実行中は、そのロール固有の変数が優先的に解決されるよう、`activeRoles` コンテキストをスタック状に管理して実行エンジンに伝播させます。
+#### 1. 静的インポート (`import_role`) vs 動的包含 (`include_role`) の比較
+
+| 評価軸 | `import_role` (静的インポート) | `include_role` (動的包含) |
+| :--- | :--- | :--- |
+| **評価タイミング** | **Parse Time**（Playbook 読み込み・初期解析時） | **Runtime**（タスク実行順序に到達した実行時） |
+| **ロール名変数参照** | 静的変数・ファクトのみ（Parse Time 確定可能変数） | 動的変数・テンプレート可（前タスクの `register` や `loop` の `item` 等） |
+| **ループ構造 (`loop`)** | 非サポート | 完全サポート（ループ内で動的にロールを連続呼び出し可能） |
+| **条件式 (`when`)** | 解析時にロール内の全タスクへ `when` 条件を直接コピー | `include_role` 指示句自体で評価し、偽（`false`）の場合はロール実行をスキップ |
+| **ハンドラー自動統合** | ロール内の `handlers/main.yml` は Play のグローバルハンドラーへ静的統合 | ロール内の `handlers/main.yml` は実行時に動的追加 |
+
+#### 2. サポートパラメータ仕様
+
+| パラメータ名 | 型 | デフォルト値 | 必須/任意 | 説明 |
+| :--- | :--- | :--- | :--- | :--- |
+| `name` | `String` | なし | 必須 | 実行対象のロール名（例: `common`, `webserver`）。 |
+| `tasks_from` | `String` | `"main.yml"` | 任意 | ロール内 `tasks/` ディレクトリ配下で読み込むタスクファイル名。 |
+| `vars_from` | `String` | `"main.yml"` | 任意 | ロール内 `vars/` ディレクトリ配下で読み込む変数ファイル名。 |
+| `defaults_from` | `String` | `"main.yml"` | 任意 | ロール内 `defaults/` ディレクトリ配下で読み込むデフォルト変数ファイル名。 |
+| `public` | `Boolean` | `false` | 任意 | `true` の場合、ロール内で定義された変数を Play 全体スコープへ永続エクスポートし、後続の外部タスクから参照可能にする。 |
+| `allow_duplicates` | `Boolean` | `true` | 任意 | `true` の場合、同一 Playbook セッションで過去に実行済みのロールであっても再実行を許可する。 |
+| `apply` | `Map<String, Object>` | なし | 任意 | ロール内のすべてのタスクへ一括適用する属性マップ（`tags`, `when`, `become` 等）。 |
+
+#### 3. 変数優先順位マッピングと `activeRoles` スタック管理
+
+ロール実行フェーズにおいて、`VariableManager` は以下の優先順位構造に従って変数オーバーライドを解決します：
+
+1. **Level 2 (Role defaults)**: ロール内 `defaults/main.yml`（または `defaults_from`）の低優先度デフォルト値。
+2. **Level 15 (Role variables)**: ロール内 `vars/main.yml`（または `vars_from`）の高優先度ロール変数。
+3. **Level 20 (Role parameters)**: `roles:` 定義時または呼び出し時の `vars:` パラメータ。
+4. **Level 21 (Include parameters)**: `include_role` / `import_role` 実行時に渡されたインクルード引数。
+
+- **`activeRoles` コンテキストスタック**:
+  - 実行エンジン（`TaskQueueManager` / `TaskExecutor`）は、ロールの開始時に `activeRoles` スタックへ対象 `Role` コンテキスト（ロール名、パラメータ、スコープ情報）を `.push()` し、終了時に `.pop()` します。
+  - 変数解決 API （`VariableManager.getAllVariables`）は、`activeRoles` スタックを深さ優先で辿り、ネストされたロール呼び出しにおいても常に内側のロール変数が最優先で解決されるコンテキスト分離を保証します。
+
+#### 4. ディレクトリ検索とロード順序
+
+`include_role` / `import_role` は、指定された `name` に基づき以下の探索パス優先順位に従ってロール構成ファイルを解決します：
+
+1. `playbook_dir/roles/<role_name>/`
+2. `playbook_dir/<role_name>/`
+3. `ANSIBLE_ROLES_PATH` 環境変数（または設定ファイル）で定義された各検索ディレクトリ
+
+#### 5. 使用例
+
+- **`include_role` による動的タスク切り替えと `public` 変数共有**:
+  ```yaml
+  - name: Conditionally include webserver role with custom task entry
+    ansible.builtin.include_role:
+      name: webserver
+      tasks_from: configure_ssl.yml
+      public: true
+      apply:
+        tags:
+          - ssl
+    vars:
+      ssl_cert_path: /etc/ssl/certs/app.crt
+    when: enable_ssl | default(false)
+  ```
 
 ### 13.5 Play レベルでのロール定義と実行構造 (`roles`)
 
