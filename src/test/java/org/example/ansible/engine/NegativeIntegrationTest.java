@@ -419,4 +419,30 @@ class NegativeIntegrationTest {
         assertTrue(result.data().containsKey("msg") || result.data().containsKey("exception"),
                 "Result data should contain error information: " + result.data());
     }
+
+    @Test
+    void testAssembleMissingRequiredParams() {
+        Task task = new Task("assemble missing src", "assemble", Map.of(
+                "dest", tempDir.resolve("out.txt").toString()
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertFalse(result.success(), "assemble module should fail due to missing 'src'");
+        assertTrue(result.data().containsKey("msg") || result.data().containsKey("exception"));
+    }
+
+    @Test
+    void testAssembleNonExistentSourceDir() {
+        Path nonExistentSrc = tempDir.resolve("no_such_src_dir");
+        Path destFile = tempDir.resolve("assembled.txt");
+
+        Task task = new Task("assemble non-existent src dir", "assemble", Map.of(
+                "src", nonExistentSrc.toString(),
+                "dest", destFile.toString()
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertFalse(result.success(), "assemble should fail when source directory does not exist");
+        assertTrue(result.data().containsKey("msg") || result.data().containsKey("exception"));
+    }
 }
