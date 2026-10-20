@@ -552,3 +552,9 @@
 - **解決策**:
     - `docs/features/Ssh-Jump-Host-Support.md` において、多段 Jump Host 接続モデル（`List<BastionConfig>`）、`-J` / `ProxyCommand` 解析、および逆順での接続クローズ仕様を明記し、テーブルフォーマットを整理。
     - `docs/implementation/Ssh-Jump-Host-Support.md` において、`SshJumpHostParser` の `ProxyJump` (カンマ区切り多段ホスト) / `ProxyCommand` 正規表現パターン、`SshConnection` の `ActiveBastion` カスケードトンネリングコード例、逆順リソース解放処理、およびエラー例外マッピングテーブルを最新化。
+
+### 1.57 [✓] ConnectionFactory コネクション解決仕様の詳細化 [追加]
+- **完了日**: 2026-10-24
+- **概要**: `docs/implementation/Connection-Plugins.md` Section 8.3 における `DefaultConnectionFactory` のコネクション解決ルール、パラメータ抽出・型変換、デフォルト/フォールバック動作、およびサポート外コネクションタイプの例外ハンドリング仕様を詳細化。
+- **解決策**:
+    - `docs/implementation/Connection-Plugins.md` に `DefaultConnectionFactory` の解決フローおよび `local`, `docker`, `ssh`/`smart`, `winrm` の詳細パラメータマッピング仕様を追加・整理。

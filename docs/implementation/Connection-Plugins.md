@@ -225,12 +225,38 @@ public interface ConnectionFactory {
 | `ansible_password` | 接続パスワード | なし |
 | `ansible_ssh_private_key_file`| 認証用秘密鍵パス | なし |
 
-### 8.3 解決フロー
+### 8.3 解決フローと標準実装 (`DefaultConnectionFactory`)
 
-1. **変数の集約**: `VariableManager` を用いて、対象ホストの `ansible_connection` 等の変数を解決します。
-2. **プラグインの特定**: `ansible_connection` の値に基づき、対応する `Connection` 実装クラス（`LocalConnection`, `SshConnection` 等）を選択します。
-3. **インスタンス化とパラメータ注入**: 解決された接続情報（ホスト、ポート、ユーザー等）をインスタンスに注入します。
-4. **接続のキャッシュ**: 同一ホスト・同一パラメータのコネクションは `TaskQueueManager` レベルで保持（Map等）し、プレイ内のタスク間で再利用することでオーバーヘッドを削減します。
+`DefaultConnectionFactory` における `ansible_connection` の評価および各コネクションプラグインの生成ロジックは以下の順序・ルールで実行されます：
+
+1. **変数の集約**: `VariableManager` を用いて、対象ホストの `ansible_connection`, `ansible_host`, `ansible_port`, `ansible_user`, `ansible_password` 等の変数を集約します。
+2. **デフォルトコネクションタイプの判定**:
+   - `ansible_connection` 変数が未指定の場合、デフォルト値として `"ssh"` が選択されます。
+   - ただし、ターゲットホスト名が `"localhost"` または `"127.0.0.1"` かつ `ansible_connection` が明示指定されていない特殊ケースでは、自動的に `"local"` （`LocalConnection`）へとフォールバックします。
+3. **プラグイン別のインスタンス化とパラメータ解決**:
+   - **`local`**:
+     - 追加のネットワーク引数は不要であり、`new LocalConnection()` を直接インスタンス化します。
+   - **`docker`**:
+     - `containerName`: `ansible_host` 変数の値を参照し、未指定時は `host.name()` をデフォルトとします。
+     - `user`: `ansible_user` 変数を取得し、`new DockerConnection(containerName, user)` をインスタンス化します。
+   - **`ssh` / `smart`**:
+     - `ansibleHost`: `ansible_host` 未指定時は `host.name()`。
+     - `port`: `ansible_port` 変数が数値（`Number`）または文字列（`String`）で存在する場合はパースし、未指定時はデフォルト `22`。
+     - `user` / `password`: `ansible_user` および `ansible_password` 変数。
+     - `privateKeyFile`: `ansible_ssh_private_key_file` 変数。
+     - `bastionConfigs`: `SshJumpHostParser.getBastionConfigs(variables)` を介して踏み台サーバー設定リストをパース。
+     - 上記パラメータを用いて `new SshConnection(...)` を生成します。
+   - **`winrm`**:
+     - `ansibleHost`: `ansible_host` 未指定時は `host.name()`。
+     - `scheme`: `ansible_winrm_scheme` 未指定時は `"http"`。`"https".equalsIgnoreCase(scheme)` により `useHttps` フラグを設定。
+     - `port`: `ansible_port` 未指定時は `useHttps` に応じて `5986` (HTTPS) または `5985` (HTTP) を自動決定。
+     - `user` / `password`: `ansible_user` および `ansible_password` 変数。
+     - `disableCertificateChecks`: `ansible_winrm_server_cert_validation` の値が `"ignore"`（デフォルト）であるか判定。
+     - 上記パラメータを用いて `new WinRMConnection(...)` を生成します。
+   - **サポート対象外のタイプ**:
+     - 未対応の `ansible_connection` タイプが指定された場合は、`IllegalArgumentException` をスローして安全に処理を中断します。
+4. **接続のキャッシュ**:
+   - 生成された `Connection` インスタンスは `TaskQueueManager` レベルで保持され、同一プレイブック実行セッション内で再利用されます。
 
 ## 9. Docker コネクションの詳細設計
 
