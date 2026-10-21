@@ -6,6 +6,39 @@
 
 ターゲットノード上で、ログインユーザー（接続ユーザー）とは別の特権ユーザー（通常は `root` または管理者アカウント）としてタスクを実行するための仕組みです。接続プラグインを通じて、`sudo`, `su`, `runas` などのオペレーティングシステム固有のコマンドやメカニズムを用いて透過的に実現します。
 
+### 1.1 権限昇格の全体データフロー (Sequence Flow)
+
+以下に、Playbook 実行エンジンからタスク解決、接続プラグイン経由での特権コマンド構築、およびパスワード注入までのシーケンスフローを示します。
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant PE as PlaybookExecutor / TQM
+    participant VR as VariableResolver
+    participant TE as TaskExecutor
+    participant CP as ConnectionPlugin
+    participant Proc as Target Process / SSH
+
+    PE->>VR: resolveBecomeContext(play, task, hostVars)
+    VR-->>PE: BecomeContext (become, method, user, flags, password)
+    PE->>TE: executeTask(task, hostVars, becomeContext)
+    TE->>CP: execCommand(command, env, becomeContext)
+    CP->>CP: Wrap command with sudo/su/runas
+    CP->>Proc: Start Process / SSH Exec Channel
+    alt becomePassword != null & sudo/su
+        CP->>Proc: Wait for BECOME-PROMPT
+        CP->>Proc: Inject password + "\n" to stdin & flush
+    end
+    Proc-->>CP: Read stdout & stderr stream
+    CP-->>TE: ConnectionResult (stdout, stderr, exitCode)
+    TE->>TE: Evaluate auth errors (sudo/su failure)
+    alt Auth Failure (sudoers / incorrect pass)
+        TE-->>PE: Throw UnreachableException / Task Failure
+    else Execution Success / Normal Result
+        TE-->>PE: TaskResult (ok / changed / failed)
+    end
+```
+
 ## 2. サポートするキーワードと変数優先順位
 
 プレイ（Play）およびタスク（Task）レベルで、以下のキーおよび対応するインベントリ/CLI 変数をサポートします。
@@ -43,6 +76,11 @@
 
 - `ConsolePromptProvider` は `System.console().readPassword()` を使用して、ターミナル上に文字を表示させずに暗号化非表示でパスワードを取得します。
 - 取得されたパスワードは `ansible_become_password` 変数として `VariableManager`（Level 1 または Level 22）に登録され、以降のすべての昇格処理で共有されます。
+
+### 3.3 非対話型（Headless）環境におけるエラー処理仕様
+CI/CD パイプラインやバックグラウンドプロセスなど、コンソール（TTY）が存在しない非対話型環境（`System.console() == null`）で `-K` / `--ask-become-pass` が指定された場合、`ConsolePromptProvider` は入力を促すことができずハングするのを防止するため、即座に `AnsibleException` をスローします。
+
+- **エラーメッセージ**: `Console prompt is not available in headless environment. Please provide password via extra-vars (-e) or vault password file.`
 
 ## 4. BecomeContext データモデルと解決ロジック
 
@@ -126,6 +164,15 @@ Windows 環境（WinRM）における特権実行方式です。
 
 Docker コンテナ内での実行（`DockerConnection`）において、`become_method=runas` または `become_user` が指定された場合、`docker exec` CLI の `-u` オプションに `becomeUser`（未指定時は `root`）を直接指定することで、Docker レベルで特権ユーザー切り替えを行います。
 
+### 5.5 プロンプト検知メカニズム (Prompt Detection)
+
+接続プラグインでは、プロセス起動後に標準出力 / 標準エラー出力ストリームを監視し、プロンプト文字列を検出してパスワードの注入タイミングを制御します。
+
+- **プロンプトマーカー一致**: `sudo -p BECOME-PROMPT` により、出力ストリーム中に `BECOME-PROMPT` 文字列が含まれるかをリアルタイム判定します。
+- **レガシープロンプト正規表現**: `su` や標準プロンプトの場合、以下の正規表現パターンで動的検出を行います:
+  - `(?i)(?:password|パスワード)\s*:`
+- **タイムアウト保護**: プロンプト待ちで 10 秒以上応答がない場合、プロセスのハング防止のためパスワード注入処理を中断し、タイムアウト例外を発生させます。
+
 ## 6. コネクションプラグイン別の統合仕様
 
 各接続プラグインでの `BecomeContext` 統合と処理内容は以下の通りです。
@@ -141,17 +188,18 @@ Docker コンテナ内での実行（`DockerConnection`）において、`become
 
 権限昇格実行時における失敗シナリオおよびエラー検知ルールは以下の通り定義されます。
 
-### 7.1 認証失敗の検知ルール
-プロセス実行結果の標準エラー出力（`stderr`）または終了コード（`exitCode`）に基づき、以下のパターンを検知します：
+### 7.1 エラーパターンと例外マッピングマトリクス
 
-- **`sudo` パスワード間違い・未指定**:
-  - `stderr` に `sudo: a password is required` または `sudo: 1 incorrect password attempt` が含まれる場合。
-- **`su` 認証失敗**:
-  - `stderr` に `su: Authentication failure` や `su: incorrect password` が含まれる場合。
-- **パーミッション拒否 / `sudoers` 未登録**:
-  - `stderr` に `is not in the sudoers file` が含まれる場合。
+| エラーパターン（stderr / stdout 判定） | 原因・条件 | スローされる例外 | タスク実行結果 |
+| :--- | :--- | :--- | :--- |
+| `sudo: a password is required` | `sudo` パスワード未指定 | `UnreachableException` | Host Unreachable |
+| `sudo: 1 incorrect password attempt` / `Password:` 再要求 | `sudo` パスワード間違い | `UnreachableException` | Host Unreachable |
+| `su: Authentication failure` / `su: Incorrect password` | `su` 認証失敗 | `UnreachableException` | Host Unreachable |
+| `is not in the sudoers file` | `sudoers` 権限不備 | `UnreachableException` | Host Unreachable |
+| `sudo: option requires an argument` | `become_flags` 設定不正 | `ModuleExecutionException` | Task Failed |
+| 非ゼロ exitCode (コマンド本体のエラー) | 昇格後の実行エラー | なし (`ConnectionResult`) | Task Failed / Evaluated |
 
-### 7.2 例外および実行結果へのマッピング
+### 7.2 例外および実行結果へのマッピングルール
 - **`UnreachableException` へのマッピング**:
   - 権限昇格パスワードの入力ミスや `sudoers` 権限不備によりタスクが進行不能となった場合、該当ホストを即時到達不能ステータスに移行させるため `UnreachableException` をスローします。
 - **`ConnectionResult` へのマッピング**:
@@ -159,6 +207,12 @@ Docker コンテナ内での実行（`DockerConnection`）において、`become
 
 ## 8. セキュリティおよび Native Image 考慮事項
 
-- **メモリ上のパスワード保護**: パスワード文字列（`becomePassword`）は使用後、不要になった時点でメモリからクリア処理を行うよう配慮します。
-- **ログのマスキング**: ログ出力（デバッグログおよび標準出力）において、パスワード文字列や `-p BECOME-PROMPT` 注入部分のパスワード平文がそのまま表示されないよう自動マスキング処理を適用します。
-- **GraalVM Native Image 対応**: `sudo` や `su` 等のローカルプロセスコマンド呼び出しで使用される `ProcessBuilder` の実行クラスおよび OS コマンドパスについて、`resource-config.json` 等で正しくネイティブアクセスが許可されていることを保証します。
+### 8.1 メモリ上のパスワード保護とバッファ消去
+- **`char[]` バッファの採用**: パスワードを読み込むプロンプト（`ConsolePromptProvider`）では、Java 不変オブジェクトである `String` ではなく `char[]` バッファを内部保持します。
+- **即時ゼロ埋め消去 (Memory Zeroing)**: 標準入力ストリームへの書き込みが完了した直後に、`Arrays.fill(passwordBuffer, '\0')` を呼び出し、ヒープ上にパスワード平文データが残存しないようメモリクリア処理を実行します。
+
+### 8.2 ログのマスキング処理
+- ログ出力（デバッグログおよび標準出力）において、パスワード文字列や `-p BECOME-PROMPT` 注入部分のパスワード平文がそのまま表示されないよう自動マスキング処理（`***` 置換）を適用します。
+
+### 8.3 GraalVM Native Image 対応
+- `sudo` や `su` 等のローカルプロセスコマンド呼び出しで使用される `ProcessBuilder` の実行クラスおよび OS コマンドパスについて、`resource-config.json` 等で正しくネイティブアクセスが許可されていることを保証します。

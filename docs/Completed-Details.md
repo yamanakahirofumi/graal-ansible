@@ -435,6 +435,16 @@
     - `docs/implementation/Vault-Support.md` を新規追加し、`VaultDecrypter`, `VaultEncrypter`, `VaultSecretStore`, `VaultDecryptedValue`, `ConstructVault` の技術仕様を明記。
     - `docs/README.md` のドキュメント一覧を同期。
 
+### 1.57 [✓] 権限昇格 (Privilege Escalation / become) 実装仕様の詳細化 [追加]
+- **完了日**: 2026-10-24
+- **概要**: `docs/implementation/Privilege-Escalation.md` における権限昇格（`become`）の仕様・データモデル・パラメータ優先順位・CLI連携・接続プラグイン統合および認証エラーハンドリングを網羅的に詳細化。
+- **解決策**:
+    - `docs/implementation/Privilege-Escalation.md` において Mermaid シーケンス図によるタスク実行時の権限昇格データフローを定義。
+    - `BECOME-PROMPT` プロンプトマーカーおよび正規表現による対話型プロンプト検知メカニズムとタイムアウト保護を追加。
+    - 非対話型（Headless）環境（`System.console() == null`）での `-K` / `--ask-become-pass` 指定時のエラー処理仕様を定義。
+    - `UnreachableException` および `ModuleExecutionException` へのエラーパターン別例外マッピングマトリクスを追加。
+    - メモリ上の `char[]` パスワードバッファ即時ゼロ埋め消去処理によるセキュリティ考慮事項を明記。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築
