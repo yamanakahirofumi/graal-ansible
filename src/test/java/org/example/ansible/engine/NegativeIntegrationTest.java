@@ -419,4 +419,49 @@ class NegativeIntegrationTest {
         assertTrue(result.data().containsKey("msg") || result.data().containsKey("exception"),
                 "Result data should contain error information: " + result.data());
     }
+
+    @Test
+    void testAssembleMissingRequiredParams() {
+        Task task = new Task("Assemble missing src", "assemble", Map.of(
+                "dest", tempDir.resolve("assembled.txt").toString()
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertFalse(result.success(), "assemble should fail due to missing 'src' parameter");
+        assertTrue(result.data().containsKey("msg") || result.data().containsKey("exception"),
+                "Result data should contain error information: " + result.data());
+    }
+
+    @Test
+    void testAssembleNonExistentSourceDir() {
+        Path nonExistentSrc = tempDir.resolve("non_existent_assemble_src");
+        Path destFile = tempDir.resolve("assembled.txt");
+
+        Task task = new Task("Assemble non-existent source dir", "assemble", Map.of(
+                "src", nonExistentSrc.toString(),
+                "dest", destFile.toString()
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertFalse(result.success(), "assemble should fail when source directory does not exist");
+        assertTrue(result.data().containsKey("msg") || result.data().containsKey("exception"),
+                "Result data should contain error information: " + result.data());
+    }
+
+    @Test
+    void testFindModuleNonExistentPath() {
+        Path nonExistentPath = tempDir.resolve("non_existent_find_dir");
+
+        Task task = new Task("Find in non-existent directory", "find", Map.of(
+                "paths", List.of(nonExistentPath.toString())
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertTrue(result.success(), result.message());
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> files = (List<Map<String, Object>>) result.data().get("files");
+        assertNotNull(files, "files should not be null");
+        assertTrue(files.isEmpty(), "files should be empty for non-existent path");
+        assertEquals(0, result.data().get("matched"), "matched should be 0");
+    }
 }
