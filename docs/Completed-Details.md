@@ -435,6 +435,14 @@
     - `docs/implementation/Vault-Support.md` を新規追加し、`VaultDecrypter`, `VaultEncrypter`, `VaultSecretStore`, `VaultDecryptedValue`, `ConstructVault` の技術仕様を明記。
     - `docs/README.md` のドキュメント一覧を同期。
 
+### 1.57 [✓] デフォルトコネクションファクトリ (DefaultConnectionFactory) 仕様の詳細化 [追加]
+- **完了日**: 2026-10-24
+- **概要**: `docs/implementation/Connection-Plugins.md` Section 8.3 における `DefaultConnectionFactory` の接続解決フロー、`localhost`/`127.0.0.1` 接続時の `local` フォールバック、各コネクションプラグイン (`local`, `docker`, `ssh`/`smart`, `winrm`) へのパラメータ抽出および動的型変換、`SshJumpHostParser` 踏み台解決、ならびに未サポート接続型例外処理の技術仕様を詳細化。
+- **解決策**:
+    - `docs/implementation/Connection-Plugins.md` Section 8.3 を拡張し、`ansible_connection` のデフォルト値 (`ssh`) および `localhost` / `127.0.0.1` での `local` 自動解決ルールを明記。
+    - `local`, `docker`, `ssh`/`smart`, `winrm` 各プラグインのパラメータ抽出 (`ansible_host`, `ansible_user`, `ansible_password`, `ansible_ssh_private_key_file`, `ansible_port` の Number/String 型変換, `ansible_winrm_scheme` ポート5985/5986自動割り当て, `ansible_winrm_server_cert_validation` ブール変換) を明記。
+    - `SshJumpHostParser` の踏み台解析呼び出しおよび unsupported connection 時の `IllegalArgumentException` エラーハンドリング仕様を追加。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築
