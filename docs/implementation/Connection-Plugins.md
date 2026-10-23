@@ -225,12 +225,33 @@ public interface ConnectionFactory {
 | `ansible_password` | 接続パスワード | なし |
 | `ansible_ssh_private_key_file`| 認証用秘密鍵パス | なし |
 
-### 8.3 解決フロー
+### 8.3 解決フローと DefaultConnectionFactory 実装仕様
 
-1. **変数の集約**: `VariableManager` を用いて、対象ホストの `ansible_connection` 等の変数を解決します。
-2. **プラグインの特定**: `ansible_connection` の値に基づき、対応する `Connection` 実装クラス（`LocalConnection`, `SshConnection` 等）を選択します。
-3. **インスタンス化とパラメータ注入**: 解決された接続情報（ホスト、ポート、ユーザー等）をインスタンスに注入します。
-4. **接続のキャッシュ**: 同一ホスト・同一パラメータのコネクションは `TaskQueueManager` レベルで保持（Map等）し、プレイ内のタスク間で再利用することでオーバーヘッドを削減します。
+`DefaultConnectionFactory` は `ConnectionFactory` の標準実装であり、`VariableManager` によって解決された変数マップ（`Map<String, Object>`）およびターゲットホスト（`Host`）情報に基づき、適切な `Connection` インスタンスを透過的に生成します。
+
+- **接続タイプ（`ansible_connection`）解決およびフォールバックルール**:
+  - `variables.getOrDefault("ansible_connection", "ssh")` によりデフォルトの接続タイプ（`ssh`）を決定します。
+  - **localhost フォールバック**: `host.name()` が `"localhost"` または `"127.0.0.1"` であり、かつ変数マップに `ansible_connection` キーが明示的に存在しない場合、自動的に `local` コネクションへ切り替えます。
+
+- **プラグイン別パラメータ抽出および型変換仕様**:
+  - **`local` コネクション**:
+    - 引数なしコンストラクタで `LocalConnection` を生成します。
+  - **`docker` コネクション**:
+    - コンテナ名: `variables.getOrDefault("ansible_host", host.name())` を抽出。
+    - 実行ユーザー: `(String) variables.get("ansible_user")` を抽出。
+  - **`ssh` / `smart` コネクション**:
+    - ターゲットホスト: `variables.getOrDefault("ansible_host", host.name())` を抽出。
+    - ポート番号: デフォルト値 `22`。`ansible_port` キーが存在する場合、`Number` 型（`intValue()`）または `String` 型（`Integer.parseInt()`）から動的に数値変換。
+    - 認証情報: `ansible_user`, `ansible_password`, `ansible_ssh_private_key_file` を抽出。
+    - 踏み台設定: `SshJumpHostParser.getBastionConfigs(variables)` を呼び出し、踏み台サーバー設定リスト（`List<BastionConfig>`）を解析・注入。
+  - **`winrm` コネクション**:
+    - ターゲットホスト: `variables.getOrDefault("ansible_host", host.name())` を抽出。
+    - スキームおよびデフォルトポート: `ansible_winrm_scheme`（デフォルト `"http"`）を抽出し、`"https"` の場合はデフォルトポート `5986`、それ以外は `5985` を割り当て。`ansible_port` キーが存在する場合は動的型変換（`Number` / `String`）で上書き。
+    - 認証情報: `ansible_user`, `ansible_password` を抽出。
+    - 証明書検証フラグ: `ansible_winrm_server_cert_validation`（デフォルト `"ignore"`）を抽出し、`"ignore"` の場合は `disableCertificateChecks = true` を設定。
+
+- **未サポート接続タイプのエラー処理**:
+  - `ansible_connection` の値が上記のいずれにも該当しない場合、`IllegalArgumentException("Unsupported connection type: " + connectionType)` をスローし、不正な設定を即座に検知・防止します。
 
 ## 9. Docker コネクションの詳細設計
 
