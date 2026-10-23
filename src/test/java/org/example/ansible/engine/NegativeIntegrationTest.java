@@ -419,4 +419,25 @@ class NegativeIntegrationTest {
         assertTrue(result.data().containsKey("msg") || result.data().containsKey("exception"),
                 "Result data should contain error information: " + result.data());
     }
+
+    @Test
+    void testServiceMissingRequiredParams() {
+        Task task = new Task("service missing name", "service", Map.of(
+                "state", "started"
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertFalse(result.success(), "service module should have failed due to missing 'name'");
+    }
+
+    @Test
+    void testSystemdInvalidState() {
+        Task task = new Task("systemd invalid state", "systemd", Map.of(
+                "name", "cron",
+                "state", "invalid_state_choice"
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertFalse(result.success(), "systemd module should have failed due to invalid state");
+    }
 }
