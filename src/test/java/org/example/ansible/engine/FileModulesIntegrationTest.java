@@ -500,4 +500,56 @@ class FileModulesIntegrationTest {
         } catch (IOException ignored) {}
     }
 
+    @Test
+    void testFileModuleSymlink() throws IOException {
+        Path targetFile = tempDir.resolve("symlink-target.txt");
+        Files.writeString(targetFile, "target file content");
+
+        Path linkPath = tempDir.resolve("symlink-link.txt");
+
+        // 1. Create symbolic link
+        Task taskLink = new Task("Create symlink", "file", Map.of(
+                "src", targetFile.toString(),
+                "dest", linkPath.toString(),
+                "state", "link"
+        ));
+        TaskResult resultLink = taskExecutor.execute(play, host, taskLink, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertTrue(resultLink.success(), "symlink creation failed: " + resultLink.message() + " Data: " + resultLink.data());
+        assertTrue(resultLink.changed());
+        assertTrue(Files.isSymbolicLink(linkPath));
+        assertEquals("target file content", Files.readString(linkPath));
+
+        // 2. Remove symbolic link
+        Task taskAbsent = new Task("Remove symlink", "file", Map.of(
+                "path", linkPath.toString(),
+                "state", "absent"
+        ));
+        TaskResult resultAbsent = taskExecutor.execute(play, host, taskAbsent, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertTrue(resultAbsent.success(), "symlink removal failed: " + resultAbsent.message() + " Data: " + resultAbsent.data());
+        assertFalse(Files.exists(linkPath, java.nio.file.LinkOption.NOFOLLOW_LINKS));
+        assertTrue(Files.exists(targetFile), "Target file should remain intact");
+    }
+
+    @Test
+    void testStatModuleWithChecksum() throws IOException {
+        Path targetFile = tempDir.resolve("stat-checksum-test.txt");
+        Files.writeString(targetFile, "checksum content");
+
+        Task task = new Task("Stat file with sha256 checksum", "stat", Map.of(
+                "path", targetFile.toString(),
+                "get_checksum", true,
+                "checksum_algorithm", "sha256"
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertTrue(result.success(), "stat failed: " + result.message() + " Data: " + result.data());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> stat = (Map<String, Object>) result.data().get("stat");
+        assertNotNull(stat, "stat data should not be null");
+        assertTrue((Boolean) stat.get("exists"));
+        assertNotNull(stat.get("checksum"), "checksum should be returned when get_checksum=true");
+    }
+
 }
