@@ -500,4 +500,26 @@ class FileModulesIntegrationTest {
         } catch (IOException ignored) {}
     }
 
+    @Test
+    void testBlockInFileWithMarkerAndInsert() throws IOException {
+        Path targetFile = tempDir.resolve("block-marker-test.txt");
+        Files.writeString(targetFile, "head line\ntail line\n");
+
+        Task task = new Task("Add block with custom marker", "blockinfile", Map.of(
+                "path", targetFile.toString(),
+                "block", "custom content line",
+                "marker", "# {mark} CUSTOM BLOCK",
+                "insertafter", "head line"
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertTrue(result.success(), result.message());
+        assertTrue(result.changed());
+
+        String content = Files.readString(targetFile);
+        assertTrue(content.contains("# BEGIN CUSTOM BLOCK"));
+        assertTrue(content.contains("custom content line"));
+        assertTrue(content.contains("# END CUSTOM BLOCK"));
+    }
+
 }

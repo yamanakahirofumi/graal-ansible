@@ -419,4 +419,26 @@ class NegativeIntegrationTest {
         assertTrue(result.data().containsKey("msg") || result.data().containsKey("exception"),
                 "Result data should contain error information: " + result.data());
     }
+
+    @Test
+    void testCronMissingRequiredParams() {
+        Task task = new Task("cron missing name and job", "cron", Map.of(
+                "state", "present"
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertFalse(result.success(), "cron module should fail when required parameters are missing");
+        assertTrue(result.data().containsKey("msg") || result.data().containsKey("exception"));
+    }
+
+    @Test
+    void testBlockInFileMissingRequiredParams() {
+        Task task = new Task("blockinfile missing path", "blockinfile", Map.of(
+                "block", "some content"
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertFalse(result.success(), "blockinfile module should fail when missing path parameter");
+        assertTrue(result.data().containsKey("msg") || result.data().containsKey("exception"));
+    }
 }
