@@ -277,4 +277,21 @@ class PosixModulesIntegrationTest {
         assertFalse(Files.exists(destFile), "Destination file should not be created in check mode");
     }
 
+    @Test
+    void testGetentModuleCheckMode() {
+        Task task = new Task("Getent passwd in check mode", "getent", Map.of(
+                "database", "passwd",
+                "key", "root"
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "getent check mode failed: " + result.message() + " Data: " + result.data());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
+        assertNotNull(facts, "ansible_facts should be present in check mode");
+        assertNotNull(facts.get("getent_passwd"), "getent_passwd should be present in facts");
+    }
+
 }
