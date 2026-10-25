@@ -419,4 +419,30 @@ class NegativeIntegrationTest {
         assertTrue(result.data().containsKey("msg") || result.data().containsKey("exception"),
                 "Result data should contain error information: " + result.data());
     }
+
+    @Test
+    void testCronMissingRequiredParams() {
+        Task task = new Task("Cron missing name", "cron", Map.of(
+                "job", "echo hi"
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertFalse(result.success(), "cron should fail when missing 'name' parameter");
+        assertTrue(result.data().containsKey("msg") || result.data().containsKey("exception"),
+                "Result data should contain error information: " + result.data());
+    }
+
+    @Test
+    void testCopyMissingSourceAndContent() {
+        Path destFile = tempDir.resolve("dest_no_src.txt");
+
+        Task task = new Task("Copy missing src and content", "copy", Map.of(
+                "dest", destFile.toString()
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertFalse(result.success(), "copy module should fail when neither src nor content is provided");
+        assertTrue(result.data().containsKey("msg") || result.data().containsKey("exception"),
+                "Result data should contain error information: " + result.data());
+    }
 }
