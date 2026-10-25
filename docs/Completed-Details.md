@@ -435,6 +435,16 @@
     - `docs/implementation/Vault-Support.md` を新規追加し、`VaultDecrypter`, `VaultEncrypter`, `VaultSecretStore`, `VaultDecryptedValue`, `ConstructVault` の技術仕様を明記。
     - `docs/README.md` のドキュメント一覧を同期。
 
+### 1.56 [✓] リモートノードでのモジュール実行仕様 (Ansiballz) の詳細化 [追加]
+- **完了日**: 2026-10-24
+- **概要**: `docs/implementation/Remote-Module-Execution.md` における Ansiballz リモート実行ライフサイクル、Mermaid シーケンス図、権限昇格 (`become`) 分離機構、`wrapModule` 引数バインディングマトリクス、依存関係 ZIP (`ansible_lib.zip`) キャッシュ戦略、および例外・エラーマッピングマトリクスを詳細化。
+- **解決策**:
+    - リモート実行の全 6 段階ライフサイクルを示す Mermaid シーケンス図を追加。
+    - 一時ディレクトリ作成・SCP 転送・クリーンアップ時 (`BecomeContext.empty()`) とモジュール実行時 (ターゲット `BecomeContext`) の権限昇格分離ロジックを明記。
+    - `wrapModule` 引数バインディングマトリクス、Base64 パイプライン、`patched_dumps` 処理、および `ansible.module_utils.basic` モンキーパッチの技術仕様を拡張。
+    - `getOrCreateDependencyZip` の `ConcurrentHashMap` キャッシュと排他制御仕様を明記。
+    - `parseModuleOutput` JSON 抽出アルゴリズムおよび例外マッピングマトリクスを追加。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築
