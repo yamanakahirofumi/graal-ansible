@@ -435,6 +435,14 @@
     - `docs/implementation/Vault-Support.md` を新規追加し、`VaultDecrypter`, `VaultEncrypter`, `VaultSecretStore`, `VaultDecryptedValue`, `ConstructVault` の技術仕様を明記。
     - `docs/README.md` のドキュメント一覧を同期。
 
+### 1.56 [✓] ストラテジ・プラグイン（Strategy Plugins）実装仕様の詳細化 [追加]
+- **完了日**: 2026-10-24
+- **概要**: `docs/implementation/Strategy-Plugins.md` におけるタスク実行戦略（`LinearStrategy` / `FreeStrategy`）の実行ライフサイクル, Mermaid シーケンスフロー図, 解決優先順位, `StrategyFactory` 判定マトリクス, および例外ハンドリング・エラーリカバリ仕様を拡張・詳細化。
+- **解決策**:
+    - `LinearStrategy` の同期バッチ・タスク実行ループおよび `FreeStrategy` のマルチスレッド・セマフォ制御ライフサイクルの Mermaid シーケンスフロー図を追加。
+    - 実行戦略の解決優先順位（CLI / `ANSIBLE_STRATEGY` > Playbook `strategy` > デフォルト `"linear"`) および `StrategyFactory` 判定マトリクスを定義。
+    - 戦略実行中における例外 (`UnreachableException`, `ModuleExecutionException`, `AnsibleException`, `InterruptedException`) の処理ロジックと `TaskResult` 状態マッピングマトリクスを追加。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築
