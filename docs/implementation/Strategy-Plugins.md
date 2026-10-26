@@ -63,22 +63,34 @@ public interface Strategy {
 
 `LinearStrategy.run` の全体処理シーケンスは以下のライフサイクルに従って進行します。
 
-```
-[ Strategy.run ]
-      │
-      ├─► 1. calculateBatches(targetHosts, serial) によるバッチ分割
-      │
-      └─► 2. 各バッチ (batchHosts) ごとのループ処理:
-            │
-            ├─► 2.1 pre_tasks の実行 ──────────► (完了後ハンドラーフラッシュ)
-            │
-            ├─► 2.2 roles ディレクティブの実行
-            │
-            ├─► 2.3 tasks (メインタスク) の実行 ─► (完了後ハンドラーフラッシュ)
-            │
-            ├─► 2.4 post_tasks の実行 ─────────► (完了後ハンドラーフラッシュ)
-            │
-            └─► 2.5 ansible_play_batch マジック変数の更新
+```mermaid
+sequenceDiagram
+    autonumber
+    participant PE as PlaybookExecutor
+    participant LS as LinearStrategy
+    participant VM as VariableManager
+    participant TE as TaskExecutor
+    participant TQM as TaskQueueManager
+    participant CB as Callback
+
+    PE->>LS: run(play, targetHosts, tqm, variableManager...)
+    LS->>LS: calculateBatches(targetHosts, play.serial)
+    loop 各バッチ (batchHosts)
+        LS->>VM: updateVariables("ansible_play_batch", activeBatchHosts)
+        loop pre_tasks / roles / tasks / post_tasks
+            loop バッチ内のアクティブホスト
+                LS->>TE: executeSingleTask(task, host, ...)
+                TE-->>LS: TaskResult
+                LS->>TQM: recordResult(host, taskResult)
+                LS->>CB: onTaskResult(taskResult)
+            end
+            opt any_errors_fatal または max_fail_percentage 超過
+                LS->>TQM: markFatalError()
+            end
+        end
+        LS->>TQM: flushHandlers(batchHosts)
+    end
+    LS-->>PE: void
 ```
 
 ### 3.2 バッチ算定アルゴリズム (`calculateBatches`)
@@ -124,16 +136,43 @@ public interface Strategy {
 
 `FreeStrategy` は `java.util.concurrent.ThreadPoolExecutor` を使用して、ホストごとのタスク実行スレッドを並行稼働させます。
 
-```
-[ FreeStrategy.run ]
-       │
-       ├─► ExecutorService (スレッドプール: forks 数)
-       │         │
-       │         ├── Thread-1 (Host A): Task1 ──► Task2 ──► Task3 ...
-       │         ├── Thread-2 (Host B): Task1 ──► Task2 ────────► Task3 ...
-       │         └── Thread-3 (Host C): Task1 ───────► Task2 ────► Task3 ...
-       │
-       └─► 全スレッドの完了待機 (awaitTermination / Future.get)
+```mermaid
+sequenceDiagram
+    autonumber
+    participant PE as PlaybookExecutor
+    participant FS as FreeStrategy
+    participant Pool as ExecutorService (Worker Thread)
+    participant Sem as Semaphore (Throttle)
+    participant TE as TaskExecutor
+    participant TQM as TaskQueueManager
+    participant CB as Callback
+
+    PE->>FS: run(play, targetHosts, tqm, variableManager...)
+    FS->>Pool: Executors.newFixedThreadPool(forks)
+    par 各ホストごとの並行タスク実行 (Thread per Host)
+        Pool->>FS: runTasksForHost(host)
+        loop ホストごとの全タスク (pre_tasks, tasks, post_tasks)
+            opt throttle 指定時
+                FS->>Sem: acquire()
+            end
+            opt run_once: true 指定時
+                FS->>FS: executedRunOnceTasks.add(task)
+            end
+            FS->>TE: executeSingleTask(task, host, ...)
+            TE-->>FS: TaskResult
+            FS->>TQM: recordResult(host, taskResult)
+            FS->>CB: onTaskResult(taskResult) (synchronized)
+            opt throttle 指定時
+                FS->>Sem: release()
+            end
+            opt any_errors_fatal または max_fail_percentage 超過
+                FS->>TQM: setCancelFlag()
+            end
+        end
+    end
+    Pool-->>FS: awaitTermination / Future.get
+    FS->>TQM: flushHandlers(targetHosts)
+    FS-->>PE: void
 ```
 
 ### 4.2 フォーク数 (`forks`) とスレッドプール管理
@@ -205,31 +244,57 @@ public interface Strategy {
 
 実行エンジン（`TaskQueueManager`）は、Playbook の定義に基づいて適切な `Strategy` 実装クラスを動的に選択・生成します。
 
-### 5.1 登録と選択フロー
+### 5.1 解決優先順位 (Resolution Precedence)
 
-1. **`Play` レコードのフィールド**: `Play.strategy()` フィールド（デフォルト: `"linear"`）の文字列を取得します。
-2. **`StrategyFactory` による解決**:
-   ```java
-   public class StrategyFactory {
-       public static Strategy getStrategy(String strategyName) {
-           if ("free".equalsIgnoreCase(strategyName)) {
-               return new FreeStrategy();
-           }
-           return new LinearStrategy(); // デフォルトフォールバック
-       }
-   }
-   ```
-3. **`TaskQueueManager.executePlay` での委譲**:
-   `TaskQueueManager` は Play の実行制御自体を行わず、`StrategyFactory.getStrategy(play.strategy()).run(...)` を呼び出してストラテジ・プラグインへ制御を移譲します。
+実行戦略の指定は、以下の優先順位に従って決定されます。
+
+1. **CLI 引数 / 環境変数**: `--strategy <name>` または環境変数 `ANSIBLE_STRATEGY` による明示的オーバーライド。
+2. **Play レベルキーワード**: Playbook 内の `strategy: <name>` 定義。
+3. **デフォルト値**: 未指定時のフォールバックとして `"linear"` が適用されます。
+
+### 5.2 `StrategyFactory` の解決マトリクス
+
+`StrategyFactory` は、大文字・小文字を区別せず（case-insensitive）戦略名を判定し、対応する `Strategy` インスタンスを生成します。
+
+| 指定戦略名 | 判定規則 | 生成インスタンス | 動作仕様 |
+| :--- | :--- | :--- | :--- |
+| `"linear"` | `equalsIgnoreAsciiCase` | `LinearStrategy` | ホスト全台同期型の順次タスク実行戦略。 |
+| `"free"` | `equalsIgnoreAsciiCase` | `FreeStrategy` | ホスト独立並列型のマルチスレッド実行戦略。 |
+| 未知の戦略名 | フォールバック | `LinearStrategy` | 警告ログを出力し、デフォルトの `LinearStrategy` へ安全にフォールバック。 |
+
+```java
+public class StrategyFactory {
+    public static Strategy getStrategy(String strategyName) {
+        if ("free".equalsIgnoreCase(strategyName)) {
+            return new FreeStrategy();
+        }
+        // Default to linear strategy
+        return new LinearStrategy();
+    }
+}
+```
 
 ---
 
-## 6. 新規ストラテジ・プラグインの追加手順
+## 6. 例外ハンドリングとエラーリカバリ仕様
+
+戦略の実行中（`run` メソッド内部）に発生する各種例外と、それに対するエラーリカバリ処理のマッピング一覧です。
+
+| 例外クラス / エラー状態 | 発生タイミング | 戦略クラスの処理ロジック | 伝播および TaskResult 状態 |
+| :--- | :--- | :--- | :--- |
+| `UnreachableException` | SSH / Local コネクション確立失敗または認証エラー | 当該ホストを `tqm.markHostUnreachable(host)` へ追加し、以降の全タスク実行をスキップ。 | `TaskResult(unreachable=true, failed=true)` として結果記録。 |
+| `ModuleExecutionException` | モジュール実行の非ゼロ exit code や異常終了 | `ignore_errors` 未指定時、当該ホストを `tqm.markHostFailed(host)` へ追加。 | `TaskResult(failed=true)` として結果記録。 |
+| `AnsibleException` | Jinja2 テンプレート評価エラーや設定不整合 | 該当タスクの実行を失敗として記録し、ログを出力。 | `TaskResult(failed=true, msg=...)` として結果記録。 |
+| `InterruptedException` | `FreeStrategy` 実行時のスレッドプールタイムアウト | `executor.shutdownNow()` を呼び出し、全 Worker スレッドを即座に安全停止。 | 実行コンテキスト中断およびエラーログ記録。 |
+
+---
+
+## 7. 新規ストラテジ・プラグインの追加手順
 
 新しいカスタムタスク実行戦略を `graal-ansible` に追加するための標準手順です。
 
 1. **`Strategy` インターフェースの実装**:
-   - `org.example.ansible.engine.strategy` パッケージ配下に新規クラス（例: `HostPinnedStrategy`）を作成し、`Strategy` インターフェースを実装します。
+   - `org.example.ansible.engine` パッケージ配下に新規クラス（例: `HostPinnedStrategy`）を作成し、`Strategy` インターフェースを実装します。
    - `run(...)` メソッド内に、目的の配信・同期ロジックを記述します。
 2. **`StrategyFactory` への登録**:
    - `StrategyFactory.getStrategy` メソッドに新しい戦略名（例: `"host_pinned"`）の分岐を追加します。
@@ -238,7 +303,7 @@ public interface Strategy {
 
 ---
 
-## 7. 関連ドキュメント
+## 8. 関連ドキュメント
 
 - [Playbook 実行仕様](../features/Playbook-Execution.md)
 - [タスク実行エンジン (Worker Process)](Task-Executor.md)
