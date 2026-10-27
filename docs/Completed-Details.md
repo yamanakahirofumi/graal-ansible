@@ -435,6 +435,14 @@
     - `docs/implementation/Vault-Support.md` を新規追加し、`VaultDecrypter`, `VaultEncrypter`, `VaultSecretStore`, `VaultDecryptedValue`, `ConstructVault` の技術仕様を明記。
     - `docs/README.md` のドキュメント一覧を同期。
 
+### 1.56 [✓] コールバックプラグイン設計仕様の詳細化 [追加]
+- **完了日**: 2026-10-24
+- **概要**: `docs/implementation/Callback-Plugins.md` における Java `Callback` インターフェースのメソッドシグネチャ最新化、`CallbackFactory` 解決優先順位と例外フォールバックロジック、Mermaid シーケンス図、および全 5 種のプラグイン実装仕様を追加・更新。
+- **解決策**:
+    - `Callback.java` の `Task` 引数を保持する最新シグネチャへ同期。
+    - `CallbackFactory` の CLI パラメータ > `ANSIBLE_STDOUT_CALLBACK` > `ansible.cfg` > デフォルトの優先順位と例外フォールバック（`DefaultCallback` 復帰）仕様を定義。
+    - `DefaultCallback`, `JsonCallback`, `MinimalCallback`, `YamlCallback`, `PythonCallback` のフォーマット処理、SnakeYAML / Jackson シリアライズ規則、および GraalPy Polyglot ブリッジ仕様を追加・拡張。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築
