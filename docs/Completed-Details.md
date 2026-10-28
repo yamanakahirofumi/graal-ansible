@@ -435,6 +435,14 @@
     - `docs/implementation/Vault-Support.md` を新規追加し、`VaultDecrypter`, `VaultEncrypter`, `VaultSecretStore`, `VaultDecryptedValue`, `ConstructVault` の技術仕様を明記。
     - `docs/README.md` のドキュメント一覧を同期。
 
+### 1.56 [✓] Action Plugin 実装仕様の詳細化 [追加]
+- **完了日**: 2026-10-24
+- **概要**: `docs/implementation/Action-Plugins.md` における FQCN アクションプラグイン探索アルゴリズム (`_create_action_plugin`), コレクション探索ルーティング, `MockLoader` ベースディレクトリ解決, 制御ノード側 `Templar` Jinja2 レンダリング, 引数の前処理・正規化と `check_mode` 伝播, 例外ハンドリングマトリクス, および並列実行戦略 (`FreeStrategy`) における GraalPy Polyglot Context 隔離仕様を追加・詳細化。
+- **解決策**:
+    - `docs/implementation/Action-Plugins.md` に FQCN プレフィックス正規化およびコレクション・site-packages・sys.path 探索優先順位を追加。
+    - 専用プラグイン非存在時の動的 `ModuleAction` フォールバック動作および `MockLoader.set_basedir` パス解決を追加。
+    - 例外捕捉と JSON レスポンス構造化マトリクスおよび `FreeStrategy` スレッドセーフティ隔離ルールを明記。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築

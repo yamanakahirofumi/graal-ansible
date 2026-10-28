@@ -43,10 +43,32 @@ Worker Process (`TaskExecutor`) は、タスクの `action` 名に基づき、�
 
 ### 3.2 Python 側 (ansible_action_launcher.py)
 1. **Ansible コアクラスのモック**: Action Plugin が依存する `Task`, `Connection`, `PlayContext`, `DataLoader`, `Templar` 等のコアクラスを、Java ブリッジを利用するようにモック化します。
-2. **プラグインのロード**: 指定された Action Plugin モジュールをインポートし、プラグインクラス（例: `ActionModule`）を生成します。
-3. **実行**: プラグインの `run(task_vars)` メソッドを実行します。
+2. **引数の前処理・正規化**:
+   - リスト型として渡された主要引数（`dest`, `path`, `src`, `name`）が要素数 1 の場合、単一の文字列/値へ自動展開（flatten）します。
+   - `src` 引数が存在する場合、そのファイル名（`os.path.basename`）を `mock_task._original_basename` へ設定します。
+   - `_ansible_check_mode` または `task_vars.ansible_check_mode` から `check_mode` 真偽値を置き、`PlayContext.check_mode` および `mock_task.check_mode` へ同期伝播させます。
+3. **ローダーとベースディレクトリの設定**:
+   - `task_executor_java.resolveLocalPath(".")` を用いて、現在実行中の Playbook / ロールのベースディレクトリを解決し、`MockLoader.set_basedir()` および `mock_task._origin.path` へ設定します。
+4. **プラグインの探索とロード**: `ansible_bridge._create_action_plugin` により FQCN またはビルトインの探索を行い、プラグインインスタンスを生成します。
+5. **実行とエラーの捕捉**: `plugin.run(tmp=None, task_vars=task_vars)` を実行し、戻り値の辞書（dict）を JSON 文字列として Java 側へ返却します。例外発生時は `traceback` を含む失敗レスポンス辞書へラップして返却します。
 
-### 3.3 Java-Python バインディング引数仕様
+### 3.3 FQCN およびコレクション Action Plugin 探索アルゴリズム (`_create_action_plugin`)
+Action Plugin のロード処理は `ansible_bridge._create_action_plugin` 内で以下の優先順位とルーティングルールに従って動的に行われます。
+
+1. **プレフィックスの正則化**:
+   - `ansible.builtin.` プレフィックスで始まるアクション名（例: `ansible.builtin.copy`）は、先頭の 16 文字を取り除いて `copy` に変換します。
+   - `ansible.legacy.` プレフィックスで始まるアクション名（例: `ansible.legacy.template`）は、先頭の 15 文字を取り除いて `template` に変換します。
+2. **コレクションパス内の FQCN 検索**:
+   - アクション名にドット（`.`）が含まれる FQCN 指定（例: `my_namespace.my_collection.my_action`）の場合、`collection_paths_java` に登録された各コレクションディレクトリ配下の `ansible_collections/<namespace>/<collection>/plugins/action/<action>.py` を検索します。
+3. **Core site-packages 内の検索**:
+   - `site_packages_java` に登録されたパス配下の `ansible/plugins/action/<base_name>.py` を検索します。
+4. **Python システムパス (`sys.path`) 内の検索**:
+   - `sys.path` に存在するすべての検索パス配下の `ansible/plugins/action/<base_name>.py` を検索します。
+5. **専用 Action Plugin 非存在時のフォールバック (`ModuleAction`)**:
+   - 専用のアクションプラグイン Python ファイルが存在しない場合（例: 通常モジュールの呼び出し）、`ActionBase` を継承した動的クラス `ModuleAction` を自動生成します。
+   - `ModuleAction.run()` は内部で `self._execute_module(module_name=action_name, module_args=self._task.args, task_vars=task_vars)` を自動呼び出しし、ターゲットノード上での通常モジュール実行へと透過的に委譲します。
+
+### 3.4 Java-Python バインディング引数仕様
 Action Plugin を実行するための `ansible_action_launcher.py` に注入される Java コンテキスト引数の一覧です。
 
 | バインディング名 | Java 型 | 用途 |
@@ -61,7 +83,7 @@ Action Plugin を実行するための `ansible_action_launcher.py` に注入さ
 | `action_name` | `String` | 実行対象のアクション名 (例: `copy`, `template`)。 |
 | `task_executor_java` | `ITaskExecutor` | `_execute_module` 呼び出し時のタスク再帰実行ブリッジ。 |
 
-### 3.4 実行シーケンスフロー (Sequence Flow)
+### 3.5 実行シーケンスフロー (Sequence Flow)
 
 以下は、Java 実行エンジンから GraalPy を経由して Action Plugin が実行され、再帰的にモジュールが呼び出される全体ライフサイクルのシーケンス図です。
 
@@ -162,6 +184,34 @@ GraalPy の Polyglot API を介したデータ交換では、以下のルール�
 1. **接続の維持**: `ActionBase` が保持している `connection_java` (SSH/Local/Docker/WinRM) をそのまま使用します。
 2. **変数の同期**: `VariableManager.updateVariables` により、Python 側で変更された `task_vars` を Java 側のコンテキストへ反映させ、後続のタスクでも利用可能にします。
 3. **チェックモード (check_mode) の伝播**: `ansible_check_mode` または `_ansible_check_mode` 引数から解決された真偽値が、`PlayContext.check_mode` および `mock_task.check_mode` へ自動的に反映されます。
+
+### 4.5 制御ノード側 Jinja2 テンプレートレンダリング (`Templar`)
+Action Plugin の大きな役割の 1 つに、制御ノード側での Jinja2 テンプレートレンダリング処理（例: `template` アクションや `copy` アクションの `src` パス解決等）があります。
+
+- **`Templar` インスタンス化**:
+  - `ansible_action_launcher.py` 内で、注入された `task_vars` を引き渡して `Templar(variables=task_vars)` を生成します。
+- **Java `VariableResolver` との連携**:
+  - `Templar` による変数展開処理は、`task_vars` に含まれる全変数スコープ（Level 1 〜 22）を参照して行われます。
+  - レンダリング結果として得られた文字列やデータ構造は、そのまま Action Plugin 内部のファイル展開ロジック（`template` アクションにおけるローカルでの一時ファイル生成等）で利用されます。
+
+### 4.6 例外ハンドリングおよび JSON レスポンス構造化
+GraalPy 上での Python スクリプト実行時に例外が発生した場合、Java 実行エンジンへ安全にエラー情報を伝達するための構造化ルールが適用されます。
+
+| 例外タイプ / ステータス | 処理内容 | レスポンス辞書構造（JSON） |
+| :--- | :--- | :--- |
+| **正常終了** | プラグインの `run()` が辞書を返却。 | `{"changed": true/false, "failed": false, ...}` |
+| **Python ランタイム例外** (`Exception`) | `run_action_plugin()` 内の `try...except` で捕捉。 | `{"failed": true, "msg": str(e), "traceback": traceback.format_exc()}` |
+| **モジュール実行エラー** | `_execute_module` 呼び出し先から `failed: true` が返却。 | `{"failed": true, "msg": "...", "rc": 1, ...}` |
+| **Polyglot / GraalPy 例外** | Java 側の `TaskExecutor` で `PolyglotException` として捕捉。 | Java 側で `TaskResult` に変換し `rc=1` およびエラーメッセージを設定。 |
+
+### 4.7 並列実行戦略 (`FreeStrategy`) におけるスレッドセーフ性と Context 隔離
+`FreeStrategy` などにより複数のホストに対して Action Plugin を並列実行する場合、スレッド間での状態干渉を防止するために以下の隔離ポリシーを適用します。
+
+- **GraalPy Polyglot Context の管理**:
+  - Java 側の各 Worker スレッド (`TaskExecutor`) は、スレッドローカルまたは専用の `Context` インスタンスで Python コードを実行します。
+  - 各実行において `task_vars_java`, `module_args_java`, `connection_java` などのバインディング引数は、対象ホストおよびタスク専用の変数マップから独立して注入されます。
+- **`ansible_bridge.initialize` の冪等性**:
+  - `ansible_bridge.initialize` 内で適用されるモンキーパッチやモッククラス（`sys.modules` への登録等）は冪等に設計されており、複数スレッドからの同時呼び出しに対して安全に動作します。
 
 ## 5. モック化が必要なコンポーネント
 
