@@ -277,4 +277,59 @@ class PosixModulesIntegrationTest {
         assertFalse(Files.exists(destFile), "Destination file should not be created in check mode");
     }
 
+    @Test
+    void testWaitForModuleCheckMode() throws IOException {
+        Path targetFile = tempDir.resolve("wait_for_check.txt");
+        Files.writeString(targetFile, "content");
+
+        Task task = new Task("Wait for file in check mode", "wait_for", Map.of(
+                "path", targetFile.toString(),
+                "timeout", 5
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "wait_for check mode failed: " + result.message() + " Data: " + result.data());
+    }
+
+    @Test
+    void testFindModuleCheckMode() {
+        Task task = new Task("Find files check mode", "find", Map.of(
+                "paths", tempDir.toString(),
+                "patterns", "*.txt"
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "find check mode failed: " + result.message() + " Data: " + result.data());
+    }
+
+    @Test
+    void testStatModuleCheckMode() throws IOException {
+        Path targetFile = tempDir.resolve("stat_check.txt");
+        Files.writeString(targetFile, "stat test");
+
+        Task task = new Task("Stat check mode", "stat", Map.of(
+                "path", targetFile.toString()
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "stat check mode failed: " + result.message() + " Data: " + result.data());
+    }
+
+    @Test
+    void testMountFactsModuleCheckMode() {
+        Task task = new Task("Mount facts check mode", "mount_facts", Map.of(),
+                Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "mount_facts check mode failed: " + result.message() + " Data: " + result.data());
+    }
+
 }
