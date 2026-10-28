@@ -419,4 +419,40 @@ class NegativeIntegrationTest {
         assertTrue(result.data().containsKey("msg") || result.data().containsKey("exception"),
                 "Result data should contain error information: " + result.data());
     }
+
+    @Test
+    void testWaitForNonExistentPathWithTimeout() {
+        Path nonExistent = tempDir.resolve("non_existent_file.txt");
+        Task task = new Task("Wait_for non-existent path", "wait_for", Map.of(
+                "path", nonExistent.toString(),
+                "timeout", 1
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertFalse(result.success(), "wait_for should fail when target file does not exist within timeout");
+        assertTrue(result.data().containsKey("msg") || result.data().containsKey("exception"));
+    }
+
+    @Test
+    void testUriMissingRequiredParams() {
+        Task task = new Task("Uri missing url", "uri", Map.of(
+                "method", "GET"
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertFalse(result.success(), "uri should fail due to missing required 'url' parameter");
+        assertTrue(result.data().containsKey("msg") || result.data().containsKey("exception"));
+    }
+
+    @Test
+    void testUriConnectionRefused() {
+        Task task = new Task("Uri connection refused", "uri", Map.of(
+                "url", "http://127.0.0.1:59999/test",
+                "timeout", 2
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertFalse(result.success(), "uri should fail when connection is refused or timed out");
+        assertTrue(result.data().containsKey("msg") || result.data().containsKey("exception"));
+    }
 }
