@@ -24,14 +24,9 @@ Native Image ビルドは、Maven の `-Pnative` プロファイルを通じて 
     <mainClass>org.example.ansible.Main</mainClass>
     <buildArgs>
         <buildArg>--no-fallback</buildArg>
-        <buildArg>--initialize-at-build-time=org.example.ansible.util.Constants</buildArg>
-        <buildArg>--initialize-at-run-time=org.apache.sshd.common.util.security.SecurityUtils</buildArg>
+        <buildArg>--initialize-at-build-time=org.example.ansible.util.OSHandlerFactory</buildArg>
         <buildArg>-H:+ReportExceptionStackTraces</buildArg>
-        <buildArg>-H:ConfigurationFileDirectories=src/main/resources/META-INF/native-image/org.example.ansible</buildArg>
-        <buildArg>-H:+AddAllCharsets</buildArg>
-        <buildArg>--enable-http</buildArg>
-        <buildArg>--enable-https</buildArg>
-        <buildArg>--enable-url-protocols=http,https,jar,file</buildArg>
+        <buildArg>-H:ConfigurationFileDirectories=src/main/resources/META-INF/native-image/org.example/graal-ansible</buildArg>
     </buildArgs>
 </configuration>
 ```
@@ -41,11 +36,10 @@ Native Image ビルドは、Maven の `-Pnative` プロファイルを通じて 
 | コンパイラ引数 | 種別 | 仕様と用途 |
 | :--- | :--- | :--- |
 | `--no-fallback` | 必須 | JVM フォールバックバイナリ（JVM を要求する形式）の生成を禁止し、純粋な Native Image バイナリの構築を保証します。 |
-| `--initialize-at-build-time` | 最適化 | 不変な定数クラス（`Constants.java` 等）や純粋ユーティリティクラスをビルド時に初期化し、実行時オーバーヘッドを排除します。 |
+| `--initialize-at-build-time` | 最適化 | 不変な定数・ファクトリクラス（`OSHandlerFactory.java` 等）や純粋ユーティリティクラスをビルド時に初期化し、実行時オーバーヘッドを排除します。 |
 | `--initialize-at-run-time` | 互換性 | ランダムシード生成や OS 状態に依存するセキュリティライブラリ（Apache MINA SSHD や JCA プロバイダ等）の初期化を実行時まで遅延させます。 |
-| `-H:ConfigurationFileDirectories` | 設定 | `reflect-config.json`, `resource-config.json`, `jni-config.json`, `serialization-config.json` が配置されたディレクトリを明示指定します。 |
-| `-H:+AddAllCharsets` | 文字コード | 日本語環境（UTF-8, Shift_JIS/Windows-31J, EUC-JP 等）のエンコーディング変換をバイナリ内に内蔵させます。 |
-| `--enable-http` / `--enable-https` | ネットワーク | `WinRMConnection` (HTTPS) や `uri`/`get_url` モジュール等の通信用ソケットプロトコルを有効化します。 |
+| `-H:ConfigurationFileDirectories` | 設定 | `reflect-config.json`, `resource-config.json`, `native-image.properties` が配置されたディレクトリ（`src/main/resources/META-INF/native-image/org.example/graal-ansible/`）を明示指定します。 |
+| `-H:+ReportExceptionStackTraces` | デバッグ | ビルド時例外発生時に詳細なスタックトレースを出力します。 |
 
 ## 3. リフレクション構成仕様 (reflect-config.json)
 
@@ -55,18 +49,23 @@ Java の動的リフレクション機能（クラスロード、フィールド
 
 | カテゴリ | 該当クラス / ライブラリ | 登録内容と用途 |
 | :--- | :--- | :--- |
-| **Java Records** | `Play`, `Task`, `Host`, `TaskResult`, `BecomeContext`, `BastionConfig`, `VaultDecryptedValue`, `Role`, `ExecutionReport` | SnakeYAML 2.x および Jackson がデシリアライズ・リフレクションアクセスするために全フィールド・コンストラクタを登録。 |
-| **CLI / Options** | `org.example.ansible.cli.PlaybookCli`, `Main` | Picocli によるアノテーション解釈およびコマンドライン引数マッピング用。 |
-| **JSON / SerDe** | `com.fasterxml.jackson.databind.ObjectMapper`, `java.util.LinkedHashMap`, `java.util.ArrayList` | モジュール実行結果 (JSON) およびインベントリ動的データの Java オブジェクトマッピング用。 |
-| **YAML 解析** | `org.yaml.snakeyaml.constructor.Constructor`, `AnsibleYamlConstructor`, `YamlUtil` | SnakeYAML 2.x カスタムタグ (`!vault` 等) および AST ノードリフレクション生成用。 |
-| **テンプレート** | `org.example.ansible.engine.filter.*`, `org.example.ansible.engine.lookup.*`, `Jinjava` | Jinjava カスタムフィルター・ルックアップ機能の動的メソッド参照用。 |
-| **接続プラグイン** | `SshConnection`, `LocalConnection`, `DockerConnection`, `WinRMConnection`, Apache MINA SSHD, WinRM4J | JCA 暗号プロバイダ、動的ソケット・SSL コンテキスト生成、WinRM 内部クラス用。 |
+| **Java Records / Data Models** | `Playbook`, `Play`, `Task`, `TaskResult` | SnakeYAML 2.x および Jackson がデシリアライズ・リフレクションアクセスするために全フィールド・コンストラクタを登録。 |
+| **CLI / Options** | `org.example.ansible.cli.PlaybookCli` | Picocli によるアノテーション解釈およびコマンドライン引数マッピング用 (`run`, `call` メソッド)。 |
+| **JSON / SerDe** | `com.fasterxml.jackson.databind.ObjectMapper`, `java.util.LinkedHashMap`, `java.util.ArrayList`, `java.util.HashMap` | モジュール実行結果 (JSON) およびインベントリ動的データの Java オブジェクトマッピング用。 |
 
-### 3.2 代表的設定例 (JSON 構造)
+### 3.2 リフレクション構成 (JSON 構造)
 
-#### Java Record クラスおよび AST コンストラクタ
+`src/main/resources/META-INF/native-image/org.example/graal-ansible/reflect-config.json`:
+
 ```json
 [
+  {
+    "name": "org.example.ansible.engine.Playbook",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true,
+    "allDeclaredFields": true,
+    "allPublicMethods": true
+  },
   {
     "name": "org.example.ansible.engine.Play",
     "allDeclaredConstructors": true,
@@ -82,40 +81,40 @@ Java の動的リフレクション機能（クラスロード、フィールド
     "allPublicMethods": true
   },
   {
-    "name": "org.example.ansible.engine.ExecutionReport",
+    "name": "org.example.ansible.engine.TaskResult",
     "allDeclaredConstructors": true,
-    "allPublicFields": true,
+    "allPublicConstructors": true,
+    "allDeclaredFields": true,
     "allPublicMethods": true
-  }
-]
-```
-
-#### CLI オプション解析 (Picocli)
-```json
-[
+  },
   {
     "name": "org.example.ansible.cli.PlaybookCli",
     "allDeclaredFields": true,
     "allDeclaredConstructors": true,
     "methods": [
-      { "name": "run", "parameterTypes": [] }
+      { "name": "run", "parameterTypes": [] },
+      { "name": "call", "parameterTypes": [] }
     ]
-  }
-]
-```
-
-#### Jinjava カスタムフィルター・ルックアッププラグイン
-```json
-[
-  {
-    "name": "org.example.ansible.engine.filter.CombineFilter",
-    "allDeclaredConstructors": true,
-    "allPublicMethods": true
   },
   {
-    "name": "org.example.ansible.engine.lookup.FileLookup",
+    "name": "java.util.LinkedHashMap",
     "allDeclaredConstructors": true,
-    "allPublicMethods": true
+    "allPublicConstructors": true
+  },
+  {
+    "name": "java.util.ArrayList",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true
+  },
+  {
+    "name": "java.util.HashMap",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true
+  },
+  {
+    "name": "com.fasterxml.jackson.databind.ObjectMapper",
+    "allDeclaredConstructors": true,
+    "methods": [ { "name": "<init>", "parameterTypes": [] } ]
   }
 ]
 ```
@@ -126,26 +125,20 @@ Native Image バイナリ内に含めるリソースファイルおよび動的�
 
 ### 4.1 内蔵が必要なリソース一覧
 
-- **Python ランチャーおよびブリッジスクリプト**:
-  - `ansible_bridge.py`: ランタイムブリッジスクリプト。
-  - `ansible_launcher.py`: 標準モジュール実行ランチャー。
-  - `ansible_action_launcher.py`: Action Plugin 実行ランチャー。
-  - `ansible_mock_launcher.py`: モックモジュール実行ランチャー。
-- **Python 標準ライブラリおよび `ansible-core` バンドル**:
-  - GraalPy が参照する `site-packages/ansible/` 配下のコアファイルおよび `module_utils` ZIP バンドル (`ansible_lib.zip`)。
-- **設定ファイルとログ定義**:
-  - デフォルトの `ansible.cfg` 設定テンプレート、logging.properties、META-INF 記述子。
+- **YAML 設定・Playbook テンプレートファイル**: `.*\.yml`, `.*\.yaml`
+- **Python ランチャーおよびスクリプト**: `.*\.py` (`ansible_bridge.py`, `ansible_launcher.py`, `ansible_action_launcher.py` 等)
 
-### 4.2 設定具体例 (JSON 構造)
+### 4.2 リソース構成 (JSON 構造)
+
+`src/main/resources/META-INF/native-image/org.example/graal-ansible/resource-config.json`:
 
 ```json
 {
   "resources": {
     "includes": [
-      { "pattern": "python/.*\\.py$" },
-      { "pattern": "python/.*\\.zip$" },
-      { "pattern": "ansible\\.cfg$" },
-      { "pattern": "META-INF/native-image/.*" }
+      { "pattern": ".*\\.yml" },
+      { "pattern": ".*\\.yaml" },
+      { "pattern": ".*\\.py" }
     ]
   },
   "bundles": []
@@ -155,33 +148,10 @@ Native Image バイナリ内に含めるリソースファイルおよび動的�
 ## 5. JNI およびシリアライゼーション構成仕様 (jni-config.json / serialization-config.json)
 
 ### 5.1 JNI 構成 (`jni-config.json`)
-GraalPy の Truffle C 拡張バインディングや、POSIX/Windows OS ネイティブ API 呼び出しに必要な C-JNI 参照を登録します。
-
-```json
-[
-  {
-    "name": "com.oracle.truffle.polyglot.PolyglotImpl",
-    "allDeclaredFields": true,
-    "allDeclaredConstructors": true
-  },
-  {
-    "name": "org.example.ansible.util.PythonOSMock",
-    "allDeclaredFields": true,
-    "allPublicMethods": true
-  }
-]
-```
+GraalPy の Truffle C 拡張バインディングや、POSIX/Windows OS ネイティブ API 呼び出しに必要な C-JNI 参照を必要に応じて登録します。
 
 ### 5.2 シリアライゼーション構成 (`serialization-config.json`)
-Java の標準オブジェクトシリアライゼーションや Jinjava キャッシュで永続化される例外型・状態オブジェクトを登録します。
-
-```json
-[
-  { "name": "java.lang.RuntimeException" },
-  { "name": "java.util.HashMap" },
-  { "name": "java.util.ArrayList" }
-]
-```
+Java の標準オブジェクトシリアライゼーションやキャッシュ等で永続化される例外型・状態オブジェクトを登録します。
 
 ## 6. GraalPy ポポリグロット組込み最適化仕様
 
@@ -212,7 +182,7 @@ GraalVM Native Image コンパイラは、ビルド時に Python コンテキス
 2. **実行パスの自動収集**:
    `PlaybookExecutorTest`, `BuiltinModulesIntegrationTest`, `SshConnectionTest`, `WinRMConnectionTest` 等の統合テストが実行される中で、実際に使用されたリフレクション、JNI、リソースアクセス、動的プロキシがトレースエージェントにより自動記録されます。
 3. **マージとリポジトリ同期**:
-   生成された JSON ファイル群を `src/main/resources/META-INF/native-image/org.example.ansible/` へマージ（`config-merge-dir`）し、バージョン管理下へ配置します。
+   生成された JSON ファイル群を `src/main/resources/META-INF/native-image/org.example/graal-ansible/` へマージ（`config-merge-dir`）し、バージョン管理下へ配置します。
 
 ## 8. 関連ドキュメント
 
