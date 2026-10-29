@@ -419,4 +419,37 @@ class NegativeIntegrationTest {
         assertTrue(result.data().containsKey("msg") || result.data().containsKey("exception"),
                 "Result data should contain error information: " + result.data());
     }
+
+    @Test
+    void testCronMissingRequiredParams() {
+        Task task = new Task("cron missing name or job", "cron", Map.of(
+                "minute", "0"
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertFalse(result.success(), "cron module should fail due to missing required params");
+        assertTrue(result.data().containsKey("msg"));
+    }
+
+    @Test
+    void testKnownHostsMissingRequiredParams() {
+        Task task = new Task("known_hosts missing name and key", "known_hosts", Map.of(
+                "state", "present"
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertFalse(result.success(), "known_hosts module should fail due to missing required params");
+        assertTrue(result.data().containsKey("msg"));
+    }
+
+    @Test
+    void testSysvinitMissingRequiredParams() {
+        Task task = new Task("sysvinit missing name", "sysvinit", Map.of(
+                "state", "started"
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertFalse(result.success(), "sysvinit module should fail due to missing 'name'");
+        assertTrue(result.data().containsKey("msg"));
+    }
 }
