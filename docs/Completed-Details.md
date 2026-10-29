@@ -552,3 +552,10 @@
 - **解決策**:
     - `docs/features/Ssh-Jump-Host-Support.md` において、多段 Jump Host 接続モデル（`List<BastionConfig>`）、`-J` / `ProxyCommand` 解析、および逆順での接続クローズ仕様を明記し、テーブルフォーマットを整理。
     - `docs/implementation/Ssh-Jump-Host-Support.md` において、`SshJumpHostParser` の `ProxyJump` (カンマ区切り多段ホスト) / `ProxyCommand` 正規表現パターン、`SshConnection` の `ActiveBastion` カスケードトンネリングコード例、逆順リソース解放処理、およびエラー例外マッピングテーブルを最新化。
+
+### 2.17 [✓] Native Image 最適化仕様 (Native-Image-Optimization.md) の最新情報整理 [整理]
+- **完了日**: 2026-10-29
+- **概要**: `docs/implementation/Native-Image-Optimization.md` において、Native Image 設定ファイル配置ディレクトリパス（`src/main/resources/META-INF/native-image/org.example/graal-ansible/`）、コンパイラ引数（`native-image.properties`）、リフレクション設定（`reflect-config.json`）、リソースアクセス設定（`resource-config.json`）を実際のプロジェクト構成と最新同期・整理。
+- **解決策**:
+    - `Native-Image-Optimization.md` 内の設定ディレクトリパス、コンパイラ引数例、および reflect/resource JSON 例を最新の `src/main/resources/META-INF/native-image/org.example/graal-ansible/` 内のファイルと完全同期。
+    - `Specification-Rule.md` に準拠し Markdown テーブルの列幅フォーマットを揃えて可読性を向上。
