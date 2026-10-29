@@ -277,4 +277,47 @@ class PosixModulesIntegrationTest {
         assertFalse(Files.exists(destFile), "Destination file should not be created in check mode");
     }
 
+    @Test
+    void testKnownHostsModule() throws IOException {
+        Path knownHostsFile = tempDir.resolve("known_hosts_real");
+
+        // 1. Add key
+        Task taskAdd = new Task("Add host key", "known_hosts", Map.of(
+                "name", "github.com",
+                "key", "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC...",
+                "path", knownHostsFile.toString(),
+                "state", "present"
+        ));
+
+        TaskResult resultAdd = taskExecutor.execute(play, host, taskAdd, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(resultAdd.success(), "known_hosts add failed: " + resultAdd.message() + " Data: " + resultAdd.data());
+        assertTrue(Files.exists(knownHostsFile));
+        assertTrue(Files.readString(knownHostsFile).contains("github.com"));
+
+        // 2. Remove key
+        Task taskRemove = new Task("Remove host key", "known_hosts", Map.of(
+                "name", "github.com",
+                "key", "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC...",
+                "path", knownHostsFile.toString(),
+                "state", "absent"
+        ));
+
+        TaskResult resultRemove = taskExecutor.execute(play, host, taskRemove, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(resultRemove.success(), "known_hosts remove failed: " + resultRemove.message() + " Data: " + resultRemove.data());
+        assertFalse(Files.readString(knownHostsFile).contains("github.com"));
+    }
+
+    @Test
+    void testSysvinitModuleCheckMode() {
+        Task task = new Task("Sysvinit check mode", "sysvinit", Map.of(
+                "name", "procps",
+                "state", "started"
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "sysvinit check mode failed: " + result.message() + " Data: " + result.data());
+    }
+
 }
