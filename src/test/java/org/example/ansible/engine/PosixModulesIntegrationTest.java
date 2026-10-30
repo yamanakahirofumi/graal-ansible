@@ -277,4 +277,19 @@ class PosixModulesIntegrationTest {
         assertFalse(Files.exists(destFile), "Destination file should not be created in check mode");
     }
 
+    @Test
+    void testSystemdServiceModuleCheckMode() {
+        Task task = new Task("systemd_service check mode", "systemd_service", Map.of(
+                "name", "procps",
+                "state", "started"
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "systemd_service check mode failed: " + result.message() + " Data: " + result.data());
+        assertFalse(result.changed(), "systemd_service in check mode for already active service should not report changed");
+        assertEquals("procps", result.data().get("name"));
+    }
+
 }
