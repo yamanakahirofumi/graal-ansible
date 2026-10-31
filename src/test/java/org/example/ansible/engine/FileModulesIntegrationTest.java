@@ -500,4 +500,27 @@ class FileModulesIntegrationTest {
         } catch (IOException ignored) {}
     }
 
+    @Test
+    void testBlockInFileWithMarkerAndInsert() throws IOException {
+        Path targetFile = tempDir.resolve("block_marker_test.txt");
+        Files.writeString(targetFile, "# HEADER\nline1\nline2\n# FOOTER\n");
+
+        Task task = new Task("Insert block with custom marker and insertafter", "blockinfile", Map.of(
+                "path", targetFile.toString(),
+                "block", "my custom block\nsecond line",
+                "marker", "# {mark} ANSIBLE MANAGED BLOCK #",
+                "insertafter", "^line1"
+        ));
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "blockinfile failed: " + result.message() + " Data: " + result.data());
+        assertTrue(result.changed(), "blockinfile should report changed");
+
+        String content = Files.readString(targetFile);
+        assertTrue(content.contains("# BEGIN ANSIBLE MANAGED BLOCK #"));
+        assertTrue(content.contains("my custom block"));
+        assertTrue(content.contains("second line"));
+        assertTrue(content.contains("# END ANSIBLE MANAGED BLOCK #"));
+    }
+
 }

@@ -277,4 +277,21 @@ class PosixModulesIntegrationTest {
         assertFalse(Files.exists(destFile), "Destination file should not be created in check mode");
     }
 
+    @Test
+    void testLineInFileModuleWithValidate() throws IOException {
+        Path targetFile = tempDir.resolve("lineinfile_validate.txt");
+        Files.writeString(targetFile, "line 1\nline 2\n");
+
+        Task task = new Task("Lineinfile with validate", "lineinfile", Map.of(
+                "path", targetFile.toString(),
+                "line", "line 3 valid",
+                "validate", "echo %s"
+        ));
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "lineinfile with validate failed: " + result.message() + " Data: " + result.data());
+        assertTrue(result.changed());
+        assertTrue(Files.readString(targetFile).contains("line 3 valid"));
+    }
+
 }
