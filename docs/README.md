@@ -30,7 +30,7 @@
 - [CLI仕様](features/CLI-Specification.md)：ansible-playbook互換のコマンドライン引数
 - [処理フロー](features/Process-Flow.md)：管理ノードからターゲットノードまでの全体フロー（**本プロジェクトの基本設計方針**）
 - [動作環境](features/System-Requirements.md)：Java/GraalVMの実行環境とOS互換性
-- [インベントリ管理](features/Inventory-System.md)：静的・動的インベントリのサポート範囲
+- [インベントリ管理](features/Inventory-System.md)：静的・動的インベントリおよびディレクトリ構造のサポート範囲
 - [コレクションの管理と取得方法](features/Collection-Management.md)：実際のコレクションを取得・利用する手順
 - [Playbook実行仕様](features/Playbook-Execution.md)：タスク実行、ループ、条件分岐のサポート範囲
 - [Ansible Vault 復号仕様](features/Vault-Support.md)：Ansible Vaultのネイティブ復号仕様と実装アーキテクチャ

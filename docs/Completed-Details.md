@@ -552,3 +552,12 @@
 - **解決策**:
     - `docs/features/Ssh-Jump-Host-Support.md` において、多段 Jump Host 接続モデル（`List<BastionConfig>`）、`-J` / `ProxyCommand` 解析、および逆順での接続クローズ仕様を明記し、テーブルフォーマットを整理。
     - `docs/implementation/Ssh-Jump-Host-Support.md` において、`SshJumpHostParser` の `ProxyJump` (カンマ区切り多段ホスト) / `ProxyCommand` 正規表現パターン、`SshConnection` の `ActiveBastion` カスケードトンネリングコード例、逆順リソース解放処理、およびエラー例外マッピングテーブルを最新化。
+
+### 1.56 [✓] インベントリシステム仕様の詳細化 [追加]
+- **完了日**: 2026-10-24
+- **概要**: `docs/features/Inventory-System.md` におけるプロバイダー自動判別アルゴリズム（ファイル形式、OS別実行可能判定、Python プラグインキー検知）、ディレクトリ走査順序・除外規則、およびインベントリ変数スコープ（Level 3, 4, 6, 8, 9）の仕様を追加・詳細化。
+- **解決策**:
+    - `InventoryManager` による登録プロバイダー判定順序（Script -> Python -> File）と未知ファイル時の挙動（例外 vs ディレクトリ走査時スキップ）を明記。
+    - OS別（Linux/macOS vs Windows）の静的ファイル／実行可能スクリプト判定ルールを定義。
+    - ディレクトリ走査時のアルファベット昇順ソート規則と除外ファイル・ディレクトリ規則（隠しファイル、バックアップ、vars系ディレクトリ）を明記。
+    - インベントリ関連変数優先順位テーブル（Level 3, Level 4, Level 6, Level 8, Level 9）を追加・整理。
