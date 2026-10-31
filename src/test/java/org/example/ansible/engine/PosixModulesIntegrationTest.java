@@ -278,18 +278,20 @@ class PosixModulesIntegrationTest {
     }
 
     @Test
-    void testSystemdServiceModuleCheckMode() {
-        Task task = new Task("systemd_service check mode", "systemd_service", Map.of(
-                "name", "procps",
-                "state", "started"
-        ), Map.of(), null, null, null, List.of(), null, null, false,
-                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
-                null, null, null, null, true, null);
+    void testLineInFileModuleWithValidate() throws IOException {
+        Path targetFile = tempDir.resolve("lineinfile_validate.txt");
+        Files.writeString(targetFile, "line 1\nline 2\n");
+
+        Task task = new Task("Lineinfile with validate", "lineinfile", Map.of(
+                "path", targetFile.toString(),
+                "line", "line 3 valid",
+                "validate", "echo %s"
+        ));
 
         TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
-        assertTrue(result.success(), "systemd_service check mode failed: " + result.message() + " Data: " + result.data());
-        assertFalse(result.changed(), "systemd_service in check mode for already active service should not report changed");
-        assertEquals("procps", result.data().get("name"));
+        assertTrue(result.success(), "lineinfile with validate failed: " + result.message() + " Data: " + result.data());
+        assertTrue(result.changed());
+        assertTrue(Files.readString(targetFile).contains("line 3 valid"));
     }
 
 }

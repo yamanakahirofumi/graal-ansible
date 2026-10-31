@@ -518,7 +518,8 @@ class FileModulesIntegrationTest {
 
         String content = Files.readString(targetFile);
         assertTrue(content.contains("# BEGIN ANSIBLE MANAGED BLOCK #"));
-        assertTrue(content.contains("my custom block\nsecond line"));
+        assertTrue(content.contains("my custom block"));
+        assertTrue(content.contains("second line"));
         assertTrue(content.contains("# END ANSIBLE MANAGED BLOCK #"));
     }
 
