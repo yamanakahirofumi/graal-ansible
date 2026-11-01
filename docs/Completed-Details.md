@@ -435,6 +435,17 @@
     - `docs/implementation/Vault-Support.md` を新規追加し、`VaultDecrypter`, `VaultEncrypter`, `VaultSecretStore`, `VaultDecryptedValue`, `ConstructVault` の技術仕様を明記。
     - `docs/README.md` のドキュメント一覧を同期。
 
+### 1.56 [✓] アーキテクチャ設計仕様の詳細化 [追加]
+- **完了日**: 2026-11-01
+- **概要**: `docs/tech/Architecture.md` におけるアーキテクチャ設計仕様を、Java 21 / GraalPy 実装に合わせて拡充・詳細化。
+- **解決策**:
+    - パッケージ構造とレイヤー別（CLI, Parser, Inventory, Engine, Connection, Module, Util）の責務境界・公開インターフェース・依存関係マトリクスを追加。
+    - 7 つの処理フェーズ（初期化、インベントリ解決、オーケストレーション、スケジューリング、遅延変数評価、モジュール転送/実行、集約・レポーティング）と Mermaid シーケンス図を定義。
+    - 並行性・スレッドモデルマトリクス（`LinearStrategy`, `FreeStrategy`, `throttle`, `max_fail_percentage`, `any_errors_fatal`, `AsyncJobManager`）および不変データモデル（Java Record）の設計を明記。
+    - GraalPy Polyglot 実行基盤アーキテクチャ（事前ロード・Warm-up、双方向ブリッジ、スレッドローカル探索パス隔離、Bindings クリーンアップ）を定義。
+    - プラグインファクトリ拡張アーキテクチャ（Connection, Strategy, Callback, InventoryProvider, Lookup, Filter）および SPI 抽象化マトリクスを追加。
+    - レジリエンス・例外階層設計（`AnsibleException`）、エラー回復・変数伝播（`block/rescue/always`）、逆順リソース解放ライフサイクル、および GraalVM Native Image AOT コンパイル設計を詳細化。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築
