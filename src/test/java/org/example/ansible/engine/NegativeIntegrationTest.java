@@ -419,4 +419,52 @@ class NegativeIntegrationTest {
         assertTrue(result.data().containsKey("msg") || result.data().containsKey("exception"),
                 "Result data should contain error information: " + result.data());
     }
+
+    @Test
+    void testAssembleMissingRequiredParams() {
+        Task task = new Task("assemble missing src and dest", "assemble", Map.of());
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertFalse(result.success(), "assemble should fail when required parameters are missing");
+        assertTrue(result.data().containsKey("msg") || result.data().containsKey("exception"),
+                "Result data should contain error information: " + result.data());
+    }
+
+    @Test
+    void testAssembleNonExistentSourceDir() {
+        Path nonExistentSrc = tempDir.resolve("non_existent_assemble_src");
+        Path destFile = tempDir.resolve("assembled_out.txt");
+
+        Task task = new Task("assemble non-existent src", "assemble", Map.of(
+                "src", nonExistentSrc.toString(),
+                "dest", destFile.toString()
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertFalse(result.success(), "assemble should fail when src directory does not exist");
+        assertTrue(result.data().containsKey("msg") || result.data().containsKey("exception"),
+                "Result data should contain error information: " + result.data());
+    }
+
+    @Test
+    void testCronMissingRequiredParams() {
+        Task task = new Task("cron missing name and job", "cron", Map.of(
+                "minute", "10"
+        ));
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertFalse(result.success(), "cron module should fail when required parameters are missing");
+        assertTrue(result.data().containsKey("msg") || result.data().containsKey("exception"),
+                "Result data should contain error information: " + result.data());
+    }
+
+    @Test
+    void testBlockInFileMissingRequiredParams() {
+        Task task = new Task("blockinfile missing block and path", "blockinfile", Map.of());
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertFalse(result.success(), "blockinfile module should fail when required parameters are missing");
+        assertTrue(result.data().containsKey("msg") || result.data().containsKey("exception"),
+                "Result data should contain error information: " + result.data());
+    }
 }
