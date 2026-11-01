@@ -277,4 +277,54 @@ class PosixModulesIntegrationTest {
         assertFalse(Files.exists(destFile), "Destination file should not be created in check mode");
     }
 
+    @Test
+    void testBlockInFileModuleCheckMode() throws IOException {
+        Path targetFile = tempDir.resolve("posix_block_check.txt");
+        Files.writeString(targetFile, "# HEADER\ninitial line\n# FOOTER\n");
+
+        Task task = new Task("Insert block in check mode", "blockinfile", Map.of(
+                "path", targetFile.toString(),
+                "block", "managed content"
+        ), Map.of(), null, null, null, List.of(), null, null, false,
+                null, 3, 5, null, false, false, false, List.of(), List.of(), List.of(),
+                null, null, null, null, true, null);
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "blockinfile check mode failed: " + result.message() + " Data: " + result.data());
+        assertTrue(result.changed(), "blockinfile check mode should report changed = true");
+
+        String content = Files.readString(targetFile);
+        assertFalse(content.contains("managed content"), "File should not be modified in check mode");
+    }
+
+    @Test
+    void testMountFactsModule() {
+        Task task = new Task("Gather mount facts", "mount_facts", Map.of());
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+
+        assertTrue(result.success(), "mount_facts failed: " + result.message() + " Data: " + result.data());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> facts = (Map<String, Object>) result.data().get("ansible_facts");
+        assertNotNull(facts, "ansible_facts should be present");
+        assertTrue(facts.containsKey("mount_points") || facts.containsKey("mounts"),
+                "mount info should be present in ansible_facts: " + facts);
+    }
+
+    @Test
+    void testLineInFileModuleWithValidate() throws IOException {
+        Path targetFile = tempDir.resolve("lineinfile_validate.txt");
+        Files.writeString(targetFile, "line 1\nline 2\n");
+
+        Task task = new Task("Lineinfile with validate", "lineinfile", Map.of(
+                "path", targetFile.toString(),
+                "line", "line 3 valid",
+                "validate", "echo %s"
+        ));
+
+        TaskResult result = taskExecutor.execute(play, host, task, variableManager, false, null, null, new LocalConnection(), null);
+        assertTrue(result.success(), "lineinfile with validate failed: " + result.message() + " Data: " + result.data());
+        assertTrue(result.changed());
+        assertTrue(Files.readString(targetFile).contains("line 3 valid"));
+    }
+
 }
