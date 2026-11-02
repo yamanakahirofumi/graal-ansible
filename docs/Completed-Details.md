@@ -435,6 +435,15 @@
     - `docs/implementation/Vault-Support.md` を新規追加し、`VaultDecrypter`, `VaultEncrypter`, `VaultSecretStore`, `VaultDecryptedValue`, `ConstructVault` の技術仕様を明記。
     - `docs/README.md` のドキュメント一覧を同期。
 
+### 1.56 [✓] GraalPy 統合・実行ライフサイクル仕様の詳細化 [追加]
+- **完了日**: 2026-10-24
+- **概要**: `docs/tech/GraalPy-Integration.md` における GraalVM Polyglot Context オプション設定、スレッド分離・バインディング解放ライフサイクル、Java-Python データバインディングマトリクス、モジュールローカル/リモート（Ansiballz）実行パス、例外捕捉と JSON 出力解析アルゴリズム（`parseModuleOutput`）の詳細仕様を追加・拡充。
+- **解決策**:
+    - `docs/tech/GraalPy-Integration.md` を更新し、Context オプションテーブル（`python.IsolateNativeModules`, `python.PosixModuleBackend`, `python.Executable`, `python.CoreHome` 等）およびスレッド分離ライフサイクルを明記。
+    - Java-Python データバインディング引数マトリクス（`complex_args_java`, `module_name`, `site_packages_java`, `connection_java`, `become_context_java`, `environment_java` 等）および `_deep_convert` 再帰変換ルールを追加。
+    - 管理ノード（Local）とターゲットノード（Ansiballz）の実行フロー図（Mermaid）と詳細ステップを体系化。
+    - `SystemExit` / 未補足例外制御フローと、波括弧抽出・行探索による堅牢な `parseModuleOutput` JSON パース仕様を明記。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築
