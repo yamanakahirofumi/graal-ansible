@@ -435,6 +435,17 @@
     - `docs/implementation/Vault-Support.md` を新規追加し、`VaultDecrypter`, `VaultEncrypter`, `VaultSecretStore`, `VaultDecryptedValue`, `ConstructVault` の技術仕様を明記。
     - `docs/README.md` のドキュメント一覧を同期。
 
+### 1.56 [✓] 処理フロー仕様の詳細化 [追加]
+- **完了日**: 2026-10-24
+- **概要**: `docs/features/Process-Flow.md` における Playbook 読み込みからターゲット実行までの全体処理フロー（本プロジェクトの基本設計方針）を詳細化。
+- **解決策**:
+    - 管理ノードからターゲットノードに至る全体処理シーケンス図（Mermaid）を更新・詳細化。
+    - 7 段階の Playbook 実行パイプライン（CLI 解析、インベントリ解決、YAML 解析、Play 初期化、タスクオーケストレーション、モジュール実行、結果集計・レポーティング）の各ステージ入出力仕様を明記。
+    - コンポーネント間データ交換インターフェース仕様（型、不変性、受渡データ項目）テーブルを追加。
+    - 実行戦略別の並行処理フロー（Linear 戦略の同期バリア・serial バッチ実行、Free 戦略のスレッドプール・throttle・max_fail_percentage）を Mermaid 図付きで詳細化。
+    - モジュール実行モデルの分岐仕様（Action Plugin、Ansiballz リモート実行、Local 実行）を定義。
+    - ブロック例外リカバリ（`block`/`rescue`/`always`）および逆順（LIFO）リソースクリーンアップライフサイクルを Mermaid 図付きで明記。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築
