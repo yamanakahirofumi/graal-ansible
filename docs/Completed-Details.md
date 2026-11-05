@@ -435,6 +435,15 @@
     - `docs/implementation/Vault-Support.md` を新規追加し、`VaultDecrypter`, `VaultEncrypter`, `VaultSecretStore`, `VaultDecryptedValue`, `ConstructVault` の技術仕様を明記。
     - `docs/README.md` のドキュメント一覧を同期。
 
+### 1.56 [✓] AnsibleModule 初期化・Java モック実装仕様の詳細化 [追加]
+- **完了日**: 2026-11-05
+- **概要**: `docs/implementation/Ansible-Module-Initialization.md` における `AnsibleModule` 初期化、Java 側 `PythonAnsibleModuleMock` の引数型変換マトリクス、ファイル共通引数合成、ファイル・ダイジェスト操作エミュレーション、および `run_command` / `getent` システムモック仕様を詳細化。
+- **解決策**:
+    - `PythonAnsibleModuleMock` の有効スペック生成（`add_file_common_args`）、エイリアス解決、型変換規則マトリクス（str/path, list, bool, int, raw）、パス属性フォールバック、およびフラグ解析（check_mode, debug, diff）仕様を明記。
+    - ファイル操作エミュレーション（`sha1`, `md5`, `sha256`, `digest_from_file`, `atomic_move`, `backup_local`, `makedirs_safe`）および属性管理（`get_file_attributes`, `storedFileArgs`）を定義。
+    - `run_command` の引数パス正規化、カレントディレクトリ移動構文（Windows `cd /d` vs POSIX `cd`）、`Connection.execCommand` 委譲、および `getent passwd` / `getent group` 組み込みモックレスポンス構造を明記。
+    - `docs/README.md` のドキュメント一覧と同期。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築
