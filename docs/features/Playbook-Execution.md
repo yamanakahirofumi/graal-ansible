@@ -31,11 +31,21 @@
     - **ルックアッププラグイン (7種類)**: `dict`, `env`, `file`, `first_found`, `pipe`, `template`, `vars` をサポート（詳細なパラメータ仕様および使用例は [変数とテンプレートの実装詳細](../implementation/Variables-Templating.md#7-lookup-プラグイン-lookup-plugins) を参照）。
 - **方針**: 未実装のフィルターやルックアップ、あるいはテンプレートのレンダリングエラー（未定義変数の参照等）が発生した場合は、原則として `RuntimeException` をスローし、該当ホストのタスクを失敗（failed）として処理します。
 
-### 2.3 ループ (`loop`, `with_items`) の処理
-- **懸念点**: `loop` と `with_X` 系では挙動が異なり、特に複雑なデータ構造に対するループ処理のパースがブレやすいです。
-- **方針**: `loop` を基本とし、`with_items` などのレガシーな構文は内部で `loop` に変換して処理します（実装済み）。
-    - **with_items**: `loop: "{{ list | flatten(levels=1) }}"` に変換。
-    - **with_dict**: `loop: "{{ dict | dict2items }}"` に変換。
+### 2.3 ループ (`loop`, `with_items`) と制御 (`loop_control`)
+- **状況**: 実装済み。
+- **詳細**:
+    - **基本ループ構文**: `loop` ディレクティブに指定されたリストまたは Jinja2 テンプレートを展開し、各アイテムに対してタスクを順次反復実行します。
+    - **レガシー構文変換**: `with_items` や `with_dict` などの構文は内部的に `loop` 処理へ自動変換されます。
+        - **with_items**: `loop: "{{ list | flatten(levels=1) }}"` に変換。
+        - **with_dict**: `loop: "{{ dict | dict2items }}"` に変換。
+        - **with_list**: 平坦化を行わずに直接 `loop` へマッピング。
+    - **ループ制御 (`loop_control`)**:
+        - `loop_var`: 反復変数のカスタム変数名指定（多重ループ時の名前衝突回避、デフォルト `"item"`）。
+        - `index_var`: `0` から開始する現在の反復インデックスの変数名指定。
+        - `label`: ログやコールバック表示用のアイテム識別ラベル文字列の Jinja2 テンプレート指定。
+        - `pause`: イテレーション間に挿入する待機秒数（2回目以降のイテレーション直前にスリープ）。
+    - **イテレーション結果集約 (`results`)**: 各イテレーションの結果（`item`, `changed`, `failed`, `skipped` 等）はタスク実行結果の `results` リストに集約され、1 つでも失敗があればタスク全体が失敗（`failed=true`）、いずれかで変更があれば全体変更（`changed=true`）として判定されます。
+    - **実装詳細**: 各パラメータ仕様、集約判定アルゴリズム、およびシーケンス図は、[タスク制御の実装詳細](../implementation/Task-Control.md#2-ループ-loop) を参照してください。
 
 ### 2.4 タスクの並列実行 (Strategy)
 - **状況**: `linear`（デフォルト）および `free` の実行戦略が完全に実装され、動作検証済みです。

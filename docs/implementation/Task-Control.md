@@ -21,8 +21,8 @@
 同一のタスクを複数のアイテムに対して繰り返し実行します。
 
 - **実装方針**:
-    - `loop` フィールドに指定されたリスト（またはリストを返すテンプレート）を解析します。
-    - リストの各アイテムについて、特殊変数 `item` にその値を割り当て、タスクを繰り返し実行します。
+    - `loop` フィールドに指定されたリスト（またはリストを返すテンプレート）を `VariableResolver.resolveLoopItems()` を用いて解決します。
+    - リストの各アイテムについて、特殊変数 `item`（または `loop_control.loop_var` で指定されたカスタム変数名）にその値を割り当て、タスクを繰り返し実行します。
     - 各イテレーションの結果は、最終的なタスク結果の `results` リストに格納されます。
 - **レガシー対応**:
     - `with_items`, `with_dict`, `with_list` 等のレガシーなループ構文は、内部的に `loop` 処理へ変換されます。
@@ -32,19 +32,99 @@
 - **データ構造**:
     - `Task` レコードに `Object loop` フィールドを保持します。
 
-### 2.1 ループ制御 (`loop_control`)
+### 2.1 ループ制御ディレクティブ (`loop_control`)
 
-`loop` の振る舞いを詳細に制御します。
+`loop` の振る舞いを詳細に制御するためのパラメータ仕様です。
 
-- **実装方針**:
-    - **index_var**: 現在のループインデックス（0開始）を格納する変数名を指定します。
-    - **loop_var**: 各イテレーションのアイテムを格納する変数名を指定します（デフォルトは `item`）。
-    - **label**: 実行結果の出力に使用するテンプレートを指定します。複雑な辞書をループする場合に、特定のキーのみを表示してログを整理するのに役立ちます。
-    - **pause**: 各アイテムの実行間に挿入する待ち時間（秒）を指定します。
-- **データ構造**:
-    - `Task` レコードに `Map<String, Object> loop_control` フィールドを保持し、`YamlParser` で解析可能とします。
-- **実行エンジンへの統合**:
-    - `TaskExecutor.executeLoopTask` において、`index_var` のカウントアップ、`loop_var` による変数名の動的な切り替え、および `pause` による待機処理を実装します。
+| パラメータ名 | 型              | デフォルト値 | 説明                                                                                                 |
+| :----------- | :-------------- | :----------- | :--------------------------------------------------------------------------------------------------- |
+| `loop_var`   | `String`        | `"item"`     | 各イテレーションの現在のアイテムを保持する変数名を指定します。多重ループやネスト時の変数衝突を防ぎます。 |
+| `index_var`  | `String`        | `null`       | 現在のループインデックス（`0` から開始する整数）を格納する変数名を指定します。未指定時は変数は作成されません。 |
+| `label`      | `String`        | `null`       | コールバックやログ出力用のカスタム表示テンプレート。評価結果は各イテレーション結果に `_ansible_item_label` として格納されます。 |
+| `pause`      | `Number`/`String` | `0`        | 各イテレーションの実行間に挿入する待機秒数（秒単位スリープ）。初回イテレーション実行前には適用されません。 |
+
+- **実行エンジンへの統合 (`TaskExecutor.executeLoopTask`)**:
+    - **アイテム解決**: `variableResolver.resolveLoopItems(task.loop(), allVars)` を呼び出し、リスト型データを取得します。結果が `null` の場合は失敗（`failed=true`）として即座に終了します。
+    - **ウェイト制御 (`pause`)**: 2 回目以降のイテレーション（`index > 0`）開始直前に、`pauseSeconds` が 0 より大きい場合 `Thread.sleep(pauseSeconds * 1000L)` を実行します。`InterruptedException` 発生時はループを即座に中断します。
+    - **変数スコープ注入**: 各イテレーションの実行コンテキスト `iterationVars` に対し、`loop_var`（デフォルト `"item"`）へアイテムオブジェクトを代入し、`index_var` が定義されている場合は `index`（整数）を格納します。
+    - **結果カスタマイズの適用**: 各イテレーション実行直後、`task.until()` が未指定かつスキップされていない場合、`evaluateResultCustomization` によりイテレーションごとの `failed_when` および `changed_when` を評価・確定します。
+
+### 2.2 イテレーション結果データ構造と最終集約 (`results`)
+
+各アイテムの実行結果は個別の辞書データとして整形され、最終的な `TaskResult` の `results` リストに集約されます。
+
+#### イテレーション単位の結果データ (`buildIterationResultData`)
+各イテレーション完了時、以下のキーを含む `Map<String, Object>` が構築されます：
+- **`item`**: 評価対象となった現在のアイテム値（元のオブジェクト型を保持）。
+- **`changed`**: 当該イテレーションで変更が発生したかを示す真偽値 (`Boolean`)。
+- **`failed`**: 当該イテレーションが失敗したかを示す真偽値 (`Boolean`)。
+- **`skipped`**: 当該イテレーションが `when` 条件等でスキップされた場合のみ `true` がセットされます。
+- **`<loop_var>`**: `loop_control.loop_var` が指定されている場合、その変数名でアイテム値が追加格納されます。
+- **`<index_var>`**: `loop_control.index_var` が指定されている場合、現在のループインデックス値（`0, 1, 2, ...`）が格納されます。
+- **`_ansible_item_label`**: `loop_control.label` が指定されている場合、`iterationVars` を用いて Jinja2 評価されたラベル文字列が格納されます。
+- **モジュール実行戻り値**: モジュール実行によって返却された各フィールド（`rc`, `stdout`, `stderr`, `msg`, `ansible_facts` 等）がそのまま保持されます。
+
+#### 最終ループ結果の集約判定ロジック (`buildFinalLoopResult`)
+全アイテムのイテレーションが終了した後、以下の集約ルールに基づいて全体の `TaskResult` が構築されます：
+
+```java
+boolean anyFailed = false;
+boolean anyChanged = false;
+boolean allSkipped = true;
+```
+
+1. **全体成否判定 (`success`)**:
+   - いずれかのイテレーションで `!result.success() && !result.isSkipped()` が真となった場合、`anyFailed = true` となります。
+   - 最終的な `TaskResult.success()` は `!anyFailed` と判定され、1 つでも失敗があればタスク全体が失敗とみなされます。
+2. **全体変更判定 (`changed`)**:
+   - いずれかのイテレーションで `result.changed()` が真となった場合、`anyChanged = true` となります。
+   - 最終的な `TaskResult.changed()` は `anyChanged` と判定されます。
+3. **全体スキップ判定 (`skipped`)**:
+   - すべてのイテレーションがスキップされた場合（`allSkipped = true`）、最終データの `skipped` フラグに `true` がセットされます。
+4. **戻り値データ構造**:
+   - 最終タスク結果の `data` マップには `results: List<Map<String, Object>>`, `changed: Boolean`, （全スキップ時の）`skipped: Boolean` がセットされ、メッセージとして失敗時は `"One or more loop items failed"`、成功時は `"OK"` が返却されます。
+
+### 2.3 ループ実行ライフサイクル (Mermaid シーケンス図)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant TQM as TaskQueueManager
+    participant TE as TaskExecutor
+    participant VR as VariableResolver
+    participant CP as Connection
+    participant RM as Remote/Module
+
+    TQM->>TE: executeTask(play, host, task)
+    TE->>VR: resolveLoopItems(task.loop, allVars)
+    VR-->>TE: items (List)
+    loop 各 item (インデックス index: 0, 1, ...)
+        opt index > 0 && pause > 0
+            TE->>TE: Thread.sleep(pause * 1000)
+        end
+        TE->>TE: iterationVars 構築 (item, loop_var, index_var)
+        TE->>VR: isWhenConditionMet(task.when, iterationVars)
+        alt when 条件が false
+            TE->>TE: resultData (skipped=true)
+        else when 条件が true
+            TE->>CP: execCommand / runModule(task, iterationVars)
+            CP->>RM: モジュール実行
+            RM-->>CP: 実行結果 (rc, stdout, etc.)
+            CP-->>TE: TaskResult
+            TE->>TE: evaluateResultCustomization(failed_when, changed_when)
+        end
+        opt loop_control.label 定義時
+            TE->>VR: resolveValue(label, iterationVars)
+            VR-->>TE: _ansible_item_label
+        end
+        TE->>TE: buildIterationResultData() -> loopResults.add()
+    end
+    TE->>TE: buildFinalLoopResult(loopResults, anyFailed, anyChanged, allSkipped)
+    TE-->>TQM: TaskResult (data.results を内包)
+    opt register 定義時
+        TQM->>TQM: VariableManager に結果を登録 (results リストを含む)
+    end
+```
 
 ## 3. 変数登録 (`register`)
 

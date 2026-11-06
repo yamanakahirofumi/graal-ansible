@@ -435,6 +435,16 @@
     - `docs/implementation/Vault-Support.md` を新規追加し、`VaultDecrypter`, `VaultEncrypter`, `VaultSecretStore`, `VaultDecryptedValue`, `ConstructVault` の技術仕様を明記。
     - `docs/README.md` のドキュメント一覧を同期。
 
+### 1.56 [✓] ループ制御 (loop_control) およびイテレーション結果集約仕様の詳細化 [追加]
+- **完了日**: 2026-10-24
+- **概要**: `docs/implementation/Task-Control.md` および `docs/features/Playbook-Execution.md` における `loop` および `loop_control` ディレクティブ（`loop_var`, `index_var`, `label`, `pause`）、各イテレーション結果データ構造、最終集約ロジック（`results`, `anyFailed`, `anyChanged`, `allSkipped`）、およびライフサイクルシーケンス図を追加・詳細化。
+- **解決策**:
+    - `loop_control` パラメータ仕様（型、デフォルト値、説明テーブル、2回目以降イテレーションでの `pause` 待機処理、`loop_var`/`index_var` 変数注入）を明記。
+    - イテレーション単位結果データ（`item`, `changed`, `failed`, `skipped`, `<loop_var>`, `<index_var>`, `_ansible_item_label` 等）の構造定義を追加。
+    - 最終 `TaskResult` の `results` 集約ルール（失敗判定、変更判定、全スキップ判定、メッセージ）を詳細化。
+    - ループ実行ライフサイクルを示す Mermaid シーケンス図を追加。
+    - `docs/features/Playbook-Execution.md` のループ仕様セクションを更新し、`loop_control` および結果集約の記述を拡充。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築
