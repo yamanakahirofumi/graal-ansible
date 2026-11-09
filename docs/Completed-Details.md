@@ -435,6 +435,17 @@
     - `docs/implementation/Vault-Support.md` を新規追加し、`VaultDecrypter`, `VaultEncrypter`, `VaultSecretStore`, `VaultDecryptedValue`, `ConstructVault` の技術仕様を明記。
     - `docs/README.md` のドキュメント一覧を同期。
 
+### 1.56 [✓] CLI仕様 (CLI-Specification) の詳細化 [追加]
+- **完了日**: 2026-10-24
+- **概要**: `docs/features/CLI-Specification.md` における CLI 引数仕様、`--force-handlers` オプション、Level 1 CLI 変数（`ansible_check_mode`, `ansible_diff_mode`, `ansible_force_handlers`, `ansible_become_*`, `ansible_verbosity`, `ansible_run_tags`, `ansible_skip_tags`）へのマッピング規則、`--extra-vars` 構文解析詳細、Ansible Vault パスワード解決規則とヘッドレス環境ハンドリング、環境変数一覧、コールバック選択メカニズム、および終了コードマッピングを追加・詳細化。
+- **解決策**:
+    - `docs/features/CLI-Specification.md` の第 2 項表に `--force-handlers` を追加し、Markdown テーブル列幅を整形。
+    - 第 3 項に全 Level 1 CLI 変数マッピング表および `--ask-become-pass` のヘッドレスコンソールエラーハンドリング仕様を追加。
+    - 第 4 項に `--extra-vars` の `@file`, インライン JSON/YAML, `key=value`, 汎用 YAML フォールバックの解析メカニズムを追記。
+    - 第 5 項に Vault パスワード解決優先順位と `prompt` キーワードおよびヘッドレス環境の例外ハンドリングを明記。
+    - 第 6 項に `ANSIBLE_ROLES_PATH`, `ANSIBLE_LOG_PATH` 等の環境変数一覧を追加。
+    - 第 8 項に `CallbackFactory` による標準出力コールバック選択および CLI 終了コード（0, 1, 2, 4）マッピングを追記。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築
