@@ -435,6 +435,12 @@
     - `docs/implementation/Vault-Support.md` を新規追加し、`VaultDecrypter`, `VaultEncrypter`, `VaultSecretStore`, `VaultDecryptedValue`, `ConstructVault` の技術仕様を明記。
     - `docs/README.md` のドキュメント一覧を同期。
 
+### 1.56 [✓] インベントリシステム機能仕様の詳細化 [追加]
+- **完了日**: 2026-10-24
+- **概要**: `docs/features/Inventory-System.md` における静的インベントリ（INI / YAML）のサポート構文・構造仕様、動的更新モジュール（`add_host`, `group_by`）の実行時インベントリ操作仕様、外部インベントリ仕様（スクリプト方式の JSON スキーマと実行メカニズム、プラグイン方式の自動検出と GraalPy 連携）、ディレクトリ走査と除外規則、変数優先順位（`all` < 親グループ < 子グループ < ホスト個別変数）および複数グループ所属時のマージ規則、ならびにホストパターン解析（Bracket-Aware Splitting）と範囲パターン展開（数値、ゼロパディング、アルファベット、リバース、直積）の仕様を詳細化。
+- **解決策**:
+    - `docs/features/Inventory-System.md` に静的・動的更新・外部連携・ディレクトリ走査規則・変数解決規則・パターン展開の全仕様を体系的に追記・同期。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築
