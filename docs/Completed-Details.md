@@ -435,6 +435,13 @@
     - `docs/implementation/Vault-Support.md` を新規追加し、`VaultDecrypter`, `VaultEncrypter`, `VaultSecretStore`, `VaultDecryptedValue`, `ConstructVault` の技術仕様を明記。
     - `docs/README.md` のドキュメント一覧を同期。
 
+### 1.56 [✓] インベントリシステム仕様の詳細化と実装仕様の拡充 [追加]
+- **完了日**: 2026-10-24
+- **概要**: `docs/implementation/Inventory-System.md` および `docs/features/Inventory-System.md` において、`InventoryProvider` / `InventoryManager` のプロバイダー自動判別・優先解決フロー、OS別判定ルール、ディレクトリ再帰探索アルゴリズムと除外ルール一覧テーブル、複数インベントリソース（ファイル、スクリプト、プラグイン）のマージ仕様、および実行時動的インベントリ更新仕様（`add_host`, `group_by`）を拡張・詳細化。
+- **解決策**:
+    - `docs/implementation/Inventory-System.md` に各プロバイダー（`PythonInventoryProvider`, `ScriptInventoryProvider`, `FileInventoryProvider`）の OS 判定条件テーブル、プロバイダー解決パイプライン、ファイル除外ルール一覧テーブル、複数ソースのグループ・ホスト・変数のマージアルゴリズム（`mergeGroup`）、および `Inventory.addHostToGroup` による動的インベントリ更新仕様を追加。
+    - `docs/features/Inventory-System.md` にディレクトリ走査と自動除外ルール一覧テーブル、複数インベントリソースのマージ仕様を追記・同期。
+
 ## 2. 整理・調整済み (Refactored/Adjusted)
 
 ### 2.1 [✓] GitHub Actions CI ワークフローの構築
